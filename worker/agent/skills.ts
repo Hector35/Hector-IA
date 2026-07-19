@@ -1,0 +1,13 @@
+export type Skill={id:string;description:string;triggers:string[];tools:string[];steps:string[];success:string[];risk:'low'|'medium'|'high'};
+
+export const SKILLS:Skill[]=[
+{id:'research-web',description:'Investigar información actual con fuentes y evidencia.',triggers:['investiga','busca','actual','noticias','compara'],tools:['web'],steps:['Definir la pregunta verificable','Buscar fuentes actuales','Contrastar fuentes','Separar hechos e inferencias','Entregar citas y fecha'],success:['Fuentes identificadas','Contradicciones explicadas'],risk:'low'},
+{id:'github-code',description:'Modificar código con rama, pruebas y PR.',triggers:['github','codigo','bug','repositorio','programa','corrige'],tools:['github','runner'],steps:['Inspeccionar repositorio','Crear rama','Editar cambios mínimos','Ejecutar typecheck, tests y build','Crear PR','Verificar despliegue'],success:['Pruebas aprobadas','Diff revisable','Evidencia de producción'],risk:'medium'},
+{id:'browser-verify',description:'Abrir una URL conocida y verificar interfaz o contenido.',triggers:['abre','pagina','url','interfaz','produccion','captura'],tools:['browser'],steps:['Validar URL permitida','Abrir con navegador aislado','Esperar carga','Capturar evidencia','Reportar errores visibles'],success:['HTTP correcto','Captura o reporte generado'],risk:'low'},
+{id:'memory-curation',description:'Guardar, actualizar o invalidar memoria estructurada.',triggers:['recuerda','olvida','preferencia','memoria'],tools:['d1'],steps:['Clasificar dato','Determinar vigencia y confianza','Detectar contradicciones','Guardar o invalidar'],success:['Memoria trazable','Sin duplicados contradictorios'],risk:'medium'},
+{id:'self-analysis',description:'Autoevaluar capacidades, fallos y siguiente mejora.',triggers:['autoanaliza','limitaciones','que falta','mejorate','problemas'],tools:['evals','d1'],steps:['Ejecutar pruebas','Leer errores recientes','Agrupar fallos repetidos','Priorizar por impacto','Generar prompt de mejora'],success:['Puntuación reproducible','Problemas concretos'],risk:'low'}
+];
+
+export function selectSkills(input:string,limit=4){const q=input.toLowerCase();return SKILLS.map(skill=>({skill,score:skill.triggers.reduce((n,t)=>n+(q.includes(t)?1:0),0)})).filter(x=>x.score>0).sort((a,b)=>b.score-a.score).slice(0,limit).map(x=>x.skill);}
+
+export function renderSkills(skills:Skill[]){return skills.map(s=>`SKILL ${s.id}\nObjetivo: ${s.description}\nHerramientas: ${s.tools.join(', ')}\nPasos:\n${s.steps.map((x,i)=>`${i+1}. ${x}`).join('\n')}\nÉxito:\n${s.success.map(x=>`- ${x}`).join('\n')}\nRiesgo: ${s.risk}`).join('\n\n');}
