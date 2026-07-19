@@ -36,11 +36,24 @@ jobs:
         with:
           node-version: 22
           cache: npm
-      - run: npm ci
-      - run: npm run typecheck
-      - run: npm test -- --passWithNoTests
-      - run: npm run build
-      - name: Prepare Cloudflare credentials
+      - name: Instalar dependencias
+        id: install
+        shell: bash
+        run: npm ci 2>&1 | tee /tmp/deploy-install.log
+      - name: Typecheck
+        id: typecheck
+        shell: bash
+        run: npm run typecheck 2>&1 | tee /tmp/deploy-typecheck.log
+      - name: Pruebas
+        id: tests
+        shell: bash
+        run: npm test -- --passWithNoTests 2>&1 | tee /tmp/deploy-tests.log
+      - name: Build
+        id: build
+        shell: bash
+        run: npm run build 2>&1 | tee /tmp/deploy-build.log
+      - name: Preparar credenciales Cloudflare
+        id: credentials
         shell: bash
         run: |
           set -euo pipefail
@@ -49,19 +62,42 @@ jobs:
           test -n "$CLOUDFLARE_ACCOUNT_ID"
           echo "::add-mask::$CLEAN_TOKEN"
           echo "CLOUDFLARE_API_TOKEN=$CLEAN_TOKEN" >> "$GITHUB_ENV"
-      - name: Apply D1 migrations
-        run: npx wrangler d1 migrations apply hector-os-db --remote
-      - name: Deploy Héctor OS
-        run: npx wrangler deploy
-      - name: Verify production health
-        run: curl -fsS https://hector-os.hectorhdzr035.workers.dev/health | jq -e '.ok == true'
-      - name: Publish success receipt
+      - name: Aplicar migraciones D1
+        id: migrations
+        shell: bash
+        run: npx wrangler d1 migrations apply hector-os-db --remote 2>&1 | tee /tmp/deploy-migrations.log
+      - name: Desplegar Héctor OS
+        id: deploy
+        shell: bash
+        run: npx wrangler deploy 2>&1 | tee /tmp/deploy-worker.log
+      - name: Verificar salud de producción
+        id: health
+        shell: bash
+        run: curl -fsS https://hector-os.hectorhdzr035.workers.dev/health | tee /tmp/deploy-health.log | jq -e '.ok == true'
+      - name: Publicar recibo correcto
         if: success()
         env:
           GH_TOKEN: ${{ github.token }}
         run: gh issue create --title "[deploy-production] OK ${GITHUB_SHA::7}" --body "✅ Héctor OS compiló, pasó pruebas, aplicó migraciones D1, se desplegó en Cloudflare y respondió correctamente en /health."
-      - name: Publish failure receipt
+      - name: Publicar diagnóstico fallido
         if: failure()
         env:
           GH_TOKEN: ${{ github.token }}
-        run: gh issue create --title "[deploy-production] FALLO ${GITHUB_SHA::7}" --body "❌ El despliegue de producción falló. Revisa el workflow Deploy Production. No se expusieron secretos."
+          INSTALL_OUTCOME: ${{ steps.install.outcome }}
+          TYPECHECK_OUTCOME: ${{ steps.typecheck.outcome }}
+          TESTS_OUTCOME: ${{ steps.tests.outcome }}
+          BUILD_OUTCOME: ${{ steps.build.outcome }}
+          CREDENTIALS_OUTCOME: ${{ steps.credentials.outcome }}
+          MIGRATIONS_OUTCOME: ${{ steps.migrations.outcome }}
+          DEPLOY_OUTCOME: ${{ steps.deploy.outcome }}
+          HEALTH_OUTCOME: ${{ steps.health.outcome }}
+        shell: bash
+        run: |
+          set +e
+          LOG=""
+          for file in /tmp/deploy-install.log /tmp/deploy-typecheck.log /tmp/deploy-tests.log /tmp/deploy-build.log /tmp/deploy-migrations.log /tmp/deploy-worker.log /tmp/deploy-health.log; do
+            if [ -s "$file" ]; then LOG="$(tail -n 70 "$file")"; fi
+          done
+          SAFE="$(printf '%s' "$LOG" | sed -E 's/(sk-[A-Za-z0-9_-]+)/[REDACTED]/g; s/(Bearer )[A-Za-z0-9._-]+/\1[REDACTED]/g; s/(API_TOKEN[=: ]+)[A-Za-z0-9._-]+/\1[REDACTED]/g' | head -c 6500)"
+          BODY="❌ Despliegue falló para $GITHUB_SHA.\n\nResultados:\n- npm ci: ${INSTALL_OUTCOME}\n- typecheck: ${TYPECHECK_OUTCOME}\n- pruebas: ${TESTS_OUTCOME}\n- build: ${BUILD_OUTCOME}\n- credenciales: ${CREDENTIALS_OUTCOME}\n- migraciones: ${MIGRATIONS_OUTCOME}\n- deploy: ${DEPLOY_OUTCOME}\n- health: ${HEALTH_OUTCOME}\n\nÚltimo diagnóstico sanitizado:\n\`\`\`\n${SAFE:-Sin salida capturada}\n\`\`\`"
+          gh issue create --title "[deploy-production] FALLO ${GITHUB_SHA::7}" --body "$BODY"
