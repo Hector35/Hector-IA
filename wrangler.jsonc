@@ -4,6 +4,7 @@
   "main": "worker/index.ts",
   "compatibility_date": "2026-07-19",
   "observability": { "enabled": true },
+  "triggers": { "crons": ["*/2 * * * *"] },
   "vars": { "OPENAI_MODEL": "gpt-5.4-mini", "APP_NAME": "Héctor OS" },
   "d1_databases": [{ "binding": "DB", "database_name": "hector-os-db", "database_id": "16303e77-d2e8-463d-b6a4-77a9c77df0ee", "migrations_dir": "migrations" }],
   "r2_buckets": [{ "binding": "FILES", "bucket_name": "hector-os-files" }]
