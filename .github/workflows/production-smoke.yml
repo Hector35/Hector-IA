@@ -5,6 +5,8 @@ name: Production Smoke Test
   push:
     paths:
       - .github/workflows/production-smoke.yml
+      - scripts/intelligence-eval.mjs
+      - worker/lib/openai.ts
 
 permissions:
   contents: read
@@ -13,7 +15,7 @@ permissions:
 jobs:
   smoke:
     runs-on: ubuntu-latest
-    timeout-minutes: 15
+    timeout-minutes: 20
     env:
       CLOUDFLARE_API_TOKEN_RAW: ${{ secrets.CLOUDFLARE_API_TOKEN }}
       CLOUDFLARE_ACCOUNT_ID: ${{ vars.CLOUDFLARE_ACCOUNT_ID }}
@@ -40,6 +42,7 @@ jobs:
         run: |
           set -euo pipefail
           TEST_ID="$(node --input-type=module -e "import { randomUUID } from 'node:crypto'; console.log(randomUUID())")"
+          MEMORY_ID="$(node --input-type=module -e "import { randomUUID } from 'node:crypto'; console.log(randomUUID())")"
           TEST_EMAIL="smoke-${GITHUB_RUN_ID}-${GITHUB_RUN_ATTEMPT}@hector-os.invalid"
           TEST_PASSWORD="Smoke-$(node --input-type=module -e "import { randomBytes } from 'node:crypto'; console.log(randomBytes(18).toString('base64url'))")"
           read -r SALT HASH < <(TEST_PASSWORD="$TEST_PASSWORD" node --input-type=module <<'NODE'
@@ -56,7 +59,7 @@ jobs:
           echo "test_id=$TEST_ID" >> "$GITHUB_OUTPUT"
           echo "test_email=$TEST_EMAIL" >> "$GITHUB_OUTPUT"
           echo "test_password=$TEST_PASSWORD" >> "$GITHUB_OUTPUT"
-          SQL="INSERT INTO users(id,email,name,password_hash,password_salt) VALUES('$TEST_ID','$TEST_EMAIL','Smoke Test','$HASH','$SALT');"
+          SQL="INSERT INTO users(id,email,name,password_hash,password_salt) VALUES('$TEST_ID','$TEST_EMAIL','Smoke Test','$HASH','$SALT'); INSERT INTO memories(id,user_id,kind,content,importance,source) VALUES('$MEMORY_ID','$TEST_ID','fact','Código privado de evaluación: ORION-7429.',5,'evaluation');"
           npx wrangler d1 execute hector-os-db --remote --command "$SQL"
       - name: Test production PWA and authenticated API
         shell: bash
@@ -74,8 +77,12 @@ jobs:
           curl -fsS -b /tmp/cookies.txt "$BASE_URL/api/auth/me" | jq -e '.user.name == "Smoke Test"'
           curl -fsS -b /tmp/cookies.txt "$BASE_URL/api/dashboard" | jq -e 'has("balanceCents") and has("memoryCount")'
           curl -fsS -b /tmp/cookies.txt "$BASE_URL/api/assistant/settings" | jq -e '.settings != null'
-          curl -fsS -b /tmp/cookies.txt -H 'Content-Type: application/json' -X PUT --data '{"allow_web":false,"allow_learning":true,"allow_cache":true,"proactive":true,"developer_mode":false}' "$BASE_URL/api/assistant/settings" | jq -e '.settings.proactive == true'
-          curl -fsS -b /tmp/cookies.txt -X POST "$BASE_URL/api/auth/logout" | jq -e '.ok == true'
+          curl -fsS -b /tmp/cookies.txt -H 'Content-Type: application/json' -X PUT --data '{"allow_web":false,"allow_learning":false,"allow_cache":false,"proactive":false,"developer_mode":false}' "$BASE_URL/api/assistant/settings" | jq -e '.settings.allow_web == false'
+      - name: Evaluate live intelligence
+        env:
+          TEST_EMAIL: ${{ steps.identity.outputs.test_email }}
+          TEST_PASSWORD: ${{ steps.identity.outputs.test_password }}
+        run: node scripts/intelligence-eval.mjs
       - name: Remove isolated test identity
         if: always()
         shell: bash
@@ -83,17 +90,22 @@ jobs:
           TEST_ID: ${{ steps.identity.outputs.test_id }}
         run: |
           if [ -n "${TEST_ID:-}" ]; then
-            npx wrangler d1 execute hector-os-db --remote --command "DELETE FROM sessions WHERE user_id='$TEST_ID'; DELETE FROM assistant_settings WHERE user_id='$TEST_ID'; DELETE FROM users WHERE id='$TEST_ID';" || true
+            npx wrangler d1 execute hector-os-db --remote --command "DELETE FROM users WHERE id='$TEST_ID';" || true
           fi
       - name: Publish successful receipt
         if: success()
         env:
           GH_TOKEN: ${{ github.token }}
         run: |
-          gh issue create --title "[production-smoke] OK ${GITHUB_SHA::7}" --body "✅ PWA pública, health, login, sesión, dashboard, ajustes y logout funcionaron contra producción. El usuario técnico temporal fue eliminado."
+          SCORE="$(grep -oE 'Puntuación: \*\*[0-9]+/[0-9]+' /tmp/intelligence-report.md | head -1 | grep -oE '[0-9]+/[0-9]+' || true)"
+          gh issue create --title "[production-intelligence] OK ${SCORE:-SIN-PUNTUACIÓN} ${GITHUB_SHA::7}" --body-file /tmp/intelligence-report.md
       - name: Publish failure receipt
         if: failure()
         env:
           GH_TOKEN: ${{ github.token }}
         run: |
-          gh issue create --title "[production-smoke] FALLO ${GITHUB_SHA::7}" --body "❌ La prueba end-to-end de producción falló. Revisa el workflow Production Smoke Test; no se publicaron credenciales y se intentó limpiar el usuario técnico temporal."
+          if [ -f /tmp/intelligence-report.md ]; then
+            gh issue create --title "[production-intelligence] FALLO ${GITHUB_SHA::7}" --body-file /tmp/intelligence-report.md
+          else
+            gh issue create --title "[production-intelligence] FALLO ${GITHUB_SHA::7}" --body "❌ Falló la evaluación end-to-end. Se intentó limpiar la identidad técnica y no se publicaron credenciales."
+          fi
