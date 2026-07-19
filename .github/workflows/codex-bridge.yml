@@ -1,0 +1,55 @@
+name: Codex Bridge
+"on":
+  workflow_dispatch:
+    inputs:
+      operation:
+        description: Operación remota
+        required: true
+        type: choice
+        options: [status, task]
+      kind:
+        description: Tipo de tarea
+        required: false
+        default: programming
+        type: choice
+        options: [research, learning, programming, automation, agent, api, skill, update]
+      title:
+        description: Título de tarea
+        required: false
+        type: string
+      prompt:
+        description: Instrucción autorizada
+        required: false
+        type: string
+permissions:
+  contents: read
+jobs:
+  bridge:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - name: Consultar Héctor OS
+        if: inputs.operation == 'status'
+        env:
+          CONTROL_TOKEN: ${{ secrets.HECTOR_CONTROL_TOKEN }}
+        run: |
+          RESPONSE="$(curl --fail-with-body --silent --show-error --max-time 30 -H "Authorization: Bearer $CONTROL_TOKEN" https://hector-os.hectorhdzr035.workers.dev/control/v1/status)"
+          echo '## Estado de Héctor OS' >> "$GITHUB_STEP_SUMMARY"
+          echo '```json' >> "$GITHUB_STEP_SUMMARY"
+          echo "$RESPONSE" | jq . >> "$GITHUB_STEP_SUMMARY"
+          echo '```' >> "$GITHUB_STEP_SUMMARY"
+      - name: Enviar tarea a Héctor OS
+        if: inputs.operation == 'task'
+        env:
+          CONTROL_TOKEN: ${{ secrets.HECTOR_CONTROL_TOKEN }}
+          KIND: ${{ inputs.kind }}
+          TITLE: ${{ inputs.title }}
+          PROMPT: ${{ inputs.prompt }}
+        run: |
+          test -n "$TITLE" && test -n "$PROMPT"
+          BODY="$(jq -nc --arg kind "$KIND" --arg title "$TITLE" --arg prompt "$PROMPT" '{kind:$kind,title:$title,prompt:$prompt}')"
+          RESPONSE="$(curl --fail-with-body --silent --show-error --max-time 30 -X POST -H "Authorization: Bearer $CONTROL_TOKEN" -H 'Content-Type: application/json' --data "$BODY" https://hector-os.hectorhdzr035.workers.dev/control/v1/tasks)"
+          echo '## Tarea entregada a Héctor OS' >> "$GITHUB_STEP_SUMMARY"
+          echo '```json' >> "$GITHUB_STEP_SUMMARY"
+          echo "$RESPONSE" | jq . >> "$GITHUB_STEP_SUMMARY"
+          echo '```' >> "$GITHUB_STEP_SUMMARY"
