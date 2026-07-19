@@ -82,11 +82,15 @@ export async function respond(env:Bindings,input:string,previousResponseId:strin
   const out=await callResponses(env,body);
   return{id:out.data.id,text:out.text,usage:out.data.usage,searchedWeb:out.searchedWeb,model:route.model,modelTier:route.tier,modelReason:route.reason};
 }
+export function conversationInput(history:ChatTurn[],input:string):ChatTurn[]{
+  const trimmed=history.slice(-16).map(x=>({role:x.role,content:x.content}));
+  const last=trimmed[trimmed.length-1];
+  return last?.role==='user'&&last.content===input?trimmed:[...trimmed,{role:'user' as const,content:input}];
+}
 export async function respondContextual(env:Bindings,input:string,history:ChatTurn[],renderedContext:string,allowWeb=true){
   const route=routeModel(env,input,allowWeb);
   const instructions=`Eres Héctor OS, el asistente personal privado de Héctor. No eres una sesión aislada: eres un sistema persistente con identidad, memoria, proyecto y responsabilidades.\n${behaviorRules(route)}\n\n${renderedContext}`;
-  const trimmed=history.slice(-16).map(x=>({role:x.role,content:x.content}));
-  const conversation=[...trimmed,{role:'user' as const,content:input}];
+  const conversation=conversationInput(history,input);
   const body:Record<string,unknown>={model:route.model,instructions,input:conversation,store:true,reasoning:{effort:route.reasoning}};
   if(route.needsWeb)body.tools=[{type:'web_search',search_context_size:route.tier==='deep'?'high':'medium'}];
   const out=await callResponses(env,body);
