@@ -1,0 +1,10 @@
+{
+  "$schema": "node_modules/wrangler/config-schema.json",
+  "name": "hector-os",
+  "main": "worker/index.ts",
+  "compatibility_date": "2026-07-19",
+  "observability": { "enabled": true },
+  "vars": { "OPENAI_MODEL": "gpt-5.4-mini", "APP_NAME": "Héctor OS" },
+  "d1_databases": [{ "binding": "DB", "database_name": "hector-os-db", "database_id": "REPLACE_WITH_D1_DATABASE_ID", "migrations_dir": "migrations" }],
+  "r2_buckets": [{ "binding": "FILES", "bucket_name": "hector-os-files" }]
+}
