@@ -1,9 +1,10 @@
 import type { Bindings } from '../types';
 export type AIUsage={input_tokens?:number;output_tokens?:number;input_tokens_details?:{cached_tokens?:number}};
 type AIResponse = { id:string; output_text?:string; output?: Array<{type:string;content?:Array<{type:string;text?:string}>}>; usage?:AIUsage; error?:{message:string} };
-export async function respond(env: Bindings, input: string, previousResponseId: string|undefined, memories: string[]) {
+export async function respond(env: Bindings, input: string, previousResponseId: string|undefined, memories: string[], allowWeb=true) {
   const instructions = `Eres Héctor OS, asistente personal privado de Héctor. Responde en español, directo y analítico. Usa la memoria solo si es relevante. No inventes datos. Memoria disponible:\n${memories.map(x=>`- ${x}`).join('\n')||'- Sin memoria relevante'}`;
-  const body: Record<string,unknown> = { model:env.OPENAI_MODEL, instructions, input, store:true, tools:[{type:'web_search',search_context_size:'low'}] };
+  const body: Record<string,unknown> = { model:env.OPENAI_MODEL, instructions, input, store:true };
+  if(allowWeb)body.tools=[{type:'web_search',search_context_size:'low'}];
   if (previousResponseId) body.previous_response_id = previousResponseId;
   const res = await fetch('https://api.openai.com/v1/responses',{method:'POST',headers:{Authorization:`Bearer ${env.OPENAI_API_KEY}`,'Content-Type':'application/json'},body:JSON.stringify(body)});
   const data = await res.json<AIResponse>();
