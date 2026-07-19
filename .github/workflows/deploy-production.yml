@@ -7,6 +7,7 @@ on:
     paths:
       - 'src/**'
       - 'worker/**'
+      - 'migrations/**'
       - 'public/**'
       - 'package.json'
       - 'package-lock.json'
@@ -48,6 +49,8 @@ jobs:
           test -n "$CLOUDFLARE_ACCOUNT_ID"
           echo "::add-mask::$CLEAN_TOKEN"
           echo "CLOUDFLARE_API_TOKEN=$CLEAN_TOKEN" >> "$GITHUB_ENV"
+      - name: Apply D1 migrations
+        run: npx wrangler d1 migrations apply hector-os-db --remote
       - name: Deploy Héctor OS
         run: npx wrangler deploy
       - name: Verify production health
@@ -56,7 +59,7 @@ jobs:
         if: success()
         env:
           GH_TOKEN: ${{ github.token }}
-        run: gh issue create --title "[deploy-production] OK ${GITHUB_SHA::7}" --body "✅ Héctor OS compiló, pasó pruebas, se desplegó en Cloudflare y respondió correctamente en /health."
+        run: gh issue create --title "[deploy-production] OK ${GITHUB_SHA::7}" --body "✅ Héctor OS compiló, pasó pruebas, aplicó migraciones D1, se desplegó en Cloudflare y respondió correctamente en /health."
       - name: Publish failure receipt
         if: failure()
         env:
