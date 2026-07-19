@@ -20,7 +20,7 @@ describe('Héctor OS model routing benchmark',()=>{
     ['Diseña e implementa una arquitectura completa en Cloudflare Workers, D1 y R2, compara riesgos y optimiza el despliegue.','deep','ingeniería de software',false],
     ['Audita este backend, encuentra fallas de seguridad y propón un plan completo de refactorización.','deep','ingeniería de software',false],
     ['Compara todas las opciones y diseña una estrategia de migración con supuestos, riesgos y pruebas.','deep','planificación y toma de decisiones',false],
-    ['Busca el precio actual y verifica la versión disponible','deep','consulta general',true],
+    ['Busca el precio actual y verifica la versión disponible','balanced','consulta general',true],
     ['Busca noticias recientes','balanced','consulta general',true]
   ] as const;
 
