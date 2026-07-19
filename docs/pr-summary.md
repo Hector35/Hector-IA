@@ -1,0 +1,1 @@
+Implements transparent runtime model identity, system release reports, verified capability and limitation lists, fresh self-evaluation, and a short improvement prompt.
