@@ -1,12 +1,25 @@
 name: Runner Verify
+
 "on":
   workflow_dispatch:
+  push:
+    paths:
+      - .github/workflows/runner-verify.yml
+      - package.json
+      - package-lock.json
+      - tsconfig*.json
+      - vite.config.*
+      - src/**
+      - worker/**
+
+permissions:
+  contents: read
+  issues: write
+
 jobs:
   build:
     runs-on: ubuntu-latest
     timeout-minutes: 20
-    permissions:
-      contents: read
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-node@v4
@@ -17,3 +30,13 @@ jobs:
       - run: npm run typecheck
       - run: npm test -- --passWithNoTests
       - run: npm run build
+      - name: Publicar resultado correcto
+        if: success()
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: gh issue create --title "[runner-verify] OK ${GITHUB_SHA::7}" --body "✅ Instalación, typecheck, pruebas y build terminaron correctamente para $GITHUB_SHA."
+      - name: Publicar resultado fallido
+        if: failure()
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: gh issue create --title "[runner-verify] FALLO ${GITHUB_SHA::7}" --body "❌ Runner Verify falló para $GITHUB_SHA. Revisa GitHub Actions para identificar el paso y los logs."
