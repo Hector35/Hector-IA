@@ -11,6 +11,12 @@ export type ContextPack={
   projectState:string[];
 };
 
+function normalizeRecentText(text:string){return text.replace(/\s+/g,' ').trim();}
+function priorMessagesOnly(messages:ContextMessage[],input:string){
+  const last=messages[messages.length-1];
+  return last?.role==='user'&&normalizeRecentText(last.content)===normalizeRecentText(input)?messages.slice(0,-1):messages;
+}
+
 export async function loadContextPack(db:D1Database,userId:string,conversationId:string|undefined,input:string):Promise<ContextPack>{
   const [systemRows,memoryRows,summaryRow,priorRows,recentRows,workRows,updateRows]=await Promise.all([
     db.prepare("SELECT category,content FROM system_context WHERE active=1 ORDER BY priority DESC,context_key").all<{category:string;content:string}>(),
@@ -24,7 +30,7 @@ export async function loadContextPack(db:D1Database,userId:string,conversationId
   const system=(systemRows.results||[]).map(x=>`[${x.category}] ${x.content}`).join('\n');
   const memories=relevantMemories(input,(memoryRows.results||[]).map(x=>x.content));
   const priorSummaries=(priorRows.results||[]).map(x=>x.summary).filter(Boolean);
-  const recentMessages=[...(recentRows.results||[])].reverse().map(x=>({role:x.role,content:x.content}));
+  const recentMessages=priorMessagesOnly([...(recentRows.results||[])].reverse().map(x=>({role:x.role,content:x.content})),input);
   const projectState=[
     ...(workRows.results||[]).map((x:any)=>`Trabajo ${x.kind}: ${x.status}, progreso ${x.progress}%${x.result?`, resultado: ${String(x.result).slice(0,240)}`:''}`),
     ...(updateRows.results||[]).map((x:any)=>`Solicitud de mejora (${x.status}): ${String(x.request_text).slice(0,240)}`)
