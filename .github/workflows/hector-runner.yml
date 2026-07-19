@@ -1,5 +1,5 @@
 name: Hector OS Runner
-on:
+"on":
   workflow_dispatch:
     inputs:
       task:
