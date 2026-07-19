@@ -9,13 +9,14 @@ import {systemInfo} from './routes/system';
 import {control} from './routes/control';
 import {generated} from './routes/generated';
 import {selfImprove} from './routes/self-improve';
+import {runner} from './routes/runner';
 import {respond,estimateCost} from './lib/openai';
 import {buildPlan} from './agent/planner';
 import {recordExperience} from './agent/learning';
 
 const app=new Hono<{Bindings:Bindings;Variables:Variables}>();
 app.use('*',secureHeaders({contentSecurityPolicy:{defaultSrc:["'self'"],connectSrc:["'self'"],imgSrc:["'self'",'data:'],styleSrc:["'self'","'unsafe-inline'"]}}));
-app.route('/control/v1',control);app.route('/generated',generated);app.route('/self-improve/v1',selfImprove);app.route('/api/auth',auth);app.route('/api/agent',agent);app.route('/api/intelligence',intelligence);app.route('/api/system',systemInfo);app.route('/api',intelligence);app.route('/api',api);
+app.route('/control/v1',control);app.route('/generated',generated);app.route('/self-improve/v1',selfImprove);app.route('/runner/v1',runner);app.route('/api/auth',auth);app.route('/api/agent',agent);app.route('/api/intelligence',intelligence);app.route('/api/system',systemInfo);app.route('/api',intelligence);app.route('/api',api);
 app.get('/health',c=>c.json({ok:true,service:c.env.APP_NAME}));app.all('*',c=>c.env.ASSETS.fetch(c.req.raw));
 
 async function event(env:Bindings,jobId:string,message:string,progress:number){await env.DB.prepare('INSERT INTO work_events(id,job_id,message,progress) VALUES(?,?,?,?)').bind(crypto.randomUUID(),jobId,message,progress).run();}

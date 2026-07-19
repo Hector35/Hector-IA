@@ -1,12 +1,12 @@
-export const SYSTEM_VERSION='2.4.0';
+export const SYSTEM_VERSION='2.5.0';
 export const RELEASED_AT='2026-07-19';
 
 export const RELEASE_CHANGES=[
-  'Muestra el proveedor y el modelo real usado en cada respuesta.',
-  'Responde qué proveedor, modelo, nivel y motivo de enrutamiento utilizó.',
-  'El autoanálisis ya no depende de introspección libre: combina manifiesto, D1 y pruebas ejecutadas.',
-  'Incluye cada prueba aprobada o fallida, puntuación, modelo y latencia.',
-  'Genera un prompt técnico completo y un prompt corto para continuar las mejoras en GitHub.'
+  'Añade un runner de programación despachable desde los trabajos de Héctor OS.',
+  'El runner puede inspeccionar archivos permitidos, proponer cambios y ejecutar hasta tres ciclos de reparación.',
+  'Solo publica un pull request después de aprobar typecheck, pruebas y build.',
+  'Registra en D1 las fases working, testing, repairing, completed o blocked.',
+  'Mantiene una jaula de archivos, tamaño, intentos y riesgo bajo para evitar cambios descontrolados.'
 ] as const;
 
 export const VERIFIED_CAPABILITIES=[
@@ -15,15 +15,16 @@ export const VERIFIED_CAPABILITIES=[
   'Búsqueda web cuando la solicitud requiere información reciente.',
   'Archivos mediante R2.',
   'Trabajos persistentes con planner, selección de Skills, progreso y journal de experiencias.',
+  'Runner de programación editar-probar-corregir mediante GitHub Actions y OpenAI de razonamiento.',
   'Workflow de navegador con Playwright para verificar URLs conocidas y guardar evidencia.',
   'Autoevaluación reproducible con resultados persistidos y prompts de mejora.',
   'PWA móvil con Markdown y metadatos reales del modelo.'
 ] as const;
 
 export const CURRENT_LIMITATIONS=[
-  'El workflow de navegador todavía no se despacha automáticamente desde el orquestador ni devuelve sus artefactos al chat.',
-  'No dispone aún de un runner general con terminal y filesystem aislado para modificar proyectos arbitrarios.',
-  'Los trabajos persistentes todavía no ejecutan un ciclo completo editar-probar-corregir.',
+  'El runner modifica únicamente Héctor OS y una lista explícita de archivos permitidos; no es una terminal general para cualquier repositorio.',
+  'El workflow de navegador todavía no devuelve automáticamente capturas y artefactos al chat.',
+  'La publicación termina en pull request; el merge y la verificación de producción siguen siendo pasos separados.',
   'No puede confirmar cambios externos recientes sin consultar una herramienta o recibir evidencia.',
   'La recuperación de memoria sigue basada principalmente en coincidencia textual.',
   'Correo, calendario, Drive y otras aplicaciones aún no están conectadas dentro de Héctor OS.',
@@ -31,7 +32,7 @@ export const CURRENT_LIMITATIONS=[
 ] as const;
 
 export function shortImprovementPrompt(gaps:string[]=[]){
-  const targets=gaps.length?gaps.join(', '):'despacho automático del navegador, runner agentivo, ciclo editar-probar-corregir y memoria semántica';
+  const targets=gaps.length?gaps.join(', '):'integración de artefactos del navegador, memoria semántica, merge verificado y smoke test de producción';
   return `Audita Hector35/Hector-IA y corrige estas carencias verificables: ${targets}. Añade pruebas reproducibles, ejecuta typecheck, tests y build, y no declares éxito sin evidencia de despliegue y smoke test.`;
 }
 
