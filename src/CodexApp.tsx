@@ -1,9 +1,10 @@
 import {FormEvent,useEffect,useRef,useState} from 'react';
-import {ArrowUp,FileText,FolderOpen,LogOut,Menu,MessageSquare,PanelLeftClose,Plus,Settings,SquarePen,Terminal,Upload,X} from 'lucide-react';
+import {ArrowUp,FileText,FolderOpen,History,LogOut,Menu,MessageSquare,PanelLeftClose,Plus,Settings,SquarePen,Terminal,Upload,X} from 'lucide-react';
 import {api,type User} from './api';
+import {MarkdownMessage} from './MarkdownMessage';
 
 type View='chat'|'work'|'files'|'settings';
-type ChatMessage={role:string;content:string};
+type ChatMessage={role:string;content:string;provider?:string;model?:string;fallback?:boolean};
 
 export function CodexApp(){
   const [user,setUser]=useState<User|null|undefined>();
@@ -50,7 +51,7 @@ function ChatView(){
   useEffect(()=>{void loadHistory()},[]);
   const open=async(id:string)=>{const r=await api.conversationMessages(id);setCid(id);setMessages(r.items||[]);setHistoryOpen(false)};
   const fresh=()=>{setCid(undefined);setMessages([]);setHistoryOpen(false)};
-  const send=async(e?:FormEvent)=>{e?.preventDefault();if(!text.trim()||busy)return;const q=text.trim();setText('');setMessages(m=>[...m,{role:'user',content:q}]);setBusy(true);try{const r=await api.chat(q,cid);setCid(r.conversationId);setMessages(m=>[...m,r.message]);await loadHistory()}catch(err){setMessages(m=>[...m,{role:'assistant',content:`Error: ${err instanceof Error?err.message:'No disponible'}`}])}finally{setBusy(false);setTimeout(()=>end.current?.scrollIntoView({behavior:'smooth'}),40)}};
+  const send=async(e?:FormEvent)=>{e?.preventDefault();if(!text.trim()||busy)return;const q=text.trim();setText('');setMessages(m=>[...m,{role:'user',content:q}]);setBusy(true);try{const r=await api.chat(q,cid);setCid(r.conversationId);setMessages(m=>[...m,{...r.message,provider:r.provider,model:r.model,fallback:r.fallback}]);await loadHistory()}catch(err){setMessages(m=>[...m,{role:'assistant',content:`Error: ${err instanceof Error?err.message:'No disponible'}`}])}finally{setBusy(false);setTimeout(()=>end.current?.scrollIntoView({behavior:'smooth'}),40)}};
   return <div className="cxChatLayout">
     <section className={`cxHistory ${historyOpen?'open':''}`}>
       <div className="cxHistoryHead"><strong>Conversaciones</strong><button onClick={()=>setHistoryOpen(false)}><PanelLeftClose/></button></div>
@@ -58,10 +59,10 @@ function ChatView(){
       <div className="cxHistoryList">{history.map(x=><button key={x.id} className={cid===x.id?'active':''} onClick={()=>open(x.id)}><MessageSquare/><span>{x.title||'Sin título'}</span></button>)}</div>
     </section>
     <section className="cxConversation">
-      <header className="cxChatHeader"><button onClick={()=>setHistoryOpen(true)} aria-label="Abrir conversaciones"><Menu/></button><span>{cid?'Conversación':'Héctor OS'}</span><button onClick={fresh} aria-label="Nuevo chat"><SquarePen/></button></header>
+      <header className="cxChatHeader"><button onClick={()=>setHistoryOpen(true)} aria-label="Abrir conversaciones"><History/></button><span>{cid?'Conversación':'Héctor OS'}</span><button onClick={fresh} aria-label="Nuevo chat"><SquarePen/></button></header>
       <div className="cxMessages">
         {messages.length===0&&<div className="cxWelcome"><div className="cxMark">H</div><h1>¿En qué trabajamos?</h1><p>Pregunta, analiza, programa o inicia una tarea.</p></div>}
-        {messages.map((m,i)=><article key={i} className={`cxMessage ${m.role}`}><div>{m.content}</div></article>)}
+        {messages.map((m,i)=><article key={i} className={`cxMessage ${m.role}`}><div>{m.role==='assistant'?<><MarkdownMessage content={m.content}/>{m.provider&&<div className="cxProvider"><span>{m.provider==='cloudflare'?'Cloudflare AI':'OpenAI'}</span>{m.model&&<span>{m.model}</span>}{m.fallback&&<span>fallback</span>}</div>}</>:m.content}</div></article>)}
         {busy&&<article className="cxMessage assistant"><div className="cxThinking"><i/><i/><i/></div></article>}
         <div ref={end}/>
       </div>
