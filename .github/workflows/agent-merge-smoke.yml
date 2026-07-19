@@ -1,0 +1,88 @@
+name: Agent Merge Production Verify
+
+on:
+  pull_request:
+    types: [closed]
+
+permissions:
+  contents: read
+  issues: write
+  id-token: write
+
+jobs:
+  verify:
+    if: github.event.pull_request.merged == true && startsWith(github.event.pull_request.head.ref, 'hector-agent/')
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    env:
+      BASE_URL: https://hector-os.hectorhdzr035.workers.dev
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+      - name: Esperar despliegue del commit fusionado
+        shell: bash
+        run: |
+          set -euo pipefail
+          for attempt in $(seq 1 30); do
+            if curl -fsS "$BASE_URL/health" | jq -e '.ok == true' >/dev/null; then exit 0; fi
+            sleep 10
+          done
+          exit 1
+      - name: Instalar Playwright
+        run: npm install --no-save playwright && npx playwright install --with-deps chromium
+      - name: Smoke test visual y funcional
+        shell: bash
+        run: |
+          node --input-type=module <<'EOF'
+          import {chromium} from 'playwright';
+          import {mkdir,writeFile} from 'node:fs/promises';
+          const browser=await chromium.launch({headless:true});
+          const page=await browser.newPage({viewport:{width:390,height:844}});
+          const errors=[];
+          page.on('console',m=>{if(m.type()==='error')errors.push(m.text())});
+          page.on('pageerror',e=>errors.push(e.message));
+          const response=await page.goto(process.env.BASE_URL,{waitUntil:'networkidle',timeout:45000});
+          await mkdir('merge-evidence',{recursive:true});
+          await page.screenshot({path:'merge-evidence/page.png',fullPage:true});
+          const report={url:page.url(),title:await page.title(),status:response?.status()??null,errors,mergedSha:process.env.GITHUB_SHA,checkedAt:new Date().toISOString()};
+          await writeFile('merge-evidence/report.json',JSON.stringify(report,null,2));
+          await browser.close();
+          if(!response||response.status()>=400||errors.length)process.exit(1);
+          EOF
+      - name: Obtener token OIDC
+        id: oidc
+        shell: bash
+        run: |
+          TOKEN="$(curl -fsS -H "Authorization: bearer $ACTIONS_ID_TOKEN_REQUEST_TOKEN" "${ACTIONS_ID_TOKEN_REQUEST_URL}&audience=hector-os-evidence" | jq -r .value)"
+          echo "::add-mask::$TOKEN"
+          echo "token=$TOKEN" >> "$GITHUB_OUTPUT"
+      - name: Guardar evidencia en Héctor OS
+        env:
+          OIDC_TOKEN: ${{ steps.oidc.outputs.token }}
+        shell: bash
+        run: |
+          node --input-type=module <<'EOF'
+          import fs from 'node:fs';
+          const report=JSON.parse(fs.readFileSync('merge-evidence/report.json','utf8'));
+          const screenshotBase64=fs.readFileSync('merge-evidence/page.png').toString('base64');
+          fs.writeFileSync('/tmp/evidence.json',JSON.stringify({source:'merge-smoke',url:report.url,title:report.title,status:report.status,errors:report.errors,runId:process.env.GITHUB_RUN_ID,screenshotBase64}));
+          EOF
+          curl -fsS -H "Authorization: Bearer $OIDC_TOKEN" -H 'Content-Type: application/json' --data-binary @/tmp/evidence.json "$BASE_URL/evidence/v1/browser"
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: merge-production-evidence
+          path: merge-evidence
+          retention-days: 14
+      - name: Publicar recibo verificado
+        if: success()
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: gh issue create --title "[merge-smoke] OK PR #${{ github.event.pull_request.number }}" --body "PR fusionado, producción saludable y smoke test móvil aprobado con evidencia persistida en R2/D1."
+      - name: Publicar fallo verificable
+        if: failure()
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: gh issue create --title "[merge-smoke] FALLO PR #${{ github.event.pull_request.number }}" --body "El PR fue fusionado, pero no se confirmó producción saludable y smoke test completo. No se declara éxito."

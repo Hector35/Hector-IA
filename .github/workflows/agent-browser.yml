@@ -12,14 +12,25 @@ on:
         required: false
         default: 390x844
         type: string
+      job_id:
+        description: UUID opcional del trabajo
+        required: false
+        type: string
+      user_id:
+        description: UUID opcional del propietario
+        required: false
+        type: string
 
 permissions:
   contents: read
+  id-token: write
 
 jobs:
   verify:
     runs-on: ubuntu-latest
-    timeout-minutes: 10
+    timeout-minutes: 12
+    env:
+      BASE_URL: https://hector-os.hectorhdzr035.workers.dev
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-node@v4
@@ -52,8 +63,33 @@ jobs:
           await writeFile('agent-evidence/report.json',JSON.stringify(report,null,2));
           console.log(report);
           await browser.close();
-          if(!response||response.status()>=400)process.exit(1);
+          if(!response||response.status()>=400)process.exitCode=1;
           EOF
+      - name: Obtener token OIDC
+        id: oidc
+        if: always()
+        shell: bash
+        run: |
+          TOKEN="$(curl -fsS -H "Authorization: bearer $ACTIONS_ID_TOKEN_REQUEST_TOKEN" "${ACTIONS_ID_TOKEN_REQUEST_URL}&audience=hector-os-evidence" | jq -r .value)"
+          test -n "$TOKEN"
+          echo "::add-mask::$TOKEN"
+          echo "token=$TOKEN" >> "$GITHUB_OUTPUT"
+      - name: Integrar artefactos en Héctor OS
+        if: always()
+        env:
+          OIDC_TOKEN: ${{ steps.oidc.outputs.token }}
+          JOB_ID: ${{ inputs.job_id }}
+          USER_ID: ${{ inputs.user_id }}
+        shell: bash
+        run: |
+          node --input-type=module <<'EOF'
+          import fs from 'node:fs';
+          const report=JSON.parse(fs.readFileSync('agent-evidence/report.json','utf8'));
+          const screenshotBase64=fs.readFileSync('agent-evidence/page.png').toString('base64');
+          const payload={jobId:process.env.JOB_ID||undefined,userId:process.env.USER_ID||undefined,source:'agent-browser',url:report.url,title:report.title,status:report.status,errors:report.errors,runId:process.env.GITHUB_RUN_ID,screenshotBase64};
+          fs.writeFileSync('/tmp/evidence.json',JSON.stringify(payload));
+          EOF
+          curl -fsS -H "Authorization: Bearer $OIDC_TOKEN" -H 'Content-Type: application/json' --data-binary @/tmp/evidence.json "$BASE_URL/evidence/v1/browser"
       - uses: actions/upload-artifact@v4
         if: always()
         with:
