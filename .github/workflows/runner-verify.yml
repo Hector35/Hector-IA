@@ -26,17 +26,44 @@ jobs:
         with:
           node-version: 22
           cache: npm
-      - run: npm ci
-      - run: npm run typecheck
-      - run: npm test -- --passWithNoTests
-      - run: npm run build
+      - name: Instalar dependencias
+        id: install
+        shell: bash
+        run: npm ci 2>&1 | tee /tmp/runner-install.log
+      - name: Typecheck
+        id: typecheck
+        shell: bash
+        run: npm run typecheck 2>&1 | tee /tmp/runner-typecheck.log
+      - name: Pruebas
+        id: tests
+        shell: bash
+        run: npm test -- --passWithNoTests 2>&1 | tee /tmp/runner-tests.log
+      - name: Build
+        id: build
+        shell: bash
+        run: npm run build 2>&1 | tee /tmp/runner-build.log
       - name: Publicar resultado correcto
         if: success()
         env:
           GH_TOKEN: ${{ github.token }}
         run: gh issue create --title "[runner-verify] OK ${GITHUB_SHA::7}" --body "✅ Instalación, typecheck, pruebas y build terminaron correctamente para $GITHUB_SHA."
-      - name: Publicar resultado fallido
+      - name: Publicar diagnóstico fallido
         if: failure()
         env:
           GH_TOKEN: ${{ github.token }}
-        run: gh issue create --title "[runner-verify] FALLO ${GITHUB_SHA::7}" --body "❌ Runner Verify falló para $GITHUB_SHA. Revisa GitHub Actions para identificar el paso y los logs."
+          INSTALL_OUTCOME: ${{ steps.install.outcome }}
+          TYPECHECK_OUTCOME: ${{ steps.typecheck.outcome }}
+          TESTS_OUTCOME: ${{ steps.tests.outcome }}
+          BUILD_OUTCOME: ${{ steps.build.outcome }}
+        shell: bash
+        run: |
+          set +e
+          LOG=""
+          for file in /tmp/runner-install.log /tmp/runner-typecheck.log /tmp/runner-tests.log /tmp/runner-build.log; do
+            if [ -s "$file" ]; then
+              LOG="$(tail -n 60 "$file")"
+            fi
+          done
+          SAFE="$(printf '%s' "$LOG" | sed -E 's/(sk-[A-Za-z0-9_-]+)/[REDACTED]/g; s/(Bearer )[A-Za-z0-9._-]+/\1[REDACTED]/g' | head -c 6000)"
+          BODY="❌ Runner Verify falló para $GITHUB_SHA.\n\nResultados:\n- npm ci: ${INSTALL_OUTCOME}\n- typecheck: ${TYPECHECK_OUTCOME}\n- pruebas: ${TESTS_OUTCOME}\n- build: ${BUILD_OUTCOME}\n\nÚltimo diagnóstico sanitizado:\n\`\`\`\n${SAFE:-Sin salida capturada}\n\`\`\`"
+          gh issue create --title "[runner-verify] FALLO ${GITHUB_SHA::7}" --body "$BODY"
