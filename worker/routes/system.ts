@@ -1,16 +1,30 @@
 import {Hono} from 'hono';
 import type {Bindings,Variables} from '../types';
 import {requireAuth} from '../lib/auth';
-import {renderSystemReport,SYSTEM_VERSION,RELEASED_AT,RELEASE_CHANGES,VERIFIED_CAPABILITIES,CURRENT_LIMITATIONS,shortImprovementPrompt} from '../intelligence/system-manifest';
+import {SYSTEM_VERSION,RELEASED_AT,RELEASE_CHANGES,VERIFIED_CAPABILITIES,CURRENT_LIMITATIONS,shortImprovementPrompt} from '../intelligence/system-manifest';
+import {renderEvidenceSelfAnalysis} from '../intelligence/self-report';
 
 export const systemInfo=new Hono<{Bindings:Bindings;Variables:Variables}>();
 systemInfo.use('*',requireAuth);
 
 systemInfo.get('/report',async c=>{
   const userId=c.get('userId');
-  const latest=await c.env.DB.prepare('SELECT score,grade,gaps_json,model,created_at FROM self_evaluations WHERE user_id=? ORDER BY created_at DESC LIMIT 1').bind(userId).first<any>();
+  const [latest,promptRow]=await Promise.all([
+    c.env.DB.prepare('SELECT score,grade,strengths_json,gaps_json,tests_json,model,latency_ms,created_at FROM self_evaluations WHERE user_id=? ORDER BY created_at DESC LIMIT 1').bind(userId).first<any>(),
+    c.env.DB.prepare("SELECT prompt FROM improvement_prompts WHERE user_id=? ORDER BY created_at DESC LIMIT 1").bind(userId).first<any>()
+  ]);
   const gaps=latest?.gaps_json?JSON.parse(latest.gaps_json):[];
-  return c.json({version:SYSTEM_VERSION,releasedAt:RELEASED_AT,changes:RELEASE_CHANGES,capabilities:VERIFIED_CAPABILITIES,limitations:CURRENT_LIMITATIONS,evaluation:latest?{score:latest.score,grade:latest.grade,gaps,model:latest.model,createdAt:latest.created_at}:null,prompt:shortImprovementPrompt(gaps),text:renderSystemReport(latest?.score,latest?.grade,gaps)});
+  const strengths=latest?.strengths_json?JSON.parse(latest.strengths_json):[];
+  const tests=latest?.tests_json?JSON.parse(latest.tests_json):[];
+  const prompt=promptRow?.prompt||shortImprovementPrompt(gaps);
+  const evaluation=latest?{score:latest.score,grade:latest.grade,strengths,gaps,tests,model:latest.model,latencyMs:latest.latency_ms,createdAt:latest.created_at,prompt}:null;
+  const text=evaluation?renderEvidenceSelfAnalysis({score:evaluation.score,grade:evaluation.grade,strengths:evaluation.strengths,gaps:evaluation.gaps,tests:evaluation.tests,averageLatencyMs:evaluation.latencyMs||0,prompt:evaluation.prompt}):[
+    `## Héctor OS ${SYSTEM_VERSION}`,
+    `Actualizado: ${RELEASED_AT}`,
+    '',
+    'Todavía no existe una autoevaluación ejecutada. Escribe **“autoevalúate”** para generar pruebas, evidencia y un prompt de mejora.'
+  ].join('\n');
+  return c.json({version:SYSTEM_VERSION,releasedAt:RELEASED_AT,changes:RELEASE_CHANGES,capabilities:VERIFIED_CAPABILITIES,limitations:CURRENT_LIMITATIONS,evaluation,prompt:shortImprovementPrompt(gaps),text});
 });
 
 systemInfo.get('/model',async c=>{
