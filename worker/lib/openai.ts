@@ -1,6 +1,7 @@
 import type { Bindings } from '../types';
+import { BOOTSTRAP_VERSION,renderBootstrap } from '../intelligence/bootstrap';
 
-export const CONTEXTUAL_ENGINE_VERSION='2.0.2';
+export const CONTEXTUAL_ENGINE_VERSION='2.1.0';
 export type AIUsage={input_tokens?:number;output_tokens?:number;input_tokens_details?:{cached_tokens?:number}};
 type AIResponse={id:string;output_text?:string;output?:Array<{type:string;content?:Array<{type:string;text?:string}>}>;usage?:AIUsage;error?:{message:string}};
 export type Route={model:string;tier:'fast'|'balanced'|'deep';reason:string;reasoning:'low'|'medium'|'high';task:string;needsWeb:boolean};
@@ -57,16 +58,17 @@ REGLAS DE OPERACIÓN
 - Conserva continuidad con el historial y el contexto suministrados. Si hay conflicto, prioriza información reciente y explícita.
 - No afirmes haber usado una herramienta, modificado código, desplegado o verificado algo sin evidencia en el contexto.
 - En salud, legal, finanzas y seguridad, identifica riesgos concretos y umbrales de acción.
-- En cálculos técnicos, muestra ecuaciones si ayudan, pero repite siempre los resultados finales en texto plano con número y unidad, por ejemplo: "Corriente nominal: 25 A".
-- Cuando evalúes tus capacidades o carencias, no describas únicamente capacidades genéricas de un modelo lingüístico. Basa cada afirmación en componentes presentes en el contexto: D1, R2, Worker, memoria, resúmenes, router, herramientas, pruebas, despliegues y rutas API. Para cada capacidad indica evidencia; para cada carencia indica causa arquitectónica, impacto, prueba reproducible y mejora concreta. Separa claramente lo que pertenece al modelo externo de lo que implementa Héctor OS.
+- En cálculos técnicos, muestra ecuaciones si ayudan, pero repite siempre los resultados finales en texto plano con número y unidad.
+- Cuando evalúes tus capacidades o carencias, basa cada afirmación en componentes presentes: D1, R2, Worker, memoria, resúmenes, router, herramientas, pruebas, despliegues y rutas API.
 - Antes de responder revisa silenciosamente: objetivo, consistencia, evidencia, omisiones y aplicabilidad.
 - No reveles razonamiento privado; entrega solo la respuesta final.
 
 ENRUTAMIENTO
 - Tarea: ${route.task}
 - Nivel: ${route.tier}
-- Motivo: ${route.reason}`;}
-function legacyPrompt(route:Route,memories:string[]){return `Eres Héctor OS, el asistente personal privado de Héctor.\n${behaviorRules(route)}\n\nMEMORIA RELEVANTE\n${memories.length?memories.map(x=>`- ${x}`).join('\n'):'- Sin memoria relevante'}`;}
+- Motivo: ${route.reason}
+- Bootstrap: ${BOOTSTRAP_VERSION}`;}
+function legacyPrompt(route:Route,memories:string[]){return `${renderBootstrap()}\n\n${behaviorRules(route)}\n\nMEMORIA RELEVANTE\n${memories.length?memories.map(x=>`- ${x}`).join('\n'):'- Sin memoria relevante'}`;}
 async function callResponses(env:Bindings,body:Record<string,unknown>){
   const res=await fetch('https://api.openai.com/v1/responses',{method:'POST',headers:{Authorization:`Bearer ${env.OPENAI_API_KEY}`,'Content-Type':'application/json'},body:JSON.stringify(body)});
   const data=await res.json<AIResponse>();
@@ -84,7 +86,7 @@ export async function respond(env:Bindings,input:string,previousResponseId:strin
 }
 export async function respondContextual(env:Bindings,input:string,history:ChatTurn[],renderedContext:string,allowWeb=true){
   const route=routeModel(env,input,allowWeb);
-  const instructions=`Eres Héctor OS, el asistente personal privado de Héctor. No eres una sesión aislada: eres un sistema persistente con identidad, memoria, proyecto y responsabilidades.\n${behaviorRules(route)}\n\n${renderedContext}`;
+  const instructions=`${renderBootstrap()}\n\n${behaviorRules(route)}\n\nCONTEXTO DINÁMICO\n${renderedContext}`;
   const trimmed=history.slice(-16).map(x=>({role:x.role,content:x.content}));
   const conversation=[...trimmed,{role:'user' as const,content:input}];
   const body:Record<string,unknown>={model:route.model,instructions,input:conversation,store:true,reasoning:{effort:route.reasoning}};
@@ -94,7 +96,7 @@ export async function respondContextual(env:Bindings,input:string,history:ChatTu
 }
 export async function inspectImage(env:Bindings,prompt:string,dataUrl:string){
   const model=env.OPENAI_MODEL_BALANCED||env.OPENAI_MODEL;
-  const instructions='Analiza la imagen para Héctor. Responde en español, directo, preciso y útil. Separa observaciones visibles, inferencias y recomendaciones. Revisa silenciosamente que no estés afirmando como visible algo que solo estás infiriendo.';
+  const instructions=`${renderBootstrap()}\n\nAnaliza la imagen para Héctor. Responde en español, directo, preciso y útil. Separa observaciones visibles, inferencias y recomendaciones. No afirmes como visible algo que solo estás infiriendo.`;
   const out=await callResponses(env,{model,instructions,input:[{role:'user',content:[{type:'input_text',text:prompt},{type:'input_image',image_url:dataUrl,detail:'auto'}]}],store:false,reasoning:{effort:'medium'}});
   return{text:out.text,usage:out.data.usage,model};
 }
