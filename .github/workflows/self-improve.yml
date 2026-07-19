@@ -39,11 +39,22 @@ jobs:
         with:
           node-version: 22
           cache: npm
-      - run: npm ci
+      - id: install
+        run: npm ci
       - name: Validate model credential
-        run: test -n "$OPENAI_API_KEY"
+        id: credential
+        shell: bash
+        run: |
+          if [ -z "$OPENAI_API_KEY" ]; then
+            echo "MODEL_CREDENTIAL_MISSING" > /tmp/self-improve-error.txt
+            exit 12
+          fi
       - name: Ask Héctor OS to inspect and improve itself
-        run: node scripts/self-improve.mjs
+        id: agent
+        shell: bash
+        run: |
+          set -o pipefail
+          node scripts/self-improve.mjs 2> >(tee /tmp/self-improve-error.txt >&2)
       - name: Detect proposed changes
         id: changes
         shell: bash
@@ -55,12 +66,15 @@ jobs:
             git diff --stat
           fi
       - name: Typecheck
+        id: typecheck
         if: steps.changes.outputs.changed == 'true'
         run: npm run typecheck
       - name: Tests
+        id: tests
         if: steps.changes.outputs.changed == 'true'
         run: npm test -- --passWithNoTests
       - name: Build
+        id: build
         if: steps.changes.outputs.changed == 'true'
         run: npm run build
       - name: Create guarded improvement branch
@@ -96,4 +110,7 @@ jobs:
       - name: Publish failure receipt
         if: failure()
         shell: bash
-        run: gh issue create --title "[self-improve] FALLO ${GITHUB_SHA::7}" --body "El ciclo autónomo falló antes de crear o validar un PR. No se modificó main ni producción. Revisa el workflow Hector OS Self Improve."
+        run: |
+          REASON="$(tail -n 8 /tmp/self-improve-error.txt 2>/dev/null | sed -E 's/(sk-[A-Za-z0-9_-]+)/[REDACTED]/g' | head -c 1200 || true)"
+          BODY="El ciclo autónomo falló de forma segura. No se modificó main ni producción.\n\nResultados de pasos:\n- credencial: ${{ steps.credential.outcome }}\n- agente: ${{ steps.agent.outcome }}\n- typecheck: ${{ steps.typecheck.outcome }}\n- pruebas: ${{ steps.tests.outcome }}\n- build: ${{ steps.build.outcome }}\n\nDiagnóstico sanitizado:\n\`\`\`\n${REASON:-Sin detalle disponible}\n\`\`\`"
+          gh issue create --title "[self-improve] FALLO ${GITHUB_SHA::7}" --body "$BODY"
