@@ -1,6 +1,6 @@
 name: Production Smoke Test
 
-on:
+"on":
   workflow_dispatch:
   push:
     paths:
@@ -39,14 +39,15 @@ jobs:
         shell: bash
         run: |
           set -euo pipefail
-          TEST_ID="$(node -e "console.log(crypto.randomUUID())")"
+          TEST_ID="$(node --input-type=module -e "import { randomUUID } from 'node:crypto'; console.log(randomUUID())")"
           TEST_EMAIL="smoke-${GITHUB_RUN_ID}-${GITHUB_RUN_ATTEMPT}@hector-os.invalid"
-          TEST_PASSWORD="Smoke-$(node -e "console.log(crypto.randomBytes(18).toString('base64url'))")"
+          TEST_PASSWORD="Smoke-$(node --input-type=module -e "import { randomBytes } from 'node:crypto'; console.log(randomBytes(18).toString('base64url'))")"
           read -r SALT HASH < <(TEST_PASSWORD="$TEST_PASSWORD" node --input-type=module <<'NODE'
+          import { randomBytes, webcrypto } from 'node:crypto';
           const password = process.env.TEST_PASSWORD;
-          const salt = crypto.randomBytes(16).toString('base64url');
-          const key = await crypto.subtle.importKey('raw', new TextEncoder().encode(password), 'PBKDF2', false, ['deriveBits']);
-          const bits = await crypto.subtle.deriveBits({name:'PBKDF2',salt:new TextEncoder().encode(salt),iterations:50000,hash:'SHA-256'}, key, 256);
+          const salt = randomBytes(16).toString('base64url');
+          const key = await webcrypto.subtle.importKey('raw', new TextEncoder().encode(password), 'PBKDF2', false, ['deriveBits']);
+          const bits = await webcrypto.subtle.deriveBits({name:'PBKDF2',salt:new TextEncoder().encode(salt),iterations:50000,hash:'SHA-256'}, key, 256);
           const hash = Buffer.from(bits).toString('hex');
           console.log(salt, hash);
           NODE
@@ -88,9 +89,11 @@ jobs:
         if: success()
         env:
           GH_TOKEN: ${{ github.token }}
-        run: gh issue create --title "[production-smoke] OK ${GITHUB_SHA::7}" --body "✅ PWA pública, health, login, sesión, dashboard, ajustes y logout funcionaron contra producción. El usuario técnico temporal fue eliminado."
+        run: |
+          gh issue create --title "[production-smoke] OK ${GITHUB_SHA::7}" --body "✅ PWA pública, health, login, sesión, dashboard, ajustes y logout funcionaron contra producción. El usuario técnico temporal fue eliminado."
       - name: Publish failure receipt
         if: failure()
         env:
           GH_TOKEN: ${{ github.token }}
-        run: gh issue create --title "[production-smoke] FALLO ${GITHUB_SHA::7}" --body "❌ La prueba end-to-end de producción falló. Revisa el workflow Production Smoke Test; no se publicaron credenciales y se intentó limpiar el usuario técnico temporal."
+        run: |
+          gh issue create --title "[production-smoke] FALLO ${GITHUB_SHA::7}" --body "❌ La prueba end-to-end de producción falló. Revisa el workflow Production Smoke Test; no se publicaron credenciales y se intentó limpiar el usuario técnico temporal."
