@@ -42,10 +42,8 @@ async function runSelfEvaluation(env:Bindings,db:D1Database,userId:string){
   const context=renderContext(pack),results:any[]=[];let total=0,totalLatency=0,lastModel='';
   for(const item of checks()){
     const start=Date.now();
-    try{
-      const out=await respondContextual(env,item.prompt,[],context,false),latency=Date.now()-start,passed=item.test(out.text),score=passed?item.max:0;
-      total+=score;totalLatency+=latency;lastModel=out.model;results.push({name:item.name,score,max:item.max,passed,latencyMs:latency,response:out.text.slice(0,1600),model:out.model});
-    }catch(error){results.push({name:item.name,score:0,max:item.max,passed:false,error:error instanceof Error?error.message:'Error'});}
+    try{const out=await respondContextual(env,item.prompt,[],context,false),latency=Date.now()-start,passed=item.test(out.text),score=passed?item.max:0;total+=score;totalLatency+=latency;lastModel=out.model;results.push({name:item.name,score,max:item.max,passed,latencyMs:latency,response:out.text.slice(0,1600),model:out.model});}
+    catch(error){results.push({name:item.name,score:0,max:item.max,passed:false,error:error instanceof Error?error.message:'Error'});}
   }
   const strengths=results.filter(x=>x.passed).map(x=>x.name),gaps=results.filter(x=>!x.passed).map(x=>x.name);
   const grade=total>=90?'A':total>=80?'B':total>=70?'C':total>=60?'D':'F',evaluationId=crypto.randomUUID();
@@ -80,14 +78,15 @@ intelligence.post('/chat',async c=>{
   const config=await settings(c.env.DB,userId),pack=await loadContextPack(c.env.DB,userId,cid,message),context=renderContext(pack);
   try{
     const out=await respondContextual(c.env,message,pack.recentMessages,context,config.allowWeb),usage=estimateCost(out.usage);if(out.searchedWeb)usage.costUsd+=.01;
+    const provider=out.provider==='cloudflare'?'Cloudflare':'OpenAI';
     await c.env.DB.batch([
       c.env.DB.prepare('INSERT INTO messages(id,conversation_id,role,content) VALUES(?,?,?,?)').bind(crypto.randomUUID(),cid,'assistant',out.text),
-      c.env.DB.prepare("UPDATE conversations SET openai_previous_response_id=?,updated_at=CURRENT_TIMESTAMP WHERE id=?").bind(out.id,cid),
-      c.env.DB.prepare('INSERT INTO api_usage(id,user_id,provider,service,model,input_units,cached_input_units,output_units,estimated_cost_usd,metadata_json) VALUES(?,?,?,?,?,?,?,?,?,?)').bind(crypto.randomUUID(),userId,'OpenAI',out.searchedWeb?'contextual-chat+web':'contextual-chat',out.model,usage.input,usage.cached,usage.output,usage.costUsd,JSON.stringify({tier:out.modelTier,reason:out.modelReason,task:out.task,searchedWeb:out.searchedWeb}))
+      c.env.DB.prepare("UPDATE conversations SET openai_previous_response_id=?,updated_at=CURRENT_TIMESTAMP WHERE id=?").bind(out.provider==='openai'?out.id:null,cid),
+      c.env.DB.prepare('INSERT INTO api_usage(id,user_id,provider,service,model,input_units,cached_input_units,output_units,estimated_cost_usd,metadata_json) VALUES(?,?,?,?,?,?,?,?,?,?)').bind(crypto.randomUUID(),userId,provider,out.searchedWeb?'contextual-chat+web':'contextual-chat',out.model,usage.input,usage.cached,usage.output,usage.costUsd,JSON.stringify({tier:out.modelTier,reason:out.modelReason,task:out.task,searchedWeb:out.searchedWeb,providerReason:out.providerReason,fallback:out.fallback}))
     ]);
     if(config.allowLearning)await maybeSaveExplicitMemory(c.env.DB,userId,message);
     await saveRollingSummary(c.env.DB,userId,cid);
-    return c.json({conversationId:cid,message:{role:'assistant',content:out.text},usage,searchedWeb:out.searchedWeb,model:out.model,modelTier:out.modelTier,modelReason:out.modelReason,context:{memories:pack.memories.length,recentMessages:pack.recentMessages.length,hasSummary:!!pack.summary}});
+    return c.json({conversationId:cid,message:{role:'assistant',content:out.text},usage,searchedWeb:out.searchedWeb,model:out.model,provider:out.provider,providerReason:out.providerReason,fallback:out.fallback,modelTier:out.modelTier,modelReason:out.modelReason,context:{memories:pack.memories.length,recentMessages:pack.recentMessages.length,hasSummary:!!pack.summary}});
   }catch(error){return c.json({error:error instanceof Error?error.message:'Error de IA contextual'},502);}
 });
 
