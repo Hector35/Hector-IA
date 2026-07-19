@@ -13,14 +13,15 @@ const codeSignals=/\b(código|codigo|typescript|javascript|python|react|worker|c
 const planningSignals=/\b(plan|estrategia|prioridades|decisión|decision|opciones|comparar|compara|arquitectura|diseño|diseña|proyecto|pasos|riesgos|migración|migracion)\b/i;
 const medicalSignals=/\b(dolor|síntoma|sintoma|medicamento|salud|lesión|lesion|cirugía|cirugia|dedo|taquicardia|presión|presion|dosis)\b/i;
 
-function words(text:string){return [...new Set(text.toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g,'').match(/[a-z0-9]{3,}/g)||[])].filter(x=>!['para','como','pero','porque','esta','este','esto','tiene','quiero','puede','hacer','sobre','desde','todo','todos','todas','cuando','donde'].includes(x));}
+function normalizeText(text:string){return text.toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g,'');}
+function words(text:string){return [...new Set(normalizeText(text).match(/[a-z0-9]{3,}/g)||[])].filter(x=>!['para','como','pero','porque','esta','este','esto','tiene','quiero','puede','hacer','sobre','desde','todo','todos','todas','cuando','donde'].includes(x));}
 export function relevantMemories(input:string,memories:string[]){
-  const query=words(input),numbers=input.match(/\b\d+(?:[.,]\d+)?\b/g)||[];
+  const normalizedInput=normalizeText(input),query=words(input),numbers=input.match(/\b\d+(?:[.,]\d+)?\b/g)||[];
   return memories.map((content,index)=>{
-    const normalized=content.toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g,'');
+    const normalized=normalizeText(content);
     const overlap=query.reduce((n,w)=>n+(normalized.includes(w)?1:0),0);
     const numeric=numbers.reduce((n,x)=>n+(normalized.includes(x)?2:0),0);
-    const exact=input.length>12&&normalized.includes(input.toLowerCase().slice(0,40))?4:0;
+    const exact=normalizedInput.length>12&&normalized.includes(normalizedInput.slice(0,40))?4:0;
     return{content,score:overlap*2+numeric+exact-Math.min(index,20)*0.02};
   }).filter(x=>x.score>0).sort((a,b)=>b.score-a.score).slice(0,8).map(x=>x.content);
 }
