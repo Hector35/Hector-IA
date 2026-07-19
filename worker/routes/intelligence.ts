@@ -4,6 +4,7 @@ import type { Bindings,Variables } from '../types';
 import { requireAuth } from '../lib/auth';
 import { estimateCost,respondContextual } from '../lib/openai';
 import { loadContextPack,maybeSaveExplicitMemory,renderContext } from '../lib/context';
+import {renderEvidenceSelfAnalysis} from '../intelligence/self-report';
 
 export const intelligence=new Hono<{Bindings:Bindings;Variables:Variables}>();
 intelligence.use('*',requireAuth);
@@ -54,25 +55,32 @@ async function runSelfEvaluation(env:Bindings,db:D1Database,userId:string){
     db.prepare('INSERT INTO self_evaluations(id,user_id,score,grade,strengths_json,gaps_json,tests_json,model,latency_ms) VALUES(?,?,?,?,?,?,?,?,?)').bind(evaluationId,userId,total,grade,JSON.stringify(strengths),JSON.stringify(gaps),JSON.stringify(results),lastModel,Math.round(totalLatency/checks().length)),
     db.prepare('INSERT INTO improvement_prompts(id,evaluation_id,user_id,target,prompt) VALUES(?,?,?,?,?)').bind(promptId,evaluationId,userId,'ChatGPT + GitHub',prompt)
   ]);
-  return{evaluationId,promptId,score:total,grade,strengths,gaps,tests:results,averageLatencyMs:Math.round(totalLatency/checks().length),prompt};
+  return{evaluationId,promptId,score:total,grade,strengths,gaps,tests:results,averageLatencyMs:Math.round(totalLatency/checks().length),prompt,lastModel};
+}
+
+function isSelfAnalysisRequest(message:string){
+  return /(?:^|\b)(?:autoeval[uú]a(?:te)?|autoanal[ií]za(?:te)?|eval[uú]a tu inteligencia|qu[eé] te falta|qu[eé] puedes hacer|cu[aá]les son tus limitaciones|dime tus limitaciones|qu[eé] mejoraste|qu[eé] cambi[oó]|estado del sistema|informe del sistema|problemas por resolver|mejoras recomendadas)(?:\b|$)/i.test(message);
 }
 
 intelligence.post('/chat',async c=>{
   const parsed=z.object({message:z.string().min(1).max(12000),conversationId:z.string().uuid().optional()}).safeParse(await c.req.json());
   if(!parsed.success)return c.json({error:'Mensaje inválido'},400);
   const userId=c.get('userId'),message=parsed.data.message,cid=await ensureConversation(c.env.DB,userId,parsed.data.conversationId,message);
-  if(/^(?:\/)?(?:autoeval[uú]a(?:te)?|autoanal[ií]za(?:te)?|eval[uú]a tu inteligencia|qu[eé] te falta)/i.test(message)){
+  if(isSelfAnalysisRequest(message)){
     const report=await runSelfEvaluation(c.env,c.env.DB,userId);
-    const failures=report.tests.filter((x:any)=>!x.passed).map((x:any)=>`- ${x.name}: prueba fallida`).join('\n');
-    const text=`Autoevaluación verificable completada: ${report.score}/100 (${report.grade}).\n\nFortalezas comprobadas: ${report.strengths.join(', ')||'ninguna'}.\nCarencias detectadas por pruebas:\n${failures||'- Ninguna en esta suite.'}\nLatencia media: ${report.averageLatencyMs} ms.\n\nGeneré un prompt técnico con evidencia y causas raíz para ChatGPT + GitHub.`;
-    await c.env.DB.batch([c.env.DB.prepare('INSERT INTO messages(id,conversation_id,role,content) VALUES(?,?,?,?)').bind(crypto.randomUUID(),cid,'user',message),c.env.DB.prepare('INSERT INTO messages(id,conversation_id,role,content) VALUES(?,?,?,?)').bind(crypto.randomUUID(),cid,'assistant',text)]);await saveRollingSummary(c.env.DB,userId,cid);
-    return c.json({conversationId:cid,message:{role:'assistant',content:text},selfEvaluation:report});
+    const text=renderEvidenceSelfAnalysis(report);
+    await c.env.DB.batch([
+      c.env.DB.prepare('INSERT INTO messages(id,conversation_id,role,content) VALUES(?,?,?,?)').bind(crypto.randomUUID(),cid,'user',message),
+      c.env.DB.prepare('INSERT INTO messages(id,conversation_id,role,content) VALUES(?,?,?,?)').bind(crypto.randomUUID(),cid,'assistant',text)
+    ]);
+    await saveRollingSummary(c.env.DB,userId,cid);
+    return c.json({conversationId:cid,message:{role:'assistant',content:text},provider:'system',model:`self-evaluation:${report.lastModel||'unknown'}`,modelTier:'verified',modelReason:'manifiesto + D1 + suite reproducible',fallback:false,selfEvaluation:report});
   }
   if(/genera(?:me)? (?:el |un )?prompt de mejora|prompt para (?:chatgpt|github)/i.test(message)){
     const latest=await c.env.DB.prepare("SELECT prompt FROM improvement_prompts WHERE user_id=? AND status='ready' ORDER BY created_at DESC LIMIT 1").bind(userId).first<{prompt:string}>();
     const text=latest?.prompt||'Aún no existe una autoevaluación. Escribe “autoevalúate” para generar el diagnóstico y el prompt.';
     await c.env.DB.batch([c.env.DB.prepare('INSERT INTO messages(id,conversation_id,role,content) VALUES(?,?,?,?)').bind(crypto.randomUUID(),cid,'user',message),c.env.DB.prepare('INSERT INTO messages(id,conversation_id,role,content) VALUES(?,?,?,?)').bind(crypto.randomUUID(),cid,'assistant',text)]);await saveRollingSummary(c.env.DB,userId,cid);
-    return c.json({conversationId:cid,message:{role:'assistant',content:text},improvementPrompt:latest?.prompt});
+    return c.json({conversationId:cid,message:{role:'assistant',content:text},provider:'system',model:'improvement-prompt-registry',modelTier:'verified',modelReason:'última autoevaluación persistida',fallback:false,improvementPrompt:latest?.prompt});
   }
   await c.env.DB.prepare('INSERT INTO messages(id,conversation_id,role,content) VALUES(?,?,?,?)').bind(crypto.randomUUID(),cid,'user',message).run();
   const config=await settings(c.env.DB,userId),pack=await loadContextPack(c.env.DB,userId,cid,message),context=renderContext(pack);
