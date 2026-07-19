@@ -4,11 +4,11 @@ export type AIUsage={input_tokens?:number;output_tokens?:number;input_tokens_det
 type AIResponse={id:string;output_text?:string;output?:Array<{type:string;content?:Array<{type:string;text?:string}>}>;usage?:AIUsage;error?:{message:string}};
 export type Route={model:string;tier:'fast'|'balanced'|'deep';reason:string;reasoning:'low'|'medium'|'high';task:string;needsWeb:boolean};
 
-const deepSignals=/\b(programa|programar|código|codigo|arquitectura|depura|debug|analiza a fondo|demuestra|prueba matemática|estrategia|plan completo|investiga profundamente|compara todas|diseña|optimiza|auditoría|auditoria|diagnóstico|diagnostico|razona paso|ingeniería|ingenieria|implementa|refactoriza|hipótesis|hipotesis|modelo completo)\b/i;
+const deepSignals=/\b(programa|programar|código|codigo|arquitectura|depura|debug|analiza a fondo|demuestra|prueba matemática|estrategia|plan completo|investiga profundamente|compara todas|diseña|optimiza|audita|auditoría|auditoria|diagnóstico|diagnostico|razona paso|ingeniería|ingenieria|implementa|refactoriza|refactorización|refactorizacion|hipótesis|hipotesis|modelo completo)\b/i;
 const fastSignals=/^(hola|gracias|ok|sí|si|no|cuánto|cuanto|qué hora|que hora|resume|traduce|corrige)\b/i;
 const currentSignals=/\b(hoy|ahora|actual|actualmente|reciente|último|ultima|última|precio|clima|noticia|ley|regla|versión|version|disponible|quién es|quien es|verifica|investiga|busca)\b/i;
 const codeSignals=/\b(código|codigo|typescript|javascript|python|react|worker|cloudflare|github|api|sql|d1|r2|bug|error|deploy|workflow|frontend|backend)\b/i;
-const planningSignals=/\b(plan|estrategia|prioridades|decisión|decision|opciones|comparar|arquitectura|diseño|diseña|proyecto|pasos)\b/i;
+const planningSignals=/\b(plan|estrategia|prioridades|decisión|decision|opciones|comparar|compara|arquitectura|diseño|diseña|proyecto|pasos|riesgos|migración|migracion)\b/i;
 const medicalSignals=/\b(dolor|síntoma|sintoma|medicamento|salud|lesión|lesion|cirugía|cirugia|dedo|taquicardia|presión|presion|dosis)\b/i;
 
 function words(text:string){return [...new Set(text.toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g,'').match(/[a-z0-9]{3,}/g)||[])].filter(x=>!['para','como','pero','porque','esta','este','esto','tiene','quiero','puede','hacer','sobre','desde','todo','todos','todas','cuando','donde'].includes(x));}
@@ -36,8 +36,10 @@ export function routeModel(env:Bindings,input:string,allowWeb:boolean):Route{
   const deep=env.OPENAI_MODEL_REASONING||balanced;
   const needsWeb=allowWeb&&currentSignals.test(input);
   const hasDeepSignal=deepSignals.test(input);
-  const isTechnicalPlan=codeSignals.test(input)&&planningSignals.test(input);
-  const score=(input.length>700?2:0)+(input.length>2200?2:0)+(hasDeepSignal?3:0)+(isTechnicalPlan?1:0)+(needsWeb?1:0)+(input.split('\n').length>8?1:0);
+  const hasPlanningSignal=planningSignals.test(input);
+  const isTechnicalPlan=codeSignals.test(input)&&hasPlanningSignal;
+  const isComplexPlan=hasDeepSignal&&hasPlanningSignal;
+  const score=(input.length>700?2:0)+(input.length>2200?2:0)+(hasDeepSignal?3:0)+(isTechnicalPlan?1:0)+(isComplexPlan?1:0)+(needsWeb?1:0)+(input.split('\n').length>8?1:0);
   const task=classify(input);
   if(score>=4)return{model:deep,tier:'deep',reason:'solicitud compleja, técnica o de alto impacto',reasoning:'high',task,needsWeb};
   if(input.length<140&&fastSignals.test(input))return{model:fast,tier:'fast',reason:'consulta breve y directa',reasoning:'low',task,needsWeb};
