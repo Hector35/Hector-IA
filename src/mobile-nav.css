@@ -1,0 +1,26 @@
+@media (max-width: 760px) {
+  .bottom {
+    justify-content: flex-start;
+    gap: 2px;
+    overflow-x: auto;
+    overflow-y: hidden;
+    -webkit-overflow-scrolling: touch;
+    scrollbar-width: none;
+    padding-left: 6px;
+    padding-right: 6px;
+  }
+
+  .bottom::-webkit-scrollbar {
+    display: none;
+  }
+
+  .bottom button {
+    flex: 0 0 68px;
+    min-width: 68px;
+  }
+
+  .bottom::after {
+    content: '';
+    flex: 0 0 6px;
+  }
+}
