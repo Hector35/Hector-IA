@@ -1,0 +1,99 @@
+name: Hector OS Self Improve
+
+"on":
+  workflow_dispatch:
+    inputs:
+      task:
+        description: Mejora concreta que Héctor OS debe investigar
+        required: false
+        type: string
+  push:
+    branches: [main]
+    paths:
+      - scripts/self-improve.mjs
+      - .github/workflows/self-improve.yml
+
+permissions:
+  contents: write
+  pull-requests: write
+  issues: write
+
+concurrency:
+  group: hector-os-self-improve
+  cancel-in-progress: false
+
+jobs:
+  improve:
+    runs-on: ubuntu-latest
+    timeout-minutes: 25
+    env:
+      OPENAI_API_KEY: ${{ secrets.OPENAI_API_KEY != '' && secrets.OPENAI_API_KEY || secrets.CODEX_TOKEN }}
+      SELF_IMPROVE_MODEL: gpt-5.4
+      SELF_IMPROVE_TASK: ${{ inputs.task || 'Autoanaliza el núcleo contextual de Héctor OS. Encuentra una sola debilidad real y aplica una mejora pequeña con prueba o criterio reproducible. Evita cambios cosméticos.' }}
+      GH_TOKEN: ${{ github.token }}
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+      - run: npm ci
+      - name: Validate model credential
+        run: test -n "$OPENAI_API_KEY"
+      - name: Ask Héctor OS to inspect and improve itself
+        run: node scripts/self-improve.mjs
+      - name: Detect proposed changes
+        id: changes
+        shell: bash
+        run: |
+          if git diff --quiet; then
+            echo "changed=false" >> "$GITHUB_OUTPUT"
+          else
+            echo "changed=true" >> "$GITHUB_OUTPUT"
+            git diff --stat
+          fi
+      - name: Typecheck
+        if: steps.changes.outputs.changed == 'true'
+        run: npm run typecheck
+      - name: Tests
+        if: steps.changes.outputs.changed == 'true'
+        run: npm test -- --passWithNoTests
+      - name: Build
+        if: steps.changes.outputs.changed == 'true'
+        run: npm run build
+      - name: Create guarded improvement branch
+        if: steps.changes.outputs.changed == 'true'
+        id: branch
+        shell: bash
+        run: |
+          BRANCH="hector-self-improve/${GITHUB_RUN_ID}-${GITHUB_RUN_ATTEMPT}"
+          git config user.name "Hector OS"
+          git config user.email "actions@users.noreply.github.com"
+          git checkout -b "$BRANCH"
+          git add worker/lib/openai.ts worker/lib/context.ts worker/routes/intelligence.ts worker/lib/openai.test.ts worker/lib/context.test.ts 2>/dev/null || true
+          git commit -m "feat(ai): autonomous guarded improvement"
+          git push origin "$BRANCH"
+          echo "name=$BRANCH" >> "$GITHUB_OUTPUT"
+      - name: Open pull request for human-visible audit
+        if: steps.changes.outputs.changed == 'true'
+        id: pr
+        shell: bash
+        run: |
+          PR_URL="$(gh pr create --base main --head '${{ steps.branch.outputs.name }}' --title 'Héctor OS: propuesta autónoma de mejora' --body-file /tmp/self-improve-report.md)"
+          echo "url=$PR_URL" >> "$GITHUB_OUTPUT"
+          echo "$PR_URL" >> "$GITHUB_STEP_SUMMARY"
+      - name: Publish success receipt
+        if: success()
+        shell: bash
+        run: |
+          if [ "${{ steps.changes.outputs.changed }}" = "true" ]; then
+            gh issue create --title "[self-improve] PROPUESTA OK ${GITHUB_SHA::7}" --body "Héctor OS inspeccionó su código, generó una mejora de riesgo bajo, pasó typecheck, pruebas y build, y abrió un PR: ${{ steps.pr.outputs.url }}"
+          else
+            gh issue create --title "[self-improve] SIN CAMBIOS ${GITHUB_SHA::7}" --body-file /tmp/self-improve-report.md
+          fi
+      - name: Publish failure receipt
+        if: failure()
+        shell: bash
+        run: gh issue create --title "[self-improve] FALLO ${GITHUB_SHA::7}" --body "El ciclo autónomo falló antes de crear o validar un PR. No se modificó main ni producción. Revisa el workflow Hector OS Self Improve."
