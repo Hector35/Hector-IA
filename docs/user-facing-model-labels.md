@@ -1,0 +1,1 @@
+Provider labels: `Cloudflare AI`, `OpenAI`, or `Sistema`. Model labels must use the exact runtime model identifier returned by the provider. The `fallback` label appears only when Workers AI failed and OpenAI completed the response.
