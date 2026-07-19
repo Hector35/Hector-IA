@@ -1,0 +1,62 @@
+name: Agent Browser
+
+on:
+  workflow_dispatch:
+    inputs:
+      url:
+        description: URL HTTPS a verificar
+        required: true
+        type: string
+      viewport:
+        description: Viewport, por ejemplo 390x844
+        required: false
+        default: 390x844
+        type: string
+
+permissions:
+  contents: read
+
+jobs:
+  verify:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+      - name: Validar URL
+        env:
+          TARGET_URL: ${{ inputs.url }}
+        run: node -e "const u=new URL(process.env.TARGET_URL);if(u.protocol!=='https:')throw new Error('Solo HTTPS');"
+      - name: Instalar Playwright
+        run: npm install --no-save playwright && npx playwright install --with-deps chromium
+      - name: Navegar y capturar evidencia
+        env:
+          TARGET_URL: ${{ inputs.url }}
+          VIEWPORT: ${{ inputs.viewport }}
+        run: |
+          node --input-type=module <<'EOF'
+          import {chromium} from 'playwright';
+          import {mkdir,writeFile} from 'node:fs/promises';
+          const [width,height]=String(process.env.VIEWPORT||'390x844').split('x').map(Number);
+          const browser=await chromium.launch({headless:true});
+          const page=await browser.newPage({viewport:{width,height}});
+          const errors=[];
+          page.on('console',m=>{if(m.type()==='error')errors.push(m.text())});
+          page.on('pageerror',e=>errors.push(e.message));
+          const response=await page.goto(process.env.TARGET_URL,{waitUntil:'networkidle',timeout:45000});
+          await mkdir('agent-evidence',{recursive:true});
+          await page.screenshot({path:'agent-evidence/page.png',fullPage:true});
+          const report={url:page.url(),title:await page.title(),status:response?.status()??null,viewport:{width,height},errors,checkedAt:new Date().toISOString()};
+          await writeFile('agent-evidence/report.json',JSON.stringify(report,null,2));
+          console.log(report);
+          await browser.close();
+          if(!response||response.status()>=400)process.exit(1);
+          EOF
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: agent-browser-evidence
+          path: agent-evidence
+          retention-days: 7
