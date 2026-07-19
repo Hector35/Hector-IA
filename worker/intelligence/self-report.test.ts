@@ -15,7 +15,7 @@ describe('renderEvidenceSelfAnalysis',()=>{
       averageLatencyMs:123,
       prompt:'Corrige la verificación con pruebas reproducibles.'
     });
-    expect(text).toContain('Héctor OS 2.4.0');
+    expect(text).toContain('Héctor OS 2.5.0');
     expect(text).toContain('✓ **identidad**');
     expect(text).toContain('✗ **verificación**');
     expect(text).toContain('La introspección libre del modelo no cuenta como evidencia');
