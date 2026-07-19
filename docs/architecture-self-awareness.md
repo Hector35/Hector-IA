@@ -1,0 +1,1 @@
+The system manifest is versioned source-of-truth for release capabilities and limitations. Runtime model identity is read from actual provider output and D1 usage metadata. These sources are intentionally separate to prevent a model from inventing its own deployment state.
