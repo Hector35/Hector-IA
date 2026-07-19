@@ -1,0 +1,1 @@
+Verification targets: model metadata must be sourced from API response or D1 usage records; self-analysis must run the existing evaluation suite before reporting a score; release report must separate verified capabilities from architectural limitations.
