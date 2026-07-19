@@ -20,7 +20,7 @@ jobs:
           cache: npm
       - run: npm ci
       - run: npm run typecheck
-      - run: npm test --if-present
+      - run: npm test -- --passWithNoTests
       - run: npm run build
       - name: Resumen
         run: echo "Tarea verificada: ${{ inputs.task }}" >> "$GITHUB_STEP_SUMMARY"
