@@ -1,4 +1,5 @@
 name: Hector OS Runner
+
 "on":
   workflow_dispatch:
     inputs:
@@ -6,8 +7,13 @@ name: Hector OS Runner
         description: Trabajo autorizado para compilar y probar
         required: true
         type: string
+  push:
+    paths:
+      - .github/workflows/hector-runner.yml
+
 permissions:
   contents: read
+
 jobs:
   verify:
     runs-on: ubuntu-latest
@@ -23,4 +29,5 @@ jobs:
       - run: npm test -- --passWithNoTests
       - run: npm run build
       - name: Resumen
-        run: echo "Tarea verificada: ${{ inputs.task }}" >> "$GITHUB_STEP_SUMMARY"
+        run: |
+          echo "Tarea verificada: ${{ inputs.task || 'validación automática' }}" >> "$GITHUB_STEP_SUMMARY"
