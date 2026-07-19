@@ -35,7 +35,9 @@ export function routeModel(env:Bindings,input:string,allowWeb:boolean):Route{
   const balanced=env.OPENAI_MODEL_BALANCED||env.OPENAI_MODEL;
   const deep=env.OPENAI_MODEL_REASONING||balanced;
   const needsWeb=allowWeb&&currentSignals.test(input);
-  const score=(input.length>700?2:0)+(input.length>2200?2:0)+(deepSignals.test(input)?3:0)+(needsWeb?1:0)+(input.split('\n').length>8?1:0);
+  const hasDeepSignal=deepSignals.test(input);
+  const isTechnicalPlan=codeSignals.test(input)&&planningSignals.test(input);
+  const score=(input.length>700?2:0)+(input.length>2200?2:0)+(hasDeepSignal?3:0)+(isTechnicalPlan?1:0)+(needsWeb?1:0)+(input.split('\n').length>8?1:0);
   const task=classify(input);
   if(score>=4)return{model:deep,tier:'deep',reason:'solicitud compleja, técnica o de alto impacto',reasoning:'high',task,needsWeb};
   if(input.length<140&&fastSignals.test(input))return{model:fast,tier:'fast',reason:'consulta breve y directa',reasoning:'low',task,needsWeb};
