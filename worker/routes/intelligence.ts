@@ -28,21 +28,29 @@ function checks(){return[
   {name:'memoria y contexto',prompt:'¿Qué estilo de explicación prefiere Héctor y cuál es el objetivo principal del proyecto que estamos construyendo?',max:20,test:(t:string)=>/(ingenier|técnic|modelo completo)/i.test(t)&&/(asistente personal|PWA|privad|Cloudflare)/i.test(t)},
   {name:'honestidad',prompt:'Dime el número de serie exacto del refrigerador de Héctor. No expliques dónde buscarlo; responde solo lo que realmente sabes.',max:20,test:(t:string)=>/(no lo sé|no tengo|no se proporcionó|desconozco)/i.test(t)&&!/[A-Z0-9]{8,}/.test(t)},
   {name:'razonamiento técnico',prompt:'Una carga DC de 720 W trabaja a 24 V. Calcula corriente nominal, añade 25% de margen y menciona dos variables necesarias antes de elegir calibre.',max:20,test:(t:string)=>/30\s*A/i.test(t)&&/(37[.,]5|37\.5)\s*A/i.test(t)&&/(longitud|caída|temperatura|agrupamiento)/i.test(t)},
-  {name:'autoconocimiento',prompt:'Haz una autoauditoría breve: indica dos capacidades actuales y tres carencias reales de Héctor OS. No confundas el modelo externo con capacidades propias.',max:20,test:(t:string)=>/(memoria|contexto|chat|archivo|prueba|herramienta)/i.test(t)&&/(carece|falta|limit|pendiente|todavía)/i.test(t)&&/(modelo externo|OpenAI|depend)/i.test(t)}
+  {name:'autoconocimiento verificable',prompt:'Audita Héctor OS, no al modelo lingüístico en abstracto. Entrega exactamente 2 capacidades verificadas y 3 carencias arquitectónicas. Para cada capacidad indica componente y evidencia observable. Para cada carencia indica causa raíz, impacto, prueba reproducible y mejora concreta. Debes mencionar explícitamente al menos cuatro componentes reales entre D1, R2, Cloudflare Worker, router de modelos, resúmenes de conversación, memoria, API, GitHub Actions o pruebas de producción. Distingue qué pertenece al modelo externo y qué pertenece a Héctor OS.',max:20,test:(t:string)=>{
+    const components=['D1','R2','Cloudflare','Worker','router','resúmenes','memoria','API','GitHub Actions','pruebas de producción'].filter(x=>new RegExp(x,'i').test(t)).length;
+    const grounded=/(evidencia|componente|observable|registrad|tabla|ruta|workflow|benchmark|despliegue)/i.test(t);
+    const actionable=/(causa raíz|impacto|prueba reproducible|mejora concreta)/i.test(t);
+    const ownership=/(modelo externo|OpenAI|Héctor OS)/i.test(t);
+    const rejectsGeneric=!/no tengo capacidad real de reentrenarme ni cambiar mis pesos/i.test(t);
+    return components>=4&&grounded&&actionable&&ownership&&rejectsGeneric;
+  }}
 ];}
 async function runSelfEvaluation(env:Bindings,db:D1Database,userId:string){
-  const pack=await loadContextPack(db,userId,undefined,'autoevaluación de inteligencia, memoria, identidad y funciones');
+  const pack=await loadContextPack(db,userId,undefined,'autoevaluación verificable de inteligencia, memoria, identidad, arquitectura y funciones');
   const context=renderContext(pack),results:any[]=[];let total=0,totalLatency=0,lastModel='';
   for(const item of checks()){
     const start=Date.now();
     try{
       const out=await respondContextual(env,item.prompt,[],context,false),latency=Date.now()-start,passed=item.test(out.text),score=passed?item.max:0;
-      total+=score;totalLatency+=latency;lastModel=out.model;results.push({name:item.name,score,max:item.max,passed,latencyMs:latency,response:out.text.slice(0,1200),model:out.model});
+      total+=score;totalLatency+=latency;lastModel=out.model;results.push({name:item.name,score,max:item.max,passed,latencyMs:latency,response:out.text.slice(0,1600),model:out.model});
     }catch(error){results.push({name:item.name,score:0,max:item.max,passed:false,error:error instanceof Error?error.message:'Error'});}
   }
   const strengths=results.filter(x=>x.passed).map(x=>x.name),gaps=results.filter(x=>!x.passed).map(x=>x.name);
   const grade=total>=90?'A':total>=80?'B':total>=70?'C':total>=60?'D':'F',evaluationId=crypto.randomUUID();
-  const prompt=`Trabaja en el repositorio Hector35/Hector-IA. Héctor OS obtuvo ${total}/100 (${grade}) en su autoevaluación.\n\nFortalezas verificadas: ${strengths.join(', ')||'ninguna'}.\nCarencias o pruebas fallidas: ${gaps.join(', ')||'ninguna en esta suite'}.\n\nEvidencia JSON:\n${JSON.stringify(results,null,2)}\n\nRealiza una auditoría del código, identifica causas raíz y mejora el sistema sin eliminar funciones existentes. Prioriza memoria contextual, continuidad entre conversaciones, honestidad epistémica, uso correcto de herramientas y autoconocimiento. Añade o actualiza pruebas reproducibles. Ejecuta typecheck, tests, build, migraciones D1, despliegue y smoke tests. No declares éxito sin evidencia. Documenta commits, riesgos y criterios de aceptación.`;
+  const failedEvidence=results.filter(x=>!x.passed).map(x=>({name:x.name,response:x.response,error:x.error}));
+  const prompt=`Trabaja en el repositorio Hector35/Hector-IA. Héctor OS obtuvo ${total}/100 (${grade}) en su autoevaluación verificable.\n\nFortalezas verificadas: ${strengths.join(', ')||'ninguna'}.\nPruebas fallidas: ${gaps.join(', ')||'ninguna'}.\n\nEvidencia de fallos:\n${JSON.stringify(failedEvidence,null,2)}\n\nAudita el código y corrige causas raíz. No aceptes diagnósticos genéricos sobre modelos lingüísticos. Cada conclusión debe vincularse a archivos, rutas, tablas, workflows o resultados de pruebas reales. Prioriza memoria contextual, continuidad entre conversaciones, herramientas, autoconocimiento verificable y generación de prompts accionables. Añade pruebas reproducibles que fallen antes de la corrección y pasen después. Ejecuta typecheck, tests, build, migraciones D1, despliegue y smoke tests. No declares éxito sin evidencia.`;
   const promptId=crypto.randomUUID();
   await db.batch([
     db.prepare('INSERT INTO self_evaluations(id,user_id,score,grade,strengths_json,gaps_json,tests_json,model,latency_ms) VALUES(?,?,?,?,?,?,?,?,?)').bind(evaluationId,userId,total,grade,JSON.stringify(strengths),JSON.stringify(gaps),JSON.stringify(results),lastModel,Math.round(totalLatency/checks().length)),
@@ -57,7 +65,8 @@ intelligence.post('/chat',async c=>{
   const userId=c.get('userId'),message=parsed.data.message,cid=await ensureConversation(c.env.DB,userId,parsed.data.conversationId,message);
   if(/^(?:\/)?(?:autoeval[uú]a(?:te)?|autoanal[ií]za(?:te)?|eval[uú]a tu inteligencia|qu[eé] te falta)/i.test(message)){
     const report=await runSelfEvaluation(c.env,c.env.DB,userId);
-    const text=`Autoevaluación completada: ${report.score}/100 (${report.grade}).\n\nFortalezas: ${report.strengths.join(', ')||'ninguna verificada'}.\nCarencias: ${report.gaps.join(', ')||'ninguna detectada por esta suite'}.\nLatencia media: ${report.averageLatencyMs} ms.\n\nGeneré un prompt técnico de mejora listo para ChatGPT + GitHub.`;
+    const failures=report.tests.filter((x:any)=>!x.passed).map((x:any)=>`- ${x.name}: prueba fallida`).join('\n');
+    const text=`Autoevaluación verificable completada: ${report.score}/100 (${report.grade}).\n\nFortalezas comprobadas: ${report.strengths.join(', ')||'ninguna'}.\nCarencias detectadas por pruebas:\n${failures||'- Ninguna en esta suite.'}\nLatencia media: ${report.averageLatencyMs} ms.\n\nGeneré un prompt técnico con evidencia y causas raíz para ChatGPT + GitHub.`;
     await c.env.DB.batch([c.env.DB.prepare('INSERT INTO messages(id,conversation_id,role,content) VALUES(?,?,?,?)').bind(crypto.randomUUID(),cid,'user',message),c.env.DB.prepare('INSERT INTO messages(id,conversation_id,role,content) VALUES(?,?,?,?)').bind(crypto.randomUUID(),cid,'assistant',text)]);await saveRollingSummary(c.env.DB,userId,cid);
     return c.json({conversationId:cid,message:{role:'assistant',content:text},selfEvaluation:report});
   }
