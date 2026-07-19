@@ -1,0 +1,96 @@
+name: Production Smoke Test
+
+on:
+  workflow_dispatch:
+  push:
+    paths:
+      - .github/workflows/production-smoke.yml
+
+permissions:
+  contents: read
+  issues: write
+
+jobs:
+  smoke:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    env:
+      CLOUDFLARE_API_TOKEN_RAW: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+      CLOUDFLARE_ACCOUNT_ID: ${{ vars.CLOUDFLARE_ACCOUNT_ID }}
+      BASE_URL: https://hector-os.hectorhdzr035.workers.dev
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+      - run: npm ci
+      - name: Prepare Cloudflare credentials
+        shell: bash
+        run: |
+          set -euo pipefail
+          CLEAN_TOKEN="$(printf %s "$CLOUDFLARE_API_TOKEN_RAW" | tr -d '[:space:]')"
+          test -n "$CLEAN_TOKEN"
+          test -n "$CLOUDFLARE_ACCOUNT_ID"
+          echo "::add-mask::$CLEAN_TOKEN"
+          echo "CLOUDFLARE_API_TOKEN=$CLEAN_TOKEN" >> "$GITHUB_ENV"
+      - name: Create isolated test identity
+        id: identity
+        shell: bash
+        run: |
+          set -euo pipefail
+          TEST_ID="$(node -e "console.log(crypto.randomUUID())")"
+          TEST_EMAIL="smoke-${GITHUB_RUN_ID}-${GITHUB_RUN_ATTEMPT}@hector-os.invalid"
+          TEST_PASSWORD="Smoke-$(node -e "console.log(crypto.randomBytes(18).toString('base64url'))")"
+          read -r SALT HASH < <(TEST_PASSWORD="$TEST_PASSWORD" node --input-type=module <<'NODE'
+          const password = process.env.TEST_PASSWORD;
+          const salt = crypto.randomBytes(16).toString('base64url');
+          const key = await crypto.subtle.importKey('raw', new TextEncoder().encode(password), 'PBKDF2', false, ['deriveBits']);
+          const bits = await crypto.subtle.deriveBits({name:'PBKDF2',salt:new TextEncoder().encode(salt),iterations:50000,hash:'SHA-256'}, key, 256);
+          const hash = Buffer.from(bits).toString('hex');
+          console.log(salt, hash);
+          NODE
+          )
+          echo "::add-mask::$TEST_PASSWORD"
+          echo "test_id=$TEST_ID" >> "$GITHUB_OUTPUT"
+          echo "test_email=$TEST_EMAIL" >> "$GITHUB_OUTPUT"
+          echo "test_password=$TEST_PASSWORD" >> "$GITHUB_OUTPUT"
+          SQL="INSERT INTO users(id,email,name,password_hash,password_salt) VALUES('$TEST_ID','$TEST_EMAIL','Smoke Test','$HASH','$SALT');"
+          npx wrangler d1 execute hector-os-db --remote --command "$SQL"
+      - name: Test production PWA and authenticated API
+        shell: bash
+        env:
+          TEST_EMAIL: ${{ steps.identity.outputs.test_email }}
+          TEST_PASSWORD: ${{ steps.identity.outputs.test_password }}
+        run: |
+          set -euo pipefail
+          test "$(curl -fsS -o /tmp/root.html -w '%{http_code}' "$BASE_URL/")" = "200"
+          grep -qi '<html' /tmp/root.html
+          curl -fsS "$BASE_URL/health" | jq -e '.ok == true'
+          LOGIN_CODE="$(curl -sS -c /tmp/cookies.txt -o /tmp/login.json -w '%{http_code}' -H 'Content-Type: application/json' --data "$(jq -nc --arg email "$TEST_EMAIL" --arg password "$TEST_PASSWORD" '{email:$email,password:$password}')" "$BASE_URL/api/auth/login")"
+          test "$LOGIN_CODE" = "200"
+          jq -e '.user.name == "Smoke Test"' /tmp/login.json
+          curl -fsS -b /tmp/cookies.txt "$BASE_URL/api/auth/me" | jq -e '.user.name == "Smoke Test"'
+          curl -fsS -b /tmp/cookies.txt "$BASE_URL/api/dashboard" | jq -e 'has("balanceCents") and has("memoryCount")'
+          curl -fsS -b /tmp/cookies.txt "$BASE_URL/api/assistant/settings" | jq -e '.settings != null'
+          curl -fsS -b /tmp/cookies.txt -H 'Content-Type: application/json' -X PUT --data '{"allow_web":false,"allow_learning":true,"allow_cache":true,"proactive":true,"developer_mode":false}' "$BASE_URL/api/assistant/settings" | jq -e '.settings.proactive == true'
+          curl -fsS -b /tmp/cookies.txt -X POST "$BASE_URL/api/auth/logout" | jq -e '.ok == true'
+      - name: Remove isolated test identity
+        if: always()
+        shell: bash
+        env:
+          TEST_ID: ${{ steps.identity.outputs.test_id }}
+        run: |
+          if [ -n "${TEST_ID:-}" ]; then
+            npx wrangler d1 execute hector-os-db --remote --command "DELETE FROM sessions WHERE user_id='$TEST_ID'; DELETE FROM assistant_settings WHERE user_id='$TEST_ID'; DELETE FROM users WHERE id='$TEST_ID';" || true
+          fi
+      - name: Publish successful receipt
+        if: success()
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: gh issue create --title "[production-smoke] OK ${GITHUB_SHA::7}" --body "✅ PWA pública, health, login, sesión, dashboard, ajustes y logout funcionaron contra producción. El usuario técnico temporal fue eliminado."
+      - name: Publish failure receipt
+        if: failure()
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: gh issue create --title "[production-smoke] FALLO ${GITHUB_SHA::7}" --body "❌ La prueba end-to-end de producción falló. Revisa el workflow Production Smoke Test; no se publicaron credenciales y se intentó limpiar el usuario técnico temporal."
