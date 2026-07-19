@@ -1,6 +1,6 @@
 import type { Bindings } from '../types';
 
-export const CONTEXTUAL_ENGINE_VERSION='2.0.0';
+export const CONTEXTUAL_ENGINE_VERSION='2.0.1';
 export type AIUsage={input_tokens?:number;output_tokens?:number;input_tokens_details?:{cached_tokens?:number}};
 type AIResponse={id:string;output_text?:string;output?:Array<{type:string;content?:Array<{type:string;text?:string}>}>;usage?:AIUsage;error?:{message:string}};
 export type Route={model:string;tier:'fast'|'balanced'|'deep';reason:string;reasoning:'low'|'medium'|'high';task:string;needsWeb:boolean};
@@ -57,6 +57,7 @@ REGLAS DE OPERACIÓN
 - Conserva continuidad con el historial y el contexto suministrados. Si hay conflicto, prioriza información reciente y explícita.
 - No afirmes haber usado una herramienta, modificado código, desplegado o verificado algo sin evidencia en el contexto.
 - En salud, legal, finanzas y seguridad, identifica riesgos concretos y umbrales de acción.
+- En cálculos técnicos, muestra ecuaciones si ayudan, pero repite siempre los resultados finales en texto plano con número y unidad, por ejemplo: "Corriente nominal: 25 A".
 - Antes de responder revisa silenciosamente: objetivo, consistencia, evidencia, omisiones y aplicabilidad.
 - No reveles razonamiento privado; entrega solo la respuesta final.
 
