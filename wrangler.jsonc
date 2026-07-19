@@ -10,8 +10,11 @@
     "OPENAI_MODEL_FAST": "gpt-5.4-mini",
     "OPENAI_MODEL_BALANCED": "gpt-5.4-mini",
     "OPENAI_MODEL_REASONING": "gpt-5.4",
+    "CLOUDFLARE_MODEL_FAST": "@cf/meta/llama-3.1-8b-instruct-fast",
+    "CLOUDFLARE_AI_ENABLED": "true",
     "APP_NAME": "Héctor OS"
   },
+  "ai": { "binding": "AI" },
   "d1_databases": [{ "binding": "DB", "database_name": "hector-os-db", "database_id": "16303e77-d2e8-463d-b6a4-77a9c77df0ee", "migrations_dir": "migrations" }],
   "r2_buckets": [{ "binding": "FILES", "bucket_name": "hector-os-files" }]
 }
