@@ -32,6 +32,6 @@ systemInfo.get('/model',async c=>{
   const metadata=latest?.metadata_json?JSON.parse(latest.metadata_json):{};
   return c.json({
     current:{provider:latest?.provider||null,model:latest?.model||null,service:latest?.service||null,createdAt:latest?.created_at||null,tier:metadata.tier||null,reason:metadata.providerReason||metadata.reason||null,fallback:!!metadata.fallback},
-    configured:{cloudflare:c.env.CLOUDFLARE_AI_ENABLED!=='false'?c.env.CLOUDFLARE_AI_MODEL||'@cf/meta/llama-3.1-8b-instruct-fast':null,openaiFast:c.env.OPENAI_MODEL_FAST||c.env.OPENAI_MODEL,openaiBalanced:c.env.OPENAI_MODEL_BALANCED||c.env.OPENAI_MODEL,openaiReasoning:c.env.OPENAI_MODEL_REASONING||c.env.OPENAI_MODEL}
+    configured:{cloudflare:c.env.CLOUDFLARE_AI_ENABLED!=='false'?c.env.CLOUDFLARE_MODEL_FAST||'@cf/meta/llama-3.1-8b-instruct-fast':null,openaiFast:c.env.OPENAI_MODEL_FAST||c.env.OPENAI_MODEL,openaiBalanced:c.env.OPENAI_MODEL_BALANCED||c.env.OPENAI_MODEL,openaiReasoning:c.env.OPENAI_MODEL_REASONING||c.env.OPENAI_MODEL}
   });
 });
