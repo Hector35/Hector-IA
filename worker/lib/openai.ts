@@ -1,7 +1,8 @@
 import type { Bindings } from '../types';
 import { BOOTSTRAP_VERSION,renderBootstrap } from '../intelligence/bootstrap';
+import {callCloudflare,chooseProvider,type ProviderName} from './providers';
 
-export const CONTEXTUAL_ENGINE_VERSION='2.1.0';
+export const CONTEXTUAL_ENGINE_VERSION='2.2.0';
 export type AIUsage={input_tokens?:number;output_tokens?:number;input_tokens_details?:{cached_tokens?:number}};
 type AIResponse={id:string;output_text?:string;output?:Array<{type:string;content?:Array<{type:string;text?:string}>}>;usage?:AIUsage;error?:{message:string}};
 export type Route={model:string;tier:'fast'|'balanced'|'deep';reason:string;reasoning:'low'|'medium'|'high';task:string;needsWeb:boolean};
@@ -76,28 +77,41 @@ async function callResponses(env:Bindings,body:Record<string,unknown>){
   const text=data.output_text||data.output?.flatMap(x=>x.content||[]).map(x=>x.text||'').join('')||'No pude generar una respuesta.';
   return{data,text,searchedWeb:data.output?.some(x=>x.type==='web_search_call')||false};
 }
-export async function respond(env:Bindings,input:string,previousResponseId:string|undefined,memories:string[],allowWeb=true){
-  const route=routeModel(env,input,allowWeb),selectedMemories=relevantMemories(input,memories);
-  const body:Record<string,unknown>={model:route.model,instructions:legacyPrompt(route,selectedMemories),input,store:true,reasoning:{effort:route.reasoning}};
+async function executeHybrid(env:Bindings,input:string,instructions:string,route:Route,openAIInput:unknown){
+  const enabled=env.CLOUDFLARE_AI_ENABLED!=='false';
+  const decision=chooseProvider(input,route.tier,route.needsWeb,enabled);
+  if(decision.provider==='cloudflare'){
+    try{
+      const cf=await callCloudflare(env,instructions,input);
+      return{id:cf.id,text:cf.text,usage:cf.usage,searchedWeb:false,model:cf.model,provider:'cloudflare' as ProviderName,providerReason:decision.reason,fallback:false};
+    }catch(error){
+      const body:Record<string,unknown>={model:route.model,instructions,input:openAIInput,store:true,reasoning:{effort:route.reasoning}};
+      const out=await callResponses(env,body);
+      return{id:out.data.id,text:out.text,usage:out.data.usage,searchedWeb:false,model:route.model,provider:'openai' as ProviderName,providerReason:`Fallback: ${error instanceof Error?error.message:'Workers AI falló'}`,fallback:true};
+    }
+  }
+  const body:Record<string,unknown>={model:route.model,instructions,input:openAIInput,store:true,reasoning:{effort:route.reasoning}};
   if(route.needsWeb)body.tools=[{type:'web_search',search_context_size:route.tier==='deep'?'high':'medium'}];
-  if(previousResponseId)body.previous_response_id=previousResponseId;
   const out=await callResponses(env,body);
-  return{id:out.data.id,text:out.text,usage:out.data.usage,searchedWeb:out.searchedWeb,model:route.model,modelTier:route.tier,modelReason:route.reason};
+  return{id:out.data.id,text:out.text,usage:out.data.usage,searchedWeb:out.searchedWeb,model:route.model,provider:'openai' as ProviderName,providerReason:decision.reason,fallback:false};
+}
+export async function respond(env:Bindings,input:string,previousResponseId:string|undefined,memories:string[],allowWeb=true){
+  const route=routeModel(env,input,allowWeb),selectedMemories=relevantMemories(input,memories),instructions=legacyPrompt(route,selectedMemories);
+  const result=await executeHybrid(env,input,instructions,route,input);
+  return{...result,modelTier:route.tier,modelReason:route.reason};
 }
 export async function respondContextual(env:Bindings,input:string,history:ChatTurn[],renderedContext:string,allowWeb=true){
   const route=routeModel(env,input,allowWeb);
   const instructions=`${renderBootstrap()}\n\n${behaviorRules(route)}\n\nCONTEXTO DINÁMICO\n${renderedContext}`;
   const trimmed=history.slice(-16).map(x=>({role:x.role,content:x.content}));
   const conversation=[...trimmed,{role:'user' as const,content:input}];
-  const body:Record<string,unknown>={model:route.model,instructions,input:conversation,store:true,reasoning:{effort:route.reasoning}};
-  if(route.needsWeb)body.tools=[{type:'web_search',search_context_size:route.tier==='deep'?'high':'medium'}];
-  const out=await callResponses(env,body);
-  return{id:out.data.id,text:out.text,usage:out.data.usage,searchedWeb:out.searchedWeb,model:route.model,modelTier:route.tier,modelReason:route.reason,task:route.task};
+  const result=await executeHybrid(env,input,instructions,route,conversation);
+  return{...result,modelTier:route.tier,modelReason:route.reason,task:route.task};
 }
 export async function inspectImage(env:Bindings,prompt:string,dataUrl:string){
   const model=env.OPENAI_MODEL_BALANCED||env.OPENAI_MODEL;
   const instructions=`${renderBootstrap()}\n\nAnaliza la imagen para Héctor. Responde en español, directo, preciso y útil. Separa observaciones visibles, inferencias y recomendaciones. No afirmes como visible algo que solo estás infiriendo.`;
   const out=await callResponses(env,{model,instructions,input:[{role:'user',content:[{type:'input_text',text:prompt},{type:'input_image',image_url:dataUrl,detail:'auto'}]}],store:false,reasoning:{effort:'medium'}});
-  return{text:out.text,usage:out.data.usage,model};
+  return{text:out.text,usage:out.data.usage,model,provider:'openai' as ProviderName};
 }
 export function estimateCost(usage?:AIUsage){const input=usage?.input_tokens||0,cached=usage?.input_tokens_details?.cached_tokens||0,output=usage?.output_tokens||0;return{input,cached,output,costUsd:((input-cached)*.75+cached*.075+output*4.5)/1_000_000};}
