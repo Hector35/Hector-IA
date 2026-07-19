@@ -8,6 +8,7 @@ name: Cloudflare Credential Preflight
 
 permissions:
   contents: read
+  issues: write
 
 jobs:
   verify:
@@ -39,3 +40,14 @@ jobs:
         run: |
           echo "## Cloudflare preflight correcto" >> "$GITHUB_STEP_SUMMARY"
           echo "El token fue aceptado y CLOUDFLARE_ACCOUNT_ID está configurado." >> "$GITHUB_STEP_SUMMARY"
+      - name: Publicar resultado verificable
+        if: always()
+        uses: actions/github-script@v7
+        with:
+          script: |
+            const ok = '${{ job.status }}' === 'success';
+            const title = `[preflight-cloudflare] ${ok ? 'OK' : 'FALLO'} ${context.sha.slice(0, 7)}`;
+            const body = ok
+              ? '✅ Cloudflare aceptó CLOUDFLARE_API_TOKEN y CLOUDFLARE_ACCOUNT_ID está configurado. No se expuso ningún valor.'
+              : '❌ El preflight de Cloudflare falló. Revisa el workflow Cloudflare Credential Preflight para identificar si falta el secret, la variable o permisos del token. No se expuso ningún valor.';
+            await github.rest.issues.create({owner: context.repo.owner, repo: context.repo.repo, title, body});
