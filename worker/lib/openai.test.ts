@@ -92,6 +92,14 @@ describe('Héctor OS memory retrieval benchmark',()=>{
     expect(selected[0]).toContain('4,396.50');
   });
 
+  it('boosts accent-insensitive exact phrase matches',()=>{
+    const selected=relevantMemories('Versión actual del proyecto en Cloudflare',[
+      'Proyecto Cloudflare con versión actual del módulo.',
+      'Version actual del proyecto en Cloudflare Workers.'
+    ]);
+    expect(selected[0]).toBe('Version actual del proyecto en Cloudflare Workers.');
+  });
+
   it('returns no unrelated memories',()=>{
     expect(relevantMemories('¿Cuál es la capital de Japón?',memories)).toEqual([]);
   });
