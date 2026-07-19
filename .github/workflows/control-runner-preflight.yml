@@ -1,0 +1,67 @@
+name: Control and Runner Preflight
+
+"on":
+  workflow_dispatch:
+  push:
+    paths:
+      - .github/workflows/control-runner-preflight.yml
+
+permissions:
+  contents: read
+  issues: write
+
+jobs:
+  verify:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    env:
+      CONTROL_TOKEN: ${{ secrets.HECTOR_CONTROL_TOKEN }}
+    steps:
+      - name: Validar HECTOR_CONTROL_TOKEN
+        shell: bash
+        run: |
+          set -euo pipefail
+          test -n "$CONTROL_TOKEN" || { echo "Falta HECTOR_CONTROL_TOKEN"; exit 1; }
+          echo "::add-mask::$CONTROL_TOKEN"
+
+      - name: Consultar estado de Héctor OS
+        id: status
+        shell: bash
+        run: |
+          set -euo pipefail
+          RESPONSE="$(curl --fail-with-body --silent --show-error --max-time 30 \
+            -H "Authorization: Bearer $CONTROL_TOKEN" \
+            https://hector-os.hectorhdzr035.workers.dev/control/v1/status)"
+          echo "$RESPONSE" | jq .
+          echo "status_json=$(echo "$RESPONSE" | jq -c .)" >> "$GITHUB_OUTPUT"
+
+      - name: Enviar tarea técnica de verificación
+        id: task
+        shell: bash
+        run: |
+          set -euo pipefail
+          BODY='{"kind":"programming","title":"Preflight runner authentication","prompt":"Verifica que el runner de GitHub puede aceptar una tarea técnica de Héctor OS. No modifiques datos ni despliegues recursos."}'
+          RESPONSE="$(curl --fail-with-body --silent --show-error --max-time 30 \
+            -X POST \
+            -H "Authorization: Bearer $CONTROL_TOKEN" \
+            -H 'Content-Type: application/json' \
+            --data "$BODY" \
+            https://hector-os.hectorhdzr035.workers.dev/control/v1/tasks)"
+          echo "$RESPONSE" | jq .
+          echo "task_json=$(echo "$RESPONSE" | jq -c .)" >> "$GITHUB_OUTPUT"
+
+      - name: Publicar resultado seguro
+        if: always()
+        env:
+          GH_TOKEN: ${{ github.token }}
+          JOB_STATUS: ${{ job.status }}
+          STATUS_JSON: ${{ steps.status.outputs.status_json }}
+          TASK_JSON: ${{ steps.task.outputs.task_json }}
+        shell: bash
+        run: |
+          set -euo pipefail
+          TITLE="[control-runner-preflight] ${JOB_STATUS^^} ${GITHUB_SHA::7}"
+          BODY="Estado general: ${JOB_STATUS}.\n\n"
+          if [ -n "${STATUS_JSON:-}" ]; then BODY+="Status endpoint: \\`$(echo "$STATUS_JSON" | jq -c '{ok,service,version,status}')\\`\n\n"; fi
+          if [ -n "${TASK_JSON:-}" ]; then BODY+="Task endpoint: \\`$(echo "$TASK_JSON" | jq -c '{id,status,runner,runnerStatus}')\\`\n"; fi
+          gh issue create --title "$TITLE" --body "$BODY"
