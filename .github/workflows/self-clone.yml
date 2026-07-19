@@ -1,0 +1,46 @@
+name: Hector OS Self Clone
+"on":
+  workflow_dispatch:
+    inputs:
+      project_id:
+        description: Proyecto de fábrica
+        required: true
+        type: string
+      job_id:
+        description: Trabajo de compilación
+        required: true
+        type: string
+      worker_name:
+        description: Nombre seguro del Worker espejo
+        required: true
+        type: string
+permissions:
+  contents: read
+jobs:
+  clone:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    env:
+      CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+      CLOUDFLARE_ACCOUNT_ID: ${{ vars.CLOUDFLARE_ACCOUNT_ID }}
+      WORKER_NAME: ${{ inputs.worker_name }}
+      PROJECT_ID: ${{ inputs.project_id }}
+      JOB_ID: ${{ inputs.job_id }}
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+      - run: npm ci
+      - name: Crear Worker espejo
+        run: |
+          mkdir -p .self-clone
+          printf '%s\n' "export default { fetch(request, env) { return env.HECTOR_OS.fetch(request); } };" > .self-clone/worker.js
+          printf '{"name":"%s","main":"worker.js","compatibility_date":"2026-07-18","services":[{"binding":"HECTOR_OS","service":"hector-os"}]}\n' "$WORKER_NAME" > .self-clone/wrangler.json
+          npx wrangler deploy --config .self-clone/wrangler.json
+      - name: Registrar copia terminada
+        run: |
+          URL="https://${WORKER_NAME}.hectorhdzr035.workers.dev"
+          npx wrangler d1 execute hector-os-db --remote --command "UPDATE app_projects SET status='deployed',deployment_url='$URL',updated_at=CURRENT_TIMESTAMP WHERE id='$PROJECT_ID'; UPDATE build_jobs SET status='completed',log='Copia espejo desplegada y conectada al núcleo principal',updated_at=CURRENT_TIMESTAMP WHERE id='$JOB_ID';"
+          echo "Copia desplegada: $URL" >> "$GITHUB_STEP_SUMMARY"
