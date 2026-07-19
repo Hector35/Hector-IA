@@ -1,0 +1,64 @@
+name: Expose Mobile Modules
+
+"on":
+  workflow_dispatch:
+  push:
+    paths:
+      - .github/workflows/expose-mobile-modules.yml
+
+permissions:
+  contents: write
+
+jobs:
+  patch:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          token: ${{ github.token }}
+      - name: Expose every module in mobile navigation
+        shell: bash
+        run: |
+          python - <<'PY'
+          from pathlib import Path
+
+          app = Path('src/App.tsx')
+          text = app.read_text()
+          old = '<nav className="bottom">{nav.slice(0,5).map('
+          new = '<nav className="bottom">{nav.map('
+          if old not in text:
+              raise SystemExit('Expected mobile navigation expression was not found')
+          app.write_text(text.replace(old, new, 1))
+
+          css = Path('src/styles.css')
+          styles = css.read_text()
+          marker = '/* mobile-all-modules */'
+          if marker not in styles:
+              styles += '''\n\n/* mobile-all-modules */
+          @media (max-width: 900px) {
+            .bottom {
+              display: flex;
+              overflow-x: auto;
+              overflow-y: hidden;
+              justify-content: flex-start;
+              gap: 0;
+              padding-left: max(8px, env(safe-area-inset-left));
+              padding-right: max(8px, env(safe-area-inset-right));
+              -webkit-overflow-scrolling: touch;
+              scrollbar-width: none;
+            }
+            .bottom::-webkit-scrollbar { display: none; }
+            .bottom button { flex: 0 0 76px; min-width: 76px; }
+          }
+          '''
+              css.write_text(styles)
+          PY
+      - name: Commit mobile navigation fix
+        shell: bash
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add src/App.tsx src/styles.css
+          git diff --cached --quiet && exit 0
+          git commit -m "Show all Hector OS modules on mobile"
+          git push
