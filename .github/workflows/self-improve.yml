@@ -108,22 +108,28 @@ jobs:
         id: branch
         shell: bash
         run: |
-          BRANCH="hector-self-improve/${GITHUB_RUN_ID}-${GITHUB_RUN_ATTEMPT}"
-          git config user.name "Hector OS"
-          git config user.email "actions@users.noreply.github.com"
-          git checkout -b "$BRANCH"
-          git add worker/lib/openai.ts worker/lib/context.ts worker/routes/intelligence.ts worker/lib/openai.test.ts worker/lib/context.test.ts 2>/dev/null || true
-          git commit -m "feat(ai): autonomous guarded improvement"
-          git push origin "$BRANCH"
-          echo "name=$BRANCH" >> "$GITHUB_OUTPUT"
+          set -o pipefail
+          {
+            BRANCH="hector-self-improve/${GITHUB_RUN_ID}-${GITHUB_RUN_ATTEMPT}"
+            git config user.name "Hector OS"
+            git config user.email "actions@users.noreply.github.com"
+            git checkout -b "$BRANCH"
+            git add worker/lib/openai.ts worker/lib/context.ts worker/routes/intelligence.ts worker/lib/openai.test.ts worker/lib/context.test.ts 2>/dev/null || true
+            git commit -m "feat(ai): autonomous guarded improvement"
+            git push origin "$BRANCH"
+            echo "name=$BRANCH" >> "$GITHUB_OUTPUT"
+          } 2> >(tee /tmp/self-improve-error.txt >&2)
       - name: Open pull request for human-visible audit
         if: steps.changes.outputs.changed == 'true'
         id: pr
         shell: bash
         run: |
-          PR_URL="$(gh pr create --base main --head '${{ steps.branch.outputs.name }}' --title 'Héctor OS: propuesta autónoma de mejora' --body-file /tmp/self-improve-report.md)"
-          echo "url=$PR_URL" >> "$GITHUB_OUTPUT"
-          echo "$PR_URL" >> "$GITHUB_STEP_SUMMARY"
+          set -o pipefail
+          {
+            PR_URL="$(gh pr create --base main --head '${{ steps.branch.outputs.name }}' --title 'Héctor OS: propuesta autónoma de mejora' --body-file /tmp/self-improve-report.md)"
+            echo "url=$PR_URL" >> "$GITHUB_OUTPUT"
+            echo "$PR_URL" >> "$GITHUB_STEP_SUMMARY"
+          } 2> >(tee /tmp/self-improve-error.txt >&2)
       - name: Publish success receipt
         if: success()
         shell: bash
@@ -137,6 +143,6 @@ jobs:
         if: failure()
         shell: bash
         run: |
-          REASON="$(tail -n 10 /tmp/self-improve-error.txt 2>/dev/null | sed -E 's/(sk-[A-Za-z0-9_-]+)/[REDACTED]/g' | head -c 1400 || true)"
-          BODY="El ciclo autónomo falló de forma segura. No se modificó main ni producción.\n\nResultados:\n- OIDC: ${{ steps.oidc.outcome }}\n- propuesta: ${{ steps.proposal.outcome }}\n- agente: ${{ steps.agent.outcome }}\n- typecheck: ${{ steps.typecheck.outcome }}\n- pruebas: ${{ steps.tests.outcome }}\n- build: ${{ steps.build.outcome }}\n\nDiagnóstico sanitizado:\n\`\`\`\n${REASON:-Sin detalle disponible}\n\`\`\`"
+          REASON="$(tail -n 14 /tmp/self-improve-error.txt 2>/dev/null | sed -E 's/(sk-[A-Za-z0-9_-]+)/[REDACTED]/g' | head -c 1800 || true)"
+          BODY="El ciclo autónomo falló de forma segura. No se modificó main ni producción.\n\nResultados:\n- OIDC: ${{ steps.oidc.outcome }}\n- propuesta: ${{ steps.proposal.outcome }}\n- agente: ${{ steps.agent.outcome }}\n- typecheck: ${{ steps.typecheck.outcome }}\n- pruebas: ${{ steps.tests.outcome }}\n- build: ${{ steps.build.outcome }}\n- rama: ${{ steps.branch.outcome }}\n- PR: ${{ steps.pr.outcome }}\n\nDiagnóstico sanitizado:\n\`\`\`\n${REASON:-Sin detalle disponible}\n\`\`\`"
           gh issue create --title "[self-improve] FALLO ${GITHUB_SHA::7}" --body "$BODY"
