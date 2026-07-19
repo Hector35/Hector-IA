@@ -1,0 +1,64 @@
+name: Deploy Production
+
+on:
+  workflow_dispatch:
+  push:
+    branches: [main]
+    paths:
+      - 'src/**'
+      - 'worker/**'
+      - 'public/**'
+      - 'package.json'
+      - 'package-lock.json'
+      - 'vite.config.*'
+      - 'wrangler.jsonc'
+      - '.github/workflows/deploy-production.yml'
+
+permissions:
+  contents: read
+  issues: write
+
+concurrency:
+  group: hector-os-production
+  cancel-in-progress: true
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    env:
+      CLOUDFLARE_API_TOKEN_RAW: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+      CLOUDFLARE_ACCOUNT_ID: ${{ vars.CLOUDFLARE_ACCOUNT_ID }}
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+      - run: npm ci
+      - run: npm run typecheck
+      - run: npm test -- --passWithNoTests
+      - run: npm run build
+      - name: Prepare Cloudflare credentials
+        shell: bash
+        run: |
+          set -euo pipefail
+          CLEAN_TOKEN="$(printf %s "$CLOUDFLARE_API_TOKEN_RAW" | tr -d '[:space:]')"
+          test -n "$CLEAN_TOKEN"
+          test -n "$CLOUDFLARE_ACCOUNT_ID"
+          echo "::add-mask::$CLEAN_TOKEN"
+          echo "CLOUDFLARE_API_TOKEN=$CLEAN_TOKEN" >> "$GITHUB_ENV"
+      - name: Deploy Héctor OS
+        run: npx wrangler deploy
+      - name: Verify production health
+        run: curl -fsS https://hector-os.hectorhdzr035.workers.dev/health | jq -e '.ok == true'
+      - name: Publish success receipt
+        if: success()
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: gh issue create --title "[deploy-production] OK ${GITHUB_SHA::7}" --body "✅ Héctor OS compiló, pasó pruebas, se desplegó en Cloudflare y respondió correctamente en /health."
+      - name: Publish failure receipt
+        if: failure()
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: gh issue create --title "[deploy-production] FALLO ${GITHUB_SHA::7}" --body "❌ El despliegue de producción falló. Revisa el workflow Deploy Production. No se expusieron secretos."
