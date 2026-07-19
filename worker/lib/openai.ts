@@ -2,7 +2,7 @@ import type { Bindings } from '../types';
 
 export type AIUsage={input_tokens?:number;output_tokens?:number;input_tokens_details?:{cached_tokens?:number}};
 type AIResponse={id:string;output_text?:string;output?:Array<{type:string;content?:Array<{type:string;text?:string}>}>;usage?:AIUsage;error?:{message:string}};
-type Route={model:string;tier:'fast'|'balanced'|'deep';reason:string;reasoning:'low'|'medium'|'high';task:string;needsWeb:boolean};
+export type Route={model:string;tier:'fast'|'balanced'|'deep';reason:string;reasoning:'low'|'medium'|'high';task:string;needsWeb:boolean};
 
 const deepSignals=/\b(programa|programar|código|codigo|arquitectura|depura|debug|analiza a fondo|demuestra|prueba matemática|estrategia|plan completo|investiga profundamente|compara todas|diseña|optimiza|auditoría|auditoria|diagnóstico|diagnostico|razona paso|ingeniería|ingenieria|implementa|refactoriza|hipótesis|hipotesis|modelo completo)\b/i;
 const fastSignals=/^(hola|gracias|ok|sí|si|no|cuánto|cuanto|qué hora|que hora|resume|traduce|corrige)\b/i;
@@ -12,7 +12,7 @@ const planningSignals=/\b(plan|estrategia|prioridades|decisión|decision|opcione
 const medicalSignals=/\b(dolor|síntoma|sintoma|medicamento|salud|lesión|lesion|cirugía|cirugia|dedo|taquicardia|presión|presion|dosis)\b/i;
 
 function words(text:string){return [...new Set(text.toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g,'').match(/[a-z0-9]{3,}/g)||[])].filter(x=>!['para','como','pero','porque','esta','este','esto','tiene','quiero','puede','hacer','sobre','desde','todo','todos','todas','cuando','donde'].includes(x));}
-function relevantMemories(input:string,memories:string[]){
+export function relevantMemories(input:string,memories:string[]){
   const query=words(input),numbers=input.match(/\b\d+(?:[.,]\d+)?\b/g)||[];
   return memories.map((content,index)=>{
     const normalized=content.toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g,'');
@@ -22,7 +22,7 @@ function relevantMemories(input:string,memories:string[]){
     return{content,score:overlap*2+numeric+exact-Math.min(index,20)*0.02};
   }).filter(x=>x.score>0).sort((a,b)=>b.score-a.score).slice(0,8).map(x=>x.content);
 }
-function classify(input:string){
+export function classify(input:string){
   if(codeSignals.test(input))return'ingeniería de software';
   if(medicalSignals.test(input))return'salud y análisis de riesgo';
   if(planningSignals.test(input))return'planificación y toma de decisiones';
@@ -30,7 +30,7 @@ function classify(input:string){
   if(/\b(explica|cómo funciona|como funciona|origen|emerge|física|fisica|química|quimica|biología|biologia)\b/i.test(input))return'explicación técnica';
   return'consulta general';
 }
-function routeModel(env:Bindings,input:string,allowWeb:boolean):Route{
+export function routeModel(env:Bindings,input:string,allowWeb:boolean):Route{
   const fast=env.OPENAI_MODEL_FAST||env.OPENAI_MODEL;
   const balanced=env.OPENAI_MODEL_BALANCED||env.OPENAI_MODEL;
   const deep=env.OPENAI_MODEL_REASONING||balanced;
