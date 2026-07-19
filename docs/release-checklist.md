@@ -1,0 +1,7 @@
+- Typecheck
+- Unit tests
+- Build
+- Deploy
+- Health check
+- Ask which model was used
+- Run self-analysis and verify the improvement prompt
