@@ -1,0 +1,39 @@
+name: PWA Factory PR
+
+on:
+  pull_request:
+    paths:
+      - 'worker/routes/pwa-factory.ts'
+      - 'worker/routes/pwa-runner-status.ts'
+      - 'worker/index.ts'
+      - 'migrations/0018_pwa_factory.sql'
+      - '.github/workflows/pwa-factory.yml'
+      - '.github/workflows/pwa-factory-pr.yml'
+
+permissions:
+  contents: read
+
+jobs:
+  verify-repository:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+      - name: Install dependencies
+        run: npm ci --ignore-scripts --no-audit --no-fund
+      - name: Typecheck
+        run: npm run typecheck
+      - name: Tests
+        run: npm test
+      - name: Build
+        run: npm run build
+      - name: Validate factory contract
+        run: |
+          grep -q "export const pwaFactory" worker/routes/pwa-factory.ts
+          grep -q "workflow_dispatch" .github/workflows/pwa-factory.yml
+          grep -q "CREATE TABLE IF NOT EXISTS pwa_projects" migrations/0018_pwa_factory.sql
+          grep -q "app.route('/api/pwa-factory',pwaFactory)" worker/index.ts
