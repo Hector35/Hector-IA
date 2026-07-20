@@ -4,6 +4,7 @@ import {CodexApp} from './CodexApp';
 import './codex-ui.css';
 import './codex-mobile.css';
 import './chat-content.css';
+import './project-ui.css';
 
 ReactDOM.createRoot(document.getElementById('root')!).render(
   <React.StrictMode><CodexApp/></React.StrictMode>
