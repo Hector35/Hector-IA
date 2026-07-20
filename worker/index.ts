@@ -14,13 +14,14 @@ import {evidence} from './routes/evidence';
 import {delegations,processNextDelegation} from './routes/delegations';
 import {projects,processProjectQueue} from './routes/projects';
 import {conversations} from './routes/conversations';
+import {chatAgents,processChatAgentRuns} from './routes/chat-agents';
 import {respond,estimateCost} from './lib/openai';
 import {buildPlan} from './agent/planner';
 import {recordExperience} from './agent/learning';
 
 const app=new Hono<{Bindings:Bindings;Variables:Variables}>();
 app.use('*',secureHeaders({contentSecurityPolicy:{defaultSrc:["'self'"],connectSrc:["'self'"],imgSrc:["'self'",'data:'],styleSrc:["'self'","'unsafe-inline'"]}}));
-app.route('/control/v1',control);app.route('/generated',generated);app.route('/self-improve/v1',selfImprove);app.route('/runner/v1',runner);app.route('/evidence/v1',evidence);app.route('/api/auth',auth);app.route('/api/agent',agent);app.route('/api/intelligence',intelligence);app.route('/api/system',systemInfo);app.route('/api/delegations',delegations);app.route('/api/projects',projects);app.route('/api/conversations',conversations);app.route('/api',intelligence);app.route('/api',api);
+app.route('/control/v1',control);app.route('/generated',generated);app.route('/self-improve/v1',selfImprove);app.route('/runner/v1',runner);app.route('/evidence/v1',evidence);app.route('/api/auth',auth);app.route('/api/agent',agent);app.route('/api/intelligence',intelligence);app.route('/api/system',systemInfo);app.route('/api/delegations',delegations);app.route('/api/projects',projects);app.route('/api/conversations',conversations);app.route('/api/chat-agents',chatAgents);app.route('/api',intelligence);app.route('/api',api);
 app.get('/health',c=>c.json({ok:true,service:c.env.APP_NAME}));app.all('*',c=>c.env.ASSETS.fetch(c.req.raw));
 
 async function event(env:Bindings,jobId:string,message:string,progress:number){await env.DB.prepare('INSERT INTO work_events(id,job_id,message,progress) VALUES(?,?,?,?)').bind(crypto.randomUUID(),jobId,message,progress).run();}
@@ -46,4 +47,4 @@ async function processNext(env:Bindings){
  ]);await recordExperience(env,{jobId:job.id,userId:job.user_id,objective:job.prompt,status:'blocked',result:message,skills:plan.skills,attempts:1,durationMs:Date.now()-started});}
 }
 
-export default {fetch:app.fetch,scheduled:(_controller:ScheduledController,env:Bindings,ctx:ExecutionContext)=>{ctx.waitUntil(processNext(env));ctx.waitUntil(processNextDelegation(env));ctx.waitUntil(processProjectQueue(env));}};
+export default {fetch:app.fetch,scheduled:(_controller:ScheduledController,env:Bindings,ctx:ExecutionContext)=>{ctx.waitUntil(processNext(env));ctx.waitUntil(processNextDelegation(env));ctx.waitUntil(processProjectQueue(env));ctx.waitUntil(processChatAgentRuns(env));}};
