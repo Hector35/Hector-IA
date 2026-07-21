@@ -49,8 +49,8 @@ auth.post('/register',async c=>{
  const id=crypto.randomUUID(),{hash,salt}=await hashPassword(parsed.data.password),token=randomToken(),tokenHash=await sha256(token),ipHash=await requestIpHash(c);
  try{
   await c.env.DB.batch([
-   c.env.DB.prepare('INSERT INTO owner_registration(singleton,user_id) VALUES(1,?)').bind(id),
    c.env.DB.prepare('INSERT INTO users(id,email,name,password_hash,password_salt) VALUES(?,?,?,?,?)').bind(id,parsed.data.email.toLowerCase(),parsed.data.name||'Héctor',hash,salt),
+   c.env.DB.prepare('INSERT INTO owner_registration(singleton,user_id) VALUES(1,?)').bind(id),
    c.env.DB.prepare("INSERT INTO sessions(id,user_id,token_hash,expires_at,last_seen_at,user_agent,ip_hash) VALUES(?,?,?,datetime('now','+30 days'),CURRENT_TIMESTAMP,?,?)").bind(crypto.randomUUID(),id,tokenHash,userAgent(c),ipHash)
   ]);
  }catch{return c.json({error:'El propietario ya fue registrado'},409);}
@@ -64,8 +64,8 @@ auth.post('/login',async c=>{
  const u=await c.env.DB.prepare('SELECT * FROM users WHERE email=?').bind(parsed.data.email.toLowerCase()).first<any>();
  if(!u||!await verifyPassword(parsed.data.password,u.password_salt,u.password_hash)){
   const blockedUntil=await recordFailure(c,limit.key,limit.failures);
-  if(blockedUntil)c.header('Retry-After',String(Math.ceil(BLOCK_MS/1000)));
-  return c.json({error:'Credenciales inválidas'},blockedUntil?429:401);
+  if(blockedUntil){c.header('Retry-After',String(Math.ceil(BLOCK_MS/1000)));return c.json({error:'Credenciales inválidas'},429);}
+  return c.json({error:'Credenciales inválidas'},401);
  }
  await clearFailures(c,limit.key);await createSession(c,u.id);return c.json({user:{id:u.id,name:u.name}});
 });
