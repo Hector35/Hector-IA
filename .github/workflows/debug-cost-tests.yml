@@ -17,6 +17,13 @@ jobs:
           cache: npm
       - run: npm ci --silent
       - name: Focused tests
-        run: |
-          set -o pipefail
-          npx vitest run worker/lib/model-pricing.test.ts worker/lib/deliberation.test.ts --reporter=verbose 2>&1 | tail -100
+        id: focused
+        continue-on-error: true
+        run: npx vitest run worker/lib/model-pricing.test.ts worker/lib/deliberation.test.ts --reporter=verbose > test-output.txt 2>&1
+      - uses: actions/upload-artifact@v4
+        with:
+          name: cost-test-output
+          path: test-output.txt
+      - name: Preserve failure status
+        if: steps.focused.outcome == 'failure'
+        run: exit 1
