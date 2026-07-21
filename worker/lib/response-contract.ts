@@ -23,7 +23,7 @@ export function enforceResponseContract(input:string,output:string):ResponseCont
  }
 
  if(/(?:responde|contesta)\s+(?:solo|únicamente)\s+con\s+(?:sí|si)\s+o\s+no/i.test(input)){
-  const answer=text.match(/\b(sí|si|no)\b/i)?.[1];
+  const answer=text.match(/(?:^|[^\p{L}])(sí|si|no)(?=$|[^\p{L}])/iu)?.[1];
   if(answer){const normalized=/^no$/i.test(answer)?'No':'Sí';if(text!==normalized){text=normalized;applied=true;reasons.push('respuesta binaria normalizada');}}
  }
 
