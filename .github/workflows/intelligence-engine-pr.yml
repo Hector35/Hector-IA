@@ -1,0 +1,32 @@
+name: Intelligence Engine PR
+
+on:
+  pull_request:
+    paths:
+      - 'worker/lib/openai.ts'
+      - 'worker/lib/deliberation.ts'
+      - 'worker/lib/deliberation.test.ts'
+      - 'worker/types.ts'
+      - '.github/workflows/intelligence-engine-pr.yml'
+
+permissions:
+  contents: read
+
+jobs:
+  verify-intelligence-engine:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+      - name: Install dependencies
+        run: npm ci --ignore-scripts --no-audit --no-fund
+      - name: Typecheck
+        run: npm run typecheck
+      - name: Tests
+        run: npm test -- --passWithNoTests
+      - name: Production build
+        run: npm run build
