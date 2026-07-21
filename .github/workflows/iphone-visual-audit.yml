@@ -7,12 +7,14 @@ on:
       - 'src/**'
       - 'scripts/iphone-visual-audit.mjs'
       - 'scripts/iphone-visual-regression.mjs'
+      - 'scripts/iphone-visual-summary.mjs'
       - '.github/workflows/iphone-visual-audit.yml'
       - 'package.json'
       - 'package-lock.json'
 
 permissions:
   contents: read
+  pull-requests: write
 
 jobs:
   audit:
@@ -71,6 +73,8 @@ jobs:
           VISUAL_AUDIT_OUTPUT: visual-baseline
         run: node scripts/iphone-visual-audit.mjs
       - name: Comparar píxeles y generar diffs
+        id: regression
+        continue-on-error: true
         env:
           VISUAL_BASELINE_DIR: visual-baseline
           VISUAL_CURRENT_DIR: visual-current
@@ -79,6 +83,33 @@ jobs:
           VISUAL_MAX_CHANGED_PIXELS: '12000'
           VISUAL_PIXEL_THRESHOLD: '0.12'
         run: node scripts/iphone-visual-regression.mjs
+      - name: Generar resumen legible
+        if: always() && hashFiles('visual-diff/regression-report.json') != ''
+        env:
+          VISUAL_ARTIFACT_URL: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}
+          VISUAL_CHANGE_APPROVED: ${{ contains(github.event.pull_request.labels.*.name, 'visual-change-approved') }}
+        run: |
+          node scripts/iphone-visual-summary.mjs
+          cat visual-diff/pr-summary.md >> "$GITHUB_STEP_SUMMARY"
+      - name: Publicar o actualizar comentario del PR
+        if: always() && github.event_name == 'pull_request' && hashFiles('visual-diff/pr-summary.md') != ''
+        uses: actions/github-script@v7
+        with:
+          script: |
+            const fs = require('fs');
+            const marker = '<!-- hector-iphone-visual-regression -->';
+            const body = fs.readFileSync('visual-diff/pr-summary.md', 'utf8');
+            const { owner, repo } = context.repo;
+            const issue_number = context.issue.number;
+            const comments = await github.paginate(github.rest.issues.listComments, {
+              owner, repo, issue_number, per_page: 100
+            });
+            const previous = comments.find(comment => comment.user?.type === 'Bot' && comment.body?.includes(marker));
+            if (previous) {
+              await github.rest.issues.updateComment({ owner, repo, comment_id: previous.id, body });
+            } else {
+              await github.rest.issues.createComment({ owner, repo, issue_number, body });
+            }
       - name: Mostrar logs de servidores
         if: failure()
         run: |
@@ -101,3 +132,8 @@ jobs:
             visual-diff
           if-no-files-found: warn
           retention-days: 14
+      - name: Aplicar resultado de regresión
+        if: always() && steps.regression.outcome == 'failure' && !contains(github.event.pull_request.labels.*.name, 'visual-change-approved')
+        run: |
+          echo 'La regresión visual superó los umbrales y no tiene aprobación explícita.'
+          exit 1
