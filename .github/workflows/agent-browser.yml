@@ -39,7 +39,7 @@ jobs:
       - name: Validar URL
         env:
           TARGET_URL: ${{ inputs.url }}
-        run: node -e "const u=new URL(process.env.TARGET_URL);if(u.protocol!=='https:')throw new Error('Solo HTTPS');"
+        run: node --input-type=module -e "import {authorizeBrowserRequest} from './scripts/browser-network-policy.mjs'; await authorizeBrowserRequest(process.env.TARGET_URL,{mainNavigation:true});"
       - name: Instalar Playwright
         run: npm install --no-save playwright && npx playwright install --with-deps chromium
       - name: Navegar y capturar evidencia
@@ -49,21 +49,62 @@ jobs:
         run: |
           node --input-type=module <<'EOF'
           import {chromium} from 'playwright';
+          import {lookup} from 'node:dns/promises';
           import {mkdir,writeFile} from 'node:fs/promises';
+          import {authorizeBrowserRequest} from './scripts/browser-network-policy.mjs';
+
           const [width,height]=String(process.env.VIEWPORT||'390x844').split('x').map(Number);
+          const errors=[];
+          const blocked=[];
+          const dnsCache=new Map();
+          const cachedLookup=(hostname,options)=>{
+            const key=hostname.toLowerCase();
+            if(!dnsCache.has(key))dnsCache.set(key,lookup(hostname,options));
+            return dnsCache.get(key);
+          };
+          await mkdir('agent-evidence',{recursive:true});
           const browser=await chromium.launch({headless:true});
           const page=await browser.newPage({viewport:{width,height}});
-          const errors=[];
-          page.on('console',m=>{if(m.type()==='error')errors.push(m.text())});
-          page.on('pageerror',e=>errors.push(e.message));
-          const response=await page.goto(process.env.TARGET_URL,{waitUntil:'networkidle',timeout:45000});
-          await mkdir('agent-evidence',{recursive:true});
-          await page.screenshot({path:'agent-evidence/page.png',fullPage:true});
-          const report={url:page.url(),title:await page.title(),status:response?.status()??null,viewport:{width,height},errors,checkedAt:new Date().toISOString()};
+          let response=null;
+          let navigationError=null;
+
+          page.on('console',message=>{if(message.type()==='error')errors.push(message.text())});
+          page.on('pageerror',error=>errors.push(error.message));
+          await page.route('**/*',async route=>{
+            const request=route.request();
+            const mainNavigation=request.isNavigationRequest()&&request.frame()===page.mainFrame();
+            try{
+              await authorizeBrowserRequest(request.url(),{mainNavigation,resolver:cachedLookup});
+              await route.continue();
+            }catch(error){
+              const reason=error instanceof Error?error.message:'Solicitud bloqueada';
+              blocked.push(`${request.method()} ${request.url()} — ${reason}`.slice(0,1800));
+              await route.abort('blockedbyclient');
+            }
+          });
+
+          try{
+            response=await page.goto(process.env.TARGET_URL,{waitUntil:'networkidle',timeout:45000});
+          }catch(error){
+            navigationError=error instanceof Error?error.message:'Navegación fallida';
+            errors.push(navigationError);
+          }
+
+          try{await page.screenshot({path:'agent-evidence/page.png',fullPage:true});}
+          catch(error){errors.push(`No se pudo capturar pantalla: ${error instanceof Error?error.message:'error'}`);}
+          const report={
+            url:page.url()||process.env.TARGET_URL,
+            title:await page.title().catch(()=>''),
+            status:response?.status()??null,
+            viewport:{width,height},
+            errors:[...errors,...blocked].slice(0,100),
+            blockedRequests:blocked.length,
+            checkedAt:new Date().toISOString()
+          };
           await writeFile('agent-evidence/report.json',JSON.stringify(report,null,2));
           console.log(report);
           await browser.close();
-          if(!response||response.status()>=400)process.exitCode=1;
+          if(navigationError||blocked.length||!response||response.status()>=400)process.exitCode=1;
           EOF
       - name: Obtener token OIDC
         id: oidc
@@ -82,6 +123,8 @@ jobs:
           USER_ID: ${{ inputs.user_id }}
         shell: bash
         run: |
+          test -f agent-evidence/report.json
+          test -f agent-evidence/page.png
           node --input-type=module <<'EOF'
           import fs from 'node:fs';
           const report=JSON.parse(fs.readFileSync('agent-evidence/report.json','utf8'));
