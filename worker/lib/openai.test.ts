@@ -3,10 +3,10 @@ import { classify,conversationInput,relevantMemories,routeModel } from './openai
 import type { Bindings } from '../types';
 
 const env={
-  OPENAI_MODEL:'gpt-5.4-mini',
-  OPENAI_MODEL_FAST:'gpt-5.4-mini',
-  OPENAI_MODEL_BALANCED:'gpt-5.4-mini',
-  OPENAI_MODEL_REASONING:'gpt-5.4'
+  OPENAI_MODEL:'gpt-5.6-terra',
+  OPENAI_MODEL_FAST:'gpt-5.6-luna',
+  OPENAI_MODEL_BALANCED:'gpt-5.6-terra',
+  OPENAI_MODEL_REASONING:'gpt-5.6-sol'
 } as Bindings;
 
 describe('Héctor OS model routing benchmark',()=>{
@@ -21,7 +21,8 @@ describe('Héctor OS model routing benchmark',()=>{
     ['Audita este backend, encuentra fallas de seguridad y propón un plan completo de refactorización.','deep','ingeniería de software',false],
     ['Compara todas las opciones y diseña una estrategia de migración con supuestos, riesgos y pruebas.','deep','planificación y toma de decisiones',false],
     ['Busca el precio actual y verifica la versión disponible','balanced','consulta general',true],
-    ['Busca noticias recientes','balanced','consulta general',true]
+    ['Busca noticias recientes','balanced','consulta general',true],
+    ['¿Qué cambió hoy en OpenAI y GPT-5.6?','balanced','consulta general',true]
   ] as const;
 
   it.each(routingCases)('routes %s', (prompt,tier,task,needsWeb)=>{
@@ -35,16 +36,19 @@ describe('Héctor OS model routing benchmark',()=>{
     expect(routeModel(env,'Busca noticias recientes',false).needsWeb).toBe(false);
   });
 
-  it('uses configured models for each tier',()=>{
-    expect(routeModel(env,'hola',true).model).toBe('gpt-5.4-mini');
-    expect(routeModel(env,'Explícame cómo funciona un transformador',true).model).toBe('gpt-5.4-mini');
-    expect(routeModel(env,'Diseña e implementa una arquitectura completa en Cloudflare Workers, D1 y R2.',true).model).toBe('gpt-5.4');
+  it('uses GPT-5.6 models configured for each tier',()=>{
+    expect(routeModel(env,'hola',true).model).toBe('gpt-5.6-luna');
+    expect(routeModel(env,'Explícame cómo funciona un transformador',true).model).toBe('gpt-5.6-terra');
+    const deep=routeModel(env,'Diseña e implementa una arquitectura completa en Cloudflare Workers, D1 y R2.',true);
+    expect(deep.model).toBe('gpt-5.6-sol');
+    expect(deep.reasoning).toBe('xhigh');
   });
 });
 
 describe('Héctor OS domain classification benchmark',()=>{
   const cases=[
     ['Corrige este workflow de GitHub Actions','ingeniería de software'],
+    ['Explícame qué hace Codex con este repositorio','ingeniería de software'],
     ['Tengo el dedo frío y azul después de una cirugía','salud y análisis de riesgo'],
     ['Calcula cuánto puedo gastar por día hasta la quincena','finanzas personales'],
     ['Ayúdame a decidir entre dos trabajos y construir un plan','planificación y toma de decisiones'],
