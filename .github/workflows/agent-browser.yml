@@ -20,6 +20,10 @@ on:
         description: UUID opcional del propietario
         required: false
         type: string
+      verification_id:
+        description: UUID opcional de la ejecución persistente
+        required: false
+        type: string
 
 permissions:
   contents: read
@@ -40,6 +44,30 @@ jobs:
         env:
           TARGET_URL: ${{ inputs.url }}
         run: node --input-type=module -e "import {authorizeBrowserRequest} from './scripts/browser-network-policy.mjs'; await authorizeBrowserRequest(process.env.TARGET_URL,{mainNavigation:true});"
+      - name: Obtener token OIDC inicial
+        id: oidc_start
+        shell: bash
+        run: |
+          TOKEN="$(curl -fsS -H "Authorization: bearer $ACTIONS_ID_TOKEN_REQUEST_TOKEN" "${ACTIONS_ID_TOKEN_REQUEST_URL}&audience=hector-os-evidence" | jq -r .value)"
+          test -n "$TOKEN"
+          echo "::add-mask::$TOKEN"
+          echo "token=$TOKEN" >> "$GITHUB_OUTPUT"
+      - name: Marcar verificación en ejecución
+        env:
+          OIDC_TOKEN: ${{ steps.oidc_start.outputs.token }}
+          VERIFICATION_ID: ${{ inputs.verification_id }}
+          JOB_ID: ${{ inputs.job_id }}
+          USER_ID: ${{ inputs.user_id }}
+          RUN_ID: ${{ github.run_id }}
+        shell: bash
+        run: |
+          if [ -z "$VERIFICATION_ID" ] || [ -z "$JOB_ID" ]; then exit 0; fi
+          node --input-type=module <<'EOF_NODE'
+          import fs from 'node:fs';
+          const payload={verificationId:process.env.VERIFICATION_ID,jobId:process.env.JOB_ID,userId:process.env.USER_ID||undefined,status:'running',runId:process.env.RUN_ID};
+          fs.writeFileSync('/tmp/verification-status.json',JSON.stringify(payload));
+          EOF_NODE
+          curl -fsS -H "Authorization: Bearer $OIDC_TOKEN" -H 'Content-Type: application/json' --data-binary @/tmp/verification-status.json "$BASE_URL/evidence/v1/browser/status"
       - name: Instalar Playwright
         run: npm install --no-save playwright && npx playwright install --with-deps chromium
       - name: Navegar y capturar evidencia
@@ -47,7 +75,7 @@ jobs:
           TARGET_URL: ${{ inputs.url }}
           VIEWPORT: ${{ inputs.viewport }}
         run: |
-          node --input-type=module <<'EOF'
+          node --input-type=module <<'EOF_NODE'
           import {chromium} from 'playwright';
           import {lookup} from 'node:dns/promises';
           import {mkdir,writeFile} from 'node:fs/promises';
@@ -63,51 +91,57 @@ jobs:
             return dnsCache.get(key);
           };
           await mkdir('agent-evidence',{recursive:true});
-          const browser=await chromium.launch({headless:true});
-          const page=await browser.newPage({viewport:{width,height}});
+          let browser=null;
+          let page=null;
           let response=null;
           let navigationError=null;
 
-          page.on('console',message=>{if(message.type()==='error')errors.push(message.text())});
-          page.on('pageerror',error=>errors.push(error.message));
-          await page.route('**/*',async route=>{
-            const request=route.request();
-            const mainNavigation=request.isNavigationRequest()&&request.frame()===page.mainFrame();
-            try{
-              await authorizeBrowserRequest(request.url(),{mainNavigation,resolver:cachedLookup});
-              await route.continue();
-            }catch(error){
-              const reason=error instanceof Error?error.message:'Solicitud bloqueada';
-              blocked.push(`${request.method()} ${request.url()} — ${reason}`.slice(0,1800));
-              await route.abort('blockedbyclient');
-            }
-          });
-
           try{
-            response=await page.goto(process.env.TARGET_URL,{waitUntil:'networkidle',timeout:45000});
+            browser=await chromium.launch({headless:true});
+            page=await browser.newPage({viewport:{width,height}});
+            page.on('console',message=>{if(message.type()==='error')errors.push(message.text())});
+            page.on('pageerror',error=>errors.push(error.message));
+            await page.route('**/*',async route=>{
+              const request=route.request();
+              const mainNavigation=request.isNavigationRequest()&&request.frame()===page.mainFrame();
+              try{
+                await authorizeBrowserRequest(request.url(),{mainNavigation,resolver:cachedLookup});
+                await route.continue();
+              }catch(error){
+                const reason=error instanceof Error?error.message:'Solicitud bloqueada';
+                blocked.push(`${request.method()} ${request.url()} — ${reason}`.slice(0,1800));
+                await route.abort('blockedbyclient');
+              }
+            });
+            try{
+              response=await page.goto(process.env.TARGET_URL,{waitUntil:'networkidle',timeout:45000});
+            }catch(error){
+              navigationError=error instanceof Error?error.message:'Navegación fallida';
+              errors.push(navigationError);
+            }
+            try{await page.screenshot({path:'agent-evidence/page.png',fullPage:true});}
+            catch(error){errors.push(`No se pudo capturar pantalla: ${error instanceof Error?error.message:'error'}`);}
           }catch(error){
-            navigationError=error instanceof Error?error.message:'Navegación fallida';
+            navigationError=error instanceof Error?error.message:'No se pudo iniciar el navegador';
             errors.push(navigationError);
+          }finally{
+            const report={
+              url:page?.url()||process.env.TARGET_URL,
+              title:page?await page.title().catch(()=>''):'',
+              status:response?.status()??null,
+              viewport:{width,height},
+              errors:[...errors,...blocked].slice(0,100),
+              blockedRequests:blocked.length,
+              outcome:!navigationError&&blocked.length===0&&response&&response.status()<400?'completed':'failed',
+              checkedAt:new Date().toISOString()
+            };
+            await writeFile('agent-evidence/report.json',JSON.stringify(report,null,2));
+            console.log(report);
+            if(browser)await browser.close().catch(()=>{});
           }
-
-          try{await page.screenshot({path:'agent-evidence/page.png',fullPage:true});}
-          catch(error){errors.push(`No se pudo capturar pantalla: ${error instanceof Error?error.message:'error'}`);}
-          const report={
-            url:page.url()||process.env.TARGET_URL,
-            title:await page.title().catch(()=>''),
-            status:response?.status()??null,
-            viewport:{width,height},
-            errors:[...errors,...blocked].slice(0,100),
-            blockedRequests:blocked.length,
-            checkedAt:new Date().toISOString()
-          };
-          await writeFile('agent-evidence/report.json',JSON.stringify(report,null,2));
-          console.log(report);
-          await browser.close();
-          if(navigationError||blocked.length||!response||response.status()>=400)process.exitCode=1;
-          EOF
-      - name: Obtener token OIDC
-        id: oidc
+          EOF_NODE
+      - name: Obtener token OIDC final
+        id: oidc_final
         if: always()
         shell: bash
         run: |
@@ -116,26 +150,44 @@ jobs:
           echo "::add-mask::$TOKEN"
           echo "token=$TOKEN" >> "$GITHUB_OUTPUT"
       - name: Integrar artefactos en Héctor OS
-        if: always()
+        if: always() && steps.oidc_final.outcome == 'success'
         env:
-          OIDC_TOKEN: ${{ steps.oidc.outputs.token }}
+          OIDC_TOKEN: ${{ steps.oidc_final.outputs.token }}
           JOB_ID: ${{ inputs.job_id }}
           USER_ID: ${{ inputs.user_id }}
+          VERIFICATION_ID: ${{ inputs.verification_id }}
         shell: bash
         run: |
           test -f agent-evidence/report.json
-          test -f agent-evidence/page.png
-          node --input-type=module <<'EOF'
+          node --input-type=module <<'EOF_NODE'
           import fs from 'node:fs';
           const report=JSON.parse(fs.readFileSync('agent-evidence/report.json','utf8'));
-          const screenshotBase64=fs.readFileSync('agent-evidence/page.png').toString('base64');
-          const payload={jobId:process.env.JOB_ID||undefined,userId:process.env.USER_ID||undefined,source:'agent-browser',url:report.url,title:report.title,status:report.status,errors:report.errors,runId:process.env.GITHUB_RUN_ID,screenshotBase64};
+          const payload={verificationId:process.env.VERIFICATION_ID||undefined,verificationStatus:report.outcome,jobId:process.env.JOB_ID||undefined,userId:process.env.USER_ID||undefined,source:'agent-browser',url:report.url,title:report.title||undefined,status:report.status,errors:report.errors,runId:process.env.GITHUB_RUN_ID};
+          if(fs.existsSync('agent-evidence/page.png'))payload.screenshotBase64=fs.readFileSync('agent-evidence/page.png').toString('base64');
           fs.writeFileSync('/tmp/evidence.json',JSON.stringify(payload));
-          EOF
-          curl -fsS -H "Authorization: Bearer $OIDC_TOKEN" -H 'Content-Type: application/json' --data-binary @/tmp/evidence.json "$BASE_URL/evidence/v1/browser"
+          EOF_NODE
+          curl --fail-with-body -sS -H "Authorization: Bearer $OIDC_TOKEN" -H 'Content-Type: application/json' --data-binary @/tmp/evidence.json "$BASE_URL/evidence/v1/browser"
+      - name: Marcar interrupción del workflow
+        if: failure() && steps.oidc_final.outcome == 'success'
+        env:
+          OIDC_TOKEN: ${{ steps.oidc_final.outputs.token }}
+          VERIFICATION_ID: ${{ inputs.verification_id }}
+          JOB_ID: ${{ inputs.job_id }}
+          USER_ID: ${{ inputs.user_id }}
+          RUN_ID: ${{ github.run_id }}
+        shell: bash
+        run: |
+          if [ -z "$OIDC_TOKEN" ] || [ -z "$VERIFICATION_ID" ] || [ -z "$JOB_ID" ]; then exit 0; fi
+          node --input-type=module <<'EOF_NODE'
+          import fs from 'node:fs';
+          const payload={verificationId:process.env.VERIFICATION_ID,jobId:process.env.JOB_ID,userId:process.env.USER_ID||undefined,status:'failed',runId:process.env.RUN_ID,error:'El workflow de navegador terminó antes de integrar evidencia'};
+          fs.writeFileSync('/tmp/verification-failed.json',JSON.stringify(payload));
+          EOF_NODE
+          curl -fsS -H "Authorization: Bearer $OIDC_TOKEN" -H 'Content-Type: application/json' --data-binary @/tmp/verification-failed.json "$BASE_URL/evidence/v1/browser/status" || true
       - uses: actions/upload-artifact@v4
         if: always()
         with:
           name: agent-browser-evidence
           path: agent-evidence
+          if-no-files-found: ignore
           retention-days: 7
