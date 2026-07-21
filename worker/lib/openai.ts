@@ -1,8 +1,9 @@
 import type { Bindings } from '../types';
 import { BOOTSTRAP_VERSION,renderBootstrap } from '../intelligence/bootstrap';
 import {callCloudflare,chooseProvider,type ProviderName} from './providers';
+import {assessProviderResponse,loadCloudflareHealth,recordProviderQuality,type ProviderQualityAssessment} from './provider-quality';
 
-export const CONTEXTUAL_ENGINE_VERSION='2.2.1';
+export const CONTEXTUAL_ENGINE_VERSION='2.3.0';
 export type AIUsage={input_tokens?:number;output_tokens?:number;input_tokens_details?:{cached_tokens?:number}};
 type AIResponse={id:string;output_text?:string;output?:Array<{type:string;content?:Array<{type:string;text?:string}>}>;usage?:AIUsage;error?:{message:string}};
 export type Route={model:string;tier:'fast'|'balanced'|'deep';reason:string;reasoning:'low'|'medium'|'high';task:string;needsWeb:boolean};
@@ -78,23 +79,40 @@ async function callResponses(env:Bindings,body:Record<string,unknown>){
   const text=data.output_text||data.output?.flatMap(x=>x.content||[]).map(x=>x.text||'').join('')||'No pude generar una respuesta.';
   return{data,text,searchedWeb:data.output?.some(x=>x.type==='web_search_call')||false};
 }
+async function saveQuality(env:Bindings,route:Route,started:number,requestedProvider:ProviderName,actualProvider:ProviderName,model:string,fallback:boolean,assessment:ProviderQualityAssessment,reasons:string[]=[]){
+  await recordProviderQuality(env.DB,{requestedProvider,actualProvider,model,routeTier:route.tier,task:route.task,accepted:assessment.accepted,score:assessment.score,fallback,latencyMs:Date.now()-started,reasons:[...reasons,...assessment.reasons]});
+}
+async function openAIFallback(env:Bindings,input:string,instructions:string,route:Route,openAIInput:unknown,started:number,reason:string){
+  const body:Record<string,unknown>={model:route.model,instructions,input:openAIInput,store:true,reasoning:{effort:route.reasoning}};
+  try{
+    const out=await callResponses(env,body),assessment=assessProviderResponse(input,out.text);
+    await saveQuality(env,route,started,'cloudflare','openai',route.model,true,assessment,[reason]);
+    return{id:out.data.id,text:out.text,usage:out.data.usage,searchedWeb:false,model:route.model,provider:'openai' as ProviderName,requestedProvider:'cloudflare' as ProviderName,providerReason:reason,fallback:true,qualityScore:assessment.score,qualityAccepted:assessment.accepted};
+  }catch(error){
+    const message=error instanceof Error?error.message:'OpenAI también falló';
+    await saveQuality(env,route,started,'cloudflare','openai',route.model,true,{accepted:false,score:0,reasons:[message]},[reason]);
+    throw error;
+  }
+}
 async function executeHybrid(env:Bindings,input:string,instructions:string,route:Route,openAIInput:unknown){
-  const enabled=env.CLOUDFLARE_AI_ENABLED!=='false';
-  const decision=chooseProvider(input,route.tier,route.needsWeb,enabled);
+  const started=Date.now(),enabled=env.CLOUDFLARE_AI_ENABLED!=='false';
+  const health=route.tier==='fast'&&enabled?await loadCloudflareHealth(env.DB):undefined;
+  const decision=chooseProvider(input,route.tier,route.needsWeb,enabled,health);
   if(decision.provider==='cloudflare'){
     try{
-      const cf=await callCloudflare(env,instructions,input);
-      return{id:cf.id,text:cf.text,usage:cf.usage,searchedWeb:false,model:cf.model,provider:'cloudflare' as ProviderName,providerReason:decision.reason,fallback:false};
+      const cf=await callCloudflare(env,instructions,input),assessment=assessProviderResponse(input,cf.text);
+      if(!assessment.accepted)return openAIFallback(env,input,instructions,route,openAIInput,started,`Fallback de calidad: ${assessment.reasons.join(', ')||`puntaje ${assessment.score}`}`);
+      await saveQuality(env,route,started,'cloudflare','cloudflare',cf.model,false,assessment);
+      return{id:cf.id,text:cf.text,usage:cf.usage,searchedWeb:false,model:cf.model,provider:'cloudflare' as ProviderName,requestedProvider:'cloudflare' as ProviderName,providerReason:decision.reason,fallback:false,qualityScore:assessment.score,qualityAccepted:true};
     }catch(error){
-      const body:Record<string,unknown>={model:route.model,instructions,input:openAIInput,store:true,reasoning:{effort:route.reasoning}};
-      const out=await callResponses(env,body);
-      return{id:out.data.id,text:out.text,usage:out.data.usage,searchedWeb:false,model:route.model,provider:'openai' as ProviderName,providerReason:`Fallback: ${error instanceof Error?error.message:'Workers AI falló'}`,fallback:true};
+      return openAIFallback(env,input,instructions,route,openAIInput,started,`Fallback: ${error instanceof Error?error.message:'Workers AI falló'}`);
     }
   }
   const body:Record<string,unknown>={model:route.model,instructions,input:openAIInput,store:true,reasoning:{effort:route.reasoning}};
   if(route.needsWeb)body.tools=[{type:'web_search',search_context_size:route.tier==='deep'?'high':'medium'}];
-  const out=await callResponses(env,body);
-  return{id:out.data.id,text:out.text,usage:out.data.usage,searchedWeb:out.searchedWeb,model:route.model,provider:'openai' as ProviderName,providerReason:decision.reason,fallback:false};
+  const out=await callResponses(env,body),assessment=assessProviderResponse(input,out.text);
+  await saveQuality(env,route,started,'openai','openai',route.model,false,assessment);
+  return{id:out.data.id,text:out.text,usage:out.data.usage,searchedWeb:out.searchedWeb,model:route.model,provider:'openai' as ProviderName,requestedProvider:'openai' as ProviderName,providerReason:decision.reason,fallback:false,qualityScore:assessment.score,qualityAccepted:assessment.accepted};
 }
 export async function respond(env:Bindings,input:string,previousResponseId:string|undefined,memories:string[],allowWeb=true){
   const route=routeModel(env,input,allowWeb),selectedMemories=relevantMemories(input,memories),instructions=legacyPrompt(route,selectedMemories);
