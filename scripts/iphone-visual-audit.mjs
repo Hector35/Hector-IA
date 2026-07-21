@@ -68,11 +68,15 @@ async function clickFirstVisible(page,names){
   const matcher=new RegExp(`^${name.replace(/[.*+?^${}()|[\]\\]/g,'\\$&')}$`,'i');
   for(const role of ['button','link']){
    const items=page.getByRole(role,{name:matcher});
-   const count=await items.count();
-   for(let index=0;index<count;index++){
+   for(let index=0;index<await items.count();index++){
     const item=items.nth(index);
     if(await item.isVisible()){await item.click();return true;}
    }
+  }
+  const texts=page.getByText(matcher,{exact:true});
+  for(let index=0;index<await texts.count();index++){
+   const item=texts.nth(index);
+   if(await item.isVisible()){await item.click();return true;}
   }
  }
  return false;
