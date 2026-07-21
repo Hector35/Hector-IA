@@ -10,7 +10,7 @@ pwaRunnerStatus.post('/pwa-status',async c=>{
  try{
   const token=(c.req.header('Authorization')||'').replace(/^Bearer\s+/i,'').trim();
   if(!token)throw new Error('OIDC requerido');
-  await verifyGitHubActionsToken(token,'hector-os-agent-runner');
+  await verifyGitHubActionsToken(token,'hector-os-pwa-runner');
   const parsed=schema.safeParse(await c.req.json());
   if(!parsed.success)return c.json({error:'Estado inválido'},400);
   const x=parsed.data,ok=x.status==='success';
