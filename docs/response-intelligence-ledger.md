@@ -16,10 +16,22 @@ Cada respuesta contextual de IA registra evidencia operativa suficiente para aud
 
 El propietario puede marcar una respuesta como útil o corregirla. Una corrección explícita se guarda como memoria de tipo `correction`, importancia 5 y fuente `response-feedback`. El embedding se genera posteriormente mediante el backfill semántico normal.
 
+## Enrutamiento adaptativo
+
+Antes de responder, Héctor OS consulta las valoraciones de los últimos 60 días para la misma clase de tarea:
+
+- exige al menos cinco respuestas no profundas antes de elevar esa categoría a razonamiento profundo;
+- exige al menos cuatro respuestas de Workers AI antes de evitar ese proveedor;
+- usa una tasa suavizada para que una sola valoración no cambie la política;
+- incorpora hasta cuatro correcciones explícitas recientes como reglas de respuesta;
+- nunca reduce el nivel de razonamiento ni sustituye reglas de seguridad, autoconocimiento profundo o contratos de salida.
+
+La adaptación queda visible en `model_reason`, `provider_reason`, la metadata de uso, el contexto de la traza y la respuesta del endpoint de feedback.
+
 ## Privacidad
 
 Las rutas requieren sesión autenticada y filtran siempre por `user_id`. Las trazas no contienen cadenas de razonamiento privadas. Solo registran metadatos, contexto suministrado y evidencia observable de ejecución.
 
 ## Despliegue
 
-Aplicar `migrations/0025_response_intelligence.sql` antes de habilitar el panel en producción.
+La adaptación reutiliza `migrations/0025_response_intelligence.sql`; no necesita una tabla paralela ni una migración adicional.
