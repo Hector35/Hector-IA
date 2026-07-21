@@ -4,7 +4,8 @@ import path from 'node:path';
 const allowed=[
  'src/CodexApp.tsx','src/api.ts','src/MarkdownMessage.tsx','src/chat-content.css','src/codex-ui.css','src/codex-mobile.css',
  'worker/index.ts','worker/types.ts','worker/lib/openai.ts','worker/lib/context.ts','worker/routes/agent.ts','worker/routes/intelligence.ts','worker/routes/system.ts',
- 'worker/agent/planner.ts','worker/agent/skills.ts','worker/agent/learning.ts'
+ 'worker/routes/pwa-factory.ts','worker/routes/pwa-runner-status.ts',
+ 'worker/agent/planner.ts','worker/agent/skills.ts','worker/agent/skills.test.ts','worker/agent/learning.ts'
 ];
 const file=process.env.AGENT_PROPOSAL_FILE;
 if(!file||!fs.existsSync(file))throw new Error('AGENT_PROPOSAL_FILE no disponible');
