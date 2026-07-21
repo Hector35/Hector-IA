@@ -46,9 +46,9 @@ jobs:
           PY
       - name: Validate protected routes
         run: |
-          grep -q "projectGovernance.use('*',requireAuth)" worker/routes/project-governance.ts
-          grep -q "projects.use('*',requireAuth)" worker/routes/projects.ts
-          grep -q "conversations.use('*',requireAuth)" worker/routes/conversations.ts
+          grep -Fq "projectGovernance.use('*',requireAuth)" worker/routes/project-governance.ts
+          grep -Fq "projects.use('*',requireAuth)" worker/routes/projects.ts
+          grep -Fq "conversations.use('*',requireAuth)" worker/routes/conversations.ts
       - name: Public production smoke test
         if: github.event_name != 'pull_request'
         run: |
