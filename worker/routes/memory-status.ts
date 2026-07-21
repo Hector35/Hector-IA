@@ -10,12 +10,11 @@ memoryStatus.use('*',requireAuth);
 type StatusRow=MemoryRow&{kind:string;source:string;importance:number;updated_at:string};
 export type MemoryControlItem={id:string;kind:string;content:string;source:string;importance:number;updated_at:string;embeddingReady:boolean};
 
-export const memoryItemSchema=z.object({
-  content:z.string().trim().min(2).max(2000),
-  kind:z.string().trim().regex(/^[a-z][a-z0-9_-]{0,29}$/i).default('fact'),
-  importance:z.number().int().min(1).max(5).default(3)
-});
-export const memoryUpdateSchema=memoryItemSchema.partial().refine(value=>Object.keys(value).length>0,'Sin cambios');
+const memoryContentSchema=z.string().trim().min(2).max(2000);
+const memoryKindSchema=z.string().trim().regex(/^[a-z][a-z0-9_-]{0,29}$/i);
+const memoryImportanceSchema=z.number().int().min(1).max(5);
+export const memoryItemSchema=z.object({content:memoryContentSchema,kind:memoryKindSchema.default('fact'),importance:memoryImportanceSchema.default(3)});
+export const memoryUpdateSchema=z.object({content:memoryContentSchema.optional(),kind:memoryKindSchema.optional(),importance:memoryImportanceSchema.optional()}).refine(value=>Object.keys(value).length>0,'Sin cambios');
 
 export function toMemoryControlItem(row:StatusRow):MemoryControlItem{
   return{id:row.id,kind:row.kind,content:row.content,source:row.source,importance:Number(row.importance)||1,updated_at:row.updated_at,embeddingReady:!embeddingNeedsRefresh(row)};
