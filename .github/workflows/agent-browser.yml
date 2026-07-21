@@ -167,6 +167,14 @@ jobs:
           fs.writeFileSync('/tmp/evidence.json',JSON.stringify(payload));
           EOF_NODE
           curl --fail-with-body -sS -H "Authorization: Bearer $OIDC_TOKEN" -H 'Content-Type: application/json' --data-binary @/tmp/evidence.json "$BASE_URL/evidence/v1/browser"
+      - name: Validar resultado final
+        shell: bash
+        run: |
+          node --input-type=module <<'EOF_NODE'
+          import fs from 'node:fs';
+          const report=JSON.parse(fs.readFileSync('agent-evidence/report.json','utf8'));
+          if(report.outcome!=='completed')throw new Error('La verificación visual detectó un fallo; la evidencia ya fue guardada en Héctor OS');
+          EOF_NODE
       - name: Marcar interrupción del workflow
         if: failure() && steps.oidc_final.outcome == 'success'
         env:
