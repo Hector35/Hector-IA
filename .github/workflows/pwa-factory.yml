@@ -1,0 +1,87 @@
+name: PWA Factory
+
+on:
+  workflow_dispatch:
+    inputs:
+      project_id:
+        description: PWA project id
+        required: true
+        type: string
+      slug:
+        description: PWA slug
+        required: true
+        type: string
+      version:
+        description: PWA version
+        required: true
+        type: string
+      project_path:
+        description: Generated project path
+        required: true
+        type: string
+
+permissions:
+  contents: read
+  id-token: write
+
+jobs:
+  verify:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    defaults:
+      run:
+        working-directory: ${{ inputs.project_path }}
+    steps:
+      - name: Checkout generated source
+        uses: actions/checkout@v4
+
+      - name: Setup Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: 22
+
+      - name: Install isolated dependencies
+        run: npm install --ignore-scripts --no-audit --no-fund
+
+      - name: Typecheck
+        run: npm run typecheck
+
+      - name: Build
+        run: npm run build
+
+      - name: Validate PWA assets
+        run: |
+          test -f dist/manifest.webmanifest
+          test -f dist/sw.js
+          test -f dist/icon.svg
+          grep -q '"display": "standalone"' dist/manifest.webmanifest
+          grep -q 'serviceWorker' src/main.tsx
+          grep -q 'apple-mobile-web-app-capable' index.html
+
+      - name: Upload verified build
+        uses: actions/upload-artifact@v4
+        with:
+          name: pwa-${{ inputs.slug }}-v${{ inputs.version }}
+          path: ${{ inputs.project_path }}/dist
+          if-no-files-found: error
+          retention-days: 14
+
+      - name: Report verification to Héctor OS
+        if: always()
+        working-directory: .
+        env:
+          HECTOR_OS_RUNNER_URL: ${{ secrets.HECTOR_OS_RUNNER_URL }}
+          PROJECT_ID: ${{ inputs.project_id }}
+          VERSION: ${{ inputs.version }}
+          RESULT: ${{ job.status }}
+          RUN_ID: ${{ github.run_id }}
+        run: |
+          if [ -z "${HECTOR_OS_RUNNER_URL}" ]; then
+            echo "HECTOR_OS_RUNNER_URL no configurado; se conserva el resultado en GitHub Actions."
+            exit 0
+          fi
+          TOKEN="$(curl -fsSL -H "Authorization: bearer $ACTIONS_ID_TOKEN_REQUEST_TOKEN" "${ACTIONS_ID_TOKEN_REQUEST_URL}&audience=hector-os-agent-runner" | python3 -c 'import json,sys; print(json.load(sys.stdin)["value"])')"
+          curl -fsSL -X POST "${HECTOR_OS_RUNNER_URL}/runner/v1/pwa-status" \
+            -H "Authorization: Bearer ${TOKEN}" \
+            -H "Content-Type: application/json" \
+            --data "{\"projectId\":\"${PROJECT_ID}\",\"version\":${VERSION},\"status\":\"${RESULT}\",\"runId\":\"${RUN_ID}\"}"
