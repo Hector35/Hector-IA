@@ -2,13 +2,14 @@ import {Hono} from 'hono';
 import {z} from 'zod';
 import type {Bindings,Variables} from '../types';
 import {requireAuth} from '../lib/auth';
+import {loadFeedbackRoutingProfile} from '../lib/feedback-routing';
 
 export const responseTraces=new Hono<{Bindings:Bindings;Variables:Variables}>();
 responseTraces.use('*',requireAuth);
 
 export type TraceTier='fast'|'balanced'|'deep';
 export type TraceProvider='cloudflare'|'openai';
-export type TraceContext={memories:number;recentMessages:number;hasSummary:boolean;priorSummaries?:number;projectState?:number;contractApplied?:boolean;contractReasons?:string[];cognitiveMode?:string;deliberationPasses?:number;deliberationReason?:string};
+export type TraceContext={memories:number;recentMessages:number;hasSummary:boolean;priorSummaries?:number;projectState?:number;contractApplied?:boolean;contractReasons?:string[];cognitiveMode?:string;deliberationPasses?:number;deliberationReason?:string;feedbackAdaptation?:Record<string,unknown>};
 export type PersistResponseTraceInput={
  userId:string;conversationId:string;messageId:string;requestedProvider:TraceProvider;actualProvider:TraceProvider;model:string;routeTier:TraceTier;task:string;modelReason:string;providerReason:string;searchedWeb:boolean;fallback:boolean;qualityScore:number;qualityAccepted:boolean;latencyMs:number;estimatedCostUsd:number;memories:string[];context:TraceContext;
 };
@@ -65,7 +66,7 @@ responseTraces.get('/:id',async c=>{
 responseTraces.post('/:id/feedback',async c=>{
  const parsed=z.object({rating:z.union([z.literal(1),z.literal(-1)]),correction:z.string().trim().max(1200).optional()}).safeParse(await c.req.json());
  if(!parsed.success)return c.json({error:'Retroalimentación inválida'},400);
- const userId=c.get('userId'),trace=await c.env.DB.prepare('SELECT id FROM response_traces WHERE id=? AND user_id=?').bind(c.req.param('id'),userId).first();
+ const userId=c.get('userId'),trace=await c.env.DB.prepare('SELECT id,task FROM response_traces WHERE id=? AND user_id=?').bind(c.req.param('id'),userId).first<{id:string;task:string}>();
  if(!trace)return c.json({error:'Traza no encontrada'},404);
  const correction=parsed.data.correction?.trim()||null;
  await c.env.DB.prepare(`INSERT INTO response_feedback(id,user_id,trace_id,rating,correction) VALUES(?,?,?,?,?)
@@ -75,5 +76,6 @@ responseTraces.post('/:id/feedback',async c=>{
   const duplicate=await c.env.DB.prepare('SELECT id FROM memories WHERE user_id=? AND lower(content)=lower(?) LIMIT 1').bind(userId,correction).first<{id:string}>();
   if(duplicate)memoryId=duplicate.id;else{memoryId=crypto.randomUUID();await c.env.DB.prepare("INSERT INTO memories(id,user_id,kind,content,importance,source) VALUES(?,?,'correction',?,5,'response-feedback')").bind(memoryId,userId,correction).run();}
  }
- return c.json({ok:true,rating:parsed.data.rating,correction,memoryId});
+ const profile=await loadFeedbackRoutingProfile(c.env.DB,userId,trace.task);
+ return c.json({ok:true,rating:parsed.data.rating,correction,memoryId,adaptation:{task:trace.task,sampleCount:profile.sampleCount,preferDeep:profile.preferDeep,avoidCloudflare:profile.avoidCloudflare,guidanceApplied:profile.guidance.length,reason:profile.reason}});
 });
