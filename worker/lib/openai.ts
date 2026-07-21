@@ -2,13 +2,14 @@ import type { Bindings } from '../types';
 import { BOOTSTRAP_VERSION,renderBootstrap } from '../intelligence/bootstrap';
 import {callCloudflare,chooseProvider,type ProviderName} from './providers';
 import {assessProviderResponse,loadCloudflareHealth,recordProviderQuality,type ProviderQualityAssessment} from './provider-quality';
+import {loadUserFeedbackProfile,neutralFeedbackProfile,type UserFeedbackProfile} from './response-feedback';
 
-export const CONTEXTUAL_ENGINE_VERSION='2.3.0';
+export const CONTEXTUAL_ENGINE_VERSION='2.4.0';
 export type AIUsage={input_tokens?:number;output_tokens?:number;input_tokens_details?:{cached_tokens?:number}};
 type AIResponse={id:string;output_text?:string;output?:Array<{type:string;content?:Array<{type:string;text?:string}>}>;usage?:AIUsage;error?:{message:string}};
 export type Route={model:string;tier:'fast'|'balanced'|'deep';reason:string;reasoning:'low'|'medium'|'high';task:string;needsWeb:boolean};
 export type ChatTurn={role:'user'|'assistant';content:string};
-export type ResponseOptions={reasoning?:'auto'|'high'};
+export type ResponseOptions={reasoning?:'auto'|'high';userId?:string};
 
 const deepSignals=/\b(programa|programar|código|codigo|arquitectura|depura|debug|analiza a fondo|demuestra|prueba matemática|estrategia|plan completo|investiga profundamente|compara todas|diseña|optimiza|audita|auditoría|auditoria|diagnóstico|diagnostico|razona paso|ingeniería|ingenieria|implementa|refactoriza|refactorización|refactorizacion|hipótesis|hipotesis|modelo completo)\b/i;
 const fastSignals=/^(hola|gracias|ok|sí|si|no|cuánto|cuanto|qué hora|que hora|resume|traduce|corrige)\b/i;
@@ -56,7 +57,11 @@ export function applyResponseOptions(env:Bindings,route:Route,options:ResponseOp
  if(options.reasoning!=='high')return route;
  return{...route,model:env.OPENAI_MODEL_REASONING||route.model,tier:'deep',reasoning:'high',reason:'nivel de razonamiento alto solicitado explícitamente'};
 }
-function behaviorRules(route:Route){return `Tu trabajo no es sonar inteligente: es comprender el objetivo real, conservar contexto, razonar correctamente y producir una respuesta útil y ejecutable.
+export function applyUserFeedback(env:Bindings,route:Route,feedback:UserFeedbackProfile):Route{
+ if(!feedback.preferDeep||route.tier==='deep')return route;
+ return{...route,model:env.OPENAI_MODEL_REASONING||route.model,tier:'deep',reasoning:'high',reason:`aprendizaje controlado: ${feedback.reason}`};
+}
+function behaviorRules(route:Route,guidance:string[]=[]){return `Tu trabajo no es sonar inteligente: es comprender el objetivo real, conservar contexto, razonar correctamente y producir una respuesta útil y ejecutable.
 
 REGLAS DE OPERACIÓN
 - Responde en español salvo petición contraria.
@@ -70,13 +75,13 @@ REGLAS DE OPERACIÓN
 - Cuando evalúes tus capacidades o carencias, basa cada afirmación en componentes presentes: D1, R2, Worker, memoria, resúmenes, router, herramientas, pruebas, despliegues y rutas API.
 - Antes de responder revisa silenciosamente: objetivo, consistencia, evidencia, omisiones y aplicabilidad.
 - No reveles razonamiento privado; entrega solo la respuesta final.
-
+${guidance.length?`\nPREFERENCIAS APRENDIDAS DE FEEDBACK EXPLÍCITO\n${guidance.map(item=>`- ${item}`).join('\n')}\n`:''}
 ENRUTAMIENTO
 - Tarea: ${route.task}
 - Nivel: ${route.tier}
 - Motivo: ${route.reason}
 - Bootstrap: ${BOOTSTRAP_VERSION}`;}
-function legacyPrompt(route:Route,memories:string[]){return `${renderBootstrap()}\n\n${behaviorRules(route)}\n\nMEMORIA RELEVANTE\n${memories.length?memories.map(x=>`- ${x}`).join('\n'):'- Sin memoria relevante'}`;}
+function legacyPrompt(route:Route,memories:string[],guidance:string[]=[]){return `${renderBootstrap()}\n\n${behaviorRules(route,guidance)}\n\nMEMORIA RELEVANTE\n${memories.length?memories.map(x=>`- ${x}`).join('\n'):'- Sin memoria relevante'}`;}
 async function callResponses(env:Bindings,body:Record<string,unknown>){
   const res=await fetch('https://api.openai.com/v1/responses',{method:'POST',headers:{Authorization:`Bearer ${env.OPENAI_API_KEY}`,'Content-Type':'application/json'},body:JSON.stringify(body)});
   const data=await res.json<AIResponse>();
@@ -99,10 +104,10 @@ async function openAIFallback(env:Bindings,input:string,instructions:string,rout
     throw error;
   }
 }
-async function executeHybrid(env:Bindings,input:string,instructions:string,route:Route,openAIInput:unknown){
+async function executeHybrid(env:Bindings,input:string,instructions:string,route:Route,openAIInput:unknown,feedback:UserFeedbackProfile){
   const started=Date.now(),enabled=env.CLOUDFLARE_AI_ENABLED!=='false';
   const health=route.tier==='fast'&&enabled?await loadCloudflareHealth(env.DB):undefined;
-  const decision=chooseProvider(input,route.tier,route.needsWeb,enabled,health);
+  const decision=chooseProvider(input,route.tier,route.needsWeb,enabled,health,feedback);
   if(decision.provider==='cloudflare'){
     try{
       const cf=await callCloudflare(env,instructions,input),assessment=assessProviderResponse(input,cf.text);
@@ -119,22 +124,24 @@ async function executeHybrid(env:Bindings,input:string,instructions:string,route
   await saveQuality(env,route,started,'openai','openai',route.model,false,assessment);
   return{id:out.data.id,text:out.text,usage:out.data.usage,searchedWeb:out.searchedWeb,model:route.model,provider:'openai' as ProviderName,requestedProvider:'openai' as ProviderName,providerReason:decision.reason,fallback:false,qualityScore:assessment.score,qualityAccepted:assessment.accepted};
 }
+async function resolveFeedback(env:Bindings,userId:string|undefined,task:string){return userId?loadUserFeedbackProfile(env.DB,userId,task):neutralFeedbackProfile();}
+function feedbackResult(profile:UserFeedbackProfile){return{sampleCount:profile.sampleCount,preferDeep:profile.preferDeep,avoidCloudflare:profile.avoidCloudflare,guidanceApplied:profile.guidance.length,reason:profile.reason};}
 export async function respond(env:Bindings,input:string,previousResponseId:string|undefined,memories:string[],allowWeb=true,options:ResponseOptions={}){
-  const route=applyResponseOptions(env,routeModel(env,input,allowWeb),options),selectedMemories=relevantMemories(input,memories),instructions=legacyPrompt(route,selectedMemories);
-  const result=await executeHybrid(env,input,instructions,route,input);
-  return{...result,modelTier:route.tier,modelReason:route.reason};
+  const base=applyResponseOptions(env,routeModel(env,input,allowWeb),options),feedback=await resolveFeedback(env,options.userId,base.task),route=applyUserFeedback(env,base,feedback),selectedMemories=relevantMemories(input,memories),instructions=legacyPrompt(route,selectedMemories,feedback.guidance);
+  const result=await executeHybrid(env,input,instructions,route,input,feedback);
+  return{...result,modelTier:route.tier,modelReason:route.reason,task:route.task,feedbackAdaptation:feedbackResult(feedback)};
 }
 export function conversationInput(history:ChatTurn[],input:string):ChatTurn[]{
   const trimmed=history.slice(-16).map(x=>({role:x.role,content:x.content}));
   const last=trimmed[trimmed.length-1];
   return last?.role==='user'&&last.content===input?trimmed:[...trimmed,{role:'user' as const,content:input}];
 }
-export async function respondContextual(env:Bindings,input:string,history:ChatTurn[],renderedContext:string,allowWeb=true){
-  const route=routeModel(env,input,allowWeb);
-  const instructions=`${renderBootstrap()}\n\n${behaviorRules(route)}\n\nCONTEXTO DINÁMICO\n${renderedContext}`;
+export async function respondContextual(env:Bindings,input:string,history:ChatTurn[],renderedContext:string,allowWeb=true,options:ResponseOptions={}){
+  const base=applyResponseOptions(env,routeModel(env,input,allowWeb),options),feedback=await resolveFeedback(env,options.userId,base.task),route=applyUserFeedback(env,base,feedback);
+  const instructions=`${renderBootstrap()}\n\n${behaviorRules(route,feedback.guidance)}\n\nCONTEXTO DINÁMICO\n${renderedContext}`;
   const conversation=conversationInput(history,input);
-  const result=await executeHybrid(env,input,instructions,route,conversation);
-  return{...result,modelTier:route.tier,modelReason:route.reason,task:route.task};
+  const result=await executeHybrid(env,input,instructions,route,conversation,feedback);
+  return{...result,modelTier:route.tier,modelReason:route.reason,task:route.task,feedbackAdaptation:feedbackResult(feedback)};
 }
 export async function inspectImage(env:Bindings,prompt:string,dataUrl:string){
   const model=env.OPENAI_MODEL_BALANCED||env.OPENAI_MODEL;
