@@ -11,7 +11,7 @@ const views=[
  {label:'Inicio',candidates:[]},
  {label:'Chat',candidates:['Chatear','Chat']},
  {label:'Archivos',candidates:['Explorar archivos','Archivos']},
- {label:'Trabajo',candidates:['Trabajo']},
+ {label:'Trabajo',candidates:['Trabajo'],menu:true},
  {label:'Ajustes',candidates:['Ajustes'],menu:true}
 ];
 
@@ -75,8 +75,8 @@ async function clickFirstVisible(page,names){
   }
   const texts=page.getByText(matcher,{exact:true});
   for(let index=0;index<await texts.count();index++){
-   const item=texts.nth(index);
-   if(await item.isVisible()){await item.click();return true;}
+   const item=texts.nth(index),box=await item.boundingBox();
+   if(await item.isVisible()&&box&&box.x+box.width>0&&box.x<page.viewportSize().width){await item.click();return true;}
   }
  }
  return false;
@@ -88,14 +88,12 @@ async function openMenu(page){
   const button=menuButtons.nth(index);
   if(await button.isVisible()){await button.click();await page.waitForTimeout(150);return;}
  }
- const topLeft=page.locator('button').filter({has:page.locator('svg')}).first();
- if(await topLeft.isVisible())await topLeft.click();
 }
 
 async function navigate(page,view){
  if(!view.candidates.length)return;
+ if(view.menu)await openMenu(page);
  if(await clickFirstVisible(page,view.candidates))return;
- if(view.menu){await openMenu(page);if(await clickFirstVisible(page,view.candidates))return;}
  throw new Error(`No se pudo abrir la vista ${view.label}`);
 }
 
