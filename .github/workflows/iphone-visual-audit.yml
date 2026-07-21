@@ -1,0 +1,55 @@
+name: iPhone Visual Audit
+
+on:
+  workflow_dispatch:
+  pull_request:
+    paths:
+      - 'src/**'
+      - 'scripts/iphone-visual-audit.mjs'
+      - '.github/workflows/iphone-visual-audit.yml'
+      - 'package.json'
+
+permissions:
+  contents: read
+
+jobs:
+  audit:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+      - name: Instalar dependencias
+        run: npm ci
+      - name: Instalar Playwright
+        run: npm install --no-save playwright && npx playwright install --with-deps chromium
+      - name: Construir aplicación
+        run: npm run build
+      - name: Iniciar preview local
+        run: |
+          npm exec vite preview -- --host 127.0.0.1 --port 4173 > /tmp/hector-visual-preview.log 2>&1 &
+          echo $! > /tmp/hector-visual-preview.pid
+          for attempt in $(seq 1 30); do
+            if curl -fsS http://127.0.0.1:4173 >/dev/null; then exit 0; fi
+            sleep 1
+          done
+          cat /tmp/hector-visual-preview.log
+          exit 1
+      - name: Auditar iPhone SE y 13 Pro
+        env:
+          VISUAL_AUDIT_URL: http://127.0.0.1:4173
+          VISUAL_AUDIT_OUTPUT: visual-audit
+        run: node scripts/iphone-visual-audit.mjs
+      - name: Mostrar log del preview
+        if: failure()
+        run: cat /tmp/hector-visual-preview.log || true
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: iphone-visual-audit
+          path: visual-audit
+          if-no-files-found: warn
+          retention-days: 14
