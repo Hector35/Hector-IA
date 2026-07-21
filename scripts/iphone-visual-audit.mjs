@@ -88,16 +88,23 @@ try{
   const context=await browser.newContext({viewport:device.viewport,deviceScaleFactor:2,isMobile:true,hasTouch:true,reducedMotion:'reduce'});
   const page=await context.newPage();
   const consoleErrors=[];
+  const mockedRequests=[];
   page.on('console',message=>{if(message.type()==='error')consoleErrors.push(message.text())});
   page.on('pageerror',error=>consoleErrors.push(error.message));
-  await page.route('**/api/**',async route=>route.fulfill(responseFor(route.request().url(),route.request().method())));
-  const deviceReport={id:device.id,label:device.label,viewport:device.viewport,views:[],consoleErrors};
+  await page.route('**/*',async route=>{
+   const request=route.request(),path=new URL(request.url()).pathname;
+   if(path.startsWith('/api/')){
+    mockedRequests.push(`${request.method()} ${path}`);
+    await route.fulfill(responseFor(request.url(),request.method()));
+   }else await route.continue();
+  });
+  const deviceReport={id:device.id,label:device.label,viewport:device.viewport,views:[],consoleErrors,mockedRequests};
   try{
-   await page.goto(baseUrl,{waitUntil:'networkidle',timeout:45000});
-   await page.getByText('Buenos', {exact:false}).first().waitFor({state:'visible',timeout:15000});
+   await page.goto(baseUrl,{waitUntil:'domcontentloaded',timeout:45000});
+   await page.locator('.shell').waitFor({state:'visible',timeout:15000});
    for(const label of views){
     if(label!=='Inicio')await clickView(page,label);
-    await page.waitForTimeout(250);
+    await page.waitForTimeout(300);
     const overflow=await auditOverflow(page,device.viewport);
     const focus=await auditFocus(page);
     const file=`${outputDir}/${device.id}-${label.toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g,'').replace(/\s+/g,'-')}.png`;
@@ -111,7 +118,12 @@ try{
    }
    if(consoleErrors.length){report.summary.passed=false;report.summary.failures+=consoleErrors.length;}
   }catch(error){
+   const fatalFile=`${outputDir}/${device.id}-fatal.png`;
+   await page.screenshot({path:fatalFile,fullPage:true}).catch(()=>{});
    deviceReport.fatal=error instanceof Error?error.message:String(error);
+   deviceReport.fatalScreenshot=fatalFile;
+   deviceReport.currentUrl=page.url();
+   deviceReport.bodyText=(await page.locator('body').innerText().catch(()=>'' )).slice(0,2000);
    report.summary.passed=false;report.summary.failures+=1;
   }finally{
    report.devices.push(deviceReport);
