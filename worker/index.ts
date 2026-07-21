@@ -36,5 +36,31 @@ async function event(env:Bindings,jobId:string,message:string,progress:number){a
 async function recoverExpiredLeases(env:Bindings){await env.DB.prepare(`UPDATE work_jobs SET status='queued',lease_token=NULL,lease_expires_at=NULL,next_retry_at=CURRENT_TIMESTAMP,updated_at=CURRENT_TIMESTAMP WHERE status='working' AND kind!='programming' AND (lease_expires_at IS NULL OR lease_expires_at<=CURRENT_TIMESTAMP)`).run();}
 async function claimNextJob(env:Bindings){const leaseToken=crypto.randomUUID();const job=await env.DB.prepare(`UPDATE work_jobs SET status='working',progress=10,attempt_count=attempt_count+1,lease_token=?,lease_expires_at=datetime('now',?),heartbeat_at=CURRENT_TIMESTAMP,updated_at=CURRENT_TIMESTAMP WHERE id=(SELECT id FROM work_jobs WHERE status='queued' AND kind!='programming' AND (next_retry_at IS NULL OR next_retry_at<=CURRENT_TIMESTAMP) ORDER BY created_at LIMIT 1) AND status='queued' RETURNING *`).bind(leaseToken,`+${JOB_LEASE_SECONDS} seconds`).first<any>();return job?{job,leaseToken}:null;}
 async function processNext(env:Bindings){
- await recoverExpiredLeases();
+ await recoverExpiredLeases(env);const claimed=await claimNextJob(env);if(!claimed)return;
+ const {job,leaseToken}=claimed,started=Date.now(),plan=buildPlan(job.prompt);
+ await event(env,job.id,`Inspección iniciada. Intento ${job.attempt_count}/${job.max_attempts}. Skills: ${plan.skills.join(', ')||'general-analysis'}`,10);
+ try{
+  const forced=job.reasoning_level==='high';
+  await event(env,job.id,forced?'Plan cargado; usando GPT-5.6 Sol con razonamiento máximo':'Plan verificable cargado; preparando ejecución',25);
+  const out=await respond(env,`Ejecuta según el protocolo y entrega evidencia por criterio.\n\n${job.prompt}`,undefined,[],Boolean(job.allow_web??1),{reasoning:forced?'max':'auto'}),u=estimateCost(out.usage,out.model);
+  if(out.searchedWeb)u.costUsd+=.01;
+  await event(env,job.id,'Respuesta obtenida; verificando criterios y limitaciones',80);
+  const completed=await env.DB.prepare("UPDATE work_jobs SET status='completed',progress=100,result=?,last_error=NULL,lease_token=NULL,lease_expires_at=NULL,next_retry_at=NULL,heartbeat_at=CURRENT_TIMESTAMP,updated_at=CURRENT_TIMESTAMP WHERE id=? AND lease_token=?").bind(out.text,job.id,leaseToken).run();
+  if(!completed.meta.changes)return;
+  await env.DB.batch([
+   env.DB.prepare("INSERT INTO work_events(id,job_id,message,progress) VALUES(?,?, 'Resultado guardado con evidencia y límites declarados',100)").bind(crypto.randomUUID(),job.id),
+   env.DB.prepare('INSERT INTO api_usage(id,user_id,provider,service,model,input_units,cached_input_units,output_units,estimated_cost_usd,metadata_json) VALUES(?,?,?,?,?,?,?,?,?,?)').bind(crypto.randomUUID(),job.user_id,out.provider==='cloudflare'?'Cloudflare':'OpenAI',job.schedule_id?'scheduled-work-v2':'background-work-v3',out.model,u.input,u.cached,u.output,u.costUsd,JSON.stringify({tier:out.modelTier,reasoningEffort:out.reasoningEffort,modelReason:out.modelReason,searchedWeb:out.searchedWeb}))
+  ]);
+  await recordExperience(env,{jobId:job.id,userId:job.user_id,objective:job.prompt,status:'completed',result:out.text,skills:plan.skills,attempts:job.attempt_count,durationMs:Date.now()-started});
+ }catch(e){
+  const message=e instanceof Error?e.message:'Error',retry=canRetry(job.attempt_count,job.max_attempts),delay=retryDelaySeconds(job.attempt_count),status=retry?'queued':'blocked',nextRetry=retry?`datetime('now','+${delay} seconds')`:'NULL';
+  const failed=await env.DB.prepare(`UPDATE work_jobs SET status=?,result=?,last_error=?,next_retry_at=${nextRetry},lease_token=NULL,lease_expires_at=NULL,heartbeat_at=CURRENT_TIMESTAMP,updated_at=CURRENT_TIMESTAMP WHERE id=? AND lease_token=?`).bind(status,message,message,job.id,leaseToken).run();
+  if(failed.meta.changes){
+   await event(env,job.id,retry?`Intento fallido; reintento programado en ${delay}s`:'Límite de intentos alcanzado; trabajo bloqueado',25);
+   await recordExperience(env,{jobId:job.id,userId:job.user_id,objective:job.prompt,status,result:message,skills:plan.skills,attempts:job.attempt_count,durationMs:Date.now()-started});
+  }
+ }
 }
+
+async function processScheduledWork(env:Bindings){await processDueSchedules(env);await processNext(env);}
+export default {fetch:app.fetch,scheduled:(_controller:ScheduledController,env:Bindings,ctx:ExecutionContext)=>{ctx.waitUntil(processScheduledWork(env));ctx.waitUntil(processNextDelegation(env));ctx.waitUntil(processProjectQueue(env));ctx.waitUntil(processChatAgentRuns(env));}};
