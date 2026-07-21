@@ -1,5 +1,5 @@
 import {describe,expect,it} from 'vitest';
-import {cosineSimilarity,EMBEDDING_DIMENSIONS,EMBEDDING_MODEL,embeddingNeedsRefresh,parseEmbedding,selectEmbeddingBackfill,type MemoryRow} from './context';
+import {cosineSimilarity,EMBEDDING_DIMENSIONS,EMBEDDING_MODEL,embeddingNeedsRefresh,parseEmbedding,rankSemanticMemories,selectEmbeddingBackfill,type MemoryRow} from './context';
 
 function vector(value=0.1){return JSON.stringify(Array.from({length:EMBEDDING_DIMENSIONS},()=>value));}
 function row(overrides:Partial<MemoryRow>&Pick<MemoryRow,'id'|'content'>):MemoryRow{return{model:EMBEDDING_MODEL,dimensions:EMBEDDING_DIMENSIONS,vector_json:vector(),...overrides};}
@@ -47,5 +47,22 @@ describe('selectEmbeddingBackfill',()=>{
   it('respeta el límite de costo configurado',()=>{
     const rows=Array.from({length:10},(_,index)=>row({id:String(index),content:`memoria ${index}`,vector_json:null}));
     expect(selectEmbeddingBackfill(rows,[],3)).toHaveLength(3);
+  });
+});
+
+describe('rankSemanticMemories',()=>{
+  it('ordena por similitud, aplica umbral y deduplica por memoria',()=>{
+    const items=[
+      {id:'a',content:'primera versión',vector:[0,1]},
+      {id:'b',content:'menos relevante',vector:[0.5,0.5]},
+      {id:'a',content:'versión reparada',vector:[1,0]},
+      {id:'c',content:'opuesta',vector:[-1,0]}
+    ];
+    expect(rankSemanticMemories([1,0],items,0.6,8)).toEqual(['versión reparada','menos relevante']);
+  });
+
+  it('respeta el límite de memorias semánticas',()=>{
+    const items=Array.from({length:10},(_,index)=>({id:String(index),content:`memoria ${index}`,vector:[1,index/100]}));
+    expect(rankSemanticMemories([1,0],items,0,3)).toHaveLength(3);
   });
 });
