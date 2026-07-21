@@ -66,6 +66,47 @@ jobs:
         id: migrations
         shell: bash
         run: npx wrangler d1 migrations apply hector-os-db --remote 2>&1 | tee /tmp/deploy-migrations.log
+      - name: Aprovisionar cuenta ChatGPT de pruebas
+        id: test_account
+        shell: bash
+        run: |
+          set -euo pipefail
+          node <<'NODE'
+          import {readFileSync,writeFileSync} from 'node:fs';
+          import {pbkdf2Sync,randomBytes,randomUUID} from 'node:crypto';
+
+          const source=readFileSync('worker/lib/test-account.ts','utf8');
+          const email=source.match(/TEST_ACCOUNT_EMAIL='([^']+)'/)?.[1];
+          const name=source.match(/TEST_ACCOUNT_NAME='([^']+)'/)?.[1];
+          if(!email||!name)throw new Error('No se encontró el contrato de la cuenta de pruebas');
+          const escapeSql=(value)=>value.replaceAll("'","''");
+          const password=randomBytes(48).toString('base64url');
+          const salt=randomBytes(16).toString('base64url');
+          const hash=pbkdf2Sync(password,salt,50_000,32,'sha256').toString('hex');
+          const userId=randomUUID(),auditId=randomUUID();
+          const metadata=JSON.stringify({account:name,persistent:true,isolatedBy:'user_id',source:'deploy-production'});
+          const sql=`PRAGMA foreign_keys = ON;
+          INSERT OR IGNORE INTO users(id,email,name,password_hash,password_salt)
+          VALUES('${escapeSql(userId)}','${escapeSql(email)}','${escapeSql(name)}','${escapeSql(hash)}','${escapeSql(salt)}');
+          INSERT INTO audit_log(id,user_id,action,resource_type,resource_id,metadata_json)
+          SELECT '${escapeSql(auditId)}',u.id,'test_account.provision','test_account',u.id,'${escapeSql(metadata)}'
+          FROM users u
+          WHERE u.email='${escapeSql(email)}'
+            AND NOT EXISTS(SELECT 1 FROM audit_log a WHERE a.action='test_account.provision' AND a.resource_id=u.id);
+          `;
+          writeFileSync('/tmp/provision-test-account.sql',sql,{mode:0o600});
+          NODE
+          npx wrangler d1 execute hector-os-db --remote --file=/tmp/provision-test-account.sql 2>&1 | tee /tmp/deploy-test-account.log
+          npx wrangler d1 execute hector-os-db --remote --command="SELECT id,email,name FROM users WHERE email='chatgpt-test@hectoros.invalid' LIMIT 1" --json > /tmp/test-account-verification.json 2>> /tmp/deploy-test-account.log
+          cat /tmp/test-account-verification.json >> /tmp/deploy-test-account.log
+          node <<'NODE'
+          import {readFileSync} from 'node:fs';
+          const payload=JSON.parse(readFileSync('/tmp/test-account-verification.json','utf8'));
+          const groups=Array.isArray(payload)?payload:[payload];
+          const rows=groups.flatMap(group=>Array.isArray(group?.results)?group.results:[]);
+          const found=rows.some(row=>row?.email==='chatgpt-test@hectoros.invalid'&&row?.name==='ChatGPT · Pruebas');
+          if(!found)throw new Error('La cuenta ChatGPT de pruebas no quedó presente en D1');
+          NODE
       - name: Desplegar Héctor OS
         id: deploy
         shell: bash
@@ -84,6 +125,7 @@ jobs:
             echo "- Commit: \`$GITHUB_SHA\`"
             echo "- npm ci, typecheck, pruebas y build: success"
             echo "- Migraciones D1: success"
+            echo "- Cuenta ChatGPT · Pruebas en D1: success"
             echo "- Cloudflare deploy: success"
             echo "- /health: success"
             echo "- Ejecución: ${GITHUB_SERVER_URL}/${GITHUB_REPOSITORY}/actions/runs/${GITHUB_RUN_ID}"
@@ -98,15 +140,16 @@ jobs:
           BUILD_OUTCOME: ${{ steps.build.outcome }}
           CREDENTIALS_OUTCOME: ${{ steps.credentials.outcome }}
           MIGRATIONS_OUTCOME: ${{ steps.migrations.outcome }}
+          TEST_ACCOUNT_OUTCOME: ${{ steps.test_account.outcome }}
           DEPLOY_OUTCOME: ${{ steps.deploy.outcome }}
           HEALTH_OUTCOME: ${{ steps.health.outcome }}
         shell: bash
         run: |
           set +e
           LOG=""
-          for file in /tmp/deploy-install.log /tmp/deploy-typecheck.log /tmp/deploy-tests.log /tmp/deploy-build.log /tmp/deploy-migrations.log /tmp/deploy-worker.log /tmp/deploy-health.log; do
+          for file in /tmp/deploy-install.log /tmp/deploy-typecheck.log /tmp/deploy-tests.log /tmp/deploy-build.log /tmp/deploy-migrations.log /tmp/deploy-test-account.log /tmp/deploy-worker.log /tmp/deploy-health.log; do
             if [ -s "$file" ]; then LOG="$(tail -n 70 "$file")"; fi
           done
           SAFE="$(printf '%s' "$LOG" | sed -E 's/(sk-[A-Za-z0-9_-]+)/[REDACTED]/g; s/(Bearer )[A-Za-z0-9._-]+/\1[REDACTED]/g; s/(API_TOKEN[=: ]+)[A-Za-z0-9._-]+/\1[REDACTED]/g' | head -c 6500)"
-          BODY="❌ Despliegue falló para $GITHUB_SHA.\n\nResultados:\n- npm ci: ${INSTALL_OUTCOME}\n- typecheck: ${TYPECHECK_OUTCOME}\n- pruebas: ${TESTS_OUTCOME}\n- build: ${BUILD_OUTCOME}\n- credenciales: ${CREDENTIALS_OUTCOME}\n- migraciones: ${MIGRATIONS_OUTCOME}\n- deploy: ${DEPLOY_OUTCOME}\n- health: ${HEALTH_OUTCOME}\n\nÚltimo diagnóstico sanitizado:\n\`\`\`\n${SAFE:-Sin salida capturada}\n\`\`\`"
+          BODY="❌ Despliegue falló para $GITHUB_SHA.\n\nResultados:\n- npm ci: ${INSTALL_OUTCOME}\n- typecheck: ${TYPECHECK_OUTCOME}\n- pruebas: ${TESTS_OUTCOME}\n- build: ${BUILD_OUTCOME}\n- credenciales: ${CREDENTIALS_OUTCOME}\n- migraciones: ${MIGRATIONS_OUTCOME}\n- cuenta de pruebas: ${TEST_ACCOUNT_OUTCOME}\n- deploy: ${DEPLOY_OUTCOME}\n- health: ${HEALTH_OUTCOME}\n\nÚltimo diagnóstico sanitizado:\n\`\`\`\n${SAFE:-Sin salida capturada}\n\`\`\`"
           gh issue create --title "[deploy-production] FALLO ${GITHUB_SHA::7}" --body "$BODY"
