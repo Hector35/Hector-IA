@@ -1,5 +1,5 @@
 import { describe,expect,it } from 'vitest';
-import { classify,relevantMemories,routeModel } from './openai';
+import { classify,conversationInput,relevantMemories,routeModel } from './openai';
 import type { Bindings } from '../types';
 
 const env={
@@ -92,6 +92,14 @@ describe('Héctor OS memory retrieval benchmark',()=>{
     expect(selected[0]).toContain('4,396.50');
   });
 
+  it('matches exact text consistently across accent variations',()=>{
+    const selected=relevantMemories('configuracion de la version disponible',[
+      'La configuración de la versión disponible está registrada.',
+      'Dato secundario sobre configuración general.'
+    ]);
+    expect(selected[0]).toBe('La configuración de la versión disponible está registrada.');
+  });
+
   it('returns no unrelated memories',()=>{
     expect(relevantMemories('¿Cuál es la capital de Japón?',memories)).toEqual([]);
   });
@@ -99,5 +107,41 @@ describe('Héctor OS memory retrieval benchmark',()=>{
   it('limits memory context to eight items',()=>{
     const many=Array.from({length:20},(_,i)=>`Proyecto arquitectura Cloudflare número ${i}`);
     expect(relevantMemories('arquitectura Cloudflare proyecto',many)).toHaveLength(8);
+  });
+});
+
+describe('Héctor OS contextual conversation assembly',()=>{
+  it('does not duplicate the current user input when history already ends with it',()=>{
+    const input='Continúa con Héctor OS';
+    const result=conversationInput([
+      {role:'assistant',content:'Listo.'},
+      {role:'user',content:input}
+    ],input);
+    expect(result).toEqual([
+      {role:'assistant',content:'Listo.'},
+      {role:'user',content:input}
+    ]);
+  });
+
+  it('appends a new input when the latest turn is different',()=>{
+    expect(conversationInput([
+      {role:'user',content:'Mensaje anterior'},
+      {role:'assistant',content:'Respuesta anterior'}
+    ],'Mensaje nuevo')).toEqual([
+      {role:'user',content:'Mensaje anterior'},
+      {role:'assistant',content:'Respuesta anterior'},
+      {role:'user',content:'Mensaje nuevo'}
+    ]);
+  });
+
+  it('keeps only the latest sixteen history turns before appending',()=>{
+    const history=Array.from({length:20},(_,index)=>({
+      role:index%2===0?'user' as const:'assistant' as const,
+      content:`Turno ${index}`
+    }));
+    const result=conversationInput(history,'Turno nuevo');
+    expect(result).toHaveLength(17);
+    expect(result[0].content).toBe('Turno 4');
+    expect(result.at(-1)).toEqual({role:'user',content:'Turno nuevo'});
   });
 });
