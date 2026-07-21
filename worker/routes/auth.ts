@@ -3,28 +3,18 @@ import {deleteCookie,getCookie,setCookie} from 'hono/cookie';
 import {z} from 'zod';
 import type {Bindings,Variables} from '../types';
 import {hashPassword,randomToken,sha256,verifyPassword} from '../lib/crypto';
+import {AUTH_WINDOW_MS,rateLimitDecision} from '../lib/auth-rate-limit';
 import {requireAuth} from '../lib/auth';
 
 export const auth=new Hono<{Bindings:Bindings;Variables:Variables}>();
 const credentials=z.object({email:z.string().email(),password:z.string().min(10).max(128),name:z.string().min(2).max(60).optional()});
-const MAX_FAILURES=5,WINDOW_MS=15*60_000,BLOCK_MS=15*60_000;
+const MAX_FAILURES=5,BLOCK_MS=15*60_000;
 const cookie=(c:any,token:string)=>setCookie(c,'hector_session',token,{httpOnly:true,secure:true,sameSite:'Strict',path:'/',maxAge:60*60*24*30});
-
-type RateLimitDecision={blocked:boolean;failures:number;retryAfterSeconds?:number};
 
 function requestIp(c:any){return (c.req.header('CF-Connecting-IP')||c.req.header('X-Forwarded-For')||'unknown').split(',')[0].trim();}
 async function requestIdentity(c:any,email:string){return sha256(`${requestIp(c)}|${email.toLowerCase()}`);}
 async function requestIpHash(c:any){return sha256(requestIp(c));}
 function userAgent(c:any){return (c.req.header('User-Agent')||'unknown').slice(0,300);}
-
-export function rateLimitDecision(row:{failures:number;window_started_at:string;blocked_until?:string|null}|null,now=Date.now()):RateLimitDecision{
- if(!row)return {blocked:false,failures:0};
- const blockedUntil=row.blocked_until?Date.parse(row.blocked_until):0;
- if(Number.isFinite(blockedUntil)&&blockedUntil>now)return {blocked:true,failures:row.failures,retryAfterSeconds:Math.ceil((blockedUntil-now)/1000)};
- const windowStarted=Date.parse(row.window_started_at);
- if(!Number.isFinite(windowStarted)||now-windowStarted>WINDOW_MS)return {blocked:false,failures:0};
- return {blocked:false,failures:row.failures};
-}
 
 async function enforceRateLimit(c:any,email:string){
  const key=await requestIdentity(c,email),row=await c.env.DB.prepare('SELECT failures,window_started_at,blocked_until FROM auth_rate_limits WHERE key_hash=?').bind(key).first<any>();
@@ -33,7 +23,7 @@ async function enforceRateLimit(c:any,email:string){
 async function recordFailure(c:any,key:string,currentFailures:number){
  const failures=currentFailures+1,blockedUntil=failures>=MAX_FAILURES?new Date(Date.now()+BLOCK_MS).toISOString():null;
  await c.env.DB.prepare(`INSERT INTO auth_rate_limits(key_hash,failures,window_started_at,blocked_until,updated_at) VALUES(?,?,CURRENT_TIMESTAMP,?,CURRENT_TIMESTAMP)
- ON CONFLICT(key_hash) DO UPDATE SET failures=?,window_started_at=CASE WHEN julianday('now')-julianday(window_started_at) > ? THEN CURRENT_TIMESTAMP ELSE window_started_at END,blocked_until=?,updated_at=CURRENT_TIMESTAMP`).bind(key,failures,blockedUntil,failures,WINDOW_MS/86_400_000,blockedUntil).run();
+ ON CONFLICT(key_hash) DO UPDATE SET failures=?,window_started_at=CASE WHEN julianday('now')-julianday(window_started_at) > ? THEN CURRENT_TIMESTAMP ELSE window_started_at END,blocked_until=?,updated_at=CURRENT_TIMESTAMP`).bind(key,failures,blockedUntil,failures,AUTH_WINDOW_MS/86_400_000,blockedUntil).run();
  return blockedUntil;
 }
 async function clearFailures(c:any,key:string){await c.env.DB.prepare('DELETE FROM auth_rate_limits WHERE key_hash=?').bind(key).run();}
