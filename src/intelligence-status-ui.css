@@ -1,0 +1,24 @@
+.cxIntelligenceStatus{margin:20px 0;padding:18px;border:1px solid rgba(255,255,255,.1);border-radius:18px;background:rgba(255,255,255,.025)}
+.cxIntelligenceStatusHead{display:flex;align-items:flex-start;justify-content:space-between;gap:16px;margin-bottom:16px}
+.cxIntelligenceStatusHead span:first-child{display:block;margin-bottom:5px;font-size:12px;font-weight:700;letter-spacing:.08em;text-transform:uppercase;color:#8f96a3}
+.cxIntelligenceStatusHead h2{margin:0 0 6px;font-size:20px;color:#f5f7fb}
+.cxIntelligenceStatusHead p{margin:0;max-width:680px;font-size:14px;line-height:1.5;color:#aeb4bf}
+.cxIntelligenceBadge{flex:0 0 auto;padding:7px 10px;border-radius:999px;font-size:12px;font-weight:700;border:1px solid rgba(255,255,255,.12)}
+.cxIntelligenceBadge.good{color:#98f0bd;background:rgba(27,153,88,.14);border-color:rgba(91,220,144,.24)}
+.cxIntelligenceBadge.watch{color:#f8d98a;background:rgba(190,132,23,.14);border-color:rgba(244,192,74,.25)}
+.cxIntelligenceBadge.bad{color:#ffaaa6;background:rgba(190,46,40,.15);border-color:rgba(255,105,97,.25)}
+.cxIntelligenceBadge.idle{color:#b8bec9;background:rgba(255,255,255,.05)}
+.cxIntelligenceMetrics{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:10px;margin-bottom:12px}
+.cxIntelligenceMetrics>div{padding:13px;border-radius:14px;background:#111318;border:1px solid rgba(255,255,255,.07)}
+.cxIntelligenceMetrics span{display:block;margin-bottom:7px;font-size:12px;color:#9299a5}
+.cxIntelligenceMetrics strong{font-size:19px;color:#f5f7fb}
+.cxIntelligenceDetail{display:grid;gap:8px}
+.cxIntelligenceRow{display:flex;justify-content:space-between;gap:16px;padding:11px 13px;border-radius:12px;background:rgba(255,255,255,.025);font-size:13px;color:#aeb4bf}
+.cxIntelligenceRow strong{color:#eef1f6}
+.cxIntelligenceLast{padding:13px;border-radius:12px;background:rgba(255,255,255,.025)}
+.cxIntelligenceLast span{display:block;margin-bottom:5px;font-size:12px;color:#8f96a3}
+.cxIntelligenceLast strong{display:block;margin-bottom:4px;color:#eef1f6}
+.cxIntelligenceLast p{margin:0;font-size:13px;line-height:1.45;color:#aeb4bf}
+.cxIntelligenceNotice{margin:12px 0 0;font-size:12px;color:#9299a5}
+.cxIntelligenceNotice.good{color:#94c9aa}.cxIntelligenceNotice.bad{color:#ff9b96}
+@media(max-width:720px){.cxIntelligenceStatus{padding:15px;border-radius:16px}.cxIntelligenceStatusHead{display:block}.cxIntelligenceBadge{display:inline-block;margin-top:12px}.cxIntelligenceMetrics{grid-template-columns:repeat(2,minmax(0,1fr))}.cxIntelligenceMetrics strong{font-size:17px}}
