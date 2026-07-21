@@ -8,12 +8,24 @@ export type GitHubActionsPolicy={
 };
 
 const repository='Hector35/Hector-IA';
+const defaultPolicies:Record<string,GitHubActionsPolicy>={
+  'hector-os-self-improve':{audience:'hector-os-self-improve',workflows:['self-improve.yml'],events:['push','workflow_dispatch'],refs:['refs/heads/main']},
+  'hector-os-agent-runner':{audience:'hector-os-agent-runner',workflows:['agent-code-runner.yml'],events:['workflow_dispatch'],refs:['refs/heads/main']},
+  'hector-os-pwa-runner':{audience:'hector-os-pwa-runner',workflows:['pwa-factory.yml'],events:['workflow_dispatch'],refPrefixes:['refs/heads/pwa/']},
+  'hector-os-evidence':{audience:'hector-os-evidence',workflows:['agent-browser.yml','agent-merge-smoke.yml'],events:['workflow_dispatch','pull_request'],refs:['refs/heads/main'],refPrefixes:['refs/pull/']}
+};
 const decoder=new TextDecoder();
 function decodePart(value:string){
   const normalized=value.replace(/-/g,'+').replace(/_/g,'/').padEnd(Math.ceil(value.length/4)*4,'=');
   return Uint8Array.from(atob(normalized),c=>c.charCodeAt(0));
 }
 function jsonPart<T>(value:string):T{return JSON.parse(decoder.decode(decodePart(value))) as T;}
+function resolvePolicy(policy:GitHubActionsPolicy|string){
+  if(typeof policy!=='string')return policy;
+  const resolved=defaultPolicies[policy];
+  if(!resolved)throw new Error('Política OIDC desconocida');
+  return resolved;
+}
 
 let jwksCache:{expires:number;keys:any[]}|undefined;
 async function githubKeys(){
@@ -26,21 +38,21 @@ async function githubKeys(){
 }
 function audienceMatches(aud:GitHubActionsClaims['aud'],expected:string){return Array.isArray(aud)?aud.includes(expected):aud===expected;}
 
-export function authorizeGitHubActionsClaims(claims:GitHubActionsClaims,policy:GitHubActionsPolicy){
+export function authorizeGitHubActionsClaims(claims:GitHubActionsClaims,input:GitHubActionsPolicy|string){
+  const policy=resolvePolicy(input);
   if(claims.repository!==repository)throw new Error('Repositorio OIDC no autorizado');
   if(!claims.event_name||!policy.events.includes(claims.event_name))throw new Error('Evento OIDC no autorizado');
   const workflow=claims.workflow_ref?.split('@',1)[0];
   const allowed=policy.workflows.map(file=>`${repository}/.github/workflows/${file}`);
   if(!workflow||!allowed.includes(workflow))throw new Error('Workflow OIDC no autorizado');
-  const exactAllowed=!policy.refs?.length||!!claims.ref&&policy.refs.includes(claims.ref);
-  const prefixAllowed=!policy.refPrefixes?.length||!!claims.ref&&policy.refPrefixes.some(prefix=>claims.ref!.startsWith(prefix));
-  if(policy.refs?.length&&policy.refPrefixes?.length){
-    if(!exactAllowed&&!prefixAllowed)throw new Error('Referencia OIDC no autorizada');
-  }else if(!exactAllowed||!prefixAllowed)throw new Error('Referencia OIDC no autorizada');
+  const exactAllowed=!!claims.ref&&!!policy.refs?.includes(claims.ref);
+  const prefixAllowed=!!claims.ref&&!!policy.refPrefixes?.some(prefix=>claims.ref!.startsWith(prefix));
+  if((policy.refs?.length||policy.refPrefixes?.length)&&!exactAllowed&&!prefixAllowed)throw new Error('Referencia OIDC no autorizada');
   return claims;
 }
 
-export async function verifyGitHubActionsToken(token:string,policy:GitHubActionsPolicy):Promise<GitHubActionsClaims>{
+export async function verifyGitHubActionsToken(token:string,input:GitHubActionsPolicy|string):Promise<GitHubActionsClaims>{
+  const policy=resolvePolicy(input);
   const parts=token.split('.');
   if(parts.length!==3)throw new Error('JWT inválido');
   const header=jsonPart<{alg?:string;kid?:string}>(parts[0]);
