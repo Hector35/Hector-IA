@@ -1,0 +1,59 @@
+name: Production Audit
+
+on:
+  workflow_dispatch:
+  schedule:
+    - cron: '17 9 * * *'
+  pull_request:
+    paths:
+      - 'worker/**'
+      - 'tests/**'
+      - 'migrations/**'
+      - '.github/workflows/production-audit.yml'
+
+permissions:
+  contents: read
+
+jobs:
+  audit:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+      - name: Install dependencies
+        run: npm ci --ignore-scripts --no-audit --no-fund
+      - name: Typecheck
+        run: npm run typecheck
+      - name: Unit and resilience tests
+        run: npm test
+      - name: Production build
+        run: npm run build
+      - name: Worker dry run
+        run: npx wrangler deploy --dry-run
+      - name: Validate migration ordering
+        run: |
+          python3 - <<'PY'
+          from pathlib import Path
+          files=sorted(Path('migrations').glob('*.sql'))
+          prefixes=[p.name.split('_',1)[0] for p in files]
+          assert len(prefixes)==len(set(prefixes)), f'Duplicate migration numbers: {prefixes}'
+          assert prefixes==sorted(prefixes), 'Migrations are not ordered'
+          print(f'Validated {len(files)} migrations')
+          PY
+      - name: Validate protected routes
+        run: |
+          grep -q "projectGovernance.use('*',requireAuth)" worker/routes/project-governance.ts
+          grep -q "projects.use('*',requireAuth)" worker/routes/projects.ts
+          grep -q "conversations.use('*',requireAuth)" worker/routes/conversations.ts
+      - name: Public production smoke test
+        if: github.event_name != 'pull_request'
+        run: |
+          set -euo pipefail
+          BASE='https://hector-os.hectorhdzr035.workers.dev'
+          curl --fail --silent --show-error --retry 3 --max-time 15 "$BASE/health" | grep -q '"ok":true'
+          code=$(curl --silent --output /tmp/protected --write-out '%{http_code}' --max-time 15 "$BASE/api/projects/internal-summary")
+          test "$code" = '401' -o "$code" = '403'
