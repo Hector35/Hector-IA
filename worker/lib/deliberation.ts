@@ -2,7 +2,7 @@ export type DeliberationTier='fast'|'balanced'|'deep';
 export type DeliberationOptions={reasoning?:'auto'|'high';deliberation?:'auto'|'force'|'off'};
 export type DeliberationMode='single'|'ensemble';
 export type DeliberationProfile={mode:DeliberationMode;reason:string;candidateCount:1|2;highStakes:boolean};
-export type UsageLike={input_tokens?:number;output_tokens?:number;input_tokens_details?:{cached_tokens?:number}};
+export type UsageLike={input_tokens?:number;output_tokens?:number;input_tokens_details?:{cached_tokens?:number;cache_write_tokens?:number}};
 
 export const JUDGE_MAX_CHARS=32000;
 export const JUDGE_INSTRUCTIONS_MAX_CHARS=18000;
@@ -40,4 +40,7 @@ export function judgeInput(original:string,candidates:Array<{role:CandidateRole;
  const overflow=assembled.length-JUDGE_MAX_CHARS,saferBudget=Math.max(JUDGE_MIN_CANDIDATE_CHARS,perCandidate-Math.ceil(overflow/Math.max(selected.length,1))),boundedSections=selected.map((candidate,index)=>`${headers[index]}${compactText(candidate.text,saferBudget)}`).join('\n\n');
  return `${intro}${boundedSections}${outro}`.slice(0,JUDGE_MAX_CHARS-outro.length)+outro;
 }
-export function aggregateUsage(usages:Array<UsageLike|undefined>):UsageLike{const input=usages.reduce((sum,item)=>sum+(item?.input_tokens||0),0),output=usages.reduce((sum,item)=>sum+(item?.output_tokens||0),0),cached=usages.reduce((sum,item)=>sum+(item?.input_tokens_details?.cached_tokens||0),0);return{input_tokens:input,output_tokens:output,input_tokens_details:{cached_tokens:cached}};}
+export function aggregateUsage(usages:Array<UsageLike|undefined>):UsageLike{
+ const input=usages.reduce((sum,item)=>sum+(item?.input_tokens||0),0),output=usages.reduce((sum,item)=>sum+(item?.output_tokens||0),0),cached=usages.reduce((sum,item)=>sum+(item?.input_tokens_details?.cached_tokens||0),0),cacheWrite=usages.reduce((sum,item)=>sum+(item?.input_tokens_details?.cache_write_tokens||0),0);
+ return{input_tokens:input,output_tokens:output,input_tokens_details:{cached_tokens:cached,cache_write_tokens:cacheWrite}};
+}
