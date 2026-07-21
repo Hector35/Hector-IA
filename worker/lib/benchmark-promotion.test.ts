@@ -1,6 +1,8 @@
 import {describe,expect,it} from 'vitest';
-import {summarizeBenchmarkPolicy,type BenchmarkAggregateRow} from './benchmark-promotion';
+import {applyBudgetQualityProtection,summarizeBenchmarkPolicy,type BenchmarkAggregateRow} from './benchmark-promotion';
+import type {BudgetQualityPolicy} from './budget-quality-breaker';
 const row=(winner:'baseline'|'adaptive'|'tie',baseline=10,adaptive=14,baselineCost=.01,adaptiveCost=.03):BenchmarkAggregateRow=>({winner,baseline_score:baseline,adaptive_score:adaptive,baseline_cost_usd:baselineCost,adaptive_cost_usd:adaptiveCost});
+const quality=(state:BudgetQualityPolicy['state']):BudgetQualityPolicy=>({state,sampleCount:6,acceptedCount:3,negativeCount:3,correctionCount:1,acceptanceRate:.5,negativeRate:.5,correctionRate:1/6,lastDegradedAt:'2026-07-21T22:00:00.000Z',reason:'calidad fuera de umbral'});
 
 describe('summarizeBenchmarkPolicy',()=>{
  it('permanece observando con muestras insuficientes',()=>{const policy=summarizeBenchmarkPolicy([row('adaptive'),row('adaptive')]);expect(policy.status).toBe('observing');expect(policy.strategy).toBe('baseline');});
@@ -8,4 +10,11 @@ describe('summarizeBenchmarkPolicy',()=>{
  it('no promueve si el costo excede el límite',()=>{const policy=summarizeBenchmarkPolicy(Array.from({length:6},()=>row('adaptive',10,16,.01,.08)));expect(policy.status).toBe('observing');expect(policy.strategy).toBe('baseline');});
  it('no promueve una ventaja de puntaje marginal',()=>{const policy=summarizeBenchmarkPolicy(Array.from({length:6},()=>row('adaptive',10,11)));expect(policy.status).toBe('observing');});
  it('revierte una promoción cuando las tres muestras recientes favorecen baseline',()=>{const rows=[row('baseline',15,10),row('baseline',14,10),row('tie',12,12),row('adaptive'),row('adaptive'),row('adaptive')];const policy=summarizeBenchmarkPolicy(rows,{strategy:'adaptive',status:'promoted'});expect(policy.status).toBe('rolled_back');expect(policy.strategy).toBe('baseline');});
+});
+
+describe('applyBudgetQualityProtection',()=>{
+ const base=summarizeBenchmarkPolicy([]);
+ it('fuerza inteligencia protegida cuando el ahorro pierde calidad',()=>{const policy=applyBudgetQualityProtection(base,quality('suspended'));expect(policy.strategy).toBe('adaptive');expect(policy.status).toBe('promoted');expect(policy.reason).toContain('protección temporal');});
+ it('permite una prueba controlada sin forzar la ruta alta',()=>{const policy=applyBudgetQualityProtection(base,quality('probe'));expect(policy.strategy).toBe('baseline');expect(policy.budgetQuality?.state).toBe('probe');});
+ it('respeta gobierno humano congelado o excluido',()=>{expect(applyBudgetQualityProtection(base,quality('suspended'),'excluded').strategy).toBe('baseline');expect(applyBudgetQualityProtection(base,quality('suspended'),'frozen').strategy).toBe('baseline');});
 });
