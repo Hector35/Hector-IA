@@ -74,11 +74,20 @@ jobs:
         id: health
         shell: bash
         run: curl -fsS https://hector-os.hectorhdzr035.workers.dev/health | tee /tmp/deploy-health.log | jq -e '.ok == true'
-      - name: Publicar recibo correcto
+      - name: Registrar despliegue correcto
         if: success()
-        env:
-          GH_TOKEN: ${{ github.token }}
-        run: gh issue create --title "[deploy-production] OK ${GITHUB_SHA::7}" --body "✅ Héctor OS compiló, pasó pruebas, aplicó migraciones D1, se desplegó en Cloudflare y respondió correctamente en /health."
+        shell: bash
+        run: |
+          {
+            echo "## ✅ Deploy Production"
+            echo
+            echo "- Commit: \`$GITHUB_SHA\`"
+            echo "- npm ci, typecheck, pruebas y build: success"
+            echo "- Migraciones D1: success"
+            echo "- Cloudflare deploy: success"
+            echo "- /health: success"
+            echo "- Ejecución: ${GITHUB_SERVER_URL}/${GITHUB_REPOSITORY}/actions/runs/${GITHUB_RUN_ID}"
+          } >> "$GITHUB_STEP_SUMMARY"
       - name: Publicar diagnóstico fallido
         if: failure()
         env:
