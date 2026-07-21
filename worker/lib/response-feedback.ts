@@ -1,8 +1,28 @@
 export type FeedbackReason='incorrect'|'incomplete'|'not_personalized'|'too_long'|'too_short'|'unsafe'|'other';
 export type FeedbackRow={rating:number;reason?:FeedbackReason|null;provider:string;model_tier:string;created_at?:string|null};
 export type UserFeedbackProfile={sampleCount:number;downRate:number;nonDeepSampleCount:number;nonDeepDownRate:number;cloudflareSampleCount:number;cloudflareDownRate:number;preferDeep:boolean;avoidCloudflare:boolean;guidance:string[];reason:string};
+export type FeedbackCommand={rating:'up'|'down';reason:FeedbackReason;retry:boolean};
 
 export const USER_FEEDBACK_POLICY={windowDays:60,sampleLimit:60,minNonDeepSamples:5,minCloudflareSamples:4,preferDeepDownRate:.5,avoidCloudflareDownRate:.5};
+
+function normalize(value:string){return value.toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g,'').replace(/\s+/g,' ').trim();}
+
+export function parseFeedbackCommand(message:string):FeedbackCommand|null{
+ const text=normalize(message);
+ const anchored=/^(?:esa|esta|la|tu) respuesta(?: anterior)?\b|^(?:eso|esto)\b/.test(text);
+ if(!anchored)return null;
+ const retry=/\b(corrigela|corrige|repitela|repite|hazla de nuevo|vuelve a responder|intenta otra vez)\b/.test(text);
+ if(/\b(me sirvio|estuvo bien|fue correcta|esta correcta|asi si|excelente respuesta|buena respuesta)\b/.test(text))return{rating:'up',reason:'other',retry:false};
+ if(!/\b(no me sirvio|estuvo mal|esta mal|fue incorrecta|incorrecta|incompleta|muy larga|demasiado larga|muy corta|demasiado corta|generica|no uso mi contexto|peligrosa|insegura|corrigela|corrige|hazla de nuevo|vuelve a responder)\b/.test(text))return null;
+ let reason:FeedbackReason='other';
+ if(/\b(incorrecta|estuvo mal|esta mal|fue incorrecta)\b/.test(text))reason='incorrect';
+ else if(/\b(incompleta|falto|faltaron)\b/.test(text))reason='incomplete';
+ else if(/\b(generica|no uso mi contexto|no fue personalizada)\b/.test(text))reason='not_personalized';
+ else if(/\b(muy larga|demasiado larga)\b/.test(text))reason='too_long';
+ else if(/\b(muy corta|demasiado corta)\b/.test(text))reason='too_short';
+ else if(/\b(peligrosa|insegura)\b/.test(text))reason='unsafe';
+ return{rating:'down',reason,retry};
+}
 
 function smoothedDownRate(rows:FeedbackRow[]){
  const downs=rows.filter(row=>Number(row.rating)<0).length;
