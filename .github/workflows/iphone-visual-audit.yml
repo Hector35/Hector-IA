@@ -6,8 +6,10 @@ on:
     paths:
       - 'src/**'
       - 'scripts/iphone-visual-audit.mjs'
+      - 'scripts/iphone-visual-regression.mjs'
       - '.github/workflows/iphone-visual-audit.yml'
       - 'package.json'
+      - 'package-lock.json'
 
 permissions:
   contents: read
@@ -15,41 +17,87 @@ permissions:
 jobs:
   audit:
     runs-on: ubuntu-latest
-    timeout-minutes: 15
+    timeout-minutes: 25
     steps:
       - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
       - uses: actions/setup-node@v4
         with:
           node-version: 22
           cache: npm
-      - name: Instalar dependencias
-        run: npm ci
-      - name: Instalar Playwright
-        run: npm install --no-save playwright && npx playwright install --with-deps chromium
-      - name: Construir aplicación
-        run: npm run build
-      - name: Iniciar servidor local aislado
+      - name: Instalar dependencias visuales
         run: |
-          npm run dev -- --mode test --host 127.0.0.1 --port 4173 > /tmp/hector-visual-server.log 2>&1 &
-          echo $! > /tmp/hector-visual-server.pid
+          npm ci
+          npm install --no-save playwright pixelmatch pngjs
+          npx playwright install --with-deps chromium
+      - name: Construir aplicación actual
+        run: npm run build
+      - name: Iniciar aplicación actual
+        run: |
+          npm run dev -- --mode test --host 127.0.0.1 --port 4173 > /tmp/hector-current.log 2>&1 &
+          echo $! > /tmp/hector-current.pid
           for attempt in $(seq 1 45); do
             if curl -fsS http://127.0.0.1:4173 >/dev/null; then exit 0; fi
             sleep 1
           done
-          cat /tmp/hector-visual-server.log
+          cat /tmp/hector-current.log
           exit 1
-      - name: Auditar iPhone SE y 13 Pro
+      - name: Auditar versión actual
         env:
           VISUAL_AUDIT_URL: http://127.0.0.1:4173
-          VISUAL_AUDIT_OUTPUT: visual-audit
+          VISUAL_AUDIT_OUTPUT: visual-current
         run: node scripts/iphone-visual-audit.mjs
-      - name: Mostrar log del servidor
+      - name: Preparar rama base
+        env:
+          BASE_REF: ${{ github.base_ref || 'main' }}
+        run: |
+          git fetch origin "$BASE_REF"
+          git worktree add /tmp/hector-visual-baseline "origin/$BASE_REF"
+          cd /tmp/hector-visual-baseline
+          npm ci
+          npm run build
+          npm run dev -- --mode test --host 127.0.0.1 --port 4174 > /tmp/hector-baseline.log 2>&1 &
+          echo $! > /tmp/hector-baseline.pid
+          for attempt in $(seq 1 45); do
+            if curl -fsS http://127.0.0.1:4174 >/dev/null; then exit 0; fi
+            sleep 1
+          done
+          cat /tmp/hector-baseline.log
+          exit 1
+      - name: Auditar rama base con fixtures deterministas
+        env:
+          VISUAL_AUDIT_URL: http://127.0.0.1:4174
+          VISUAL_AUDIT_OUTPUT: visual-baseline
+        run: node scripts/iphone-visual-audit.mjs
+      - name: Comparar píxeles y generar diffs
+        env:
+          VISUAL_BASELINE_DIR: visual-baseline
+          VISUAL_CURRENT_DIR: visual-current
+          VISUAL_DIFF_DIR: visual-diff
+          VISUAL_MAX_CHANGED_RATIO: '0.02'
+          VISUAL_MAX_CHANGED_PIXELS: '12000'
+          VISUAL_PIXEL_THRESHOLD: '0.12'
+        run: node scripts/iphone-visual-regression.mjs
+      - name: Mostrar logs de servidores
         if: failure()
-        run: cat /tmp/hector-visual-server.log || true
+        run: |
+          echo '=== actual ==='
+          cat /tmp/hector-current.log || true
+          echo '=== base ==='
+          cat /tmp/hector-baseline.log || true
+      - name: Detener servidores
+        if: always()
+        run: |
+          test ! -f /tmp/hector-current.pid || kill "$(cat /tmp/hector-current.pid)" || true
+          test ! -f /tmp/hector-baseline.pid || kill "$(cat /tmp/hector-baseline.pid)" || true
       - uses: actions/upload-artifact@v4
         if: always()
         with:
-          name: iphone-visual-audit
-          path: visual-audit
+          name: iphone-visual-regression
+          path: |
+            visual-current
+            visual-baseline
+            visual-diff
           if-no-files-found: warn
           retention-days: 14

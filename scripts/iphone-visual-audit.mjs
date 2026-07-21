@@ -3,6 +3,7 @@ import {mkdir,writeFile} from 'node:fs/promises';
 
 const baseUrl=process.env.VISUAL_AUDIT_URL||'http://127.0.0.1:4173';
 const outputDir=process.env.VISUAL_AUDIT_OUTPUT||'visual-audit';
+const fixedTimestamp='2026-07-21T12:00:00.000Z';
 const devices=[
  {id:'iphone-se',label:'iPhone SE',viewport:{width:320,height:568}},
  {id:'iphone-13-pro',label:'iPhone 13 Pro',viewport:{width:390,height:844}}
@@ -28,7 +29,7 @@ function responseFor(url,method){
  if(path==='/api/memories')return json({items:[{id:'memory-1',content:'Prefiere una interfaz optimizada para iPhone.',importance:5}]});
  if(path==='/api/files')return json({items:[{id:'file-1',name:'evidence.png',size_bytes:32768}]});
  if(path==='/api/usage')return json({summary:[{provider:'OpenAI',service:'contextual-chat',calls:4,input_units:9000,output_units:2500,cost_usd:0.14}]});
- if(path==='/api/work/jobs')return json({items:[{id:'job-1',title:'Validar interfaz iPhone',kind:'browser',status:'completed',progress:100,result:'Sin desbordamientos detectados',created_at:new Date().toISOString()}]});
+ if(path==='/api/work/jobs')return json({items:[{id:'job-1',title:'Validar interfaz iPhone',kind:'browser',status:'completed',progress:100,result:'Sin desbordamientos detectados',created_at:fixedTimestamp}]});
  if(path==='/api/work-evidence/jobs/job-1')return json({items:[]});
  if(path==='/api/intelligence/self-model')return json({identity:{name:'Héctor OS',mission:'Asistente privado y verificable',knowledgeVersion:'visual-test'},models:{fast:'gpt-5.6-luna',balanced:'gpt-5.6-terra',reasoning:'gpt-5.6-sol',critic:'gpt-5.6-sol'},runtime:{memories:12,workJobs:{total:4,completed:3,blocked:0},scheduledTasks:{total:2,active:2},responseTraces:8,activeSystemContexts:5},architecture:['PWA','Cloudflare Worker','D1','R2'],capabilities:[{capability:'Auditoría visual',components:['Playwright'],evidence:'capturas por viewport',limit:'entorno simulado'}],limitations:['La auditoría local usa respuestas API controladas.']});
  if(path==='/api/intelligence/status')return json({models:{fast:'gpt-5.6-luna',balanced:'gpt-5.6-terra',reasoning:'gpt-5.6-sol'}});
@@ -111,7 +112,7 @@ async function auditFocus(page){
 
 await mkdir(outputDir,{recursive:true});
 const browser=await chromium.launch({headless:true});
-const report={baseUrl,checkedAt:new Date().toISOString(),devices:[],summary:{passed:true,failures:0}};
+const report={baseUrl,checkedAt:new Date().toISOString(),fixtureTimestamp:fixedTimestamp,devices:[],summary:{passed:true,failures:0}};
 try{
  for(const device of devices){
   const context=await browser.newContext({viewport:device.viewport,deviceScaleFactor:2,isMobile:true,hasTouch:true,reducedMotion:'reduce'});
@@ -135,7 +136,7 @@ try{
     const overflow=await auditOverflow(page,device.viewport);
     const focus=await auditFocus(page);
     const file=`${outputDir}/${device.id}-${view.label.toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g,'').replace(/\s+/g,'-')}.png`;
-    await page.screenshot({path:file,fullPage:true});
+    await page.screenshot({path:file,fullPage:true,animations:'disabled'});
     const failures=[];
     if(overflow.documentOverflow>2)failures.push(`desbordamiento documental de ${overflow.documentOverflow}px`);
     if(overflow.offenders.length)failures.push(`${overflow.offenders.length} elementos fuera del viewport`);
@@ -146,7 +147,7 @@ try{
    if(consoleErrors.length){report.summary.passed=false;report.summary.failures+=consoleErrors.length;}
   }catch(error){
    const fatalFile=`${outputDir}/${device.id}-fatal.png`;
-   await page.screenshot({path:fatalFile,fullPage:true}).catch(()=>{});
+   await page.screenshot({path:fatalFile,fullPage:true,animations:'disabled'}).catch(()=>{});
    deviceReport.fatal=error instanceof Error?error.message:String(error);
    deviceReport.fatalScreenshot=fatalFile;
    deviceReport.currentUrl=page.url();
