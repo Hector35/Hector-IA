@@ -11,6 +11,10 @@ const credentials=z.object({email:z.string().email(),password:z.string().min(10)
 const MAX_FAILURES=5,BLOCK_MS=15*60_000;
 const cookie=(c:any,token:string)=>setCookie(c,'hector_session',token,{httpOnly:true,secure:true,sameSite:'Strict',path:'/',maxAge:60*60*24*30});
 
+type RateRow={failures:number;window_started_at:string;blocked_until:string|null};
+type UserRow={id:string;name:string;password_salt:string;password_hash:string};
+type SessionRow={id:string;token_hash:string;created_at:string;expires_at:string;last_seen_at:string|null;user_agent:string|null};
+
 function requestIp(c:any){return (c.req.header('CF-Connecting-IP')||c.req.header('X-Forwarded-For')||'unknown').split(',')[0].trim();}
 async function requestIdentity(c:any,email:string){return sha256(`${requestIp(c)}|${email.toLowerCase()}`);}
 async function requestIpHash(c:any){return sha256(requestIp(c));}
@@ -18,8 +22,8 @@ function userAgent(c:any){return (c.req.header('User-Agent')||'unknown').slice(0
 
 async function enforceRateLimit(c:any,email:string){
  const key=await requestIdentity(c,email);
- const row=await c.env.DB.prepare('SELECT failures,window_started_at,blocked_until FROM auth_rate_limits WHERE key_hash=?').bind(key).first<{failures:number;window_started_at:string;blocked_until:string|null}>();
- return {key,decision:rateLimitDecision(row||null)};
+ const row=await c.env.DB.prepare('SELECT failures,window_started_at,blocked_until FROM auth_rate_limits WHERE key_hash=?').bind(key).first() as RateRow|null;
+ return {key,decision:rateLimitDecision(row)};
 }
 async function recordFailure(c:any,key:string,currentFailures:number):Promise<boolean>{
  const failures=currentFailures+1,blockedUntil=failures>=MAX_FAILURES?new Date(Date.now()+BLOCK_MS).toISOString():null;
@@ -57,7 +61,7 @@ auth.post('/login',async(c:any)=>{
  if(!parsed.success)return c.json({error:'Credenciales inválidas'},400);
  const {key,decision}=await enforceRateLimit(c,parsed.data.email);
  if(decision.blocked){c.header('Retry-After',String(decision.retryAfterSeconds??900));return c.json({error:'Demasiados intentos. Intenta más tarde.'},429);}
- const u=await c.env.DB.prepare('SELECT * FROM users WHERE email=?').bind(parsed.data.email.toLowerCase()).first<any>();
+ const u=await c.env.DB.prepare('SELECT * FROM users WHERE email=?').bind(parsed.data.email.toLowerCase()).first() as UserRow|null;
  if(!u||!await verifyPassword(parsed.data.password,u.password_salt,u.password_hash)){
   const blocked=await recordFailure(c,key,decision.failures);
   if(blocked){c.header('Retry-After',String(Math.ceil(BLOCK_MS/1000)));return c.json({error:'Credenciales inválidas'},429);}
@@ -70,6 +74,6 @@ auth.post('/login',async(c:any)=>{
 
 auth.post('/logout',requireAuth,async(c:any)=>{const raw=getCookie(c,'hector_session');if(raw)await c.env.DB.prepare('DELETE FROM sessions WHERE token_hash=?').bind(await sha256(raw)).run();deleteCookie(c,'hector_session',{path:'/'});return c.json({ok:true});});
 auth.post('/logout-all',requireAuth,async(c:any)=>{await c.env.DB.prepare('DELETE FROM sessions WHERE user_id=?').bind(c.get('userId')).run();deleteCookie(c,'hector_session',{path:'/'});return c.json({ok:true});});
-auth.get('/sessions',requireAuth,async(c:any)=>{const raw=getCookie(c,'hector_session'),currentHash=raw?await sha256(raw):'';const result=await c.env.DB.prepare("SELECT id,token_hash,created_at,expires_at,last_seen_at,user_agent FROM sessions WHERE user_id=? AND expires_at>datetime('now') ORDER BY created_at DESC").bind(c.get('userId')).all<any>();const rows=result.results||[];return c.json({items:rows.map(({token_hash,...x}:any)=>({...x,current:token_hash===currentHash}))});});
-auth.delete('/sessions/:id',requireAuth,async(c:any)=>{const id=c.req.param('id');const raw=getCookie(c,'hector_session'),currentHash=raw?await sha256(raw):'';const target=await c.env.DB.prepare('SELECT token_hash FROM sessions WHERE id=? AND user_id=?').bind(id,c.get('userId')).first<any>();if(!target)return c.json({error:'Sesión no encontrada'},404);await c.env.DB.prepare('DELETE FROM sessions WHERE id=? AND user_id=?').bind(id,c.get('userId')).run();if(target.token_hash===currentHash)deleteCookie(c,'hector_session',{path:'/'});return c.json({ok:true,currentRevoked:target.token_hash===currentHash});});
+auth.get('/sessions',requireAuth,async(c:any)=>{const raw=getCookie(c,'hector_session'),currentHash=raw?await sha256(raw):'';const result=await c.env.DB.prepare("SELECT id,token_hash,created_at,expires_at,last_seen_at,user_agent FROM sessions WHERE user_id=? AND expires_at>datetime('now') ORDER BY created_at DESC").bind(c.get('userId')).all();const rows=((result.results||[]) as SessionRow[]);return c.json({items:rows.map(({token_hash,...x})=>({...x,current:token_hash===currentHash}))});});
+auth.delete('/sessions/:id',requireAuth,async(c:any)=>{const id=c.req.param('id');const raw=getCookie(c,'hector_session'),currentHash=raw?await sha256(raw):'';const target=await c.env.DB.prepare('SELECT token_hash FROM sessions WHERE id=? AND user_id=?').bind(id,c.get('userId')).first() as {token_hash:string}|null;if(!target)return c.json({error:'Sesión no encontrada'},404);await c.env.DB.prepare('DELETE FROM sessions WHERE id=? AND user_id=?').bind(id,c.get('userId')).run();if(target.token_hash===currentHash)deleteCookie(c,'hector_session',{path:'/'});return c.json({ok:true,currentRevoked:target.token_hash===currentHash});});
 auth.get('/me',requireAuth,async(c:any)=>{const raw=getCookie(c,'hector_session');if(raw)await c.env.DB.prepare("UPDATE sessions SET last_seen_at=CURRENT_TIMESTAMP WHERE token_hash=? AND (last_seen_at IS NULL OR last_seen_at<datetime('now','-5 minutes'))").bind(await sha256(raw)).run();return c.json({user:{id:c.get('userId'),name:c.get('userName')}});});
