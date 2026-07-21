@@ -1,14 +1,7 @@
-name: PWA Factory PR
+name: Repository PR Checks
 
 on:
   pull_request:
-    paths:
-      - 'worker/routes/pwa-factory.ts'
-      - 'worker/routes/pwa-runner-status.ts'
-      - 'worker/index.ts'
-      - 'migrations/0018_pwa_factory.sql'
-      - '.github/workflows/pwa-factory.yml'
-      - '.github/workflows/pwa-factory-pr.yml'
 
 permissions:
   contents: read
