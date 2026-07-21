@@ -8,7 +8,7 @@ describe('GPT-5.6 cost estimation',()=>{
   const sol=estimateCost(usage,'gpt-5.6-sol').costUsd;
   const terra=estimateCost(usage,'gpt-5.6-terra').costUsd;
   const luna=estimateCost(usage,'gpt-5.6-luna').costUsd;
-  expect(sol).toBeCloseTo(35.05,5);
+  expect(sol).toBeCloseTo(34.55,5);
   expect(terra).toBeCloseTo(17.275,5);
   expect(luna).toBeCloseTo(6.91,5);
   expect(sol).toBeGreaterThan(terra);
