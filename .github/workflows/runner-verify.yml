@@ -42,11 +42,20 @@ jobs:
         id: build
         shell: bash
         run: npm run build 2>&1 | tee /tmp/runner-build.log
-      - name: Publicar resultado correcto
+      - name: Registrar resultado correcto
         if: success()
-        env:
-          GH_TOKEN: ${{ github.token }}
-        run: gh issue create --title "[runner-verify] OK ${GITHUB_SHA::7}" --body "✅ Instalación, typecheck, pruebas y build terminaron correctamente para $GITHUB_SHA."
+        shell: bash
+        run: |
+          {
+            echo "## ✅ Runner Verify"
+            echo
+            echo "- Commit: \`$GITHUB_SHA\`"
+            echo "- npm ci: success"
+            echo "- typecheck: success"
+            echo "- pruebas: success"
+            echo "- build: success"
+            echo "- Ejecución: ${GITHUB_SERVER_URL}/${GITHUB_REPOSITORY}/actions/runs/${GITHUB_RUN_ID}"
+          } >> "$GITHUB_STEP_SUMMARY"
       - name: Publicar diagnóstico fallido
         if: failure()
         env:

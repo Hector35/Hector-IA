@@ -92,13 +92,21 @@ jobs:
           if [ -n "${TEST_ID:-}" ]; then
             npx wrangler d1 execute hector-os-db --remote --command "DELETE FROM users WHERE id='$TEST_ID';" || true
           fi
-      - name: Publish successful receipt
+      - name: Registrar evaluación correcta
         if: success()
-        env:
-          GH_TOKEN: ${{ github.token }}
+        shell: bash
         run: |
-          SCORE="$(grep -oE 'Puntuación: \*\*[0-9]+/[0-9]+' /tmp/intelligence-report.md | head -1 | grep -oE '[0-9]+/[0-9]+' || true)"
-          gh issue create --title "[production-intelligence] OK ${SCORE:-SIN-PUNTUACIÓN} ${GITHUB_SHA::7}" --body-file /tmp/intelligence-report.md
+          {
+            echo "## ✅ Production Intelligence"
+            echo
+            echo "- Commit: \`$GITHUB_SHA\`"
+            echo "- PWA, autenticación, API y limpieza: success"
+            echo "- Ejecución: ${GITHUB_SERVER_URL}/${GITHUB_REPOSITORY}/actions/runs/${GITHUB_RUN_ID}"
+            echo
+          } >> "$GITHUB_STEP_SUMMARY"
+          if [ -f /tmp/intelligence-report.md ]; then
+            cat /tmp/intelligence-report.md >> "$GITHUB_STEP_SUMMARY"
+          fi
       - name: Publish failure receipt
         if: failure()
         env:
