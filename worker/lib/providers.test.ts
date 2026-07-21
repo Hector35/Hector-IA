@@ -1,8 +1,10 @@
 import {describe,expect,it} from 'vitest';
 import {chooseProvider} from './providers';
 import type {ProviderHealth} from './provider-quality';
+import type {FeedbackRoutingProfile} from './feedback-routing';
 
 const health=(overrides:Partial<ProviderHealth>={}):ProviderHealth=>({sampleCount:12,acceptedRate:.95,fallbackRate:.05,averageLatencyMs:400,healthy:true,circuitOpen:false,reason:'calidad reciente dentro de umbrales',mostRecentAt:'2026-07-21 15:00:00',...overrides});
+const feedback=(overrides:Partial<FeedbackRoutingProfile>={}):FeedbackRoutingProfile=>({sampleCount:8,negativeRate:.6,nonDeepSampleCount:6,nonDeepNegativeRate:.62,cloudflareSampleCount:5,cloudflareNegativeRate:.57,preferDeep:false,avoidCloudflare:true,guidance:[],reason:'las valoraciones recientes muestran baja utilidad de Workers AI',...overrides});
 
 describe('chooseProvider',()=>{
   it('usa Cloudflare para consultas breves, no sensibles y saludables',()=>{
@@ -20,6 +22,11 @@ describe('chooseProvider',()=>{
     const decision=chooseProvider('hola','fast',false,true,health({healthy:false,circuitOpen:true,acceptedRate:.3,fallbackRate:.7,reason:'circuito abierto por calidad o fallback'}));
     expect(decision.provider).toBe('openai');
     expect(decision.reason).toMatch(/pausado/);
+  });
+  it('evita Workers AI cuando el libro mayor muestra baja utilidad',()=>{
+    const decision=chooseProvider('hola','fast',false,true,health(),feedback());
+    expect(decision.provider).toBe('openai');
+    expect(decision.reason).toMatch(/libro mayor/);
   });
   it('permite una prueba controlada después del enfriamiento',()=>{
     const decision=chooseProvider('hola','fast',false,true,health({reason:'enfriamiento completado; se permite una prueba controlada'}));
