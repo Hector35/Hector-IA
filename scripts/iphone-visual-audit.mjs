@@ -7,7 +7,13 @@ const devices=[
  {id:'iphone-se',label:'iPhone SE',viewport:{width:320,height:568}},
  {id:'iphone-13-pro',label:'iPhone 13 Pro',viewport:{width:390,height:844}}
 ];
-const views=['Inicio','Chat','Archivos','Trabajo','Ajustes'];
+const views=[
+ {label:'Inicio',candidates:[]},
+ {label:'Chat',candidates:['Chatear','Chat']},
+ {label:'Archivos',candidates:['Explorar archivos','Archivos']},
+ {label:'Trabajo',candidates:['Trabajo']},
+ {label:'Ajustes',candidates:['Ajustes'],menu:true}
+];
 
 function json(body,status=200){return{status,contentType:'application/json',body:JSON.stringify(body)};}
 function responseFor(url,method){
@@ -44,28 +50,49 @@ async function auditOverflow(page,viewport){
   const offenders=[];
   for(const element of document.querySelectorAll('body *')){
    const style=getComputedStyle(element);
-   if(style.display==='none'||style.visibility==='hidden'||Number(style.opacity)===0)continue;
+   if(style.display==='none'||style.visibility==='hidden'||Number(style.opacity)===0||element.closest('[inert]'))continue;
    const rect=element.getBoundingClientRect();
    if(rect.width<1||rect.height<1)continue;
    if(rect.left<-2||rect.right>width+2)offenders.push({tag:element.tagName.toLowerCase(),className:String(element.className||'').slice(0,120),left:Math.round(rect.left),right:Math.round(rect.right),width:Math.round(rect.width)});
   }
   const fixedBlocking=[...document.querySelectorAll('body *')].filter(element=>{
    const style=getComputedStyle(element),rect=element.getBoundingClientRect();
-   return style.position==='fixed'&&rect.width>width*.9&&rect.height>height*.65&&style.pointerEvents!=='none';
+   return !element.closest('[inert]')&&style.position==='fixed'&&rect.width>width*.9&&rect.height>height*.65&&style.pointerEvents!=='none';
   }).map(element=>({tag:element.tagName.toLowerCase(),className:String(element.className||'').slice(0,120)}));
   return{documentOverflow,offenders:offenders.slice(0,20),fixedBlocking};
  },viewport);
 }
 
-async function clickView(page,label){
- const buttons=page.getByRole('button',{name:label,exact:true});
- const count=await buttons.count();
- if(!count)throw new Error(`No se encontró la navegación ${label}`);
- for(let index=count-1;index>=0;index--){
-  const button=buttons.nth(index);
-  if(await button.isVisible()){await button.click();return;}
+async function clickFirstVisible(page,names){
+ for(const name of names){
+  const matcher=new RegExp(`^${name.replace(/[.*+?^${}()|[\]\\]/g,'\\$&')}$`,'i');
+  for(const role of ['button','link']){
+   const items=page.getByRole(role,{name:matcher});
+   const count=await items.count();
+   for(let index=0;index<count;index++){
+    const item=items.nth(index);
+    if(await item.isVisible()){await item.click();return true;}
+   }
+  }
  }
- throw new Error(`La navegación ${label} existe pero no es visible`);
+ return false;
+}
+
+async function openMenu(page){
+ const menuButtons=page.getByRole('button',{name:/men[uú]|navegaci[oó]n/i});
+ for(let index=0;index<await menuButtons.count();index++){
+  const button=menuButtons.nth(index);
+  if(await button.isVisible()){await button.click();await page.waitForTimeout(150);return;}
+ }
+ const topLeft=page.locator('button').filter({has:page.locator('svg')}).first();
+ if(await topLeft.isVisible())await topLeft.click();
+}
+
+async function navigate(page,view){
+ if(!view.candidates.length)return;
+ if(await clickFirstVisible(page,view.candidates))return;
+ if(view.menu){await openMenu(page);if(await clickFirstVisible(page,view.candidates))return;}
+ throw new Error(`No se pudo abrir la vista ${view.label}`);
 }
 
 async function auditFocus(page){
@@ -93,27 +120,25 @@ try{
   page.on('pageerror',error=>consoleErrors.push(error.message));
   await page.route('**/*',async route=>{
    const request=route.request(),path=new URL(request.url()).pathname;
-   if(path.startsWith('/api/')){
-    mockedRequests.push(`${request.method()} ${path}`);
-    await route.fulfill(responseFor(request.url(),request.method()));
-   }else await route.continue();
+   if(path.startsWith('/api/')){mockedRequests.push(`${request.method()} ${path}`);await route.fulfill(responseFor(request.url(),request.method()));}
+   else await route.continue();
   });
   const deviceReport={id:device.id,label:device.label,viewport:device.viewport,views:[],consoleErrors,mockedRequests};
   try{
    await page.goto(baseUrl,{waitUntil:'domcontentloaded',timeout:45000});
-   await page.locator('.shell').waitFor({state:'visible',timeout:15000});
-   for(const label of views){
-    if(label!=='Inicio')await clickView(page,label);
-    await page.waitForTimeout(300);
+   await page.getByText('Tu asistente inteligente',{exact:false}).last().waitFor({state:'visible',timeout:15000});
+   for(const view of views){
+    await navigate(page,view);
+    await page.waitForTimeout(350);
     const overflow=await auditOverflow(page,device.viewport);
     const focus=await auditFocus(page);
-    const file=`${outputDir}/${device.id}-${label.toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g,'').replace(/\s+/g,'-')}.png`;
+    const file=`${outputDir}/${device.id}-${view.label.toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g,'').replace(/\s+/g,'-')}.png`;
     await page.screenshot({path:file,fullPage:true});
     const failures=[];
     if(overflow.documentOverflow>2)failures.push(`desbordamiento documental de ${overflow.documentOverflow}px`);
     if(overflow.offenders.length)failures.push(`${overflow.offenders.length} elementos fuera del viewport`);
     if(overflow.fixedBlocking.length)failures.push('una superficie fija bloquea casi toda la pantalla');
-    deviceReport.views.push({label,screenshot:file,overflow,focus,passed:failures.length===0,failures});
+    deviceReport.views.push({label:view.label,screenshot:file,overflow,focus,passed:failures.length===0,failures});
     if(failures.length){report.summary.passed=false;report.summary.failures+=failures.length;}
    }
    if(consoleErrors.length){report.summary.passed=false;report.summary.failures+=consoleErrors.length;}
@@ -125,14 +150,9 @@ try{
    deviceReport.currentUrl=page.url();
    deviceReport.bodyText=(await page.locator('body').innerText().catch(()=>'' )).slice(0,2000);
    report.summary.passed=false;report.summary.failures+=1;
-  }finally{
-   report.devices.push(deviceReport);
-   await context.close();
-  }
+  }finally{report.devices.push(deviceReport);await context.close();}
  }
-}finally{
- await browser.close();
-}
+}finally{await browser.close();}
 await writeFile(`${outputDir}/report.json`,JSON.stringify(report,null,2));
 console.log(JSON.stringify(report,null,2));
 if(!report.summary.passed)process.exitCode=1;
