@@ -55,8 +55,8 @@ conversations.get('/:id/messages',async c=>{
  const userId=c.get('userId'),conversationId=c.req.param('id');
  const allowed=await c.env.DB.prepare('SELECT id FROM conversations WHERE id=? AND user_id=? AND COALESCE(is_internal,0)=0').bind(conversationId,userId).first();
  if(!allowed)return c.json({error:'Conversación no encontrada'},404);
- const items=(await c.env.DB.prepare(`SELECT m.id,m.role,m.content,m.provider,m.model,m.model_tier,m.task,m.created_at,
-  CASE rf.rating WHEN 1 THEN 'up' WHEN -1 THEN 'down' END feedback,rf.reason feedback_reason
+ const items=(await c.env.DB.prepare(`SELECT m.id,m.role,m.content,m.provider,m.model,m.model_tier AS modelTier,m.task,m.created_at AS createdAt,
+  CASE rf.rating WHEN 1 THEN 'up' WHEN -1 THEN 'down' END feedback,rf.reason AS feedbackReason
   FROM messages m LEFT JOIN response_feedback rf ON rf.message_id=m.id AND rf.user_id=?
   WHERE m.conversation_id=? ORDER BY m.created_at`).bind(userId,conversationId).all()).results;
  return c.json({items});
