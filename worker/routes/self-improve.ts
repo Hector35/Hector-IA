@@ -3,7 +3,7 @@ import { z } from 'zod';
 import type { Bindings } from '../types';
 import { verifyGitHubActionsToken } from '../lib/github-oidc';
 
-const audience='hector-os-self-improve';
+const oidcPolicy={audience:'hector-os-self-improve',workflows:['self-improve.yml'],events:['push','workflow_dispatch'],refs:['refs/heads/main']};
 const repository='Hector35/Hector-IA';
 const allowedFiles=['worker/lib/openai.ts','worker/lib/context.ts','worker/routes/intelligence.ts','worker/lib/openai.test.ts','worker/lib/context.test.ts'];
 const fileSchema=z.object({path:z.string(),content:z.string().max(70000)});
@@ -27,7 +27,7 @@ export const selfImprove=new Hono<{Bindings:Bindings}>();
 async function authenticate(c:any){
   const supplied=(c.req.header('Authorization')||'').replace(/^Bearer\s+/i,'').trim();
   if(!supplied)throw new Error('OIDC requerido');
-  return verifyGitHubActionsToken(supplied,audience);
+  return verifyGitHubActionsToken(supplied,oidcPolicy);
 }
 function validateChanges(changes:Array<{path:string;content:string}>){
   if(changes.length>3)throw new Error('Demasiados archivos');
