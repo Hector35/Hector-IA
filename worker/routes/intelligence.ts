@@ -5,7 +5,7 @@ import {requireAuth} from '../lib/auth';
 import {estimateCost,respondContextual} from '../lib/openai';
 import {loadContextPack,maybeSaveExplicitMemory,renderContext} from '../lib/context';
 import {renderEvidenceSelfAnalysis} from '../intelligence/self-report';
-import {loadUserFeedbackProfile,type FeedbackReason} from '../lib/response-feedback';
+import {loadUserFeedbackProfile,parseFeedbackCommand,type FeedbackReason} from '../lib/response-feedback';
 
 export const intelligence=new Hono<{Bindings:Bindings;Variables:Variables}>();
 intelligence.use('*',requireAuth);
@@ -13,6 +13,9 @@ intelligence.use('*',requireAuth);
 async function settings(db:D1Database,userId:string){const row=await db.prepare('SELECT allow_web,allow_learning FROM assistant_settings WHERE user_id=?').bind(userId).first<any>();return{allowWeb:row?!!row.allow_web:true,allowLearning:row?!!row.allow_learning:true};}
 async function ensureConversation(db:D1Database,userId:string,conversationId:string|undefined,message:string){if(conversationId){const existing=await db.prepare('SELECT id FROM conversations WHERE id=? AND user_id=?').bind(conversationId,userId).first();if(existing)return conversationId;}const id=crypto.randomUUID();await db.prepare('INSERT INTO conversations(id,user_id,title) VALUES(?,?,?)').bind(id,userId,message.slice(0,60)||'Nueva conversación').run();return id;}
 async function saveRollingSummary(db:D1Database,userId:string,conversationId:string){const rows=(await db.prepare('SELECT role,content FROM messages WHERE conversation_id=? ORDER BY created_at DESC LIMIT 12').bind(conversationId).all<any>()).results.reverse();const summary=rows.map((x:any)=>`${x.role==='user'?'Héctor':'Héctor OS'}: ${String(x.content).replace(/\s+/g,' ').slice(0,260)}`).join('\n').slice(0,3000);await db.prepare("INSERT INTO conversation_summaries(conversation_id,user_id,summary,message_count) VALUES(?,?,?,?) ON CONFLICT(conversation_id) DO UPDATE SET summary=excluded.summary,message_count=excluded.message_count,updated_at=CURRENT_TIMESTAMP").bind(conversationId,userId,summary,rows.length).run();}
+async function feedbackTarget(db:D1Database,userId:string,conversationId:string){return db.prepare(`SELECT m.id,m.conversation_id,m.provider,m.model,m.model_tier,m.task FROM messages m JOIN conversations c ON c.id=m.conversation_id WHERE m.conversation_id=? AND m.role='assistant' AND m.provider IN ('openai','cloudflare') AND c.user_id=? ORDER BY m.created_at DESC LIMIT 1`).bind(conversationId,userId).first<any>();}
+async function saveFeedback(db:D1Database,userId:string,row:any,rating:'up'|'down',reason?:FeedbackReason){const numeric=rating==='up'?1:-1,storedReason:FeedbackReason|null=numeric>0?null:(reason||'other');await db.prepare(`INSERT INTO response_feedback(id,user_id,conversation_id,message_id,rating,reason,provider,model,model_tier,task) VALUES(?,?,?,?,?,?,?,?,?,?) ON CONFLICT(user_id,message_id) DO UPDATE SET rating=excluded.rating,reason=excluded.reason,provider=excluded.provider,model=excluded.model,model_tier=excluded.model_tier,task=excluded.task,updated_at=CURRENT_TIMESTAMP`).bind(crypto.randomUUID(),userId,row.conversation_id,row.id,numeric,storedReason,row.provider,row.model||'unknown',row.model_tier||'balanced',row.task||'consulta general').run();const profile=await loadUserFeedbackProfile(db,userId,row.task||'consulta general');return{storedReason,profile};}
+function feedbackAcknowledgement(rating:'up'|'down',profile:Awaited<ReturnType<typeof loadUserFeedbackProfile>>){if(rating==='up')return'Entendido. Registré que la respuesta te sirvió; esa evidencia ayuda a conservar el nivel y proveedor cuando sigan funcionando bien.';const adaptation=profile.preferDeep?' Las próximas respuestas de este tipo usarán razonamiento profundo.':profile.avoidCloudflare?' Las próximas respuestas de este tipo evitarán Workers AI.':profile.guidance.length?' Ya incorporé la corrección como preferencia para respuestas futuras.':' Necesito más muestras antes de cambiar automáticamente el enrutamiento.';return`Entendido. Registré que la respuesta no te sirvió.${adaptation}`;}
 function checks(){return[
 {name:'identidad',prompt:'Explica en máximo 5 líneas quién eres, quién es tu propietario, cuál es tu arquitectura y cuáles son tus límites.',max:20,test:(t:string)=>/Héctor OS/i.test(t)&&/Héctor/i.test(t)&&/(Cloudflare|D1|R2|modelo)/i.test(t)&&/(límite|depend|no puedo|externo)/i.test(t)},
 {name:'memoria y contexto',prompt:'¿Qué estilo de explicación prefiere Héctor y cuál es el objetivo principal del proyecto que estamos construyendo?',max:20,test:(t:string)=>/(ingenier|técnic|modelo completo)/i.test(t)&&/(asistente personal|PWA|privad|Cloudflare)/i.test(t)},
@@ -26,7 +29,8 @@ function isSelfAnalysisRequest(message:string){return /(?:^|\b)(?:autoeval[uú]a
 intelligence.post('/chat',async c=>{
  const parsed=z.object({message:z.string().min(1).max(12000),conversationId:z.string().uuid().optional()}).safeParse(await c.req.json());
  if(!parsed.success)return c.json({error:'Mensaje inválido'},400);
- const userId=c.get('userId'),message=parsed.data.message,cid=await ensureConversation(c.env.DB,userId,parsed.data.conversationId,message);
+ const userId=c.get('userId'),message=parsed.data.message,cid=await ensureConversation(c.env.DB,userId,parsed.data.conversationId,message),command=parseFeedbackCommand(message);
+ if(command){const target=await feedbackTarget(c.env.DB,userId,cid);if(target){const {profile}=await saveFeedback(c.env.DB,userId,target,command.rating,command.reason);if(!command.retry){const text=feedbackAcknowledgement(command.rating,profile),assistantId=crypto.randomUUID();await c.env.DB.batch([c.env.DB.prepare('INSERT INTO messages(id,conversation_id,role,content) VALUES(?,?,?,?)').bind(crypto.randomUUID(),cid,'user',message),c.env.DB.prepare('INSERT INTO messages(id,conversation_id,role,content,provider,model,model_tier,task) VALUES(?,?,?,?,?,?,?,?)').bind(assistantId,cid,'assistant',text,'system','feedback-registry','verified',target.task||'consulta general')]);await saveRollingSummary(c.env.DB,userId,cid);return c.json({conversationId:cid,message:{id:assistantId,role:'assistant',content:text},provider:'system',model:'feedback-registry',modelTier:'verified',modelReason:'feedback explícito persistido',fallback:false,feedbackProfile:{sampleCount:profile.sampleCount,preferDeep:profile.preferDeep,avoidCloudflare:profile.avoidCloudflare,guidance:profile.guidance}});}}}
  if(isSelfAnalysisRequest(message)){
   const report=await runSelfEvaluation(c.env,c.env.DB,userId),text=renderEvidenceSelfAnalysis(report),assistantId=crypto.randomUUID();
   await c.env.DB.batch([c.env.DB.prepare('INSERT INTO messages(id,conversation_id,role,content) VALUES(?,?,?,?)').bind(crypto.randomUUID(),cid,'user',message),c.env.DB.prepare('INSERT INTO messages(id,conversation_id,role,content,provider,model,model_tier,task) VALUES(?,?,?,?,?,?,?,?)').bind(assistantId,cid,'assistant',text,'system',`self-evaluation:${report.lastModel||'unknown'}`,'verified','autoevaluación')]);
@@ -60,17 +64,11 @@ const feedbackReason=z.enum(['incorrect','incomplete','not_personalized','too_lo
 intelligence.post('/feedback',async c=>{
  const parsed=z.object({messageId:z.string().uuid(),rating:z.enum(['up','down']),reason:feedbackReason.optional()}).safeParse(await c.req.json());
  if(!parsed.success)return c.json({error:'Valoración inválida'},400);
- const userId=c.get('userId'),row=await c.env.DB.prepare(`SELECT m.id,m.conversation_id,m.provider,m.model,m.model_tier,m.task
-  FROM messages m JOIN conversations c ON c.id=m.conversation_id
-  WHERE m.id=? AND m.role='assistant' AND c.user_id=?`).bind(parsed.data.messageId,userId).first<any>();
+ const userId=c.get('userId'),row=await c.env.DB.prepare(`SELECT m.id,m.conversation_id,m.provider,m.model,m.model_tier,m.task FROM messages m JOIN conversations c ON c.id=m.conversation_id WHERE m.id=? AND m.role='assistant' AND c.user_id=?`).bind(parsed.data.messageId,userId).first<any>();
  if(!row)return c.json({error:'Respuesta no encontrada'},404);
  if(!['openai','cloudflare'].includes(String(row.provider)))return c.json({error:'Solo se valoran respuestas generadas por modelos'},400);
- const rating=parsed.data.rating==='up'?1:-1,reason:FeedbackReason|null=rating>0?null:(parsed.data.reason||'other');
- await c.env.DB.prepare(`INSERT INTO response_feedback(id,user_id,conversation_id,message_id,rating,reason,provider,model,model_tier,task)
-  VALUES(?,?,?,?,?,?,?,?,?,?) ON CONFLICT(user_id,message_id) DO UPDATE SET rating=excluded.rating,reason=excluded.reason,provider=excluded.provider,model=excluded.model,model_tier=excluded.model_tier,task=excluded.task,updated_at=CURRENT_TIMESTAMP`)
-  .bind(crypto.randomUUID(),userId,row.conversation_id,row.id,rating,reason,row.provider,row.model||'unknown',row.model_tier||'balanced',row.task||'consulta general').run();
- const profile=await loadUserFeedbackProfile(c.env.DB,userId,row.task||'consulta general');
- return c.json({ok:true,rating:parsed.data.rating,reason,profile:{sampleCount:profile.sampleCount,preferDeep:profile.preferDeep,avoidCloudflare:profile.avoidCloudflare,guidance:profile.guidance,reason:profile.reason}},201);
+ const {storedReason,profile}=await saveFeedback(c.env.DB,userId,row,parsed.data.rating,parsed.data.reason);
+ return c.json({ok:true,rating:parsed.data.rating,reason:storedReason,profile:{sampleCount:profile.sampleCount,preferDeep:profile.preferDeep,avoidCloudflare:profile.avoidCloudflare,guidance:profile.guidance,reason:profile.reason}},201);
 });
 
 intelligence.get('/feedback/profile',async c=>{
