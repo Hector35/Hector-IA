@@ -28,9 +28,9 @@ jobs:
         run: npm install --no-save playwright && npx playwright install --with-deps chromium
       - name: Construir aplicación
         run: npm run build
-      - name: Iniciar servidor local
+      - name: Iniciar servidor local aislado
         run: |
-          npm run dev -- --host 127.0.0.1 --port 4173 > /tmp/hector-visual-server.log 2>&1 &
+          npm run dev -- --mode test --host 127.0.0.1 --port 4173 > /tmp/hector-visual-server.log 2>&1 &
           echo $! > /tmp/hector-visual-server.pid
           for attempt in $(seq 1 45); do
             if curl -fsS http://127.0.0.1:4173 >/dev/null; then exit 0; fi
