@@ -1,5 +1,5 @@
 import {describe,expect,it} from 'vitest';
-import {evaluateBudgetQuality} from './budget-quality-breaker';
+import {evaluateBudgetQuality,sortBudgetQualityCategories,type BudgetQualityCategory} from './budget-quality-breaker';
 
 const now=Date.parse('2026-07-21T23:00:00.000Z');
 const recent='2026-07-21T22:30:00.000Z';
@@ -37,5 +37,12 @@ describe('evaluateBudgetQuality',()=>{
   const policy=evaluateBudgetQuality(Array.from({length:8},(_,index)=>({qualityAccepted:index<7,createdAt:recent})),now);
   expect(policy.state).toBe('healthy');
   expect(policy.acceptanceRate).toBe(.875);
+ });
+});
+
+describe('sortBudgetQualityCategories',()=>{
+ const item=(task:string,state:BudgetQualityCategory['state'],sampleCount:number):BudgetQualityCategory=>({task,state,sampleCount,acceptedCount:0,negativeCount:0,correctionCount:0,acceptanceRate:null,negativeRate:null,correctionRate:null,lastDegradedAt:null,reason:''});
+ it('muestra primero suspensiones, después pruebas y luego estados sanos',()=>{
+  expect(sortBudgetQualityCategories([item('general','healthy',20),item('salud','suspended',5),item('software','probe',8),item('finanzas','suspended',9)]).map(x=>x.task)).toEqual(['finanzas','salud','software','general']);
  });
 });
