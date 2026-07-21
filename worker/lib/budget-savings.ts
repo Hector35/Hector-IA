@@ -1,6 +1,6 @@
 import {estimateModelCost} from './model-pricing';
 
-export type BudgetUsageRow={model?:string|null;input_units?:number|null;cached_input_units?:number|null;output_units?:number|null;estimated_cost_usd?:number|null;metadata_json?:string|null};
+export type BudgetUsageRow={service?:string|null;model?:string|null;input_units?:number|null;cached_input_units?:number|null;output_units?:number|null;estimated_cost_usd?:number|null;metadata_json?:string|null};
 export type BudgetSavingsSummary={actualCostUsd:number;counterfactualCostUsd:number;savedUsd:number;savingsPercent:number;degradedRequests:number;qualitySamples:number;averageQuality:number|null;acceptedRequests:number;acceptanceRate:number|null;byService:Record<string,{requests:number;actualCostUsd:number;savedUsd:number}>};
 
 function finite(value:unknown){const n=Number(value);return Number.isFinite(n)&&n>=0?n:0;}
@@ -10,7 +10,7 @@ export function aggregateBudgetSavings(rows:BudgetUsageRow[]):BudgetSavingsSumma
  let actualCostUsd=0,counterfactualCostUsd=0,degradedRequests=0,qualityTotal=0,qualitySamples=0,acceptedRequests=0;
  const byService:BudgetSavingsSummary['byService']={};
  for(const row of rows){
-  const meta=metadata(row.metadata_json),decision=meta.budgetDecision,actual=finite(row.estimated_cost_usd),service=String(meta.service||meta.task||'general');
+  const meta=metadata(row.metadata_json),decision=meta.budgetDecision,actual=finite(row.estimated_cost_usd),service=String(row.service||meta.service||meta.task||'general');
   actualCostUsd+=actual;
   let counterfactual=actual;
   if(decision?.action==='degrade'&&decision?.projection?.model){
