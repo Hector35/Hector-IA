@@ -3,12 +3,14 @@ import ReactDOM from 'react-dom/client';
 import {CodexApp} from './CodexApp';
 import {installWorkEvidenceEnhancer} from './work-evidence-ui';
 import {installScheduledTasksEnhancer} from './scheduled-tasks-ui';
+import {installMemoryControlEnhancer} from './memory-control-ui';
 import './codex-ui.css';
 import './codex-mobile.css';
 import './chat-content.css';
 import './project-ui.css';
 import './work-evidence-ui.css';
 import './scheduled-tasks-ui.css';
+import './memory-control-ui.css';
 
 ReactDOM.createRoot(document.getElementById('root')!).render(
   <React.StrictMode><CodexApp/></React.StrictMode>
@@ -16,6 +18,7 @@ ReactDOM.createRoot(document.getElementById('root')!).render(
 
 installWorkEvidenceEnhancer();
 installScheduledTasksEnhancer();
+installMemoryControlEnhancer();
 
 if('serviceWorker' in navigator){
   window.addEventListener('load',async()=>{
