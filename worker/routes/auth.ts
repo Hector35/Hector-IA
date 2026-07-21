@@ -10,12 +10,14 @@ const credentials=z.object({email:z.string().email(),password:z.string().min(10)
 const MAX_FAILURES=5,WINDOW_MS=15*60_000,BLOCK_MS=15*60_000;
 const cookie=(c:any,token:string)=>setCookie(c,'hector_session',token,{httpOnly:true,secure:true,sameSite:'Strict',path:'/',maxAge:60*60*24*30});
 
+type RateLimitDecision={blocked:boolean;failures:number;retryAfterSeconds?:number};
+
 function requestIp(c:any){return (c.req.header('CF-Connecting-IP')||c.req.header('X-Forwarded-For')||'unknown').split(',')[0].trim();}
 async function requestIdentity(c:any,email:string){return sha256(`${requestIp(c)}|${email.toLowerCase()}`);}
 async function requestIpHash(c:any){return sha256(requestIp(c));}
 function userAgent(c:any){return (c.req.header('User-Agent')||'unknown').slice(0,300);}
 
-export function rateLimitDecision(row:{failures:number;window_started_at:string;blocked_until?:string|null}|null,now=Date.now()){
+export function rateLimitDecision(row:{failures:number;window_started_at:string;blocked_until?:string|null}|null,now=Date.now()):RateLimitDecision{
  if(!row)return {blocked:false,failures:0};
  const blockedUntil=row.blocked_until?Date.parse(row.blocked_until):0;
  if(Number.isFinite(blockedUntil)&&blockedUntil>now)return {blocked:true,failures:row.failures,retryAfterSeconds:Math.ceil((blockedUntil-now)/1000)};
