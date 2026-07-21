@@ -1,7 +1,8 @@
 import {applyGovernance,normalizeGovernanceMode,type GovernanceMode} from './strategy-governance';
+import {loadBudgetQualityPolicy,type BudgetQualityPolicy} from './budget-quality-breaker';
 
 export type BenchmarkAggregateRow={winner:'baseline'|'adaptive'|'tie';baseline_score:number;adaptive_score:number;baseline_cost_usd:number;adaptive_cost_usd:number;created_at?:string};
-export type BenchmarkPolicy={strategy:'baseline'|'adaptive';status:string;sampleCount:number;adaptiveWinRate:number;averageScoreDelta:number;averageCostMultiplier:number;reason:string;governanceMode?:GovernanceMode;governanceReason?:string|null};
+export type BenchmarkPolicy={strategy:'baseline'|'adaptive';status:string;sampleCount:number;adaptiveWinRate:number;averageScoreDelta:number;averageCostMultiplier:number;reason:string;governanceMode?:GovernanceMode;governanceReason?:string|null;budgetQuality?:BudgetQualityPolicy|null};
 
 export const BENCHMARK_PROMOTION_POLICY={windowDays:90,sampleLimit:40,minSamples:5,minAdaptiveWinRate:.6,minAverageScoreDelta:2,maxAverageCostMultiplier:4,rollbackWindow:3,rollbackBaselineWinRate:.5};
 
@@ -19,8 +20,18 @@ export function summarizeBenchmarkPolicy(rows:BenchmarkAggregateRow[],current?:P
  return{strategy:'baseline',status:current?.status==='rolled_back'?'rolled_back':'observing',sampleCount,adaptiveWinRate,averageScoreDelta,averageCostMultiplier,reason:sampleCount<BENCHMARK_PROMOTION_POLICY.minSamples?'muestras insuficientes':'la ventaja adaptativa aún no cumple calidad, consistencia y costo'};
 }
 
+export function applyBudgetQualityProtection(policy:BenchmarkPolicy,quality:BudgetQualityPolicy,governanceMode:GovernanceMode='auto'):BenchmarkPolicy{
+ if(governanceMode!=='auto'||quality.state!=='suspended')return{...policy,budgetQuality:quality};
+ return{...policy,strategy:'adaptive',status:'promoted',reason:`protección temporal de calidad presupuestaria: ${quality.reason}`,budgetQuality:quality};
+}
+
 export async function loadBenchmarkPolicy(db:D1Database,userId:string,category:string):Promise<BenchmarkPolicy|null>{
- try{const row=await db.prepare('SELECT strategy,status,sample_count,adaptive_win_rate,average_score_delta,average_cost_multiplier,reason,governance_mode,governance_reason FROM intelligence_strategy_policies WHERE user_id=? AND category=?').bind(userId,category).first<any>();if(!row)return null;return{strategy:row.strategy,status:row.status,sampleCount:Number(row.sample_count),adaptiveWinRate:Number(row.adaptive_win_rate),averageScoreDelta:Number(row.average_score_delta),averageCostMultiplier:Number(row.average_cost_multiplier),reason:String(row.reason),governanceMode:normalizeGovernanceMode(row.governance_mode),governanceReason:row.governance_reason?String(row.governance_reason):null};}catch{return null;}
+ try{
+  const row=await db.prepare('SELECT strategy,status,sample_count,adaptive_win_rate,average_score_delta,average_cost_multiplier,reason,governance_mode,governance_reason FROM intelligence_strategy_policies WHERE user_id=? AND category=?').bind(userId,category).first<any>();
+  const governanceMode=normalizeGovernanceMode(row?.governance_mode),base:BenchmarkPolicy=row?{strategy:row.strategy,status:row.status,sampleCount:Number(row.sample_count),adaptiveWinRate:Number(row.adaptive_win_rate),averageScoreDelta:Number(row.average_score_delta),averageCostMultiplier:Number(row.average_cost_multiplier),reason:String(row.reason),governanceMode,governanceReason:row.governance_reason?String(row.governance_reason):null}:{strategy:'baseline',status:'observing',sampleCount:0,adaptiveWinRate:0,averageScoreDelta:0,averageCostMultiplier:1,reason:'sin benchmark adaptativo persistido',governanceMode,governanceReason:null};
+  const quality=await loadBudgetQualityPolicy(db,userId,category);
+  return applyBudgetQualityProtection(base,quality,governanceMode);
+ }catch{return null;}
 }
 
 export async function recomputeBenchmarkPolicy(db:D1Database,userId:string,category:string){
