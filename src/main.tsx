@@ -8,6 +8,7 @@ import {installResponseAuditEnhancer} from './response-audit-ui';
 import {installIntelligenceStatusEnhancer} from './intelligence-status-ui';
 import {installSelfModelEnhancer} from './self-model-ui';
 import {installCognitiveBudgetEnhancer} from './cognitive-budget-ui';
+import {installHectorShellEnhancer} from './hector-shell-ui';
 import './codex-ui.css';
 import './codex-mobile.css';
 import './chat-content.css';
@@ -19,6 +20,7 @@ import './response-audit-ui.css';
 import './intelligence-status-ui.css';
 import './self-model-ui.css';
 import './cognitive-budget-ui.css';
+import './hector-shell-ui.css';
 
 ReactDOM.createRoot(document.getElementById('root')!).render(
   <React.StrictMode><CodexApp/></React.StrictMode>
@@ -31,6 +33,7 @@ installResponseAuditEnhancer();
 installIntelligenceStatusEnhancer();
 installSelfModelEnhancer();
 installCognitiveBudgetEnhancer();
+installHectorShellEnhancer();
 
 if('serviceWorker' in navigator){
   window.addEventListener('load',async()=>{
