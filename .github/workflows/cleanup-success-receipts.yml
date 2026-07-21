@@ -22,15 +22,28 @@ jobs:
         shell: bash
         run: |
           set -euo pipefail
-          PATTERN='^\[(runner-verify|deploy-production|production-intelligence|production-smoke|intelligence-unit)\] OK( |$)'
-          mapfile -t ISSUES < <(
+          mapfile -t RECEIPTS < <(
             gh issue list \
               --repo "$GITHUB_REPOSITORY" \
               --state open \
               --limit 1000 \
               --json number,title \
-              --jq ".[] | select(.title | test(\"$PATTERN\")) | .number"
+              --jq '.[] | [.number,.title] | @tsv'
           )
+
+          ISSUES=()
+          for receipt in "${RECEIPTS[@]}"; do
+            IFS=$'\t' read -r number title <<< "$receipt"
+            case "$title" in
+              "[runner-verify] OK"|"[runner-verify] OK "*|\
+              "[deploy-production] OK"|"[deploy-production] OK "*|\
+              "[production-intelligence] OK"|"[production-intelligence] OK "*|\
+              "[production-smoke] OK"|"[production-smoke] OK "*|\
+              "[intelligence-unit] OK"|"[intelligence-unit] OK "*)
+                ISSUES+=("$number")
+                ;;
+            esac
+          done
 
           for issue in "${ISSUES[@]}"; do
             gh issue comment "$issue" \
@@ -45,6 +58,6 @@ jobs:
             echo "## Limpieza de recibos exitosos"
             echo
             echo "- Issues cerrados: ${#ISSUES[@]}"
-            echo "- Filtro: \`$PATTERN\`"
+            echo "- Prefijos permitidos: runner-verify, deploy-production, production-intelligence, production-smoke e intelligence-unit."
             echo "- Los issues de fallo no fueron modificados."
           } >> "$GITHUB_STEP_SUMMARY"
