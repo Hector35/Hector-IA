@@ -1,0 +1,8 @@
+:where(button,a,input,textarea,select,[tabindex]):focus-visible{outline:3px solid #8fb3ff;outline-offset:3px;box-shadow:0 0 0 5px rgba(93,140,255,.2)!important}
+.cxSidebar nav button.active{aria-current:page}
+.cxBackdrop,.hxHistoryBackdrop{touch-action:manipulation}
+.cxComposer textarea{scroll-margin-bottom:calc(env(safe-area-inset-bottom,0px) + 96px)}
+@media (prefers-reduced-motion:reduce){*,*::before,*::after{scroll-behavior:auto!important;animation-duration:.001ms!important;animation-iteration-count:1!important;transition-duration:.001ms!important}.cxThinking i,.cxPulse{animation:none!important}.hxActionCard:hover,.cxChatHeader button:hover,.cxMobileMenu:hover{transform:none!important}}
+@media (prefers-contrast:more){:root{--hx-line:rgba(190,200,255,.58);--hx-muted:#c3c9da}.cxSidebar,.cxHistory,.cxComposer,.hxActionCard,.cxSidebar nav button,.cxLogout{border-color:rgba(210,217,255,.62)!important}.cxProvider,.hxNavCopy small,.hxActionCopy small{color:#d0d5e3!important}}
+@media (forced-colors:active){.hxHeroMark,.cxLogo,.cxComposer>button,.cxPrimary{forced-color-adjust:auto}.hxActionCard,.cxSidebar nav button,.cxLogout,.cxComposer{border:1px solid ButtonText}.cxProvider span{border:1px solid CanvasText}}
+@media(max-width:760px){:where(.cxSidebar button,.cxHistory button,.hxActionCard,.cxComposer>button){min-height:44px}.cxComposer{padding-bottom:max(10px,env(safe-area-inset-bottom,0px))}}
