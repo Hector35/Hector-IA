@@ -1,7 +1,8 @@
 export type BudgetQualitySample={qualityAccepted?:boolean|number|null;feedbackRating?:number|null;correction?:string|null;createdAt?:string|null};
 export type BudgetQualityPolicy={state:'healthy'|'suspended'|'probe';sampleCount:number;acceptedCount:number;negativeCount:number;correctionCount:number;acceptanceRate:number|null;negativeRate:number|null;correctionRate:number|null;lastDegradedAt:string|null;reason:string};
+export type BudgetQualityCategory=BudgetQualityPolicy&{task:string};
 
-export const BUDGET_QUALITY_BREAKER={windowDays:14,minSamples:5,maxSamples:20,minAcceptanceRate:.75,maxNegativeRate:.35,maxCorrectionRate:.3,probeAfterHours:24} as const;
+export const BUDGET_QUALITY_BREAKER={windowDays:14,minSamples:5,maxSamples:20,maxCategories:12,minAcceptanceRate:.75,maxNegativeRate:.35,maxCorrectionRate:.3,probeAfterHours:24} as const;
 
 function validDate(value:unknown){const date=new Date(String(value||''));return Number.isNaN(date.getTime())?null:date;}
 
@@ -23,6 +24,8 @@ export function evaluateBudgetQuality(samples:BudgetQualitySample[],nowMs=Date.n
  return{state:'suspended',sampleCount,acceptedCount,negativeCount,correctionCount,acceptanceRate,negativeRate,correctionRate,lastDegradedAt,reason:'degradaciones suspendidas para proteger calidad: aceptación o correcciones fuera de umbral'};
 }
 
+export function sortBudgetQualityCategories(items:BudgetQualityCategory[]){const priority={suspended:0,probe:1,healthy:2};return [...items].sort((a,b)=>priority[a.state]-priority[b.state]||b.sampleCount-a.sampleCount||a.task.localeCompare(b.task,'es'));}
+
 export async function loadBudgetQualityPolicy(db:D1Database,userId:string,task:string):Promise<BudgetQualityPolicy>{
  try{
   const rows=(await db.prepare(`SELECT t.quality_accepted qualityAccepted,t.created_at createdAt,f.rating feedbackRating,f.correction correction
@@ -33,4 +36,15 @@ export async function loadBudgetQualityPolicy(db:D1Database,userId:string,task:s
    ORDER BY t.created_at DESC LIMIT ?`).bind(userId,task,`-${BUDGET_QUALITY_BREAKER.windowDays} days`,BUDGET_QUALITY_BREAKER.maxSamples).all<BudgetQualitySample>()).results||[];
   return evaluateBudgetQuality(rows);
  }catch{return evaluateBudgetQuality([]);}
+}
+
+export async function loadBudgetQualityOverview(db:D1Database,userId:string):Promise<BudgetQualityCategory[]>{
+ try{
+  const tasks=(await db.prepare(`SELECT task,MAX(created_at) last_seen FROM response_traces
+   WHERE user_id=? AND created_at>=datetime('now',?)
+     AND json_extract(context_json,'$.budgetDecision.action')='degrade'
+   GROUP BY task ORDER BY last_seen DESC LIMIT ?`).bind(userId,`-${BUDGET_QUALITY_BREAKER.windowDays} days`,BUDGET_QUALITY_BREAKER.maxCategories).all<{task:string}>()).results||[];
+  const items=await Promise.all(tasks.filter(row=>String(row.task||'').trim()).map(async row=>({task:String(row.task),...await loadBudgetQualityPolicy(db,userId,String(row.task))})));
+  return sortBudgetQualityCategories(items);
+ }catch{return [];}
 }
