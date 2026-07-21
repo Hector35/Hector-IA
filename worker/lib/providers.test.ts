@@ -1,12 +1,14 @@
 import {describe,expect,it} from 'vitest';
 import {chooseProvider} from './providers';
 import type {ProviderHealth} from './provider-quality';
+import type {UserFeedbackProfile} from './response-feedback';
 
 const health=(overrides:Partial<ProviderHealth>={}):ProviderHealth=>({sampleCount:12,acceptedRate:.95,fallbackRate:.05,averageLatencyMs:400,healthy:true,circuitOpen:false,reason:'calidad reciente dentro de umbrales',mostRecentAt:'2026-07-21 15:00:00',...overrides});
+const feedback=(overrides:Partial<UserFeedbackProfile>={}):UserFeedbackProfile=>({sampleCount:8,downRate:.2,nonDeepSampleCount:6,nonDeepDownRate:.2,cloudflareSampleCount:4,cloudflareDownRate:.2,preferDeep:false,avoidCloudflare:false,guidance:[],reason:'sin evidencia suficiente para cambiar el enrutamiento',...overrides});
 
 describe('chooseProvider',()=>{
   it('usa Cloudflare para consultas breves, no sensibles y saludables',()=>{
-    expect(chooseProvider('hola, resume esto','fast',false,true,health()).provider).toBe('cloudflare');
+    expect(chooseProvider('hola, resume esto','fast',false,true,health(),feedback()).provider).toBe('cloudflare');
   });
   it('mantiene OpenAI para web, complejidad y datos sensibles',()=>{
     expect(chooseProvider('busca noticias de hoy','fast',true,true,health()).provider).toBe('openai');
@@ -20,6 +22,11 @@ describe('chooseProvider',()=>{
     const decision=chooseProvider('hola','fast',false,true,health({healthy:false,circuitOpen:true,acceptedRate:.3,fallbackRate:.7,reason:'circuito abierto por calidad o fallback'}));
     expect(decision.provider).toBe('openai');
     expect(decision.reason).toMatch(/pausado/);
+  });
+  it('evita Cloudflare cuando el feedback personal demuestra baja utilidad',()=>{
+    const decision=chooseProvider('hola','fast',false,true,health(),feedback({avoidCloudflare:true,reason:'feedback reciente indica baja utilidad de Workers AI'}));
+    expect(decision.provider).toBe('openai');
+    expect(decision.reason).toMatch(/aprendizaje controlado/);
   });
   it('permite una prueba controlada después del enfriamiento',()=>{
     const decision=chooseProvider('hola','fast',false,true,health({reason:'enfriamiento completado; se permite una prueba controlada'}));
