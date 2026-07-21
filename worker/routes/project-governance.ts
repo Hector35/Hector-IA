@@ -13,7 +13,7 @@ const schema=z.object({
  tasks:z.array(z.string().min(3).max(600)).min(1).max(16).optional()
 });
 
-export function cleanProjectText(value:string){return value.replace(/[*_`#]+/g,'').replace(/\s+/g,' ').replace(/[;,.]+$/,'').trim();}
+export function cleanProjectText(value:string){return value.replace(/[*_`#]+/g,'').replace(/\s+/g,' ').trim().replace(/[;,.]+$/,'').trim();}
 export function normalizeProjectText(value:string){return cleanProjectText(value).toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g,'').replace(/[^a-z0-9 ]/g,'').replace(/\s+/g,' ').trim();}
 export async function projectObjectiveHash(title:string,objective:string){const value=`${normalizeProjectText(title)}|${normalizeProjectText(objective)}`;const bytes=await crypto.subtle.digest('SHA-256',new TextEncoder().encode(value));return [...new Uint8Array(bytes)].map(x=>x.toString(16).padStart(2,'0')).join('');}
 
