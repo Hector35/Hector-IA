@@ -9,7 +9,7 @@ responseTraces.use('*',requireAuth);
 
 export type TraceTier='fast'|'balanced'|'deep';
 export type TraceProvider='cloudflare'|'openai';
-export type TraceContext={memories:number;recentMessages:number;hasSummary:boolean;priorSummaries?:number;projectState?:number;contractApplied?:boolean;contractReasons?:string[];feedbackAdaptation?:Record<string,unknown>};
+export type TraceContext={memories:number;recentMessages:number;hasSummary:boolean;priorSummaries?:number;projectState?:number;contractApplied?:boolean;contractReasons?:string[];cognitiveMode?:string;deliberationPasses?:number;deliberationReason?:string;feedbackAdaptation?:Record<string,unknown>};
 export type PersistResponseTraceInput={userId:string;conversationId:string;messageId:string;requestedProvider:TraceProvider;actualProvider:TraceProvider;model:string;routeTier:TraceTier;task:string;modelReason:string;providerReason:string;searchedWeb:boolean;fallback:boolean;qualityScore:number;qualityAccepted:boolean;latencyMs:number;estimatedCostUsd:number;memories:string[];context:TraceContext};
 
 export function reasoningForTier(tier:TraceTier){return tier==='deep'?'high':tier==='fast'?'low':'medium';}
