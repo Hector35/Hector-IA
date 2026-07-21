@@ -15,6 +15,8 @@ export type WorkEvidenceItem={
  file_id:string|null;
 };
 
+export type VerificationTarget={url:string;viewport:string};
+
 type WorkEvidenceRow={
  id:string;
  source:string;
@@ -28,6 +30,8 @@ type WorkEvidenceRow={
  file_id:string|null;
 };
 
+type OwnedJob={id:string;title:string;status:string;progress:number};
+
 export function parseEvidenceErrors(value:string|null):string[]{
  if(!value)return [];
  try{
@@ -36,13 +40,71 @@ export function parseEvidenceErrors(value:string|null):string[]{
  }catch{return [];}
 }
 
+function isPrivateHostname(value:string){
+ const hostname=value.toLowerCase().replace(/^\[|\]$/g,'');
+ if(hostname==='localhost'||hostname.endsWith('.localhost')||hostname.endsWith('.local')||hostname.endsWith('.internal'))return true;
+ if(hostname==='::'||hostname==='::1'||/^(fc|fd|fe8|fe9|fea|feb)/.test(hostname))return true;
+ const mapped=hostname.match(/(?:^|:)(\d+\.\d+\.\d+\.\d+)$/)?.[1];
+ const ipv4=mapped||hostname;
+ const parts=ipv4.split('.');
+ if(parts.length!==4||!parts.every(part=>/^\d+$/.test(part)&&Number(part)>=0&&Number(part)<=255))return false;
+ const [a,b]=parts.map(Number);
+ return a===0||a===10||a===127||a>=224||(a===100&&b>=64&&b<=127)||(a===169&&b===254)||(a===172&&b>=16&&b<=31)||(a===192&&b===168)||(a===198&&(b===18||b===19));
+}
+
+export function normalizeVerificationTarget(value:unknown):VerificationTarget|null{
+ if(!value||typeof value!=='object')return null;
+ const input=value as Record<string,unknown>;
+ if(typeof input.url!=='string')return null;
+ let url:URL;
+ try{url=new URL(input.url.trim());}catch{return null;}
+ if(url.protocol!=='https:'||url.username||url.password||isPrivateHostname(url.hostname))return null;
+ const viewport=typeof input.viewport==='string'&&input.viewport.trim()?input.viewport.trim():'390x844';
+ const match=/^(\d{2,4})x(\d{2,4})$/.exec(viewport);
+ if(!match)return null;
+ const width=Number(match[1]),height=Number(match[2]);
+ if(width<320||width>1920||height<480||height>3000)return null;
+ url.hash='';
+ return{url:url.toString(),viewport:`${width}x${height}`};
+}
+
 export const workEvidence=new Hono<{Bindings:Bindings;Variables:Variables}>();
 workEvidence.use('*',requireAuth);
 
 async function ownedJob(c:any,jobId:string){
- const row=await c.env.DB.prepare('SELECT id,title,status FROM work_jobs WHERE id=? AND user_id=?').bind(jobId,c.get('userId')).first();
- return row as {id:string;title:string;status:string}|null;
+ const row=await c.env.DB.prepare('SELECT id,title,status,progress FROM work_jobs WHERE id=? AND user_id=?').bind(jobId,c.get('userId')).first();
+ return row as OwnedJob|null;
 }
+
+async function addEvent(c:any,job:OwnedJob,message:string){
+ await c.env.DB.prepare('INSERT INTO work_events(id,job_id,message,progress) VALUES(?,?,?,?)').bind(crypto.randomUUID(),job.id,message,job.progress).run();
+}
+
+workEvidence.post('/jobs/:jobId/verify',async c=>{
+ const job=await ownedJob(c,c.req.param('jobId'));
+ if(!job)return c.json({error:'Trabajo no encontrado'},404);
+ const target=normalizeVerificationTarget(await c.req.json().catch(()=>null));
+ if(!target)return c.json({error:'Usa una URL HTTPS pública y un viewport válido, por ejemplo 390x844'},400);
+ const recent=await c.env.DB.prepare("SELECT 1 recent FROM work_events WHERE job_id=? AND message LIKE 'Verificación visual solicitada:%' AND created_at>=datetime('now','-2 minutes') LIMIT 1").bind(job.id).first();
+ if(recent){c.header('Retry-After','120');return c.json({error:'Ya existe una verificación reciente para este trabajo'},429);}
+ const runnerToken=c.env.GITHUB_RUNNER_TOKEN?.trim();
+ if(!runnerToken){await addEvent(c,job,'Verificación visual no disponible: falta la credencial del runner');return c.json({error:'Runner de navegador no disponible'},503);}
+ let response:Response;
+ try{
+  response=await fetch('https://api.github.com/repos/Hector35/Hector-IA/actions/workflows/agent-browser.yml/dispatches',{
+   method:'POST',
+   headers:{Authorization:`Bearer ${runnerToken}`,Accept:'application/vnd.github+json','Content-Type':'application/json','User-Agent':'Hector-OS'},
+   body:JSON.stringify({ref:'main',inputs:{url:target.url,viewport:target.viewport,job_id:job.id,user_id:c.get('userId')}})
+  });
+ }catch{
+  await addEvent(c,job,'No se pudo contactar al runner de verificación visual');
+  return c.json({error:'No se pudo contactar al runner de navegador'},502);
+ }
+ if(response.status!==204){await addEvent(c,job,`GitHub rechazó la verificación visual (HTTP ${response.status})`);return c.json({error:'GitHub rechazó la verificación visual',runnerStatus:response.status},502);}
+ const parsed=new URL(target.url),label=`${parsed.origin}${parsed.pathname}`.slice(0,180);
+ await addEvent(c,job,`Verificación visual solicitada: ${label}`);
+ return c.json({accepted:true,jobId:job.id,url:target.url,viewport:target.viewport},202);
+});
 
 workEvidence.get('/jobs/:jobId',async c=>{
  const job=await ownedJob(c,c.req.param('jobId'));

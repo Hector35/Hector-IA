@@ -1,8 +1,9 @@
 type WorkJob={id:string;title:string;kind:string;status:string;progress:number;result?:string|null;updated_at?:string};
 type Evidence={id:string;source:string;url:string;title:string|null;http_status:number|null;errors:string[];run_id:string|null;created_at:string;has_screenshot:boolean;file_id:string|null};
 
-const api=async<T>(path:string):Promise<T>=>{
- const response=await fetch(path,{credentials:'include',headers:{Accept:'application/json'}});
+const api=async<T>(path:string,init?:RequestInit):Promise<T>=>{
+ const headers=new Headers(init?.headers);headers.set('Accept','application/json');if(init?.body)headers.set('Content-Type','application/json');
+ const response=await fetch(path,{credentials:'include',...init,headers});
  const data=await response.json().catch(()=>({}));
  if(!response.ok)throw new Error(data.error||'No disponible');
  return data as T;
@@ -22,16 +23,18 @@ function formatDate(value:string){
 }
 
 function statusLabel(status:string){return({queued:'En cola',working:'Trabajando',testing:'Probando',repairing:'Corrigiendo',completed:'Completado',blocked:'Bloqueado'} as Record<string,string>)[status]||status;}
+function urlLabel(value:string){try{return new URL(value).hostname;}catch{return value;}}
 
 export function installWorkEvidenceEnhancer(){
  let selectedJobId:string|undefined;
+ let selectedEvidenceContainer:HTMLElement|undefined;
  let timer:number|undefined;
  let mountedRoot:HTMLElement|undefined;
 
  const findWorkPage=()=>[...document.querySelectorAll<HTMLElement>('.cxPage')].find(page=>page.querySelector('h1')?.textContent?.trim()==='Trabajo');
 
- const renderEvidence=async(container:HTMLElement,job:WorkJob)=>{
-  container.replaceChildren(el('div','cxWorkEvidenceLoading','Cargando evidencia…'));
+ const renderEvidence=async(container:HTMLElement,job:WorkJob,showLoading=true)=>{
+  if(showLoading)container.replaceChildren(el('div','cxWorkEvidenceLoading','Cargando evidencia…'));
   try{
    const response=await api<{items:Evidence[]}>(`/api/work-evidence/jobs/${job.id}`);
    const items=response.items||[];
@@ -48,7 +51,7 @@ export function installWorkEvidenceEnhancer(){
     }
     const body=el('div','cxEvidenceBody');
     const header=el('header');
-    const title=el('strong',undefined,item.title||new URL(item.url).hostname);
+    const title=el('strong',undefined,item.title||urlLabel(item.url));
     const badge=el('span',item.http_status&&item.http_status>=400?'bad':'good',item.http_status===null?'HTTP —':`HTTP ${item.http_status}`);
     header.append(title,badge);
     const meta=el('p','cxEvidenceMeta',`${item.source} · ${formatDate(item.created_at)}`);
@@ -61,7 +64,34 @@ export function installWorkEvidenceEnhancer(){
     body.append(actions);card.append(body);grid.append(card);
    }
    container.replaceChildren(grid);
-  }catch(error){container.replaceChildren(el('div','cxWorkEvidenceError',error instanceof Error?error.message:'No se pudo cargar la evidencia'));}
+  }catch(error){if(showLoading||!container.childElementCount)container.replaceChildren(el('div','cxWorkEvidenceError',error instanceof Error?error.message:'No se pudo cargar la evidencia'));}
+ };
+
+ const showJob=async(detail:HTMLElement,job:WorkJob)=>{
+  selectedJobId=job.id;
+  detail.replaceChildren();
+  const title=el('div','cxWorkEvidenceTitle');title.append(el('span',undefined,'Evidencia verificada'),el('h3',undefined,job.title));detail.append(title);
+
+  const form=el('form','cxWorkVerify');
+  const label=el('label',undefined,'URL pública HTTPS');
+  const input=document.createElement('input');input.type='url';input.required=true;input.setAttribute('autocomplete','url');input.placeholder='https://...';input.value=location.origin;input.setAttribute('aria-label','URL pública HTTPS a verificar');
+  const button=el('button',undefined,'Verificar URL');button.type='submit';
+  const controls=el('div','cxWorkVerifyControls');controls.append(input,button);
+  const hint=el('p','cxWorkVerifyHint','Agent Browser · viewport iPhone 390×844 · actualización automática cada 8 s');
+  const state=el('p','cxWorkVerifyState');state.setAttribute('aria-live','polite');
+  form.append(label,controls,hint,state);detail.append(form);
+
+  const content=el('div','cxWorkEvidenceContent');detail.append(content);selectedEvidenceContainer=content;
+  form.onsubmit=async event=>{
+   event.preventDefault();button.disabled=true;input.disabled=true;state.className='cxWorkVerifyState';state.textContent='Enviando al navegador seguro…';
+   try{
+    await api(`/api/work-evidence/jobs/${job.id}/verify`,{method:'POST',body:JSON.stringify({url:input.value,viewport:'390x844'})});
+    state.className='cxWorkVerifyState good';state.textContent='Verificación aceptada. La captura aparecerá aquí al terminar.';
+    await renderEvidence(content,job,false);
+   }catch(error){state.className='cxWorkVerifyState bad';state.textContent=error instanceof Error?error.message:'No se pudo iniciar la verificación';}
+   finally{button.disabled=false;input.disabled=false;}
+  };
+  await renderEvidence(content,job);
  };
 
  const render=async(root:HTMLElement)=>{
@@ -69,7 +99,7 @@ export function installWorkEvidenceEnhancer(){
   root.dataset.evidenceReady='1';mountedRoot=root;
   const section=el('section','cxWorkRuns');
   const head=el('div','cxWorkRunsHead');const heading=el('div');heading.append(el('span',undefined,'Ejecuciones persistentes'),el('h2',undefined,'Trabajos y evidencia'));head.append(heading);section.append(head);
-  const layout=el('div','cxWorkRunsLayout');const jobs=el('div','cxWorkJobList');const detail=el('section','cxWorkEvidenceDetail');detail.append(el('div','cxWorkEvidenceEmpty','Selecciona un trabajo para revisar sus capturas e informes.'));layout.append(jobs,detail);section.append(layout);
+  const layout=el('div','cxWorkRunsLayout');const jobs=el('div','cxWorkJobList');const detail=el('section','cxWorkEvidenceDetail');detail.append(el('div','cxWorkEvidenceEmpty','Selecciona un trabajo para revisar o generar evidencia visual.'));layout.append(jobs,detail);section.append(layout);
   root.querySelector('.cxPageHead')?.insertAdjacentElement('afterend',section);
 
   const loadJobs=async()=>{
@@ -83,16 +113,19 @@ export function installWorkEvidenceEnhancer(){
      const meta=el('div','cxWorkJobMeta',`${job.kind} · ${Math.max(0,Math.min(100,Number(job.progress)||0))}%`);
      const progress=document.createElement('progress');progress.max=100;progress.value=Math.max(0,Math.min(100,Number(job.progress)||0));
      button.append(top,meta,progress);
-     button.onclick=()=>{selectedJobId=job.id;[...jobs.children].forEach(x=>x.classList.remove('active'));button.classList.add('active');detail.replaceChildren();const title=el('div','cxWorkEvidenceTitle');title.append(el('span',undefined,'Evidencia verificada'),el('h3',undefined,job.title));detail.append(title);const content=el('div','cxWorkEvidenceContent');detail.append(content);void renderEvidence(content,job);};
+     button.onclick=()=>{[...jobs.children].forEach(x=>x.classList.remove('active'));button.classList.add('active');void showJob(detail,job);};
      jobs.append(button);
     }
+    const selected=items.find(job=>job.id===selectedJobId);
+    if(selected&&selectedEvidenceContainer)void renderEvidence(selectedEvidenceContainer,selected,false);
+    if(selectedJobId&&!selected){selectedJobId=undefined;selectedEvidenceContainer=undefined;detail.replaceChildren(el('div','cxWorkEvidenceEmpty','El trabajo seleccionado ya no está disponible.'));}
    }catch(error){jobs.replaceChildren(el('div','cxWorkEvidenceError',error instanceof Error?error.message:'No se pudieron cargar los trabajos'));}
   };
   await loadJobs();
   timer=window.setInterval(()=>{if(document.body.contains(root))void loadJobs();},8000);
  };
 
- const scan=()=>{const page=findWorkPage();if(page&&!page.dataset.evidenceReady)void render(page);if(mountedRoot&&!document.body.contains(mountedRoot)){mountedRoot=undefined;selectedJobId=undefined;if(timer)window.clearInterval(timer);timer=undefined;}};
+ const scan=()=>{const page=findWorkPage();if(page&&!page.dataset.evidenceReady)void render(page);if(mountedRoot&&!document.body.contains(mountedRoot)){mountedRoot=undefined;selectedJobId=undefined;selectedEvidenceContainer=undefined;if(timer)window.clearInterval(timer);timer=undefined;}};
  const observer=new MutationObserver(scan);observer.observe(document.body,{childList:true,subtree:true});scan();
  return()=>{observer.disconnect();if(timer)window.clearInterval(timer);};
 }
