@@ -15,8 +15,9 @@ export function installResponseAuditEnhancer(){
   const card=el('article',`cxAuditCard ${trace.quality_accepted?'accepted':'rejected'}`),head=el('header'),title=el('div');
   title.append(el('strong',undefined,trace.conversation_title||'Conversación'),el('span',undefined,formatDate(trace.created_at)));
   const quality=el('span',`cxAuditScore ${trace.quality_accepted?'good':'bad'}`,`${trace.quality_score}/100`);head.append(title,quality);card.append(head);
-  const badges=el('div','cxAuditBadges');
+  const badges=el('div','cxAuditBadges'),cognitiveMode=String(trace.context.cognitiveMode||''),passes=Number(trace.context.deliberationPasses||1);
   badges.append(el('span',undefined,providerLabel(trace.actual_provider)),el('span',undefined,trace.model),el('span',trace.route_tier==='deep'?'deep':'',`${trace.route_tier} · ${trace.reasoning_level}`),el('span',undefined,`${trace.latency_ms} ms`),el('span',undefined,formatCost(trace.estimated_cost_usd)));
+  if(cognitiveMode.startsWith('ensemble'))badges.append(el('span',cognitiveMode==='ensemble-degraded'?'fallback':'web',cognitiveMode==='ensemble-degraded'?`Ensamble degradado · ${passes}`:`Ensamble · ${passes}`));
   if(trace.searched_web)badges.append(el('span','web','Web'));
   if(trace.fallback)badges.append(el('span','fallback',`Fallback desde ${providerLabel(trace.requested_provider)}`));
   if(trace.context.contractApplied)badges.append(el('span','web','Formato verificado'));
@@ -24,6 +25,7 @@ export function installResponseAuditEnhancer(){
   if(trace.response_preview)card.append(el('p','cxAuditPreview',trace.response_preview));
   const details=el('details','cxAuditDetails'),summary=el('summary',undefined,'Ver inteligencia utilizada'),body=el('div','cxAuditDetailBody');
   const route=el('section');route.append(el('h4',undefined,'Enrutamiento'),el('p',undefined,`${trace.task}. ${trace.model_reason}`),el('small',undefined,trace.provider_reason));body.append(route);
+  if(cognitiveMode){const cognitive=el('section');cognitive.append(el('h4',undefined,'Modo cognitivo'),el('p',undefined,`${cognitiveMode} · ${passes} pasada${passes===1?'':'s'}`));if(trace.context.deliberationReason)cognitive.append(el('small',undefined,String(trace.context.deliberationReason)));body.append(cognitive);}
   const memory=el('section');memory.append(el('h4',undefined,`Memoria usada (${trace.memories.length})`));
   if(trace.memories.length){const ul=el('ul');trace.memories.forEach(item=>ul.append(el('li',undefined,item)));memory.append(ul);}else memory.append(el('p','cxAuditMuted','No se incorporaron recuerdos personales.'));
   body.append(memory);
@@ -35,25 +37,10 @@ export function installResponseAuditEnhancer(){
   up.type=down.type='button';correction.placeholder='Escribe la corrección exacta para que Héctor OS la recuerde';correction.maxLength=1200;correction.value=trace.feedback_correction||'';
   up.onclick=()=>void submitFeedback(trace,1,correction.value,up);
   down.onclick=()=>{if(!correction.value.trim()){correction.focus();setNotice('Escribe la corrección antes de guardarla.','bad');return;}void submitFeedback(trace,-1,correction.value,down);};
-  feedback.append(label,up,down,correction);card.append(feedback);
-  return card;
+  feedback.append(label,up,down,correction);card.append(feedback);return card;
  };
- const load=async()=>{
-  if(!list||!stats)return;
-  try{const response=await api<{items:Trace[]}>('/api/response-traces?limit=30'),items=response.items||[];list.replaceChildren();
-   if(!items.length){stats.replaceChildren();list.append(el('div','cxAuditEmpty','Las próximas respuestas de IA aparecerán aquí con su memoria, modelo, costo, calidad y ruta de decisión.'));return;}
-   const accepted=items.filter(x=>x.quality_accepted).length,fallbacks=items.filter(x=>x.fallback).length,average=Math.round(items.reduce((sum,x)=>sum+Number(x.quality_score||0),0)/items.length);
-   stats.replaceChildren();[['Respuestas',String(items.length)],['Calidad media',`${average}/100`],['Aceptadas',`${accepted}/${items.length}`],['Fallbacks',String(fallbacks)]].forEach(([label,value])=>{const item=el('div');item.append(el('span',undefined,label),el('strong',undefined,value));stats!.append(item);});
-   items.forEach(trace=>list!.append(renderCard(trace)));
-  }catch(error){list.replaceChildren(el('div','cxAuditError',error instanceof Error?error.message:'No se pudo cargar la auditoría'));}
- };
- const render=async(root:HTMLElement)=>{
-  if(root.dataset.responseAuditReady==='1')return;root.dataset.responseAuditReady='1';mounted=root;
-  const section=el('section','cxResponseAudit'),head=el('div','cxAuditHead'),copy=el('div');copy.append(el('span',undefined,'Inteligencia verificable'),el('h2',undefined,'Libro mayor de respuestas'),el('p',undefined,'Audita qué modelo respondió, qué memoria utilizó, cuánto costó, qué calidad obtuvo y qué debería ocurrir después. Tus correcciones se convierten en memoria explícita.'));head.append(copy);section.append(head);
-  stats=el('div','cxAuditStats');section.append(stats);notice=el('p','cxAuditNotice');section.append(notice);list=el('div','cxAuditList');section.append(list);
-  root.querySelector('.cxPageHead')?.insertAdjacentElement('afterend',section);await load();timer=window.setInterval(()=>{if(document.body.contains(root))void load();},15000);
- };
+ const load=async()=>{if(!list||!stats)return;try{const response=await api<{items:Trace[]}>('/api/response-traces?limit=30'),items=response.items||[];list.replaceChildren();if(!items.length){stats.replaceChildren();list.append(el('div','cxAuditEmpty','Las próximas respuestas de IA aparecerán aquí con su memoria, modelo, costo, calidad y ruta de decisión.'));return;}const fallbacks=items.filter(x=>x.fallback).length,ensembles=items.filter(x=>String(x.context.cognitiveMode||'').startsWith('ensemble')).length,average=Math.round(items.reduce((sum,x)=>sum+Number(x.quality_score||0),0)/items.length);stats.replaceChildren();[['Respuestas',String(items.length)],['Calidad media',`${average}/100`],['Ensamble',String(ensembles)],['Fallbacks',String(fallbacks)]].forEach(([label,value])=>{const item=el('div');item.append(el('span',undefined,label),el('strong',undefined,value));stats!.append(item);});items.forEach(trace=>list!.append(renderCard(trace)));}catch(error){list.replaceChildren(el('div','cxAuditError',error instanceof Error?error.message:'No se pudo cargar la auditoría'));}};
+ const render=async(root:HTMLElement)=>{if(root.dataset.responseAuditReady==='1')return;root.dataset.responseAuditReady='1';mounted=root;const section=el('section','cxResponseAudit'),head=el('div','cxAuditHead'),copy=el('div');copy.append(el('span',undefined,'Inteligencia verificable'),el('h2',undefined,'Libro mayor de respuestas'),el('p',undefined,'Audita qué modelo respondió, qué memoria utilizó, cuánto costó, qué calidad obtuvo y qué debería ocurrir después. Tus correcciones se convierten en memoria explícita.'));head.append(copy);section.append(head);stats=el('div','cxAuditStats');section.append(stats);notice=el('p','cxAuditNotice');section.append(notice);list=el('div','cxAuditList');section.append(list);root.querySelector('.cxPageHead')?.insertAdjacentElement('afterend',section);await load();timer=window.setInterval(()=>{if(document.body.contains(root))void load();},15000);};
  const scan=()=>{const page=findSettingsPage();if(page&&!page.dataset.responseAuditReady)void render(page);if(mounted&&!document.body.contains(mounted)){mounted=undefined;list=undefined;stats=undefined;notice=undefined;if(timer)window.clearInterval(timer);timer=undefined;}};
- const observer=new MutationObserver(scan);observer.observe(document.body,{childList:true,subtree:true});scan();
- return()=>{observer.disconnect();if(timer)window.clearInterval(timer);};
+ const observer=new MutationObserver(scan);observer.observe(document.body,{childList:true,subtree:true});scan();return()=>{observer.disconnect();if(timer)window.clearInterval(timer);};
 }
