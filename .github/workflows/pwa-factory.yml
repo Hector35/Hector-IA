@@ -80,7 +80,7 @@ jobs:
             echo "HECTOR_OS_RUNNER_URL no configurado; se conserva el resultado en GitHub Actions."
             exit 0
           fi
-          TOKEN="$(curl -fsSL -H "Authorization: bearer $ACTIONS_ID_TOKEN_REQUEST_TOKEN" "${ACTIONS_ID_TOKEN_REQUEST_URL}&audience=hector-os-agent-runner" | python3 -c 'import json,sys; print(json.load(sys.stdin)["value"])')"
+          TOKEN="$(curl -fsSL -H "Authorization: bearer $ACTIONS_ID_TOKEN_REQUEST_TOKEN" "${ACTIONS_ID_TOKEN_REQUEST_URL}&audience=hector-os-pwa-runner" | python3 -c 'import json,sys; print(json.load(sys.stdin)["value"])')"
           curl -fsSL -X POST "${HECTOR_OS_RUNNER_URL}/runner/v1/pwa-status" \
             -H "Authorization: Bearer ${TOKEN}" \
             -H "Content-Type: application/json" \
