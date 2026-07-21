@@ -42,21 +42,38 @@ jobs:
         id: build
         shell: bash
         run: npm run build 2>&1 | tee /tmp/runner-build.log
-      - name: Registrar resultado correcto
+      - name: Registrar resultado correcto y cerrar incidentes recuperados
         if: success()
+        env:
+          GH_TOKEN: ${{ github.token }}
         shell: bash
         run: |
           {
             echo "## ✅ Runner Verify"
             echo
             echo "- Commit: \`$GITHUB_SHA\`"
+            echo "- Rama: \`$GITHUB_REF_NAME\`"
             echo "- npm ci: success"
             echo "- typecheck: success"
             echo "- pruebas: success"
             echo "- build: success"
             echo "- Ejecución: ${GITHUB_SERVER_URL}/${GITHUB_REPOSITORY}/actions/runs/${GITHUB_RUN_ID}"
           } >> "$GITHUB_STEP_SUMMARY"
-      - name: Publicar diagnóstico fallido
+
+          set +e
+          if [ "$GITHUB_REF_NAME" = "main" ]; then
+            NUMBERS="$(gh issue list --repo "$GITHUB_REPOSITORY" --state open --limit 100 --search '"[runner-verify] FALLO" in:title' --json number,title --jq '.[] | select(.title | startswith("[runner-verify] FALLO")) | .number')"
+          else
+            TITLE="[runner-verify] FALLO ${GITHUB_REF_NAME}"
+            NUMBERS="$(gh issue list --repo "$GITHUB_REPOSITORY" --state open --limit 20 --search "\"${TITLE}\" in:title" --json number,title --jq ".[] | select(.title == \"${TITLE}\") | .number")"
+          fi
+
+          for number in $NUMBERS; do
+            gh issue comment "$number" --repo "$GITHUB_REPOSITORY" --body "✅ Runner Verify se recuperó en \`$GITHUB_SHA\` para la rama \`$GITHUB_REF_NAME\`. Ejecución: ${GITHUB_SERVER_URL}/${GITHUB_REPOSITORY}/actions/runs/${GITHUB_RUN_ID}"
+            gh issue close "$number" --repo "$GITHUB_REPOSITORY" --reason completed
+          done
+          exit 0
+      - name: Publicar o actualizar diagnóstico fallido
         if: failure()
         env:
           GH_TOKEN: ${{ github.token }}
@@ -74,5 +91,14 @@ jobs:
             fi
           done
           SAFE="$(printf '%s' "$LOG" | sed -E 's/(sk-[A-Za-z0-9_-]+)/[REDACTED]/g; s/(Bearer )[A-Za-z0-9._-]+/\1[REDACTED]/g' | head -c 6000)"
-          BODY="❌ Runner Verify falló para $GITHUB_SHA.\n\nResultados:\n- npm ci: ${INSTALL_OUTCOME}\n- typecheck: ${TYPECHECK_OUTCOME}\n- pruebas: ${TESTS_OUTCOME}\n- build: ${BUILD_OUTCOME}\n\nÚltimo diagnóstico sanitizado:\n\`\`\`\n${SAFE:-Sin salida capturada}\n\`\`\`"
-          gh issue create --title "[runner-verify] FALLO ${GITHUB_SHA::7}" --body "$BODY"
+          TITLE="[runner-verify] FALLO ${GITHUB_REF_NAME}"
+          BODY="❌ Runner Verify falló para $GITHUB_SHA en la rama $GITHUB_REF_NAME.\n\nResultados:\n- npm ci: ${INSTALL_OUTCOME}\n- typecheck: ${TYPECHECK_OUTCOME}\n- pruebas: ${TESTS_OUTCOME}\n- build: ${BUILD_OUTCOME}\n- ejecución: ${GITHUB_SERVER_URL}/${GITHUB_REPOSITORY}/actions/runs/${GITHUB_RUN_ID}\n\nÚltimo diagnóstico sanitizado:\n\`\`\`\n${SAFE:-Sin salida capturada}\n\`\`\`"
+          NUMBER="$(gh issue list --repo "$GITHUB_REPOSITORY" --state open --limit 20 --search "\"${TITLE}\" in:title" --json number,title --jq ".[] | select(.title == \"${TITLE}\") | .number" | head -n 1)"
+
+          if [ -n "$NUMBER" ]; then
+            gh issue edit "$NUMBER" --repo "$GITHUB_REPOSITORY" --body "$BODY"
+            gh issue comment "$NUMBER" --repo "$GITHUB_REPOSITORY" --body "🔁 El incidente se reprodujo en \`$GITHUB_SHA\`. Se actualizó el diagnóstico con la ejecución más reciente."
+          else
+            gh issue create --repo "$GITHUB_REPOSITORY" --title "$TITLE" --body "$BODY"
+          fi
+          exit 0
