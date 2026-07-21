@@ -6,6 +6,7 @@ import {budgetAction,isBudgetProtectedTask,loadCognitiveBudget,projectCognitiveC
 import {aggregateBudgetSavings} from '../lib/budget-savings';
 import {loadForecastContextChars} from '../lib/forecast-context';
 import {loadForecastAccuracy} from '../lib/forecast-accuracy';
+import {loadBudgetQualityOverview} from '../lib/budget-quality-breaker';
 
 export const cognitiveBudget=new Hono<{Bindings:Bindings;Variables:Variables}>();
 cognitiveBudget.use('*',requireAuth);
@@ -17,7 +18,7 @@ async function loadBreakdown(db:D1Database,userId:string){
 async function loadSavings(db:D1Database,userId:string){const rows=(await db.prepare(`SELECT service,model,input_units,cached_input_units,output_units,estimated_cost_usd,metadata_json FROM api_usage WHERE user_id=? AND created_at>=datetime('now','-30 days') ORDER BY created_at DESC LIMIT 1000`).bind(userId).all<any>()).results||[];return aggregateBudgetSavings(rows);}
 function modelForTier(env:Bindings,tier:'fast'|'balanced'|'deep'){return tier==='deep'?(env.OPENAI_MODEL_REASONING||env.OPENAI_MODEL_BALANCED||env.OPENAI_MODEL):tier==='balanced'?(env.OPENAI_MODEL_BALANCED||env.OPENAI_MODEL):(env.OPENAI_MODEL_FAST||env.OPENAI_MODEL);}
 
-cognitiveBudget.get('/',async c=>{const userId=c.get('userId'),[status,breakdown,savings,forecastAccuracy]=await Promise.all([loadCognitiveBudget(c.env.DB,userId),loadBreakdown(c.env.DB,userId),loadSavings(c.env.DB,userId),loadForecastAccuracy(c.env.DB,userId)]);return c.json({budget:status,policy:{ordinary:budgetAction(status,false,false),sensitive:budgetAction(status,true,false),explicitHigh:budgetAction(status,false,true)},breakdown,savings,forecastAccuracy});});
+cognitiveBudget.get('/',async c=>{const userId=c.get('userId'),[status,breakdown,savings,forecastAccuracy,qualityByCategory]=await Promise.all([loadCognitiveBudget(c.env.DB,userId),loadBreakdown(c.env.DB,userId),loadSavings(c.env.DB,userId),loadForecastAccuracy(c.env.DB,userId),loadBudgetQualityOverview(c.env.DB,userId)]);return c.json({budget:status,policy:{ordinary:budgetAction(status,false,false),sensitive:budgetAction(status,true,false),explicitHigh:budgetAction(status,false,true)},breakdown,savings,forecastAccuracy,qualityByCategory,contentStored:false});});
 
 cognitiveBudget.post('/forecast',async c=>{
  const parsed=z.object({prompt:z.string().min(1).max(12000),task:z.string().min(1).max(120).default('consulta general'),tier:z.enum(['fast','balanced','deep']),contextChars:z.number().int().min(0).max(500000).default(0),passes:z.union([z.literal(1),z.literal(2),z.literal(3)]).default(1),explicitHigh:z.boolean().default(false),model:z.string().min(1).max(120).optional()}).safeParse(await c.req.json());
