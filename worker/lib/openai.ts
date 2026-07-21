@@ -2,13 +2,14 @@ import type { Bindings } from '../types';
 import { BOOTSTRAP_VERSION,renderBootstrap } from '../intelligence/bootstrap';
 import {callCloudflare,chooseProvider,type ProviderName} from './providers';
 import {assessProviderResponse,loadCloudflareHealth,recordProviderQuality,type ProviderQualityAssessment} from './provider-quality';
+import {aggregateUsage,candidateInstructions,chooseDeliberation,judgeInput,judgeInstructions,type CandidateRole,type DeliberationProfile} from './deliberation';
 
-export const CONTEXTUAL_ENGINE_VERSION='2.3.0';
+export const CONTEXTUAL_ENGINE_VERSION='3.0.0';
 export type AIUsage={input_tokens?:number;output_tokens?:number;input_tokens_details?:{cached_tokens?:number}};
 type AIResponse={id:string;output_text?:string;output?:Array<{type:string;content?:Array<{type:string;text?:string}>}>;usage?:AIUsage;error?:{message:string}};
 export type Route={model:string;tier:'fast'|'balanced'|'deep';reason:string;reasoning:'low'|'medium'|'high';task:string;needsWeb:boolean};
 export type ChatTurn={role:'user'|'assistant';content:string};
-export type ResponseOptions={reasoning?:'auto'|'high'};
+export type ResponseOptions={reasoning?:'auto'|'high';deliberation?:'auto'|'force'|'off'};
 
 const deepSignals=/\b(programa|programar|código|codigo|arquitectura|depura|debug|analiza a fondo|demuestra|prueba matemática|estrategia|plan completo|investiga profundamente|compara todas|diseña|optimiza|audita|auditoría|auditoria|diagnóstico|diagnostico|razona paso|ingeniería|ingenieria|implementa|refactoriza|refactorización|refactorizacion|hipótesis|hipotesis|modelo completo)\b/i;
 const fastSignals=/^(hola|gracias|ok|sí|si|no|cuánto|cuanto|qué hora|que hora|resume|traduce|corrige)\b/i;
@@ -92,36 +93,78 @@ async function openAIFallback(env:Bindings,input:string,instructions:string,rout
   try{
     const out=await callResponses(env,body),assessment=assessProviderResponse(input,out.text);
     await saveQuality(env,route,started,'cloudflare','openai',route.model,true,assessment,[reason]);
-    return{id:out.data.id,text:out.text,usage:out.data.usage,searchedWeb:false,model:route.model,provider:'openai' as ProviderName,requestedProvider:'cloudflare' as ProviderName,providerReason:reason,fallback:true,qualityScore:assessment.score,qualityAccepted:assessment.accepted};
+    return{id:out.data.id,text:out.text,usage:out.data.usage,searchedWeb:false,model:route.model,provider:'openai' as ProviderName,requestedProvider:'cloudflare' as ProviderName,providerReason:reason,fallback:true,qualityScore:assessment.score,qualityAccepted:assessment.accepted,cognitiveMode:'single' as const,deliberationPasses:1,deliberationReason:'fallback simple desde Workers AI'};
   }catch(error){
     const message=error instanceof Error?error.message:'OpenAI también falló';
     await saveQuality(env,route,started,'cloudflare','openai',route.model,true,{accepted:false,score:0,reasons:[message]},[reason]);
     throw error;
   }
 }
-async function executeHybrid(env:Bindings,input:string,instructions:string,route:Route,openAIInput:unknown){
+function toolsFor(route:Route){return route.needsWeb?[{type:'web_search',search_context_size:'high'}]:undefined;}
+function bestCandidate(input:string,candidates:Array<{role:CandidateRole;out:Awaited<ReturnType<typeof callResponses>>}>){
+ return candidates.map(candidate=>({candidate,assessment:assessProviderResponse(input,candidate.out.text)})).sort((a,b)=>b.assessment.score-a.assessment.score)[0];
+}
+async function executeOpenAIEnsemble(env:Bindings,input:string,instructions:string,route:Route,openAIInput:unknown,started:number,providerReason:string,profile:DeliberationProfile){
+ const roles:CandidateRole[]=['architect','adversary'];
+ const tools=toolsFor(route);
+ const settled=await Promise.allSettled(roles.map(role=>{
+  const body:Record<string,unknown>={model:route.model,instructions:candidateInstructions(instructions,role,route.task,profile.highStakes),input:openAIInput,store:false,reasoning:{effort:'high'}};
+  if(tools)body.tools=tools;
+  return callResponses(env,body).then(out=>({role,out}));
+ }));
+ const candidates=settled.flatMap(result=>result.status==='fulfilled'?[result.value]:[]);
+ if(!candidates.length){
+  const firstFailure=settled.find(result=>result.status==='rejected') as PromiseRejectedResult|undefined;
+  throw firstFailure?.reason instanceof Error?firstFailure.reason:new Error('No se obtuvo ninguna solución candidata');
+ }
+ const candidateUsages=candidates.map(candidate=>candidate.out.data.usage);
+ const searchedWeb=candidates.some(candidate=>candidate.out.searchedWeb);
+ const fallbackCandidate=bestCandidate(input,candidates);
+ if(candidates.length===1){
+  const assessment=fallbackCandidate.assessment;
+  await saveQuality(env,route,started,'openai','openai',route.model,true,assessment,[providerReason,profile.reason,'una rama de deliberación falló']);
+  return{id:fallbackCandidate.candidate.out.data.id,text:fallbackCandidate.candidate.out.text,usage:aggregateUsage(candidateUsages) as AIUsage,searchedWeb,model:route.model,provider:'openai' as ProviderName,requestedProvider:'openai' as ProviderName,providerReason,fallback:true,qualityScore:assessment.score,qualityAccepted:assessment.accepted,cognitiveMode:'ensemble-degraded' as const,deliberationPasses:1,deliberationReason:profile.reason};
+ }
+ const criticModel=env.OPENAI_MODEL_CRITIC||route.model;
+ try{
+  const final=await callResponses(env,{model:criticModel,instructions:judgeInstructions(instructions,route.task,profile.highStakes),input:judgeInput(input,candidates.map(candidate=>({role:candidate.role,text:candidate.out.text}))),store:true,reasoning:{effort:'high'}});
+  const finalAssessment=assessProviderResponse(input,final.text);
+  const useFinal=finalAssessment.accepted||finalAssessment.score>=fallbackCandidate.assessment.score;
+  const chosen=useFinal?final:fallbackCandidate.candidate.out;
+  const assessment=useFinal?finalAssessment:fallbackCandidate.assessment;
+  await saveQuality(env,route,started,'openai','openai',useFinal?criticModel:route.model,!useFinal,assessment,[providerReason,profile.reason,useFinal?'síntesis crítica completada':'síntesis descartada por control de calidad']);
+  return{id:chosen.data.id,text:chosen.text,usage:aggregateUsage([...candidateUsages,final.data.usage]) as AIUsage,searchedWeb:searchedWeb||final.searchedWeb,model:useFinal?criticModel:route.model,provider:'openai' as ProviderName,requestedProvider:'openai' as ProviderName,providerReason,fallback:!useFinal,qualityScore:assessment.score,qualityAccepted:assessment.accepted,cognitiveMode:'ensemble' as const,deliberationPasses:3,deliberationReason:profile.reason};
+ }catch(error){
+  const assessment=fallbackCandidate.assessment;
+  await saveQuality(env,route,started,'openai','openai',route.model,true,assessment,[providerReason,profile.reason,`juez no disponible: ${error instanceof Error?error.message:'error'}`]);
+  return{id:fallbackCandidate.candidate.out.data.id,text:fallbackCandidate.candidate.out.text,usage:aggregateUsage(candidateUsages) as AIUsage,searchedWeb,model:route.model,provider:'openai' as ProviderName,requestedProvider:'openai' as ProviderName,providerReason,fallback:true,qualityScore:assessment.score,qualityAccepted:assessment.accepted,cognitiveMode:'ensemble-degraded' as const,deliberationPasses:2,deliberationReason:profile.reason};
+ }
+}
+async function executeHybrid(env:Bindings,input:string,instructions:string,route:Route,openAIInput:unknown,options:ResponseOptions={}){
   const started=Date.now(),enabled=env.CLOUDFLARE_AI_ENABLED!=='false';
   const health=route.tier==='fast'&&enabled?await loadCloudflareHealth(env.DB):undefined;
   const decision=chooseProvider(input,route.tier,route.needsWeb,enabled,health);
+  const profile=chooseDeliberation(input,route.tier,options,env.HECTOR_DELIBERATION_ENABLED!=='false');
   if(decision.provider==='cloudflare'){
     try{
       const cf=await callCloudflare(env,instructions,input),assessment=assessProviderResponse(input,cf.text);
       if(!assessment.accepted)return openAIFallback(env,input,instructions,route,openAIInput,started,`Fallback de calidad: ${assessment.reasons.join(', ')||`puntaje ${assessment.score}`}`);
       await saveQuality(env,route,started,'cloudflare','cloudflare',cf.model,false,assessment);
-      return{id:cf.id,text:cf.text,usage:cf.usage,searchedWeb:false,model:cf.model,provider:'cloudflare' as ProviderName,requestedProvider:'cloudflare' as ProviderName,providerReason:decision.reason,fallback:false,qualityScore:assessment.score,qualityAccepted:true};
+      return{id:cf.id,text:cf.text,usage:cf.usage,searchedWeb:false,model:cf.model,provider:'cloudflare' as ProviderName,requestedProvider:'cloudflare' as ProviderName,providerReason:decision.reason,fallback:false,qualityScore:assessment.score,qualityAccepted:true,cognitiveMode:'single' as const,deliberationPasses:1,deliberationReason:profile.reason};
     }catch(error){
       return openAIFallback(env,input,instructions,route,openAIInput,started,`Fallback: ${error instanceof Error?error.message:'Workers AI falló'}`);
     }
   }
+  if(profile.mode==='ensemble')return executeOpenAIEnsemble(env,input,instructions,route,openAIInput,started,decision.reason,profile);
   const body:Record<string,unknown>={model:route.model,instructions,input:openAIInput,store:true,reasoning:{effort:route.reasoning}};
-  if(route.needsWeb)body.tools=[{type:'web_search',search_context_size:route.tier==='deep'?'high':'medium'}];
+  const tools=toolsFor(route);if(tools)body.tools=tools;
   const out=await callResponses(env,body),assessment=assessProviderResponse(input,out.text);
   await saveQuality(env,route,started,'openai','openai',route.model,false,assessment);
-  return{id:out.data.id,text:out.text,usage:out.data.usage,searchedWeb:out.searchedWeb,model:route.model,provider:'openai' as ProviderName,requestedProvider:'openai' as ProviderName,providerReason:decision.reason,fallback:false,qualityScore:assessment.score,qualityAccepted:assessment.accepted};
+  return{id:out.data.id,text:out.text,usage:out.data.usage,searchedWeb:out.searchedWeb,model:route.model,provider:'openai' as ProviderName,requestedProvider:'openai' as ProviderName,providerReason:decision.reason,fallback:false,qualityScore:assessment.score,qualityAccepted:assessment.accepted,cognitiveMode:'single' as const,deliberationPasses:1,deliberationReason:profile.reason};
 }
 export async function respond(env:Bindings,input:string,previousResponseId:string|undefined,memories:string[],allowWeb=true,options:ResponseOptions={}){
   const route=applyResponseOptions(env,routeModel(env,input,allowWeb),options),selectedMemories=relevantMemories(input,memories),instructions=legacyPrompt(route,selectedMemories);
-  const result=await executeHybrid(env,input,instructions,route,input);
+  const result=await executeHybrid(env,input,instructions,route,input,options);
   return{...result,modelTier:route.tier,modelReason:route.reason};
 }
 export function conversationInput(history:ChatTurn[],input:string):ChatTurn[]{
@@ -129,11 +172,11 @@ export function conversationInput(history:ChatTurn[],input:string):ChatTurn[]{
   const last=trimmed[trimmed.length-1];
   return last?.role==='user'&&last.content===input?trimmed:[...trimmed,{role:'user' as const,content:input}];
 }
-export async function respondContextual(env:Bindings,input:string,history:ChatTurn[],renderedContext:string,allowWeb=true){
-  const route=routeModel(env,input,allowWeb);
+export async function respondContextual(env:Bindings,input:string,history:ChatTurn[],renderedContext:string,allowWeb=true,options:ResponseOptions={}){
+  const route=applyResponseOptions(env,routeModel(env,input,allowWeb),options);
   const instructions=`${renderBootstrap()}\n\n${behaviorRules(route)}\n\nCONTEXTO DINÁMICO\n${renderedContext}`;
   const conversation=conversationInput(history,input);
-  const result=await executeHybrid(env,input,instructions,route,conversation);
+  const result=await executeHybrid(env,input,instructions,route,conversation,options);
   return{...result,modelTier:route.tier,modelReason:route.reason,task:route.task};
 }
 export async function inspectImage(env:Bindings,prompt:string,dataUrl:string){
