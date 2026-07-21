@@ -4,9 +4,10 @@ import {callCloudflare,chooseProvider,type ProviderName} from './providers';
 import {assessProviderResponse,loadCloudflareHealth,recordProviderQuality,type ProviderQualityAssessment} from './provider-quality';
 import {aggregateUsage,candidateInstructions,chooseDeliberation,judgeInput,judgeInstructions,type CandidateRole,type DeliberationProfile} from './deliberation';
 import {loadFeedbackRoutingProfile,neutralFeedbackRoutingProfile,type FeedbackRoutingProfile} from './feedback-routing';
+import {estimateModelCost} from './model-pricing';
 
-export const CONTEXTUAL_ENGINE_VERSION='3.1.0';
-export type AIUsage={input_tokens?:number;output_tokens?:number;input_tokens_details?:{cached_tokens?:number}};
+export const CONTEXTUAL_ENGINE_VERSION='3.1.1';
+export type AIUsage={input_tokens?:number;output_tokens?:number;input_tokens_details?:{cached_tokens?:number;cache_write_tokens?:number}};
 type AIResponse={id:string;output_text?:string;output?:Array<{type:string;content?:Array<{type:string;text?:string}>}>;usage?:AIUsage;error?:{message:string}};
 export type Route={model:string;tier:'fast'|'balanced'|'deep';reason:string;reasoning:'low'|'medium'|'high';task:string;needsWeb:boolean};
 export type ChatTurn={role:'user'|'assistant';content:string};
@@ -64,4 +65,4 @@ export async function respond(env:Bindings,input:string,previousResponseId:strin
 export function conversationInput(history:ChatTurn[],input:string):ChatTurn[]{const trimmed=history.slice(-16).map(x=>({role:x.role,content:x.content})),last=trimmed[trimmed.length-1];return last?.role==='user'&&last.content===input?trimmed:[...trimmed,{role:'user' as const,content:input}];}
 export async function respondContextual(env:Bindings,input:string,history:ChatTurn[],renderedContext:string,allowWeb=true,options:ResponseOptions={}){const base=applyResponseOptions(env,routeModel(env,input,allowWeb),options),feedback=await resolveFeedback(env,options.userId,base.task),route=applyFeedbackRouting(env,base,feedback),instructions=`${renderBootstrap()}\n\n${behaviorRules(route,feedback.guidance)}\n\nCONTEXTO DINÁMICO\n${renderedContext}`,conversation=conversationInput(history,input),result=await executeHybrid(env,input,instructions,route,conversation,options,feedback);return{...result,modelTier:route.tier,modelReason:route.reason,task:route.task,feedbackAdaptation:feedbackResult(feedback)};}
 export async function inspectImage(env:Bindings,prompt:string,dataUrl:string){const model=env.OPENAI_MODEL_BALANCED||env.OPENAI_MODEL,instructions=`${renderBootstrap()}\n\nAnaliza la imagen para Héctor. Responde en español, directo, preciso y útil. Separa observaciones visibles, inferencias y recomendaciones. No afirmes como visible algo que solo estás infiriendo.`,out=await callResponses(env,{model,instructions,input:[{role:'user',content:[{type:'input_text',text:prompt},{type:'input_image',image_url:dataUrl,detail:'auto'}]}],store:false,reasoning:{effort:'medium'}});return{text:out.text,usage:out.data.usage,model,provider:'openai' as ProviderName};}
-export function estimateCost(usage?:AIUsage){const input=usage?.input_tokens||0,cached=usage?.input_tokens_details?.cached_tokens||0,output=usage?.output_tokens||0;return{input,cached,output,costUsd:((input-cached)*.75+cached*.075+output*4.5)/1_000_000};}
+export function estimateCost(usage?:AIUsage,model?:string){return estimateModelCost(usage,model);}
