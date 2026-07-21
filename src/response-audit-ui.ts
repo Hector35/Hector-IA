@@ -1,0 +1,57 @@
+type Trace={id:string;conversation_title?:string|null;response_preview?:string|null;requested_provider:string;actual_provider:string;model:string;route_tier:string;reasoning_level:string;task:string;model_reason:string;provider_reason:string;searched_web:boolean;fallback:boolean;quality_score:number;quality_accepted:boolean;latency_ms:number;estimated_cost_usd:number;memories:string[];context:Record<string,unknown>;recommendation:string;feedback_rating?:number|null;feedback_correction?:string|null;created_at:string};
+
+const api=async<T>(path:string,init?:RequestInit):Promise<T>=>{const headers=new Headers(init?.headers);headers.set('Accept','application/json');if(init?.body)headers.set('Content-Type','application/json');const response=await fetch(path,{credentials:'include',...init,headers});const data=await response.json().catch(()=>({}));if(!response.ok)throw new Error(data.error||'No disponible');return data as T;};
+const el=<K extends keyof HTMLElementTagNameMap>(tag:K,className?:string,text?:string)=>{const node=document.createElement(tag);if(className)node.className=className;if(text!==undefined)node.textContent=text;return node;};
+function formatDate(value:string){const date=new Date(value.includes('T')?value:`${value.replace(' ','T')}Z`);return Number.isNaN(date.getTime())?'—':date.toLocaleString('es-MX',{dateStyle:'medium',timeStyle:'short'});}
+function formatCost(value:number){if(!value)return'$0.0000';return new Intl.NumberFormat('en-US',{style:'currency',currency:'USD',minimumFractionDigits:4,maximumFractionDigits:4}).format(value);}
+function providerLabel(value:string){return value==='cloudflare'?'Cloudflare AI':value==='openai'?'OpenAI':value;}
+function findSettingsPage(){return[...document.querySelectorAll<HTMLElement>('.cxPage')].find(page=>page.querySelector('h1')?.textContent?.trim()==='Ajustes');}
+
+export function installResponseAuditEnhancer(){
+ let mounted:HTMLElement|undefined,timer:number|undefined,list:HTMLElement|undefined,stats:HTMLElement|undefined,notice:HTMLElement|undefined;
+ const setNotice=(text:string,state='' as ''|'good'|'bad')=>{if(!notice)return;notice.className=`cxAuditNotice ${state}`;notice.textContent=text;};
+ const submitFeedback=async(trace:Trace,rating:1|-1,correction:string,button:HTMLButtonElement)=>{button.disabled=true;try{await api(`/api/response-traces/${trace.id}/feedback`,{method:'POST',body:JSON.stringify({rating,correction:correction.trim()||undefined})});setNotice(rating===1?'Respuesta marcada como útil.':'Corrección guardada y añadida a la memoria personal.','good');await load();}catch(error){setNotice(error instanceof Error?error.message:'No se pudo guardar','bad');}finally{button.disabled=false;}};
+ const renderCard=(trace:Trace)=>{
+  const card=el('article',`cxAuditCard ${trace.quality_accepted?'accepted':'rejected'}`),head=el('header'),title=el('div');
+  title.append(el('strong',undefined,trace.conversation_title||'Conversación'),el('span',undefined,formatDate(trace.created_at)));
+  const quality=el('span',`cxAuditScore ${trace.quality_accepted?'good':'bad'}`,`${trace.quality_score}/100`);head.append(title,quality);card.append(head);
+  const badges=el('div','cxAuditBadges');
+  badges.append(el('span',undefined,providerLabel(trace.actual_provider)),el('span',undefined,trace.model),el('span',trace.route_tier==='deep'?'deep':'',`${trace.route_tier} · ${trace.reasoning_level}`),el('span',undefined,`${trace.latency_ms} ms`),el('span',undefined,formatCost(trace.estimated_cost_usd)));
+  if(trace.searched_web)badges.append(el('span','web','Web'));
+  if(trace.fallback)badges.append(el('span','fallback',`Fallback desde ${providerLabel(trace.requested_provider)}`));
+  card.append(badges);
+  if(trace.response_preview)card.append(el('p','cxAuditPreview',trace.response_preview));
+  const details=el('details','cxAuditDetails'),summary=el('summary',undefined,'Ver inteligencia utilizada'),body=el('div','cxAuditDetailBody');
+  const route=el('section');route.append(el('h4',undefined,'Enrutamiento'),el('p',undefined,`${trace.task}. ${trace.model_reason}`),el('small',undefined,trace.provider_reason));body.append(route);
+  const memory=el('section');memory.append(el('h4',undefined,`Memoria usada (${trace.memories.length})`));
+  if(trace.memories.length){const ul=el('ul');trace.memories.forEach(item=>ul.append(el('li',undefined,item)));memory.append(ul);}else memory.append(el('p','cxAuditMuted','No se incorporaron recuerdos personales.'));
+  body.append(memory);
+  const context=el('section');context.append(el('h4',undefined,'Contexto'),el('p',undefined,`Mensajes recientes: ${Number(trace.context.recentMessages||0)} · Resumen: ${trace.context.hasSummary?'sí':'no'} · Estados de proyecto: ${Number(trace.context.projectState||0)}`));body.append(context);
+  const next=el('section','cxAuditRecommendation');next.append(el('h4',undefined,'Siguiente acción'),el('p',undefined,trace.recommendation));body.append(next);
+  details.append(summary,body);card.append(details);
+  const feedback=el('div','cxAuditFeedback'),label=el('span',undefined,'¿Fue correcta?'),up=el('button',trace.feedback_rating===1?'selected':'','Útil'),down=el('button',trace.feedback_rating===-1?'selected bad':'','Corregir'),correction=document.createElement('textarea');
+  up.type=down.type='button';correction.placeholder='Escribe la corrección exacta para que Héctor OS la recuerde';correction.maxLength=1200;correction.value=trace.feedback_correction||'';
+  up.onclick=()=>void submitFeedback(trace,1,correction.value,up);
+  down.onclick=()=>{if(!correction.value.trim()){correction.focus();setNotice('Escribe la corrección antes de guardarla.','bad');return;}void submitFeedback(trace,-1,correction.value,down);};
+  feedback.append(label,up,down,correction);card.append(feedback);
+  return card;
+ };
+ const load=async()=>{
+  if(!list||!stats)return;
+  try{const response=await api<{items:Trace[]}>('/api/response-traces?limit=30'),items=response.items||[];list.replaceChildren();
+   if(!items.length){stats.replaceChildren();list.append(el('div','cxAuditEmpty','Las próximas respuestas de IA aparecerán aquí con su memoria, modelo, costo, calidad y ruta de decisión.'));return;}
+   const accepted=items.filter(x=>x.quality_accepted).length,fallbacks=items.filter(x=>x.fallback).length,average=Math.round(items.reduce((sum,x)=>sum+Number(x.quality_score||0),0)/items.length);
+   stats.replaceChildren();[['Respuestas',String(items.length)],['Calidad media',`${average}/100`],['Aceptadas',`${accepted}/${items.length}`],['Fallbacks',String(fallbacks)]].forEach(([label,value])=>{const item=el('div');item.append(el('span',undefined,label),el('strong',undefined,value));stats!.append(item);});
+   items.forEach(trace=>list!.append(renderCard(trace)));
+  }catch(error){list.replaceChildren(el('div','cxAuditError',error instanceof Error?error.message:'No se pudo cargar la auditoría'));}
+ };
+ const render=async(root:HTMLElement)=>{
+  if(root.dataset.responseAuditReady==='1')return;root.dataset.responseAuditReady='1';mounted=root;
+  const section=el('section','cxResponseAudit'),head=el('div','cxAuditHead'),copy=el('div');copy.append(el('span',undefined,'Inteligencia verificable'),el('h2',undefined,'Libro mayor de respuestas'),el('p',undefined,'Audita qué modelo respondió, qué memoria utilizó, cuánto costó, qué calidad obtuvo y qué debería ocurrir después. Tus correcciones se convierten en memoria explícita.'));head.append(copy);section.append(head);
+  stats=el('div','cxAuditStats');section.append(stats);notice=el('p','cxAuditNotice');section.append(notice);list=el('div','cxAuditList');section.append(list);
+  root.querySelector('.cxPageHead')?.insertAdjacentElement('afterend',section);await load();timer=window.setInterval(()=>{if(document.body.contains(root))void load();},15000);
+ };
+ const scan=()=>{const page=findSettingsPage();if(page&&!page.dataset.responseAuditReady)void render(page);if(mounted&&!document.body.contains(mounted)){mounted=undefined;list=undefined;stats=undefined;notice=undefined;if(timer)window.clearInterval(timer);timer=undefined;}};
+ const observer=new MutationObserver(scan);observer.observe(document.body,{childList:true,subtree:true});scan();
+ return()=>{observer.disconnect();if(timer)window.clearInterval(timer);};
+}
