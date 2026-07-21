@@ -2,7 +2,8 @@ type WorkJob={id:string;title:string;kind:string;status:string;progress:number;r
 type Evidence={id:string;source:string;url:string;title:string|null;http_status:number|null;errors:string[];run_id:string|null;created_at:string;has_screenshot:boolean;file_id:string|null};
 
 const api=async<T>(path:string,init?:RequestInit):Promise<T>=>{
- const response=await fetch(path,{credentials:'include',...init,headers:{Accept:'application/json',...(init?.body?{'Content-Type':'application/json'}:{}),...(init?.headers||{})}});
+ const headers=new Headers(init?.headers);headers.set('Accept','application/json');if(init?.body)headers.set('Content-Type','application/json');
+ const response=await fetch(path,{credentials:'include',...init,headers});
  const data=await response.json().catch(()=>({}));
  if(!response.ok)throw new Error(data.error||'No disponible');
  return data as T;
