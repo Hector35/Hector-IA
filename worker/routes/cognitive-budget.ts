@@ -7,7 +7,14 @@ import {budgetAction,loadCognitiveBudget} from '../lib/cognitive-budget';
 export const cognitiveBudget=new Hono<{Bindings:Bindings;Variables:Variables}>();
 cognitiveBudget.use('*',requireAuth);
 
-cognitiveBudget.get('/',async c=>{const status=await loadCognitiveBudget(c.env.DB,c.get('userId'));return c.json({budget:status,policy:{ordinary:budgetAction(status,false,false),sensitive:budgetAction(status,true,false),explicitHigh:budgetAction(status,false,true)}});});
+async function loadBreakdown(db:D1Database,userId:string){
+ const rows=(await db.prepare(`SELECT model,service,COUNT(*) requests,COALESCE(SUM(estimated_cost_usd),0) cost_usd,COALESCE(SUM(input_units),0) input_units,COALESCE(SUM(cached_input_units),0) cached_input_units,COALESCE(SUM(output_units),0) output_units
+ FROM api_usage WHERE user_id=? AND created_at>=datetime('now','-30 days')
+ GROUP BY model,service ORDER BY cost_usd DESC LIMIT 20`).bind(userId).all<any>()).results||[];
+ return rows.map(row=>({model:String(row.model||'desconocido'),service:String(row.service||'general'),requests:Number(row.requests||0),costUsd:Number(row.cost_usd||0),inputUnits:Number(row.input_units||0),cachedInputUnits:Number(row.cached_input_units||0),outputUnits:Number(row.output_units||0)}));
+}
+
+cognitiveBudget.get('/',async c=>{const userId=c.get('userId'),[status,breakdown]=await Promise.all([loadCognitiveBudget(c.env.DB,userId),loadBreakdown(c.env.DB,userId)]);return c.json({budget:status,policy:{ordinary:budgetAction(status,false,false),sensitive:budgetAction(status,true,false),explicitHigh:budgetAction(status,false,true)},breakdown});});
 
 cognitiveBudget.put('/',async c=>{
  const parsed=z.object({dailyLimitUsd:z.number().min(0).max(1000),monthlyLimitUsd:z.number().min(0).max(10000),warnPercent:z.number().int().min(1).max(100),enforcementMode:z.enum(['observe','protect'])}).safeParse(await c.req.json());
