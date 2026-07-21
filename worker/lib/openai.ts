@@ -16,7 +16,7 @@ const currentSignals=/\b(hoy|ahora|actual|actualmente|reciente|último|ultima|ú
 const codeSignals=/\b(código|codigo|typescript|javascript|python|react|worker|cloudflare|github|api|sql|d1|r2|bug|error|deploy|workflow|frontend|backend)\b/i;
 const planningSignals=/\b(plan|estrategia|prioridades|decisión|decision|opciones|comparar|compara|arquitectura|diseño|diseña|proyecto|pasos|riesgos|migración|migracion)\b/i;
 const medicalSignals=/\b(dolor|síntoma|sintoma|medicamento|salud|lesión|lesion|cirugía|cirugia|dedo|taquicardia|presión|presion|dosis)\b/i;
-const selfKnowledgeSignals=/\b(hector os|héctor os|quién eres|quien eres|sobre ti|tu arquitectura|tus capacidades|qué puedes hacer|que puedes hacer|tus limitaciones|sobre mí|sobre mi|mi perfil|openai|chatgpt work|\bwork\b|codex|gpt[-‑ ]?5\.6)\b/i;
+const selfKnowledgeSignals=/(?:hector os|héctor os|quién eres|quien eres|sobre ti|tu arquitectura|tus capacidades|qué puedes hacer|que puedes hacer|tus limitaciones|sobre mí|sobre mi|mi perfil|openai|chatgpt work|(?:^|\s)work(?:\s|$)|codex|gpt[-‑ ]?5\.6)/i;
 const productFreshnessSignals=/\b(actual|actualmente|hoy|disponible|disponibilidad|precio|plan|límite|limite|versión|version|modelo|función|funcion|novedad|último|ultima|última)\b/i;
 
 function normalize(text:string){return text.toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g,'');}
