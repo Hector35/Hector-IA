@@ -13,12 +13,12 @@ const highStakeSignals=/\b(salud|m[eé]dic|dolor|s[ií]ntoma|dosis|cirug[ií]a|l
 const complexSignals=/\b(arquitectura|implementa|programa|depura|debug|audita|diagn[oó]stico|estrategia|plan completo|compara todas|demuestra|optimiza|refactoriza|investiga profundamente|modelo completo|causa ra[ií]z|escenario|sensibilidad)\b/i;
 
 export function chooseDeliberation(input:string,tier:DeliberationTier,options:DeliberationOptions={},enabled=true):DeliberationProfile{
- const highStakes=highStakeSignals.test(input);
+ const highStakes=highStakeSignals.test(input),complex=complexSignals.test(input);
  if(!enabled||options.deliberation==='off')return{mode:'single',reason:!enabled?'deliberación desactivada por configuración':'deliberación desactivada para esta solicitud',candidateCount:1,highStakes};
  if(options.deliberation==='force'||options.reasoning==='high')return{mode:'ensemble',reason:'razonamiento máximo solicitado explícitamente',candidateCount:2,highStakes};
  if(explicitSignals.test(input))return{mode:'ensemble',reason:'la solicitud exige verificación o inteligencia reforzada',candidateCount:2,highStakes};
- if(tier==='deep')return{mode:'ensemble',reason:'tarea clasificada como razonamiento profundo',candidateCount:2,highStakes};
- if(highStakes&&(input.length>=180||complexSignals.test(input)))return{mode:'ensemble',reason:'tarea sensible con complejidad suficiente para doble resolución',candidateCount:2,highStakes};
+ if(tier==='deep'&&(complex||input.length>=220))return{mode:'ensemble',reason:'tarea profunda con complejidad suficiente para doble resolución',candidateCount:2,highStakes};
+ if(highStakes&&(input.length>=180||complex))return{mode:'ensemble',reason:'tarea sensible con complejidad suficiente para doble resolución',candidateCount:2,highStakes};
  return{mode:'single',reason:'una sola ejecución es proporcional a la complejidad y al riesgo',candidateCount:1,highStakes};
 }
 
