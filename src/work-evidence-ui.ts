@@ -74,7 +74,7 @@ export function installWorkEvidenceEnhancer(){
 
   const form=el('form','cxWorkVerify');
   const label=el('label',undefined,'URL pública HTTPS');
-  const input=document.createElement('input');input.type='url';input.required=true;input.setAttribute('autocomplete','url');input.placeholder='https://...';input.value=location.origin;input.setAttribute('aria-label','URL pública HTTPS a verificar');
+  const input=document.createElement('input');input.type='url';input.required=true;input.autocomplete='on';input.inputMode='url';input.placeholder='https://...';input.value=location.origin;input.setAttribute('aria-label','URL pública HTTPS a verificar');
   const button=el('button',undefined,'Verificar URL');button.type='submit';
   const controls=el('div','cxWorkVerifyControls');controls.append(input,button);
   const hint=el('p','cxWorkVerifyHint','Agent Browser · viewport iPhone 390×844 · actualización automática cada 8 s');
