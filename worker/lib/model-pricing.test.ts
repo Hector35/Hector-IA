@@ -16,12 +16,13 @@ describe('pricingForModel',()=>{
 });
 
 describe('estimateModelCost',()=>{
- it('calcula Terra con lectura y escritura de caché',()=>{
+ it('calcula Terra con lectura, escritura de caché y contexto largo',()=>{
   const result=estimateModelCost({input_tokens:1_000_000,output_tokens:100_000,input_tokens_details:{cached_tokens:200_000,cache_write_tokens:100_000}},'gpt-5.6-terra');
   expect(result.input).toBe(1_000_000);
   expect(result.cached).toBe(200_000);
   expect(result.cacheWrite).toBe(100_000);
-  expect(result.costUsd).toBeCloseTo(3.6125,6);
+  expect(result.longContext).toBe(true);
+  expect(result.costUsd).toBeCloseTo(6.475,6);
   expect(result.pricingKnown).toBe(true);
  });
  it('aplica recargo de contexto largo a entrada y salida',()=>{
