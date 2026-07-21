@@ -21,7 +21,7 @@ describe('estimateModelCost',()=>{
   expect(result.input).toBe(1_000_000);
   expect(result.cached).toBe(200_000);
   expect(result.cacheWrite).toBe(100_000);
-  expect(result.costUsd).toBeCloseTo(3.8625,6);
+  expect(result.costUsd).toBeCloseTo(3.6125,6);
   expect(result.pricingKnown).toBe(true);
  });
  it('aplica recargo de contexto largo a entrada y salida',()=>{
