@@ -7,8 +7,11 @@ export type ContextPack={system:string;memories:string[];summary?:string;priorSu
 export const EMBEDDING_MODEL='text-embedding-3-small';
 export const EMBEDDING_DIMENSIONS=512;
 export const MAX_EMBEDDING_BACKFILL=6;
+export const MIN_SEMANTIC_SCORE=0.35;
+export const MAX_SEMANTIC_MEMORIES=8;
 
 export type MemoryRow={id:string;content:string;model?:string|null;dimensions?:number|null;vector_json?:string|null};
+export type SemanticCandidate={id:string;content:string;vector:number[]};
 
 type EmbeddingResponse={data?:Array<{index:number;embedding:number[]}>;error?:{message?:string}};
 
@@ -46,6 +49,17 @@ export function selectEmbeddingBackfill(rows:MemoryRow[],lexical:string[],limit=
     .map(x=>x.row);
 }
 
+export function rankSemanticMemories(query:number[],items:SemanticCandidate[],minimumScore=MIN_SEMANTIC_SCORE,limit=MAX_SEMANTIC_MEMORIES){
+  const candidates=new Map<string,SemanticCandidate>();
+  for(const item of items)candidates.set(item.id,item);
+  return [...candidates.values()]
+    .map(x=>({content:x.content,score:cosineSimilarity(query,x.vector)}))
+    .filter(x=>x.score>=minimumScore)
+    .sort((a,b)=>b.score-a.score)
+    .slice(0,Math.max(0,limit))
+    .map(x=>x.content);
+}
+
 async function embedMany(env:Bindings,inputs:string[]){
   if(!inputs.length)return [];
   const response=await fetch('https://api.openai.com/v1/embeddings',{method:'POST',headers:{Authorization:`Bearer ${env.OPENAI_API_KEY}`,'Content-Type':'application/json'},body:JSON.stringify({model:EMBEDDING_MODEL,input:inputs,dimensions:EMBEDDING_DIMENSIONS})});
@@ -54,6 +68,16 @@ async function embedMany(env:Bindings,inputs:string[]){
   const ordered=[...(data.data||[])].sort((a,b)=>a.index-b.index).map(x=>x.embedding);
   if(ordered.length!==inputs.length||ordered.some(vector=>vector.length!==EMBEDDING_DIMENSIONS||vector.some(x=>!Number.isFinite(x))))throw new Error('Respuesta de embeddings inválida');
   return ordered;
+}
+
+async function persistEmbeddingBackfill(env:Bindings,userId:string,items:SemanticCandidate[]){
+  if(!items.length)return;
+  try{
+    await env.DB.batch(items.map(item=>env.DB.prepare(`INSERT INTO memory_embeddings(memory_id,user_id,model,dimensions,vector_json,updated_at)
+      VALUES(?,?,?,?,?,CURRENT_TIMESTAMP)
+      ON CONFLICT(memory_id) DO UPDATE SET user_id=excluded.user_id,model=excluded.model,dimensions=excluded.dimensions,vector_json=excluded.vector_json,updated_at=CURRENT_TIMESTAMP`)
+      .bind(item.id,userId,EMBEDDING_MODEL,EMBEDDING_DIMENSIONS,JSON.stringify(item.vector))));
+  }catch{}
 }
 
 async function semanticMemories(env:Bindings,userId:string,input:string,rows:MemoryRow[],lexical:string[]){
@@ -67,20 +91,8 @@ async function semanticMemories(env:Bindings,userId:string,input:string,rows:Mem
   try{
     const vectors=await embedMany(env,[input,...backfill.map(x=>x.content)]),query=vectors[0];
     const refreshed=backfill.map((row,index)=>({id:row.id,content:row.content,vector:vectors[index+1]}));
-    if(refreshed.length){
-      await env.DB.batch(refreshed.map(item=>env.DB.prepare(`INSERT INTO memory_embeddings(memory_id,user_id,model,dimensions,vector_json,updated_at)
-        VALUES(?,?,?,?,?,CURRENT_TIMESTAMP)
-        ON CONFLICT(memory_id) DO UPDATE SET user_id=excluded.user_id,model=excluded.model,dimensions=excluded.dimensions,vector_json=excluded.vector_json,updated_at=CURRENT_TIMESTAMP`)
-        .bind(item.id,userId,EMBEDDING_MODEL,EMBEDDING_DIMENSIONS,JSON.stringify(item.vector))));
-    }
-    const candidates=new Map<string,{content:string;vector:number[]}>();
-    for(const item of [...existing,...refreshed])candidates.set(item.id,{content:item.content,vector:item.vector});
-    return [...candidates.values()]
-      .map(x=>({content:x.content,score:cosineSimilarity(query,x.vector)}))
-      .filter(x=>x.score>=0.35)
-      .sort((a,b)=>b.score-a.score)
-      .slice(0,8)
-      .map(x=>x.content);
+    await persistEmbeddingBackfill(env,userId,refreshed);
+    return rankSemanticMemories(query,[...existing,...refreshed]);
   }catch{return [];}
 }
 
