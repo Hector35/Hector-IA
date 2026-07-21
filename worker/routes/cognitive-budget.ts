@@ -4,6 +4,7 @@ import type {Bindings,Variables} from '../types';
 import {requireAuth} from '../lib/auth';
 import {budgetAction,isBudgetProtectedTask,loadCognitiveBudget,projectCognitiveCost,summarizeBudgetDecision} from '../lib/cognitive-budget';
 import {aggregateBudgetSavings} from '../lib/budget-savings';
+import {loadForecastContextChars} from '../lib/forecast-context';
 
 export const cognitiveBudget=new Hono<{Bindings:Bindings;Variables:Variables}>();
 cognitiveBudget.use('*',requireAuth);
@@ -28,8 +29,8 @@ cognitiveBudget.get('/',async c=>{const userId=c.get('userId'),[status,breakdown
 cognitiveBudget.post('/forecast',async c=>{
  const parsed=z.object({prompt:z.string().min(1).max(12000),task:z.string().min(1).max(120).default('consulta general'),tier:z.enum(['fast','balanced','deep']),contextChars:z.number().int().min(0).max(500000).default(0),passes:z.union([z.literal(1),z.literal(2),z.literal(3)]).default(1),explicitHigh:z.boolean().default(false),model:z.string().min(1).max(120).optional()}).safeParse(await c.req.json());
  if(!parsed.success)return c.json({error:'Pronóstico inválido',details:parsed.error.flatten()},400);
- const p=parsed.data,status=await loadCognitiveBudget(c.env.DB,c.get('userId')),model=p.model||modelForTier(c.env,p.tier),projection=projectCognitiveCost(status,model,p.tier,p.prompt.length,p.contextChars,p.passes),sensitive=isBudgetProtectedTask(p.prompt,p.task),action=budgetAction(status,sensitive,p.explicitHigh,projection);
- return c.json({forecast:summarizeBudgetDecision(status,action,projection),protected:sensitive,model,tier:p.tier,note:'Estimación previa; el costo real depende de tokens, herramientas, caché y longitud final. El texto del pronóstico no se persiste.'});
+ const p=parsed.data,userId=c.get('userId'),[status,contextChars]=await Promise.all([loadCognitiveBudget(c.env.DB,userId),loadForecastContextChars(c.env.DB,userId,p.contextChars)]),model=p.model||modelForTier(c.env,p.tier),projection=projectCognitiveCost(status,model,p.tier,p.prompt.length,contextChars,p.passes),sensitive=isBudgetProtectedTask(p.prompt,p.task),action=budgetAction(status,sensitive,p.explicitHigh,projection);
+ return c.json({forecast:summarizeBudgetDecision(status,action,projection),protected:sensitive,model,tier:p.tier,contextChars,note:'Estimación previa con contexto reciente del propietario; el costo real depende de tokens, herramientas, caché y longitud final. El texto del pronóstico no se persiste.'});
 });
 
 cognitiveBudget.put('/',async c=>{
