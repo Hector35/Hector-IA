@@ -2,7 +2,7 @@ import type { Bindings } from '../types';
 import { BOOTSTRAP_VERSION,renderBootstrap } from '../intelligence/bootstrap';
 import {callCloudflare,chooseProvider,type ProviderName} from './providers';
 
-export const CONTEXTUAL_ENGINE_VERSION='2.2.0';
+export const CONTEXTUAL_ENGINE_VERSION='2.2.1';
 export type AIUsage={input_tokens?:number;output_tokens?:number;input_tokens_details?:{cached_tokens?:number}};
 type AIResponse={id:string;output_text?:string;output?:Array<{type:string;content?:Array<{type:string;text?:string}>}>;usage?:AIUsage;error?:{message:string}};
 export type Route={model:string;tier:'fast'|'balanced'|'deep';reason:string;reasoning:'low'|'medium'|'high';task:string;needsWeb:boolean};
@@ -15,14 +15,15 @@ const codeSignals=/\b(código|codigo|typescript|javascript|python|react|worker|c
 const planningSignals=/\b(plan|estrategia|prioridades|decisión|decision|opciones|comparar|compara|arquitectura|diseño|diseña|proyecto|pasos|riesgos|migración|migracion)\b/i;
 const medicalSignals=/\b(dolor|síntoma|sintoma|medicamento|salud|lesión|lesion|cirugía|cirugia|dedo|taquicardia|presión|presion|dosis)\b/i;
 
-function words(text:string){return [...new Set(text.toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g,'').match(/[a-z0-9]{3,}/g)||[])].filter(x=>!['para','como','pero','porque','esta','este','esto','tiene','quiero','puede','hacer','sobre','desde','todo','todos','todas','cuando','donde'].includes(x));}
+function normalize(text:string){return text.toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g,'');}
+function words(text:string){return [...new Set(normalize(text).match(/[a-z0-9]{3,}/g)||[])].filter(x=>!['para','como','pero','porque','esta','este','esto','tiene','quiero','puede','hacer','sobre','desde','todo','todos','todas','cuando','donde'].includes(x));}
 export function relevantMemories(input:string,memories:string[]){
-  const query=words(input),numbers=input.match(/\b\d+(?:[.,]\d+)?\b/g)||[];
+  const normalizedInput=normalize(input),query=words(input),numbers=input.match(/\b\d+(?:[.,]\d+)?\b/g)||[];
   return memories.map((content,index)=>{
-    const normalized=content.toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g,'');
+    const normalized=normalize(content);
     const overlap=query.reduce((n,w)=>n+(normalized.includes(w)?1:0),0);
     const numeric=numbers.reduce((n,x)=>n+(normalized.includes(x)?2:0),0);
-    const exact=input.length>12&&normalized.includes(input.toLowerCase().slice(0,40))?4:0;
+    const exact=normalizedInput.length>12&&normalized.includes(normalizedInput.slice(0,40))?4:0;
     return{content,score:overlap*2+numeric+exact-Math.min(index,20)*0.02};
   }).filter(x=>x.score>0).sort((a,b)=>b.score-a.score).slice(0,8).map(x=>x.content);
 }
@@ -100,11 +101,15 @@ export async function respond(env:Bindings,input:string,previousResponseId:strin
   const result=await executeHybrid(env,input,instructions,route,input);
   return{...result,modelTier:route.tier,modelReason:route.reason};
 }
+export function conversationInput(history:ChatTurn[],input:string):ChatTurn[]{
+  const trimmed=history.slice(-16).map(x=>({role:x.role,content:x.content}));
+  const last=trimmed[trimmed.length-1];
+  return last?.role==='user'&&last.content===input?trimmed:[...trimmed,{role:'user' as const,content:input}];
+}
 export async function respondContextual(env:Bindings,input:string,history:ChatTurn[],renderedContext:string,allowWeb=true){
   const route=routeModel(env,input,allowWeb);
   const instructions=`${renderBootstrap()}\n\n${behaviorRules(route)}\n\nCONTEXTO DINÁMICO\n${renderedContext}`;
-  const trimmed=history.slice(-16).map(x=>({role:x.role,content:x.content}));
-  const conversation=[...trimmed,{role:'user' as const,content:input}];
+  const conversation=conversationInput(history,input);
   const result=await executeHybrid(env,input,instructions,route,conversation);
   return{...result,modelTier:route.tier,modelReason:route.reason,task:route.task};
 }
