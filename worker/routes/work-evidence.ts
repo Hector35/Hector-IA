@@ -27,7 +27,8 @@ export const workEvidence=new Hono<{Bindings:Bindings;Variables:Variables}>();
 workEvidence.use('*',requireAuth);
 
 async function ownedJob(c:any,jobId:string){
- return c.env.DB.prepare('SELECT id,title,status FROM work_jobs WHERE id=? AND user_id=?').bind(jobId,c.get('userId')).first<{id:string;title:string;status:string}>();
+ const row=await c.env.DB.prepare('SELECT id,title,status FROM work_jobs WHERE id=? AND user_id=?').bind(jobId,c.get('userId')).first();
+ return row as {id:string;title:string;status:string}|null;
 }
 
 workEvidence.get('/jobs/:jobId',async c=>{
