@@ -1,5 +1,5 @@
 import {describe,expect,it} from 'vitest';
-import {intervalMinutesFor,isActiveScheduledJob,nextScheduledRun,normalizeRunAt,renderScheduledPrompt,type ScheduledTaskDefinition} from './scheduler';
+import {intervalMinutesFor,isActiveScheduledJob,nextScheduledRun,normalizeRunAt,renderScheduledPrompt,scheduledJobId,type ScheduledTaskDefinition} from './scheduler';
 
 const task:ScheduledTaskDefinition={
  id:'11111111-1111-4111-8111-111111111111',
@@ -30,6 +30,13 @@ describe('scheduler',()=>{
   expect(normalizeRunAt('2026-07-21T12:02:00.000Z',now)).toBe('2026-07-21T12:02:00.000Z');
   expect(()=>normalizeRunAt('2026-07-21T11:00:00.000Z',now)).toThrow('pasado');
   expect(()=>normalizeRunAt('2028-01-01T00:00:00.000Z',now)).toThrow('un año');
+ });
+
+ it('genera el mismo UUID para el mismo turno y uno distinto para otro turno',async()=>{
+  const first=await scheduledJobId(task.id,'2026-07-21T12:00:00.000Z');
+  expect(first).toMatch(/^[0-9a-f]{8}-[0-9a-f]{4}-5[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/);
+  expect(await scheduledJobId(task.id,'2026-07-21T12:00:00.000Z')).toBe(first);
+  expect(await scheduledJobId(task.id,'2026-07-21T13:00:00.000Z')).not.toBe(first);
  });
 
  it('reconoce trabajos todavía activos',()=>{
