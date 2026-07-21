@@ -7,6 +7,7 @@ import {installMemoryControlEnhancer} from './memory-control-ui';
 import {installResponseAuditEnhancer} from './response-audit-ui';
 import {installIntelligenceStatusEnhancer} from './intelligence-status-ui';
 import {installSelfModelEnhancer} from './self-model-ui';
+import {installHectorShellEnhancer} from './hector-shell-ui';
 import './codex-ui.css';
 import './codex-mobile.css';
 import './chat-content.css';
@@ -17,6 +18,7 @@ import './memory-control-ui.css';
 import './response-audit-ui.css';
 import './intelligence-status-ui.css';
 import './self-model-ui.css';
+import './hector-shell-ui.css';
 
 ReactDOM.createRoot(document.getElementById('root')!).render(
   <React.StrictMode><CodexApp/></React.StrictMode>
@@ -28,6 +30,7 @@ installMemoryControlEnhancer();
 installResponseAuditEnhancer();
 installIntelligenceStatusEnhancer();
 installSelfModelEnhancer();
+installHectorShellEnhancer();
 
 if('serviceWorker' in navigator){
   window.addEventListener('load',async()=>{
