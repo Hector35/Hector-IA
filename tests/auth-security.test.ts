@@ -1,5 +1,5 @@
 import {describe,expect,it} from 'vitest';
-import {rateLimitDecision} from '../worker/routes/auth';
+import {rateLimitDecision} from '../worker/lib/auth-rate-limit';
 
 describe('auth rate limiting',()=>{
  const now=Date.parse('2026-07-21T12:00:00.000Z');
