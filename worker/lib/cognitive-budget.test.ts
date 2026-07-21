@@ -1,5 +1,5 @@
 import {describe,expect,it} from 'vitest';
-import {budgetAction,evaluateCognitiveBudget} from './cognitive-budget';
+import {budgetAction,evaluateCognitiveBudget,isBudgetProtectedTask,summarizeBudgetDecision} from './cognitive-budget';
 
 const settings={dailyLimitUsd:1,monthlyLimitUsd:20,warnPercent:80,enforcementMode:'protect' as const};
 
@@ -14,4 +14,10 @@ describe('budgetAction',()=>{
  it('degrada solamente tareas ordinarias',()=>expect(budgetAction(exceeded,false,false).action).toBe('degrade'));
  it('preserva tareas sensibles y solicitudes explícitas de alta inteligencia',()=>{expect(budgetAction(exceeded,true,false).action).toBe('allow-protected');expect(budgetAction(exceeded,false,true).action).toBe('allow-protected');});
  it('no aplica cambios en modo observación',()=>expect(budgetAction({...exceeded,enforcementMode:'observe'},false,false).action).toBe('allow'));
+ it('resume una decisión sin contenido privado',()=>expect(summarizeBudgetDecision(exceeded,budgetAction(exceeded,false,false))).toMatchObject({state:'exceeded',action:'degrade',dailyPercent:120}));
+});
+
+describe('isBudgetProtectedTask',()=>{
+ it('protege salud, seguridad, legal y finanzas personales',()=>{expect(isBudgetProtectedTask('Tengo dolor intenso','consulta general')).toBe(true);expect(isBudgetProtectedTask('audita una vulnerabilidad','ingeniería de software')).toBe(true);expect(isBudgetProtectedTask('revisa mi saldo','finanzas personales')).toBe(true);});
+ it('permite ahorro en tareas ordinarias',()=>expect(isBudgetProtectedTask('resume este texto','consulta general')).toBe(false));
 });
