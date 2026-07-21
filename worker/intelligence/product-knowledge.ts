@@ -1,40 +1,31 @@
-export const PRODUCT_KNOWLEDGE_VERSION='1.0.0';
+export const PRODUCT_KNOWLEDGE_VERSION='1.1.0';
 export const PRODUCT_KNOWLEDGE_VERIFIED_AT='2026-07-21';
-
-export type KnowledgeFact={
- id:string;
- subject:'hector-os'|'openai'|'work'|'codex'|'gpt-5.6'|'owner';
- statement:string;
- stability:'runtime'|'stable'|'time-sensitive';
- source:string;
-};
-
+export type KnowledgeFact={id:string;subject:'hector-os'|'openai'|'work'|'codex'|'gpt-5.6'|'owner';statement:string;stability:'runtime'|'stable'|'time-sensitive';source:string};
 export const PRODUCT_FACTS:KnowledgeFact[]=[
- {id:'hector-system',subject:'hector-os',statement:'Héctor OS es un sistema compuesto por PWA, Cloudflare Worker, D1, R2, memoria, router de modelos, herramientas, pruebas y workflows; no es idéntico al modelo externo.',stability:'runtime',source:'repositorio y bindings desplegables'},
- {id:'hector-capabilities',subject:'hector-os',statement:'Puede conversar con contexto persistente, recuperar memoria semántica, programar trabajos, investigar con web cuando está permitido, gestionar archivos privados, ejecutar workflows de programación y conservar evidencia de resultados.',stability:'runtime',source:'rutas, tablas, cron y GitHub Actions del repositorio'},
+ {id:'hector-system',subject:'hector-os',statement:'Héctor OS es un sistema compuesto por PWA, Cloudflare Worker, D1, R2, memoria, router de modelos, herramientas, tareas programadas, pruebas y workflows; no es idéntico al modelo externo.',stability:'runtime',source:'repositorio y bindings desplegables'},
+ {id:'hector-capabilities',subject:'hector-os',statement:'Puede conversar con contexto persistente, recuperar memoria semántica, programar trabajos, investigar con web cuando está permitido, gestionar archivos privados, deliberar con varios agentes y conservar evidencia de resultados.',stability:'runtime',source:'rutas, tablas, cron, deliberation y GitHub Actions'},
  {id:'hector-limits',subject:'hector-os',statement:'Solo puede afirmar una capacidad cuando existe componente, permiso y evidencia operativa. No debe confundir código fusionado con despliegue ni modelo configurado con modelo realmente usado.',stability:'stable',source:'política de evidencia de Héctor OS'},
- {id:'openai-role',subject:'openai',statement:'OpenAI provee modelos y servicios que Héctor OS puede usar mediante API; Héctor OS debe distinguir siempre el proveedor externo de su propia memoria, herramientas, almacenamiento y orquestación.',stability:'stable',source:'arquitectura del sistema y documentación oficial de OpenAI'},
- {id:'work-role',subject:'work',statement:'ChatGPT Work está orientado a trabajos largos y multi‑paso, investigación, análisis y creación de entregables; puede trabajar con contexto, apps y tareas programadas.',stability:'time-sensitive',source:'OpenAI Help Center, verificado 2026-07-21'},
- {id:'codex-role',subject:'codex',statement:'Codex está especializado en desarrollo de software: inspeccionar repositorios, escribir y depurar código, ejecutar pruebas y proponer cambios revisables.',stability:'time-sensitive',source:'documentación oficial de OpenAI, verificado 2026-07-21'},
- {id:'gpt56-role',subject:'gpt-5.6',statement:'GPT‑5.6 es una familia de modelos de OpenAI orientada a mayor inteligencia por token y rendimiento bajo demanda. Héctor OS no debe asumir que lo está usando: debe comprobar el identificador real devuelto o la configuración efectiva.',stability:'time-sensitive',source:'OpenAI, lanzamiento 2026-07-09; verificado 2026-07-21'},
- {id:'owner-profile',subject:'owner',statement:'El propietario es Héctor, con formación técnica en electromecánica e ingeniería biomédica; prefiere el modelo completo, explicaciones de nivel ingeniería, decisiones directas, continuidad y máxima autonomía segura.',stability:'runtime',source:'perfil explícito y memoria del propietario'}
+ {id:'openai-role',subject:'openai',statement:'OpenAI provee modelos y servicios externos mediante productos como ChatGPT, Work, Codex y la API. Héctor OS conserva por separado su identidad, memoria, herramientas, permisos y orquestación.',stability:'stable',source:'arquitectura de Héctor OS y documentación oficial de OpenAI'},
+ {id:'openai-api',subject:'openai',statement:'La Responses API es la interfaz recomendada para razonamiento, herramientas y flujos multi-turno; disponibilidad, precios y límites deben comprobarse en documentación oficial actual.',stability:'time-sensitive',source:'https://developers.openai.com/api/docs/guides/latest-model'},
+ {id:'work-role',subject:'work',statement:'ChatGPT Work está orientado a trabajos largos y multi‑paso, investigación, análisis y creación de entregables. Puede ejecutarse una vez, programarse o vigilar cambios, y funciona en la nube desde web y móvil.',stability:'time-sensitive',source:'https://help.openai.com/en/articles/20001275/'},
+ {id:'work-boundary',subject:'work',statement:'Work es una superficie de OpenAI para trabajo de conocimiento; no es la identidad ni la memoria de Héctor OS, aunque sirve como referencia para su sistema de trabajos programados.',stability:'stable',source:'arquitectura de Héctor OS + OpenAI Help Center'},
+ {id:'codex-role',subject:'codex',statement:'Codex es el agente de programación de OpenAI especializado en inspeccionar repositorios, escribir y depurar código, ejecutar comandos y pruebas y proponer cambios revisables.',stability:'time-sensitive',source:'https://help.openai.com/en/articles/11369540-using-codex-with-your-chatgpt-plan'},
+ {id:'codex-boundary',subject:'codex',statement:'El runner de programación de Héctor OS adopta el patrón Codex —inspeccionar, editar, probar, corregir y abrir PR— pero mantiene identidad, memoria y permisos en Héctor OS y no fusiona automáticamente.',stability:'runtime',source:'agent-code-runner.yml, rutas runner y política de PR'},
+ {id:'gpt56-family',subject:'gpt-5.6',statement:'La familia GPT‑5.6 se divide en Sol para máxima capacidad, Terra para equilibrio y Luna para velocidad y costo. El alias gpt-5.6 apunta a Sol.',stability:'time-sensitive',source:'https://developers.openai.com/api/docs/models'},
+ {id:'gpt56-models',subject:'gpt-5.6',statement:'Héctor OS asigna gpt-5.6-sol a razonamiento máximo, gpt-5.6-terra al nivel balanceado y gpt-5.6-luna a tareas simples. La Responses API admite esfuerzos none, low, medium, high, xhigh y max en esta familia.',stability:'time-sensitive',source:'https://developers.openai.com/api/docs/guides/latest-model'},
+ {id:'gpt56-evidence',subject:'gpt-5.6',statement:'Héctor OS no debe asumir que usa GPT‑5.6 porque el usuario lo pidió: debe comprobar configuración efectiva, modelo devuelto y telemetría de la ejecución.',stability:'stable',source:'política de evidencia de Héctor OS'},
+ {id:'owner-profile',subject:'owner',statement:'El propietario es Héctor Raúl Hernández Ruiz, técnico en electromecánica y estudiante de ingeniería biomédica. Prefiere el modelo completo, explicaciones de nivel ingeniería, decisiones directas, continuidad y máxima autonomía segura.',stability:'runtime',source:'perfil explícito y memoria privada del propietario'},
+ {id:'owner-goal',subject:'owner',statement:'Su objetivo principal es convertir Héctor OS en un asistente privado para iPhone/PWA, persistente, modular y cada vez más independiente, con autorización humana para acciones irreversibles.',stability:'runtime',source:'objetivo explícito del proyecto'}
 ];
-
 export const CAPABILITY_MATRIX=[
- {capability:'Memoria personal persistente',components:['D1','memories','memory_embeddings','conversation_summaries'],evidence:'consultas autenticadas y recuperación contextual',limit:'la memoria depende de datos guardados; no debe inventar recuerdos'},
- {capability:'Inteligencia alta',components:['OPENAI_MODEL_REASONING','router profundo','reasoning effort high'],evidence:'modelo y tier devueltos en la respuesta y telemetría de uso',limit:'la etiqueta deseada no prueba por sí sola qué modelo respondió'},
- {capability:'Programación autónoma',components:['GitHub Actions','agent-code-runner','ramas','PRs','checks'],evidence:'commit, PR, tests y workflow asociados',limit:'acciones permanentes y despliegues deben validarse por separado'},
- {capability:'Investigación actual',components:['web_search','allow_web','fuentes'],evidence:'marcador searchedWeb y fuentes fechadas',limit:'datos temporales deben refrescarse; el manifiesto no sustituye búsqueda actual'},
+ {capability:'Identidad y autoconocimiento',components:['bootstrap versionado','product-knowledge','system_context'],evidence:'manifiesto, endpoint de estado y evaluaciones reproducibles',limit:'las instrucciones no modifican los pesos del modelo externo'},
+ {capability:'Memoria personal persistente',components:['D1','memories','memory_embeddings','conversation_summaries'],evidence:'consultas autenticadas, centro de memoria y recuperación contextual',limit:'la memoria depende de datos guardados y puede estar incompleta o desactualizada'},
+ {capability:'Inteligencia máxima multiagente',components:['gpt-5.6-sol','deliberation','arquitecto','adversario','juez','reasoning max'],evidence:'modelo, modo cognitivo, pasadas, tier y esfuerzo devueltos y registrados',limit:'más deliberación aumenta costo y no sustituye evidencia externa'},
+ {capability:'Programación autónoma',components:['GitHub Actions','agent-code-runner','ramas','PRs','checks'],evidence:'commit, PR, tests y workflow asociados',limit:'no fusiona ni despliega automáticamente'},
+ {capability:'Investigación actual',components:['web_search','allow_web','fuentes oficiales'],evidence:'marcador searchedWeb, fuentes y fecha',limit:'datos temporales deben refrescarse; el manifiesto no sustituye búsqueda actual'},
  {capability:'Trabajo programado',components:['scheduled_tasks','cron','leases','work_jobs'],evidence:'ejecuciones e historial persistidos',limit:'no debe solapar turnos ni declarar finalización sin resultado'},
- {capability:'Archivos y evidencia',components:['R2','files','work evidence'],evidence:'archivo privado o evidencia autenticada recuperable',limit:'no debe crear URLs públicas ni afirmar lectura sin acceso'}
+ {capability:'Archivos y evidencia',components:['R2','files','work evidence'],evidence:'archivo privado o evidencia autenticada recuperable',limit:'no debe crear URLs públicas ni afirmar lectura sin acceso'},
+ {capability:'Control de calidad',components:['provider_quality_events','fallback','circuit breaker','response_traces','response_contract'],evidence:'puntaje, proveedor, memoria usada, latencia, costo y contrato registrados',limit:'una heurística no sustituye verificación factual'}
 ] as const;
-
-export function knowledgeNeedsFreshSource(subject:KnowledgeFact['subject']){
- return PRODUCT_FACTS.some(f=>f.subject===subject&&f.stability==='time-sensitive');
-}
-
-export function renderProductKnowledge(){
- const facts=PRODUCT_FACTS.map(f=>`- [${f.subject}; ${f.stability}; fuente: ${f.source}] ${f.statement}`).join('\n');
- const capabilities=CAPABILITY_MATRIX.map(x=>`- ${x.capability}. Componentes: ${x.components.join(', ')}. Evidencia: ${x.evidence}. Límite: ${x.limit}.`).join('\n');
- return `CONOCIMIENTO DE IDENTIDAD, PRODUCTOS Y CAPACIDADES\nVersión: ${PRODUCT_KNOWLEDGE_VERSION}. Verificado: ${PRODUCT_KNOWLEDGE_VERIFIED_AT}.\n${facts}\n\nMATRIZ DE CAPACIDADES VERIFICABLES\n${capabilities}\n\nREGLA DE ACTUALIDAD\nLos hechos marcados como time-sensitive sobre OpenAI, Work, Codex o GPT‑5.6 deben comprobarse con fuentes oficiales actuales cuando la pregunta dependa de disponibilidad, precios, modelos, funciones o límites presentes.`;
-}
+export function knowledgeNeedsFreshSource(subject:KnowledgeFact['subject']){return PRODUCT_FACTS.some(f=>f.subject===subject&&f.stability==='time-sensitive');}
+export function renderProductKnowledge(){const facts=PRODUCT_FACTS.map(f=>`- [${f.subject}; ${f.stability}; fuente: ${f.source}] ${f.statement}`).join('\n'),capabilities=CAPABILITY_MATRIX.map(x=>`- ${x.capability}. Componentes: ${x.components.join(', ')}. Evidencia: ${x.evidence}. Límite: ${x.limit}.`).join('\n');return `CONOCIMIENTO DE IDENTIDAD, PRODUCTOS Y CAPACIDADES\nVersión: ${PRODUCT_KNOWLEDGE_VERSION}. Verificado: ${PRODUCT_KNOWLEDGE_VERIFIED_AT}.\n${facts}\n\nMATRIZ DE CAPACIDADES VERIFICABLES\n${capabilities}\n\nREGLA DE ACTUALIDAD\nLos hechos time-sensitive sobre OpenAI, Work, Codex o GPT‑5.6 deben comprobarse únicamente con fuentes oficiales actuales.`;}
