@@ -1,5 +1,5 @@
 import {describe,expect,it} from 'vitest';
-import {aggregateUsage,candidateInstructions,chooseDeliberation,judgeInput,judgeInstructions} from './deliberation';
+import {aggregateUsage,candidateInstructions,chooseDeliberation,JUDGE_MAX_CHARS,judgeInput,judgeInstructions} from './deliberation';
 
 describe('adaptive deliberation policy',()=>{
  it('uses an ensemble for deep tasks',()=>{
@@ -35,15 +35,17 @@ describe('adaptive deliberation policy',()=>{
   expect(judge).toContain('No menciones candidatos');
  });
 
- it('assembles judge input and bounds candidate size',()=>{
-  const text=judgeInput('Objetivo original',[
-   {role:'architect',text:'A'.repeat(30000)},
-   {role:'adversary',text:'Solución B'}
+ it('bounds the complete judge payload, not only each candidate',()=>{
+  const text=judgeInput('O'.repeat(20000),[
+   {role:'architect',text:'A'.repeat(50000)},
+   {role:'adversary',text:'B'.repeat(50000)}
   ]);
   expect(text).toContain('SOLICITUD ORIGINAL');
   expect(text).toContain('SOLUCIÓN 1 — ARCHITECT');
   expect(text).toContain('SOLUCIÓN 2 — ADVERSARY');
-  expect(text.length).toBeLessThan(26000);
+  expect(text).toContain('contenido intermedio compactado');
+  expect(text.length).toBeLessThanOrEqual(JUDGE_MAX_CHARS);
+  expect(text).toContain('Entrega la mejor respuesta final posible');
  });
 
  it('aggregates usage from all passes',()=>{
