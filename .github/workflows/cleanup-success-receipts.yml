@@ -1,0 +1,50 @@
+name: Cleanup Success Receipts
+
+on:
+  workflow_dispatch:
+  push:
+    branches: [main]
+    paths:
+      - '.github/workflows/cleanup-success-receipts.yml'
+
+permissions:
+  contents: read
+  issues: write
+
+jobs:
+  cleanup:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - name: Cerrar recibos automáticos exitosos
+        env:
+          GH_TOKEN: ${{ github.token }}
+        shell: bash
+        run: |
+          set -euo pipefail
+          PATTERN='^\[(runner-verify|deploy-production|production-intelligence|production-smoke|intelligence-unit)\] OK( |$)'
+          mapfile -t ISSUES < <(
+            gh issue list \
+              --repo "$GITHUB_REPOSITORY" \
+              --state open \
+              --limit 1000 \
+              --json number,title \
+              --jq ".[] | select(.title | test(\"$PATTERN\")) | .number"
+          )
+
+          for issue in "${ISSUES[@]}"; do
+            gh issue comment "$issue" \
+              --repo "$GITHUB_REPOSITORY" \
+              --body "Cerrado automáticamente durante la limpieza de recibos exitosos. Los resultados correctos ahora permanecen en GitHub Job Summary; los issues quedan reservados para fallos accionables."
+            gh issue close "$issue" \
+              --repo "$GITHUB_REPOSITORY" \
+              --reason completed
+          done
+
+          {
+            echo "## Limpieza de recibos exitosos"
+            echo
+            echo "- Issues cerrados: ${#ISSUES[@]}"
+            echo "- Filtro: \`$PATTERN\`"
+            echo "- Los issues de fallo no fueron modificados."
+          } >> "$GITHUB_STEP_SUMMARY"
