@@ -28,24 +28,24 @@ jobs:
         run: npm install --no-save playwright && npx playwright install --with-deps chromium
       - name: Construir aplicación
         run: npm run build
-      - name: Iniciar preview local
+      - name: Iniciar servidor local
         run: |
-          npm exec vite preview -- --host 127.0.0.1 --port 4173 > /tmp/hector-visual-preview.log 2>&1 &
-          echo $! > /tmp/hector-visual-preview.pid
-          for attempt in $(seq 1 30); do
+          npm run dev -- --host 127.0.0.1 --port 4173 > /tmp/hector-visual-server.log 2>&1 &
+          echo $! > /tmp/hector-visual-server.pid
+          for attempt in $(seq 1 45); do
             if curl -fsS http://127.0.0.1:4173 >/dev/null; then exit 0; fi
             sleep 1
           done
-          cat /tmp/hector-visual-preview.log
+          cat /tmp/hector-visual-server.log
           exit 1
       - name: Auditar iPhone SE y 13 Pro
         env:
           VISUAL_AUDIT_URL: http://127.0.0.1:4173
           VISUAL_AUDIT_OUTPUT: visual-audit
         run: node scripts/iphone-visual-audit.mjs
-      - name: Mostrar log del preview
+      - name: Mostrar log del servidor
         if: failure()
-        run: cat /tmp/hector-visual-preview.log || true
+        run: cat /tmp/hector-visual-server.log || true
       - uses: actions/upload-artifact@v4
         if: always()
         with:
