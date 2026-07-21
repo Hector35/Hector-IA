@@ -3,17 +3,18 @@ import { BOOTSTRAP_VERSION,renderBootstrap } from '../intelligence/bootstrap';
 import {callCloudflare,chooseProvider,type ProviderName} from './providers';
 import {assessProviderResponse,loadCloudflareHealth,recordProviderQuality,type ProviderQualityAssessment} from './provider-quality';
 
-export const CONTEXTUAL_ENGINE_VERSION='2.3.0';
+export const CONTEXTUAL_ENGINE_VERSION='3.0.0';
 export type AIUsage={input_tokens?:number;output_tokens?:number;input_tokens_details?:{cached_tokens?:number}};
 type AIResponse={id:string;output_text?:string;output?:Array<{type:string;content?:Array<{type:string;text?:string}>}>;usage?:AIUsage;error?:{message:string}};
-export type Route={model:string;tier:'fast'|'balanced'|'deep';reason:string;reasoning:'low'|'medium'|'high';task:string;needsWeb:boolean};
+export type ReasoningEffort='low'|'medium'|'high'|'xhigh'|'max';
+export type Route={model:string;tier:'fast'|'balanced'|'deep';reason:string;reasoning:ReasoningEffort;task:string;needsWeb:boolean};
 export type ChatTurn={role:'user'|'assistant';content:string};
-export type ResponseOptions={reasoning?:'auto'|'high'};
+export type ResponseOptions={reasoning?:'auto'|'high'|'max'};
 
-const deepSignals=/\b(programa|programar|código|codigo|arquitectura|depura|debug|analiza a fondo|demuestra|prueba matemática|estrategia|plan completo|investiga profundamente|compara todas|diseña|optimiza|audita|auditoría|auditoria|diagnóstico|diagnostico|razona paso|ingeniería|ingenieria|implementa|refactoriza|refactorización|refactorizacion|hipótesis|hipotesis|modelo completo)\b/i;
+const deepSignals=/\b(programa|programar|código|codigo|arquitectura|depura|debug|analiza a fondo|demuestra|prueba matemática|estrategia|plan completo|investiga profundamente|compara todas|diseña|optimiza|audita|auditoría|auditoria|diagnóstico|diagnostico|razona paso|ingeniería|ingenieria|implementa|refactoriza|refactorización|refactorizacion|hipótesis|hipotesis|modelo completo|autoevalúa|autoevalua|autoconocimiento|inteligencia máxima|inteligencia maxima)\b/i;
 const fastSignals=/^(hola|gracias|ok|sí|si|no|cuánto|cuanto|qué hora|que hora|resume|traduce|corrige)\b/i;
-const currentSignals=/\b(hoy|ahora|actual|actualmente|reciente|último|ultima|última|precio|clima|noticia|ley|regla|versión|version|disponible|quién es|quien es|verifica|investiga|busca)\b/i;
-const codeSignals=/\b(código|codigo|typescript|javascript|python|react|worker|cloudflare|github|api|sql|d1|r2|bug|error|deploy|workflow|frontend|backend)\b/i;
+const currentSignals=/\b(hoy|ahora|actual|actualmente|reciente|último|ultima|última|precio|clima|noticia|ley|regla|versión|version|disponible|quién es|quien es|verifica|investiga|busca|openai|chatgpt work|modo work|codex|gpt[- ]?5\.6|planes de chatgpt|modelos de openai)\b/i;
+const codeSignals=/\b(código|codigo|typescript|javascript|python|react|worker|cloudflare|github|api|sql|d1|r2|bug|error|deploy|workflow|frontend|backend|codex)\b/i;
 const planningSignals=/\b(plan|estrategia|prioridades|decisión|decision|opciones|comparar|compara|arquitectura|diseño|diseña|proyecto|pasos|riesgos|migración|migracion)\b/i;
 const medicalSignals=/\b(dolor|síntoma|sintoma|medicamento|salud|lesión|lesion|cirugía|cirugia|dedo|taquicardia|presión|presion|dosis)\b/i;
 
@@ -48,13 +49,13 @@ export function routeModel(env:Bindings,input:string,allowWeb:boolean):Route{
   const isComplexPlan=hasDeepSignal&&hasPlanningSignal;
   const score=(input.length>700?2:0)+(input.length>2200?2:0)+(hasDeepSignal?3:0)+(isTechnicalPlan?1:0)+(isComplexPlan?1:0)+(needsWeb?1:0)+(input.split('\n').length>8?1:0);
   const task=classify(input);
-  if(score>=4)return{model:deep,tier:'deep',reason:'solicitud compleja, técnica o de alto impacto',reasoning:'high',task,needsWeb};
+  if(score>=4)return{model:deep,tier:'deep',reason:'solicitud compleja, técnica o de alto impacto',reasoning:'xhigh',task,needsWeb};
   if(input.length<140&&fastSignals.test(input))return{model:fast,tier:'fast',reason:'consulta breve y directa',reasoning:'low',task,needsWeb};
   return{model:balanced,tier:'balanced',reason:'consulta general con análisis',reasoning:'medium',task,needsWeb};
 }
 export function applyResponseOptions(env:Bindings,route:Route,options:ResponseOptions={}):Route{
- if(options.reasoning!=='high')return route;
- return{...route,model:env.OPENAI_MODEL_REASONING||route.model,tier:'deep',reasoning:'high',reason:'nivel de razonamiento alto solicitado explícitamente'};
+  if(options.reasoning==='auto'||!options.reasoning)return route;
+  return{...route,model:env.OPENAI_MODEL_REASONING||route.model,tier:'deep',reasoning:'max',reason:`razonamiento ${options.reasoning==='max'?'máximo':'alto'} solicitado; GPT-5.6 Sol con esfuerzo max`};
 }
 function behaviorRules(route:Route){return `Tu trabajo no es sonar inteligente: es comprender el objetivo real, conservar contexto, razonar correctamente y producir una respuesta útil y ejecutable.
 
@@ -65,18 +66,22 @@ REGLAS DE OPERACIÓN
 - Distingue hechos, inferencias, supuestos y recomendaciones. Nunca inventes datos ni acciones ejecutadas.
 - Conserva continuidad con el historial y el contexto suministrados. Si hay conflicto, prioriza información reciente y explícita.
 - No afirmes haber usado una herramienta, modificado código, desplegado o verificado algo sin evidencia en el contexto.
+- Distingue siempre Héctor OS, ChatGPT Work, Codex y el modelo GPT conectado; no son la misma entidad.
+- En preguntas sobre tus capacidades, cita componentes reales, estado disponible/condicional, evidencia y limitación.
+- Para información actual de OpenAI, Codex, Work o GPT-5.6, usa web y limita las fuentes a dominios oficiales de OpenAI.
 - En salud, legal, finanzas y seguridad, identifica riesgos concretos y umbrales de acción.
 - En cálculos técnicos, muestra ecuaciones si ayudan, pero repite siempre los resultados finales en texto plano con número y unidad.
-- Cuando evalúes tus capacidades o carencias, basa cada afirmación en componentes presentes: D1, R2, Worker, memoria, resúmenes, router, herramientas, pruebas, despliegues y rutas API.
 - Antes de responder revisa silenciosamente: objetivo, consistencia, evidencia, omisiones y aplicabilidad.
 - No reveles razonamiento privado; entrega solo la respuesta final.
 
 ENRUTAMIENTO
 - Tarea: ${route.task}
 - Nivel: ${route.tier}
+- Esfuerzo: ${route.reasoning}
+- Modelo: ${route.model}
 - Motivo: ${route.reason}
 - Bootstrap: ${BOOTSTRAP_VERSION}`;}
-function legacyPrompt(route:Route,memories:string[]){return `${renderBootstrap()}\n\n${behaviorRules(route)}\n\nMEMORIA RELEVANTE\n${memories.length?memories.map(x=>`- ${x}`).join('\n'):'- Sin memoria relevante'}`;}
+function legacyPrompt(route:Route,memories:string[],input:string){return `${renderBootstrap(input)}\n\n${behaviorRules(route)}\n\nMEMORIA RELEVANTE\n${memories.length?memories.map(x=>`- ${x}`).join('\n'):'- Sin memoria relevante'}`;}
 async function callResponses(env:Bindings,body:Record<string,unknown>){
   const res=await fetch('https://api.openai.com/v1/responses',{method:'POST',headers:{Authorization:`Bearer ${env.OPENAI_API_KEY}`,'Content-Type':'application/json'},body:JSON.stringify(body)});
   const data=await res.json<AIResponse>();
@@ -109,9 +114,7 @@ async function executeHybrid(env:Bindings,input:string,instructions:string,route
       if(!assessment.accepted)return openAIFallback(env,input,instructions,route,openAIInput,started,`Fallback de calidad: ${assessment.reasons.join(', ')||`puntaje ${assessment.score}`}`);
       await saveQuality(env,route,started,'cloudflare','cloudflare',cf.model,false,assessment);
       return{id:cf.id,text:cf.text,usage:cf.usage,searchedWeb:false,model:cf.model,provider:'cloudflare' as ProviderName,requestedProvider:'cloudflare' as ProviderName,providerReason:decision.reason,fallback:false,qualityScore:assessment.score,qualityAccepted:true};
-    }catch(error){
-      return openAIFallback(env,input,instructions,route,openAIInput,started,`Fallback: ${error instanceof Error?error.message:'Workers AI falló'}`);
-    }
+    }catch(error){return openAIFallback(env,input,instructions,route,openAIInput,started,`Fallback: ${error instanceof Error?error.message:'Workers AI falló'}`);}
   }
   const body:Record<string,unknown>={model:route.model,instructions,input:openAIInput,store:true,reasoning:{effort:route.reasoning}};
   if(route.needsWeb)body.tools=[{type:'web_search',search_context_size:route.tier==='deep'?'high':'medium'}];
@@ -120,26 +123,34 @@ async function executeHybrid(env:Bindings,input:string,instructions:string,route
   return{id:out.data.id,text:out.text,usage:out.data.usage,searchedWeb:out.searchedWeb,model:route.model,provider:'openai' as ProviderName,requestedProvider:'openai' as ProviderName,providerReason:decision.reason,fallback:false,qualityScore:assessment.score,qualityAccepted:assessment.accepted};
 }
 export async function respond(env:Bindings,input:string,previousResponseId:string|undefined,memories:string[],allowWeb=true,options:ResponseOptions={}){
-  const route=applyResponseOptions(env,routeModel(env,input,allowWeb),options),selectedMemories=relevantMemories(input,memories),instructions=legacyPrompt(route,selectedMemories);
+  const route=applyResponseOptions(env,routeModel(env,input,allowWeb),options),selectedMemories=relevantMemories(input,memories),instructions=legacyPrompt(route,selectedMemories,input);
   const result=await executeHybrid(env,input,instructions,route,input);
-  return{...result,modelTier:route.tier,modelReason:route.reason};
+  return{...result,modelTier:route.tier,modelReason:route.reason,reasoningEffort:route.reasoning};
 }
 export function conversationInput(history:ChatTurn[],input:string):ChatTurn[]{
   const trimmed=history.slice(-16).map(x=>({role:x.role,content:x.content}));
   const last=trimmed[trimmed.length-1];
   return last?.role==='user'&&last.content===input?trimmed:[...trimmed,{role:'user' as const,content:input}];
 }
-export async function respondContextual(env:Bindings,input:string,history:ChatTurn[],renderedContext:string,allowWeb=true){
-  const route=routeModel(env,input,allowWeb);
-  const instructions=`${renderBootstrap()}\n\n${behaviorRules(route)}\n\nCONTEXTO DINÁMICO\n${renderedContext}`;
+export async function respondContextual(env:Bindings,input:string,history:ChatTurn[],renderedContext:string,allowWeb=true,options:ResponseOptions={}){
+  const route=applyResponseOptions(env,routeModel(env,input,allowWeb),options);
+  const instructions=`${renderBootstrap(input)}\n\n${behaviorRules(route)}\n\nCONTEXTO DINÁMICO\n${renderedContext}`;
   const conversation=conversationInput(history,input);
   const result=await executeHybrid(env,input,instructions,route,conversation);
-  return{...result,modelTier:route.tier,modelReason:route.reason,task:route.task};
+  return{...result,modelTier:route.tier,modelReason:route.reason,reasoningEffort:route.reasoning,task:route.task};
 }
 export async function inspectImage(env:Bindings,prompt:string,dataUrl:string){
   const model=env.OPENAI_MODEL_BALANCED||env.OPENAI_MODEL;
-  const instructions=`${renderBootstrap()}\n\nAnaliza la imagen para Héctor. Responde en español, directo, preciso y útil. Separa observaciones visibles, inferencias y recomendaciones. No afirmes como visible algo que solo estás infiriendo.`;
+  const instructions=`${renderBootstrap(prompt)}\n\nAnaliza la imagen para Héctor. Responde en español, directo, preciso y útil. Separa observaciones visibles, inferencias y recomendaciones. No afirmes como visible algo que solo estás infiriendo.`;
   const out=await callResponses(env,{model,instructions,input:[{role:'user',content:[{type:'input_text',text:prompt},{type:'input_image',image_url:dataUrl,detail:'auto'}]}],store:false,reasoning:{effort:'medium'}});
   return{text:out.text,usage:out.data.usage,model,provider:'openai' as ProviderName};
 }
-export function estimateCost(usage?:AIUsage){const input=usage?.input_tokens||0,cached=usage?.input_tokens_details?.cached_tokens||0,output=usage?.output_tokens||0;return{input,cached,output,costUsd:((input-cached)*.75+cached*.075+output*4.5)/1_000_000};}
+const pricing:Record<string,{input:number;cached:number;output:number}>={
+  'gpt-5.6':{input:5,cached:.5,output:30},'gpt-5.6-sol':{input:5,cached:.5,output:30},
+  'gpt-5.6-terra':{input:2.5,cached:.25,output:15},'gpt-5.6-luna':{input:1,cached:.1,output:6},
+  'gpt-5.4':{input:2.5,cached:.25,output:15},'gpt-5.4-mini':{input:.75,cached:.075,output:4.5}
+};
+export function estimateCost(usage?:AIUsage,model='gpt-5.6-terra'){
+  const input=usage?.input_tokens||0,cached=usage?.input_tokens_details?.cached_tokens||0,output=usage?.output_tokens||0,p=pricing[model]||pricing['gpt-5.6-terra'];
+  return{input,cached,output,costUsd:((input-cached)*p.input+cached*p.cached+output*p.output)/1_000_000};
+}
