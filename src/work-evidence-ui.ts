@@ -1,5 +1,6 @@
 type WorkJob={id:string;title:string;kind:string;status:string;progress:number;result?:string|null;updated_at?:string};
 type Evidence={id:string;source:string;url:string;title:string|null;http_status:number|null;errors:string[];run_id:string|null;created_at:string;has_screenshot:boolean;file_id:string|null};
+type Verification={id:string;url:string;viewport:string;status:'queued'|'running'|'completed'|'failed';run_id:string|null;evidence_id:string|null;error:string|null;created_at:string;started_at:string|null;completed_at:string|null;updated_at:string};
 
 const api=async<T>(path:string,init?:RequestInit):Promise<T>=>{
  const headers=new Headers(init?.headers);headers.set('Accept','application/json');if(init?.body)headers.set('Content-Type','application/json');
@@ -23,6 +24,7 @@ function formatDate(value:string){
 }
 
 function statusLabel(status:string){return({queued:'En cola',working:'Trabajando',testing:'Probando',repairing:'Corrigiendo',completed:'Completado',blocked:'Bloqueado'} as Record<string,string>)[status]||status;}
+function verificationStatusLabel(status:Verification['status']){return({queued:'En cola',running:'En ejecución',completed:'Completada',failed:'Fallida'} as Record<Verification['status'],string>)[status];}
 function urlLabel(value:string){try{return new URL(value).hostname;}catch{return value;}}
 
 export function installWorkEvidenceEnhancer(){
@@ -36,34 +38,56 @@ export function installWorkEvidenceEnhancer(){
  const renderEvidence=async(container:HTMLElement,job:WorkJob,showLoading=true)=>{
   if(showLoading)container.replaceChildren(el('div','cxWorkEvidenceLoading','Cargando evidencia…'));
   try{
-   const response=await api<{items:Evidence[]}>(`/api/work-evidence/jobs/${job.id}`);
-   const items=response.items||[];
-   if(!items.length){container.replaceChildren(el('div','cxWorkEvidenceEmpty','Este trabajo todavía no tiene capturas ni informes de navegador.'));return;}
-   const grid=el('div','cxEvidenceGrid');
-   for(const item of items){
-    const card=el('article','cxEvidenceCard');
-    if(item.has_screenshot){
-     const image=document.createElement('img');
-     image.src=`/api/work-evidence/jobs/${job.id}/${item.id}/screenshot`;
-     image.alt=item.title||'Captura de verificación';
-     image.loading='lazy';
-     card.append(image);
+   const response=await api<{items:Evidence[];verifications:Verification[]}>(`/api/work-evidence/jobs/${job.id}`);
+   const items=response.items||[],verifications=response.verifications||[];
+   const content=document.createDocumentFragment();
+
+   if(verifications.length){
+    const runs=el('section','cxVerificationRuns');
+    const runsHead=el('div','cxVerificationRunsHead');runsHead.append(el('h4',undefined,'Verificaciones de navegador'),el('span',undefined,`${verifications.length} recientes`));runs.append(runsHead);
+    const list=el('div','cxVerificationRunList');
+    for(const verification of verifications){
+     const card=el('article',`cxVerificationRun ${verification.status}`);
+     const top=el('div','cxVerificationRunTop');top.append(el('strong',undefined,urlLabel(verification.url)),el('span',verification.status,verificationStatusLabel(verification.status)));
+     const meta=el('p',undefined,`${verification.viewport} · ${formatDate(verification.created_at)}`);
+     const target=document.createElement('a');target.href=verification.url;target.target='_blank';target.rel='noreferrer';target.textContent=verification.url;
+     card.append(top,meta,target);
+     if(verification.error)card.append(el('p','cxVerificationRunError',verification.error));
+     list.append(card);
     }
-    const body=el('div','cxEvidenceBody');
-    const header=el('header');
-    const title=el('strong',undefined,item.title||urlLabel(item.url));
-    const badge=el('span',item.http_status&&item.http_status>=400?'bad':'good',item.http_status===null?'HTTP —':`HTTP ${item.http_status}`);
-    header.append(title,badge);
-    const meta=el('p','cxEvidenceMeta',`${item.source} · ${formatDate(item.created_at)}`);
-    const target=document.createElement('a');target.href=item.url;target.target='_blank';target.rel='noreferrer';target.textContent=item.url;
-    body.append(header,meta,target);
-    if(item.errors.length){const errors=el('details','cxEvidenceErrors');const summary=el('summary',undefined,`${item.errors.length} error${item.errors.length===1?'':'es'}`);const list=el('ul');item.errors.slice(0,8).forEach(error=>list.append(el('li',undefined,error)));errors.append(summary,list);body.append(errors);}
-    const actions=el('div','cxEvidenceActions');
-    const report=document.createElement('a');report.href=`/api/work-evidence/jobs/${job.id}/${item.id}/report`;report.target='_blank';report.rel='noreferrer';report.textContent='Abrir informe';actions.append(report);
-    if(item.file_id){const file=document.createElement('a');file.href=`/api/files/${item.file_id}/download`;file.textContent='Descargar captura';actions.append(file);}
-    body.append(actions);card.append(body);grid.append(card);
+    runs.append(list);content.append(runs);
    }
-   container.replaceChildren(grid);
+
+   if(items.length){
+    const grid=el('div','cxEvidenceGrid');
+    for(const item of items){
+     const card=el('article','cxEvidenceCard');
+     if(item.has_screenshot){
+      const image=document.createElement('img');
+      image.src=`/api/work-evidence/jobs/${job.id}/${item.id}/screenshot`;
+      image.alt=item.title||'Captura de verificación';
+      image.loading='lazy';
+      card.append(image);
+     }
+     const body=el('div','cxEvidenceBody');
+     const header=el('header');
+     const title=el('strong',undefined,item.title||urlLabel(item.url));
+     const badge=el('span',item.http_status&&item.http_status>=400?'bad':'good',item.http_status===null?'HTTP —':`HTTP ${item.http_status}`);
+     header.append(title,badge);
+     const meta=el('p','cxEvidenceMeta',`${item.source} · ${formatDate(item.created_at)}`);
+     const target=document.createElement('a');target.href=item.url;target.target='_blank';target.rel='noreferrer';target.textContent=item.url;
+     body.append(header,meta,target);
+     if(item.errors.length){const errors=el('details','cxEvidenceErrors');const summary=el('summary',undefined,`${item.errors.length} error${item.errors.length===1?'':'es'}`);const list=el('ul');item.errors.slice(0,8).forEach(error=>list.append(el('li',undefined,error)));errors.append(summary,list);body.append(errors);}
+     const actions=el('div','cxEvidenceActions');
+     const report=document.createElement('a');report.href=`/api/work-evidence/jobs/${job.id}/${item.id}/report`;report.target='_blank';report.rel='noreferrer';report.textContent='Abrir informe';actions.append(report);
+     if(item.file_id){const file=document.createElement('a');file.href=`/api/files/${item.file_id}/download`;file.textContent='Descargar captura';actions.append(file);}
+     body.append(actions);card.append(body);grid.append(card);
+    }
+    content.append(grid);
+   }else{
+    content.append(el('div','cxWorkEvidenceEmpty',verifications.length?'La captura y el informe aparecerán al finalizar la verificación.':'Este trabajo todavía no tiene verificaciones, capturas ni informes de navegador.'));
+   }
+   container.replaceChildren(content);
   }catch(error){if(showLoading||!container.childElementCount)container.replaceChildren(el('div','cxWorkEvidenceError',error instanceof Error?error.message:'No se pudo cargar la evidencia'));}
  };
 
@@ -74,7 +98,7 @@ export function installWorkEvidenceEnhancer(){
 
   const form=el('form','cxWorkVerify');
   const label=el('label',undefined,'URL pública HTTPS');
-  const input=document.createElement('input');input.type='url';input.required=true;input.autocomplete='on';input.inputMode='url';input.placeholder='https://...';input.value=location.origin;input.setAttribute('aria-label','URL pública HTTPS a verificar');
+  const input=document.createElement('input');input.type='url';input.required=true;input.setAttribute('autocomplete','url');input.placeholder='https://...';input.value=location.origin;input.setAttribute('aria-label','URL pública HTTPS a verificar');
   const button=el('button',undefined,'Verificar URL');button.type='submit';
   const controls=el('div','cxWorkVerifyControls');controls.append(input,button);
   const hint=el('p','cxWorkVerifyHint','Agent Browser · viewport iPhone 390×844 · actualización automática cada 8 s');
@@ -86,7 +110,7 @@ export function installWorkEvidenceEnhancer(){
    event.preventDefault();button.disabled=true;input.disabled=true;state.className='cxWorkVerifyState';state.textContent='Enviando al navegador seguro…';
    try{
     await api(`/api/work-evidence/jobs/${job.id}/verify`,{method:'POST',body:JSON.stringify({url:input.value,viewport:'390x844'})});
-    state.className='cxWorkVerifyState good';state.textContent='Verificación aceptada. La captura aparecerá aquí al terminar.';
+    state.className='cxWorkVerifyState good';state.textContent='Verificación en cola. El estado, la captura y el informe se actualizarán aquí.';
     await renderEvidence(content,job,false);
    }catch(error){state.className='cxWorkVerifyState bad';state.textContent=error instanceof Error?error.message:'No se pudo iniciar la verificación';}
    finally{button.disabled=false;input.disabled=false;}
