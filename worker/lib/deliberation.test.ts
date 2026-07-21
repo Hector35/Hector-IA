@@ -2,7 +2,8 @@ import {describe,expect,it} from 'vitest';
 import {aggregateUsage,candidateInstructions,chooseDeliberation,JUDGE_MAX_CHARS,judgeInput,judgeInstructions} from './deliberation';
 
 describe('adaptive deliberation policy',()=>{
- it('uses an ensemble for deep tasks',()=>{expect(chooseDeliberation('Diseña una arquitectura completa','deep').mode).toBe('ensemble');});
+ it('uses an ensemble for deep complex tasks',()=>{expect(chooseDeliberation('Diseña una arquitectura completa','deep').mode).toBe('ensemble');});
+ it('keeps short deep identity requests proportional',()=>{expect(chooseDeliberation('¿Quién eres?','deep').mode).toBe('single');});
  it('keeps simple requests on a single pass',()=>{const profile=chooseDeliberation('Hola, gracias','fast');expect(profile.mode).toBe('single');expect(profile.candidateCount).toBe(1);});
  it('raises sensitive complex tasks to ensemble mode',()=>{const profile=chooseDeliberation('Compara escenarios financieros, riesgos y sensibilidad antes de recomendar una inversión.','balanced');expect(profile.mode).toBe('ensemble');expect(profile.highStakes).toBe(true);});
  it('honors explicit high reasoning and configuration off',()=>{expect(chooseDeliberation('Explica esto','balanced',{reasoning:'high'}).mode).toBe('ensemble');expect(chooseDeliberation('Audita a fondo esta arquitectura','deep',{},false).mode).toBe('single');expect(chooseDeliberation('Audita a fondo esta arquitectura','deep',{deliberation:'off'}).mode).toBe('single');});
