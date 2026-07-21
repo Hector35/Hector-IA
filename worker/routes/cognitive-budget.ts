@@ -2,7 +2,7 @@ import {Hono} from 'hono';
 import {z} from 'zod';
 import type {Bindings,Variables} from '../types';
 import {requireAuth} from '../lib/auth';
-import {budgetAction,loadCognitiveBudget} from '../lib/cognitive-budget';
+import {budgetAction,isBudgetProtectedTask,loadCognitiveBudget,projectCognitiveCost,summarizeBudgetDecision} from '../lib/cognitive-budget';
 
 export const cognitiveBudget=new Hono<{Bindings:Bindings;Variables:Variables}>();
 cognitiveBudget.use('*',requireAuth);
@@ -14,7 +14,16 @@ async function loadBreakdown(db:D1Database,userId:string){
  return rows.map(row=>({model:String(row.model||'desconocido'),service:String(row.service||'general'),requests:Number(row.requests||0),costUsd:Number(row.cost_usd||0),inputUnits:Number(row.input_units||0),cachedInputUnits:Number(row.cached_input_units||0),outputUnits:Number(row.output_units||0)}));
 }
 
+function modelForTier(env:Bindings,tier:'fast'|'balanced'|'deep'){return tier==='deep'?(env.OPENAI_MODEL_REASONING||env.OPENAI_MODEL_BALANCED||env.OPENAI_MODEL):tier==='balanced'?(env.OPENAI_MODEL_BALANCED||env.OPENAI_MODEL):(env.OPENAI_MODEL_FAST||env.OPENAI_MODEL);}
+
 cognitiveBudget.get('/',async c=>{const userId=c.get('userId'),[status,breakdown]=await Promise.all([loadCognitiveBudget(c.env.DB,userId),loadBreakdown(c.env.DB,userId)]);return c.json({budget:status,policy:{ordinary:budgetAction(status,false,false),sensitive:budgetAction(status,true,false),explicitHigh:budgetAction(status,false,true)},breakdown});});
+
+cognitiveBudget.post('/forecast',async c=>{
+ const parsed=z.object({prompt:z.string().min(1).max(12000),task:z.string().min(1).max(120).default('consulta general'),tier:z.enum(['fast','balanced','deep']),contextChars:z.number().int().min(0).max(500000).default(0),passes:z.union([z.literal(1),z.literal(2),z.literal(3)]).default(1),explicitHigh:z.boolean().default(false),model:z.string().min(1).max(120).optional()}).safeParse(await c.req.json());
+ if(!parsed.success)return c.json({error:'Pronóstico inválido',details:parsed.error.flatten()},400);
+ const p=parsed.data,status=await loadCognitiveBudget(c.env.DB,c.get('userId')),model=p.model||modelForTier(c.env,p.tier),projection=projectCognitiveCost(status,model,p.tier,p.prompt.length,p.contextChars,p.passes),sensitive=isBudgetProtectedTask(p.prompt,p.task),action=budgetAction(status,sensitive,p.explicitHigh,projection);
+ return c.json({forecast:summarizeBudgetDecision(status,action,projection),protected:sensitive,model,tier:p.tier,note:'Estimación previa; el costo real depende de tokens, herramientas, caché y longitud final. El texto del pronóstico no se persiste.'});
+});
 
 cognitiveBudget.put('/',async c=>{
  const parsed=z.object({dailyLimitUsd:z.number().min(0).max(1000),monthlyLimitUsd:z.number().min(0).max(10000),warnPercent:z.number().int().min(1).max(100),enforcementMode:z.enum(['observe','protect'])}).safeParse(await c.req.json());
