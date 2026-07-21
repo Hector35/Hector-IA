@@ -9,6 +9,10 @@ export type DeliberationProfile={
 };
 export type UsageLike={input_tokens?:number;output_tokens?:number;input_tokens_details?:{cached_tokens?:number}};
 
+export const JUDGE_MAX_CHARS=32000;
+const JUDGE_ORIGINAL_MAX_CHARS=6000;
+const JUDGE_MIN_CANDIDATE_CHARS=2000;
+
 const explicitSignals=/\b(m[aá]ximo razonamiento|razonamiento alto|m[aá]s inteligente|supera(?:r)?|audita a fondo|verifica a fondo|doble verificaci[oó]n|no te equivoques|alta precisi[oó]n)\b/i;
 const highStakeSignals=/\b(salud|m[eé]dic|dolor|s[ií]ntoma|dosis|cirug[ií]a|legal|demanda|contrato|finanzas|dinero|saldo|banco|inversi[oó]n|seguridad|vulnerabilidad|secreto|token|contrase[nñ]a)\b/i;
 const complexSignals=/\b(arquitectura|implementa|programa|depura|debug|audita|diagn[oó]stico|estrategia|plan completo|compara todas|demuestra|optimiza|refactoriza|investiga profundamente|modelo completo|causa ra[ií]z|escenario|sensibilidad)\b/i;
@@ -38,9 +42,29 @@ export function judgeInstructions(base:string,task:string,highStakes:boolean){
  return `${base}\n\nJUEZ DE SÍNTESIS\nDominio: ${task}.\nRecibirás dos soluciones independientes para la misma solicitud. Compara exactitud, cobertura de requisitos, consistencia, evidencia, riesgos, aplicabilidad y costo. Corrige errores en vez de votar por longitud o estilo. Produce una sola respuesta final autosuficiente, más fuerte que cualquiera de las candidatas. ${safety}\nNo menciones candidatos, deliberación, votación ni razonamiento privado. Conserva citas o atribuciones solo cuando estén respaldadas por el material recibido.`;
 }
 
+function compactText(value:string,maxChars:number){
+ if(value.length<=maxChars)return value;
+ if(maxChars<80)return value.slice(0,maxChars);
+ const marker='\n[…contenido intermedio compactado…]\n';
+ const remaining=maxChars-marker.length;
+ const head=Math.ceil(remaining*.72),tail=Math.max(0,remaining-head);
+ return `${value.slice(0,head)}${marker}${tail?value.slice(-tail):''}`;
+}
+
 export function judgeInput(original:string,candidates:Array<{role:CandidateRole;text:string}>){
- const sections=candidates.map((candidate,index)=>`SOLUCIÓN ${index+1} — ${candidate.role.toUpperCase()}\n${candidate.text.slice(0,24000)}`).join('\n\n');
- return `SOLICITUD ORIGINAL\n${original}\n\n${sections}\n\nEntrega la mejor respuesta final posible para la solicitud original.`;
+ const selected=candidates.slice(0,2),outro='\n\nEntrega la mejor respuesta final posible para la solicitud original.';
+ const intro=`SOLICITUD ORIGINAL\n${compactText(original,JUDGE_ORIGINAL_MAX_CHARS)}\n\n`;
+ const headers=selected.map((candidate,index)=>`SOLUCIÓN ${index+1} — ${candidate.role.toUpperCase()}\n`);
+ const fixedChars=intro.length+outro.length+headers.reduce((sum,value)=>sum+value.length,0)+Math.max(0,selected.length-1)*2;
+ const available=Math.max(JUDGE_MIN_CANDIDATE_CHARS*selected.length,JUDGE_MAX_CHARS-fixedChars);
+ const perCandidate=selected.length?Math.max(JUDGE_MIN_CANDIDATE_CHARS,Math.floor(available/selected.length)):0;
+ const sections=selected.map((candidate,index)=>`${headers[index]}${compactText(candidate.text,perCandidate)}`).join('\n\n');
+ const assembled=`${intro}${sections}${outro}`;
+ if(assembled.length<=JUDGE_MAX_CHARS)return assembled;
+ const overflow=assembled.length-JUDGE_MAX_CHARS;
+ const saferBudget=Math.max(JUDGE_MIN_CANDIDATE_CHARS,perCandidate-Math.ceil(overflow/Math.max(selected.length,1)));
+ const boundedSections=selected.map((candidate,index)=>`${headers[index]}${compactText(candidate.text,saferBudget)}`).join('\n\n');
+ return `${intro}${boundedSections}${outro}`.slice(0,JUDGE_MAX_CHARS-outro.length)+outro;
 }
 
 export function aggregateUsage(usages:Array<UsageLike|undefined>):UsageLike{
