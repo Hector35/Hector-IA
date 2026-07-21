@@ -13,14 +13,15 @@ const schema=z.object({
  tasks:z.array(z.string().min(3).max(600)).min(1).max(16).optional()
 });
 
-function clean(value:string){return value.replace(/[*_`#]+/g,'').replace(/\s+/g,' ').replace(/[;,.]+$/,'').trim();}
-function normalize(value:string){return clean(value).toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g,'').replace(/[^a-z0-9 ]/g,'').replace(/\s+/g,' ').trim();}
-async function digest(value:string){const bytes=await crypto.subtle.digest('SHA-256',new TextEncoder().encode(value));return [...new Uint8Array(bytes)].map(x=>x.toString(16).padStart(2,'0')).join('');}
+export function cleanProjectText(value:string){return value.replace(/[*_`#]+/g,'').replace(/\s+/g,' ').replace(/[;,.]+$/,'').trim();}
+export function normalizeProjectText(value:string){return cleanProjectText(value).toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g,'').replace(/[^a-z0-9 ]/g,'').replace(/\s+/g,' ').trim();}
+export async function projectObjectiveHash(title:string,objective:string){const value=`${normalizeProjectText(title)}|${normalizeProjectText(objective)}`;const bytes=await crypto.subtle.digest('SHA-256',new TextEncoder().encode(value));return [...new Uint8Array(bytes)].map(x=>x.toString(16).padStart(2,'0')).join('');}
 
-function compactTasks(items:string[]){
- const unique=items.map(clean).filter((x,i,a)=>x.length>=3&&a.findIndex(y=>normalize(y)===normalize(x))===i);
+export function compactProjectTasks(items:string[]){
+ const unique=items.map(cleanProjectText).filter((x,i,a)=>x.length>=3&&a.findIndex(y=>normalizeProjectText(y)===normalizeProjectText(x))===i);
  if(unique.length<=5)return unique;
- const groups=[unique.slice(0,Math.ceil(unique.length/3)),unique.slice(Math.ceil(unique.length/3),Math.ceil(unique.length*2/3)),unique.slice(Math.ceil(unique.length*2/3))].filter(x=>x.length);
+ const first=Math.ceil(unique.length/3),second=Math.ceil(unique.length*2/3);
+ const groups=[unique.slice(0,first),unique.slice(first,second),unique.slice(second)].filter(x=>x.length);
  return groups.map((group,i)=>`${['Arquitectura y alcance','Implementación','Pruebas e integración'][i]||`Bloque ${i+1}`}: ${group.join('; ')}`).slice(0,5);
 }
 
@@ -29,9 +30,9 @@ projectGovernance.post('/from-message',async c=>{
  const uid=c.get('userId'),input=parsed.data;
  const source=await c.env.DB.prepare('SELECT id FROM conversations WHERE id=? AND user_id=? AND COALESCE(is_internal,0)=0').bind(input.conversationId,uid).first();
  if(!source)return c.json({error:'Conversación origen no encontrada'},404);
- const raw=input.tasks?.length?input.tasks:extractProjectTasks(input.messageContent),tasks=compactTasks(raw);
+ const raw=input.tasks?.length?input.tasks:extractProjectTasks(input.messageContent),tasks=compactProjectTasks(raw);
  if(!tasks.length)return c.json({error:'No se detectaron subtareas útiles'},422);
- const title=clean(input.title),hash=await digest(`${normalize(title)}|${normalize(input.messageContent)}`);
+ const title=cleanProjectText(input.title),hash=await projectObjectiveHash(title,input.messageContent);
  const existing=await c.env.DB.prepare("SELECT id,title,status,director_conversation_id FROM agent_projects WHERE user_id=? AND objective_hash=? AND status IN ('queued','running','reviewing','paused','blocked') ORDER BY updated_at DESC LIMIT 1").bind(uid,hash).first<any>();
  if(existing)return c.json({id:existing.id,title:existing.title,status:existing.status,directorConversationId:existing.director_conversation_id,deduplicated:true},200);
  const projectId=crypto.randomUUID(),directorId=crypto.randomUUID(),statements:any[]=[
