@@ -8,7 +8,7 @@ responseTraces.use('*',requireAuth);
 
 export type TraceTier='fast'|'balanced'|'deep';
 export type TraceProvider='cloudflare'|'openai';
-export type TraceContext={memories:number;recentMessages:number;hasSummary:boolean;priorSummaries?:number;projectState?:number};
+export type TraceContext={memories:number;recentMessages:number;hasSummary:boolean;priorSummaries?:number;projectState?:number;contractApplied?:boolean;contractReasons?:string[]};
 export type PersistResponseTraceInput={
  userId:string;conversationId:string;messageId:string;requestedProvider:TraceProvider;actualProvider:TraceProvider;model:string;routeTier:TraceTier;task:string;modelReason:string;providerReason:string;searchedWeb:boolean;fallback:boolean;qualityScore:number;qualityAccepted:boolean;latencyMs:number;estimatedCostUsd:number;memories:string[];context:TraceContext;
 };

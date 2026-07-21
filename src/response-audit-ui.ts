@@ -19,6 +19,7 @@ export function installResponseAuditEnhancer(){
   badges.append(el('span',undefined,providerLabel(trace.actual_provider)),el('span',undefined,trace.model),el('span',trace.route_tier==='deep'?'deep':'',`${trace.route_tier} · ${trace.reasoning_level}`),el('span',undefined,`${trace.latency_ms} ms`),el('span',undefined,formatCost(trace.estimated_cost_usd)));
   if(trace.searched_web)badges.append(el('span','web','Web'));
   if(trace.fallback)badges.append(el('span','fallback',`Fallback desde ${providerLabel(trace.requested_provider)}`));
+  if(trace.context.contractApplied)badges.append(el('span','web','Formato verificado'));
   card.append(badges);
   if(trace.response_preview)card.append(el('p','cxAuditPreview',trace.response_preview));
   const details=el('details','cxAuditDetails'),summary=el('summary',undefined,'Ver inteligencia utilizada'),body=el('div','cxAuditDetailBody');
@@ -26,7 +27,8 @@ export function installResponseAuditEnhancer(){
   const memory=el('section');memory.append(el('h4',undefined,`Memoria usada (${trace.memories.length})`));
   if(trace.memories.length){const ul=el('ul');trace.memories.forEach(item=>ul.append(el('li',undefined,item)));memory.append(ul);}else memory.append(el('p','cxAuditMuted','No se incorporaron recuerdos personales.'));
   body.append(memory);
-  const context=el('section');context.append(el('h4',undefined,'Contexto'),el('p',undefined,`Mensajes recientes: ${Number(trace.context.recentMessages||0)} · Resumen: ${trace.context.hasSummary?'sí':'no'} · Estados de proyecto: ${Number(trace.context.projectState||0)}`));body.append(context);
+  const contractReasons=Array.isArray(trace.context.contractReasons)?trace.context.contractReasons.filter(x=>typeof x==='string').join(' · '):'';
+  const context=el('section');context.append(el('h4',undefined,'Contexto'),el('p',undefined,`Mensajes recientes: ${Number(trace.context.recentMessages||0)} · Resumen: ${trace.context.hasSummary?'sí':'no'} · Estados de proyecto: ${Number(trace.context.projectState||0)} · Contrato: ${trace.context.contractApplied?'ajustado':'sin cambios'}`));if(contractReasons)context.append(el('small',undefined,contractReasons));body.append(context);
   const next=el('section','cxAuditRecommendation');next.append(el('h4',undefined,'Siguiente acción'),el('p',undefined,trace.recommendation));body.append(next);
   details.append(summary,body);card.append(details);
   const feedback=el('div','cxAuditFeedback'),label=el('span',undefined,'¿Fue correcta?'),up=el('button',trace.feedback_rating===1?'selected':'','Útil'),down=el('button',trace.feedback_rating===-1?'selected bad':'','Corregir'),correction=document.createElement('textarea');
