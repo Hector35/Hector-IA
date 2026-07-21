@@ -71,7 +71,7 @@ jobs:
         shell: bash
         run: |
           set -euo pipefail
-          node <<'NODE'
+          node --input-type=module <<'NODE'
           import {readFileSync,writeFileSync} from 'node:fs';
           import {pbkdf2Sync,randomBytes,randomUUID} from 'node:crypto';
 
@@ -99,7 +99,7 @@ jobs:
           npx wrangler d1 execute hector-os-db --remote --file=/tmp/provision-test-account.sql 2>&1 | tee /tmp/deploy-test-account.log
           npx wrangler d1 execute hector-os-db --remote --command="SELECT id,email,name FROM users WHERE email='chatgpt-test@hectoros.invalid' LIMIT 1" --json > /tmp/test-account-verification.json 2>> /tmp/deploy-test-account.log
           cat /tmp/test-account-verification.json >> /tmp/deploy-test-account.log
-          node <<'NODE'
+          node --input-type=module <<'NODE'
           import {readFileSync} from 'node:fs';
           const payload=JSON.parse(readFileSync('/tmp/test-account-verification.json','utf8'));
           const groups=Array.isArray(payload)?payload:[payload];
