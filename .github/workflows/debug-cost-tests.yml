@@ -1,0 +1,22 @@
+name: Debug Cost Tests
+on:
+  pull_request:
+    branches: [main]
+    paths:
+      - 'worker/lib/model-pricing*'
+      - 'worker/lib/deliberation*'
+      - '.github/workflows/debug-cost-tests.yml'
+jobs:
+  debug-cost-tests:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+      - run: npm ci --silent
+      - name: Focused tests
+        run: |
+          set -o pipefail
+          npx vitest run worker/lib/model-pricing.test.ts worker/lib/deliberation.test.ts --reporter=verbose 2>&1 | tail -100
