@@ -1,0 +1,203 @@
+import {Hono} from 'hono';
+import {z} from 'zod';
+import type {Bindings,Variables} from '../types';
+import {requireAuth} from '../lib/auth';
+import {dispatchAgentRunner} from '../lib/agent-runner';
+import {intervalMinutesFor,isActiveScheduledJob,nextScheduledRun,normalizeRunAt,renderScheduledPrompt,type AutonomyMode,type ReasoningLevel,type ScheduleCadence,type ScheduledTaskDefinition,type PreviousScheduledRun} from '../lib/scheduler';
+
+const kinds=['research','learning','programming','automation','agent','api','skill','update'] as const;
+const cadences=['once','hourly','every_2_hours','every_6_hours','daily','weekly'] as const;
+const reasoningLevels=['standard','high'] as const;
+const autonomyModes=['guided','independent','continuous'] as const;
+
+const createSchema=z.object({
+ title:z.string().min(3).max(100),
+ prompt:z.string().min(10).max(8000),
+ kind:z.enum(kinds).default('agent'),
+ cadence:z.enum(cadences).default('once'),
+ firstRunAt:z.string().min(1),
+ reasoningLevel:z.enum(reasoningLevels).default('high'),
+ autonomyMode:z.enum(autonomyModes).default('independent'),
+ allowWeb:z.boolean().default(true)
+});
+const updateSchema=z.object({
+ title:z.string().min(3).max(100).optional(),
+ prompt:z.string().min(10).max(8000).optional(),
+ kind:z.enum(kinds).optional(),
+ cadence:z.enum(cadences).optional(),
+ nextRunAt:z.string().min(1).optional(),
+ reasoningLevel:z.enum(reasoningLevels).optional(),
+ autonomyMode:z.enum(autonomyModes).optional(),
+ allowWeb:z.boolean().optional(),
+ enabled:z.boolean().optional()
+});
+
+type ScheduleRow=ScheduledTaskDefinition&{
+ user_id:string;
+ interval_minutes:number|null;
+ enabled:number;
+ last_run_at:string|null;
+ run_count:number;
+ failure_count:number;
+ skipped_count:number;
+ lease_token:string|null;
+ lease_expires_at:string|null;
+ created_at:string;
+ updated_at:string;
+};
+type JobState=PreviousScheduledRun&{id:string;kind:string};
+
+export const schedules=new Hono<{Bindings:Bindings;Variables:Variables}>();
+schedules.use('*',requireAuth);
+
+function scheduleResponse(row:any){return{
+ ...row,
+ allow_web:!!row.allow_web,
+ enabled:!!row.enabled,
+ reasoning_level:row.reasoning_level as ReasoningLevel,
+ autonomy_mode:row.autonomy_mode as AutonomyMode,
+ cadence:row.cadence as ScheduleCadence
+};}
+
+async function lastJob(env:Bindings,id:string|undefined|null){
+ if(!id)return null;
+ return env.DB.prepare('SELECT id,kind,status,result,last_error,updated_at FROM work_jobs WHERE id=?').bind(id).first<JobState>();
+}
+
+async function recordEvent(env:Bindings,jobId:string,message:string,progress:number){
+ await env.DB.prepare('INSERT INTO work_events(id,job_id,message,progress) VALUES(?,?,?,?)').bind(crypto.randomUUID(),jobId,message,progress).run();
+}
+
+async function enqueueScheduledTask(env:Bindings,task:ScheduleRow,manual=false){
+ const previous=await lastJob(env,task.last_job_id);
+ if(isActiveScheduledJob(previous?.status))return{ok:false,active:true,jobId:previous?.id};
+ const jobId=crypto.randomUUID();
+ const prompt=renderScheduledPrompt(task,previous);
+ await env.DB.batch([
+  env.DB.prepare("INSERT INTO work_jobs(id,user_id,kind,title,prompt,status,progress,heartbeat_at,schedule_id,reasoning_level,autonomy_mode,allow_web) VALUES(?,?,?,?,?,'queued',0,CURRENT_TIMESTAMP,?,?,?,?)")
+   .bind(jobId,task.user_id,task.kind,task.title,prompt,task.id,task.reasoning_level,task.autonomy_mode,+!!task.allow_web),
+  env.DB.prepare("INSERT INTO work_events(id,job_id,message,progress) VALUES(?,?,?,0)")
+   .bind(crypto.randomUUID(),jobId,manual?'Ejecución manual creada desde la tarea programada':`Ejecución programada creada (${task.cadence}, inteligencia ${task.reasoning_level})`)
+ ]);
+
+ if(!manual){
+  const next=nextScheduledRun(task.cadence,task.next_run_at);
+  await env.DB.prepare(`UPDATE scheduled_tasks SET last_run_at=CURRENT_TIMESTAMP,last_job_id=?,run_count=run_count+1,enabled=?,next_run_at=COALESCE(?,next_run_at),lease_token=NULL,lease_expires_at=NULL,updated_at=CURRENT_TIMESTAMP WHERE id=?`)
+   .bind(jobId,next?1:0,next,task.id).run();
+ }else{
+  await env.DB.prepare('UPDATE scheduled_tasks SET last_run_at=CURRENT_TIMESTAMP,last_job_id=?,run_count=run_count+1,updated_at=CURRENT_TIMESTAMP WHERE id=?').bind(jobId,task.id).run();
+ }
+
+ if(task.kind==='programming'){
+  try{
+   await dispatchAgentRunner(env,jobId,prompt,3);
+   await env.DB.prepare("UPDATE work_jobs SET status='working',progress=5,heartbeat_at=CURRENT_TIMESTAMP,updated_at=CURRENT_TIMESTAMP WHERE id=?").bind(jobId).run();
+   await recordEvent(env,jobId,'Runner autónomo de programación iniciado con razonamiento alto',5);
+  }catch(error){
+   const message=error instanceof Error?error.message:'No se pudo iniciar el runner';
+   await env.DB.batch([
+    env.DB.prepare("UPDATE work_jobs SET status='blocked',result=?,last_error=?,updated_at=CURRENT_TIMESTAMP WHERE id=?").bind(message,message,jobId),
+    env.DB.prepare('UPDATE scheduled_tasks SET failure_count=failure_count+1,updated_at=CURRENT_TIMESTAMP WHERE id=?').bind(task.id),
+    env.DB.prepare("INSERT INTO work_events(id,job_id,message,progress) VALUES(?,?,?,0)").bind(crypto.randomUUID(),jobId,message)
+   ]);
+  }
+ }
+ return{ok:true,jobId};
+}
+
+async function claimDueSchedule(env:Bindings){
+ const token=crypto.randomUUID();
+ const row=await env.DB.prepare(`UPDATE scheduled_tasks
+ SET lease_token=?,lease_expires_at=datetime('now','+5 minutes'),updated_at=CURRENT_TIMESTAMP
+ WHERE id=(SELECT id FROM scheduled_tasks WHERE enabled=1 AND next_run_at<=CURRENT_TIMESTAMP AND (lease_expires_at IS NULL OR lease_expires_at<=CURRENT_TIMESTAMP) ORDER BY next_run_at LIMIT 1)
+ RETURNING *`).bind(token).first<ScheduleRow>();
+ return row?{row,token}:null;
+}
+
+async function processClaim(env:Bindings,task:ScheduleRow,token:string){
+ try{
+  const previous=await lastJob(env,task.last_job_id);
+  if(isActiveScheduledJob(previous?.status)){
+   await env.DB.prepare("UPDATE scheduled_tasks SET skipped_count=skipped_count+1,next_run_at=datetime('now','+15 minutes'),lease_token=NULL,lease_expires_at=NULL,updated_at=CURRENT_TIMESTAMP WHERE id=? AND lease_token=?").bind(task.id,token).run();
+   return;
+  }
+  const result=await enqueueScheduledTask(env,task,false);
+  if(!result.ok)await env.DB.prepare("UPDATE scheduled_tasks SET skipped_count=skipped_count+1,next_run_at=datetime('now','+15 minutes'),lease_token=NULL,lease_expires_at=NULL,updated_at=CURRENT_TIMESTAMP WHERE id=? AND lease_token=?").bind(task.id,token).run();
+ }catch(error){
+  const retryAt=new Date(Date.now()+15*60_000).toISOString();
+  await env.DB.prepare('UPDATE scheduled_tasks SET failure_count=failure_count+1,next_run_at=?,lease_token=NULL,lease_expires_at=NULL,updated_at=CURRENT_TIMESTAMP WHERE id=? AND lease_token=?').bind(retryAt,task.id,token).run();
+ }
+}
+
+export async function processDueSchedules(env:Bindings,limit=3){
+ let processed=0;
+ for(let i=0;i<Math.max(1,Math.min(10,limit));i++){
+  const claimed=await claimDueSchedule(env);
+  if(!claimed)break;
+  await processClaim(env,claimed.row,claimed.token);
+  processed++;
+ }
+ return processed;
+}
+
+schedules.get('/',async c=>{
+ const rows=(await c.env.DB.prepare(`SELECT s.*,j.status last_job_status,substr(j.result,1,600) last_result_preview,j.updated_at last_job_updated_at
+ FROM scheduled_tasks s LEFT JOIN work_jobs j ON j.id=s.last_job_id
+ WHERE s.user_id=? ORDER BY s.enabled DESC,s.next_run_at ASC,s.created_at DESC LIMIT 100`).bind(c.get('userId')).all()).results;
+ return c.json({items:rows.map(scheduleResponse)});
+});
+
+schedules.post('/',async c=>{
+ const parsed=createSchema.safeParse(await c.req.json());
+ if(!parsed.success)return c.json({error:'Tarea programada inválida',details:parsed.error.flatten()},400);
+ const uid=c.get('userId');
+ const active=await c.env.DB.prepare('SELECT COUNT(*) count FROM scheduled_tasks WHERE user_id=? AND enabled=1').bind(uid).first<{count:number}>();
+ if(Number(active?.count||0)>=20)return c.json({error:'Límite de 20 tareas programadas activas alcanzado'},409);
+ let nextRunAt:string;
+ try{nextRunAt=normalizeRunAt(parsed.data.firstRunAt);}catch(error){return c.json({error:error instanceof Error?error.message:'Fecha inválida'},400);}
+ const id=crypto.randomUUID(),interval=intervalMinutesFor(parsed.data.cadence);
+ await c.env.DB.prepare(`INSERT INTO scheduled_tasks(id,user_id,title,prompt,kind,cadence,interval_minutes,reasoning_level,autonomy_mode,allow_web,next_run_at)
+ VALUES(?,?,?,?,?,?,?,?,?,?,?)`).bind(id,uid,parsed.data.title,parsed.data.prompt,parsed.data.kind,parsed.data.cadence,interval,parsed.data.reasoningLevel,parsed.data.autonomyMode,+parsed.data.allowWeb,nextRunAt).run();
+ const row=await c.env.DB.prepare('SELECT * FROM scheduled_tasks WHERE id=?').bind(id).first<ScheduleRow>();
+ return c.json({item:scheduleResponse(row)},201);
+});
+
+schedules.patch('/:id',async c=>{
+ const parsed=updateSchema.safeParse(await c.req.json());
+ if(!parsed.success)return c.json({error:'Cambios inválidos',details:parsed.error.flatten()},400);
+ const current=await c.env.DB.prepare('SELECT * FROM scheduled_tasks WHERE id=? AND user_id=?').bind(c.req.param('id'),c.get('userId')).first<ScheduleRow>();
+ if(!current)return c.json({error:'Tarea programada no encontrada'},404);
+ let nextRunAt=current.next_run_at;
+ if(parsed.data.nextRunAt){try{nextRunAt=normalizeRunAt(parsed.data.nextRunAt);}catch(error){return c.json({error:error instanceof Error?error.message:'Fecha inválida'},400);}}
+ const cadence=parsed.data.cadence||current.cadence;
+ const next={
+  title:parsed.data.title??current.title,prompt:parsed.data.prompt??current.prompt,kind:parsed.data.kind??current.kind,cadence,
+  reasoning:parsed.data.reasoningLevel??current.reasoning_level,autonomy:parsed.data.autonomyMode??current.autonomy_mode,
+  allowWeb:parsed.data.allowWeb===undefined?!!current.allow_web:parsed.data.allowWeb,enabled:parsed.data.enabled===undefined?!!current.enabled:parsed.data.enabled
+ };
+ await c.env.DB.prepare(`UPDATE scheduled_tasks SET title=?,prompt=?,kind=?,cadence=?,interval_minutes=?,reasoning_level=?,autonomy_mode=?,allow_web=?,enabled=?,next_run_at=?,lease_token=NULL,lease_expires_at=NULL,updated_at=CURRENT_TIMESTAMP WHERE id=? AND user_id=?`)
+  .bind(next.title,next.prompt,next.kind,next.cadence,intervalMinutesFor(next.cadence),next.reasoning,next.autonomy,+next.allowWeb,+next.enabled,nextRunAt,current.id,current.user_id).run();
+ const row=await c.env.DB.prepare('SELECT * FROM scheduled_tasks WHERE id=?').bind(current.id).first<ScheduleRow>();
+ return c.json({item:scheduleResponse(row)});
+});
+
+schedules.post('/:id/run-now',async c=>{
+ const task=await c.env.DB.prepare('SELECT * FROM scheduled_tasks WHERE id=? AND user_id=?').bind(c.req.param('id'),c.get('userId')).first<ScheduleRow>();
+ if(!task)return c.json({error:'Tarea programada no encontrada'},404);
+ const result=await enqueueScheduledTask(c.env,task,true);
+ if(!result.ok)return c.json({error:'La ejecución anterior sigue activa',jobId:result.jobId},409);
+ return c.json({ok:true,jobId:result.jobId},201);
+});
+
+schedules.get('/:id/runs',async c=>{
+ const owned=await c.env.DB.prepare('SELECT id FROM scheduled_tasks WHERE id=? AND user_id=?').bind(c.req.param('id'),c.get('userId')).first();
+ if(!owned)return c.json({error:'Tarea programada no encontrada'},404);
+ const items=(await c.env.DB.prepare('SELECT id,kind,title,status,progress,result,last_error,created_at,updated_at FROM work_jobs WHERE schedule_id=? ORDER BY created_at DESC LIMIT 30').bind(c.req.param('id')).all()).results;
+ return c.json({items});
+});
+
+schedules.delete('/:id',async c=>{
+ const result=await c.env.DB.prepare('DELETE FROM scheduled_tasks WHERE id=? AND user_id=?').bind(c.req.param('id'),c.get('userId')).run();
+ if(!result.meta.changes)return c.json({error:'Tarea programada no encontrada'},404);
+ return c.json({ok:true});
+});
