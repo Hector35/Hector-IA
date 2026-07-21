@@ -2,6 +2,8 @@ name: Cleanup Success Receipts
 
 on:
   workflow_dispatch:
+  schedule:
+    - cron: '17 * * * *'
   push:
     branches: [main]
     paths:
@@ -10,6 +12,10 @@ on:
 permissions:
   contents: read
   issues: write
+
+concurrency:
+  group: cleanup-success-receipts
+  cancel-in-progress: false
 
 jobs:
   cleanup:
@@ -48,7 +54,7 @@ jobs:
           for issue in "${ISSUES[@]}"; do
             gh issue comment "$issue" \
               --repo "$GITHUB_REPOSITORY" \
-              --body "Cerrado automáticamente durante la limpieza de recibos exitosos. Los resultados correctos ahora permanecen en GitHub Job Summary; los issues quedan reservados para fallos accionables."
+              --body "Cerrado automáticamente durante la limpieza de recibos exitosos. Los resultados correctos permanecen en GitHub Job Summary; los issues quedan reservados para fallos accionables."
             gh issue close "$issue" \
               --repo "$GITHUB_REPOSITORY" \
               --reason completed
@@ -60,4 +66,5 @@ jobs:
             echo "- Issues cerrados: ${#ISSUES[@]}"
             echo "- Prefijos permitidos: runner-verify, deploy-production, production-intelligence, production-smoke e intelligence-unit."
             echo "- Los issues de fallo no fueron modificados."
+            echo "- La limpieza también se ejecuta cada hora para retirar recibos creados por workflows heredados."
           } >> "$GITHUB_STEP_SUMMARY"
