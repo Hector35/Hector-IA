@@ -54,7 +54,7 @@ describe('runtime reuse engine',()=>{
 
  it('consulta únicamente experiencias verificadas y aisladas por usuario',async()=>{
   let sql='',bindings:unknown[]=[];
-  const db={prepare:(statement:string)=>{sql=statement;return{bind:(...values:unknown[])=>{bindings=values;return{all:async()=>({results:[{id:'verified-1',objective:'Corrige repositorio',result:'Inspeccionar el error y ejecutar pruebas.',skills_json:'["github-code"]',attempts:1,created_at:'2026-07-22T00:00:00Z',estimated_cost_usd:.01}]})};}};}};
+  const db={prepare:(statement:string)=>{sql=statement;return{bind:(...values:unknown[])=>{bindings=values;return{all:async()=>({results:[{id:'verified-1',objective:'Corrige repositorio',result:'Inspeccionar el error y ejecutar pruebas.',skills_json:'["github-code"]',attempts:1,created_at:'2026-07-22T00:00:00Z',estimated_cost_usd:.01}]})};}};}} as any;
   const items=await loadRuntimeReuseCandidates(db,'owner-1');
   expect(sql).toContain("user_id=? AND status='completed' AND verified=1");
   expect(bindings).toEqual(['owner-1']);
