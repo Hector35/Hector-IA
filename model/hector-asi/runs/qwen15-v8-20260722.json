@@ -1,0 +1,63 @@
+{
+  "schemaVersion": "1.0.0",
+  "experimentId": "hector-asi-qwen15-v8",
+  "status": "experimental-weights-generated-reproducibly",
+  "championPromoted": false,
+  "baseModel": {
+    "repository": "Qwen/Qwen2.5-1.5B-Instruct",
+    "revision": "989aa7980e4cf806f80c7fef2b1adb7bc71aa306",
+    "license": "Apache-2.0"
+  },
+  "training": {
+    "method": "LoRA SFT",
+    "hardware": "GitHub-hosted CPU runner",
+    "replicas": 2,
+    "epochsPerReplica": 2,
+    "stepsPerReplica": 48,
+    "seed": 35,
+    "trainableParameters": 8716288,
+    "parameterDeltaL2": 3.063180685043335,
+    "secondsFirstReplica": 473.7053964138031,
+    "targetModules": ["q_proj", "k_proj", "v_proj", "o_proj"],
+    "loraRank": 32,
+    "loraAlpha": 64,
+    "learningRate": 0.00005,
+    "maxLength": 112
+  },
+  "datasets": {
+    "trainPath": "model/hector-asi/data/qwen15-sft-v5.jsonl",
+    "trainExamples": 24,
+    "trainSha256": "d508b6e89877a3fbbac5646fe730d405de239f9087549e9f43d8bcbebd3446c6",
+    "validationPath": "model/hector-asi/evals/qwen15-held-out-v5.jsonl",
+    "validationExamples": 12,
+    "validationSha256": "794eeb3c961b16f974a6241a38b62ef34c22b3482116406eff2f277528bb02c7",
+    "privateUserData": false
+  },
+  "evaluation": {
+    "baseValidationLoss": 4.1809311509132385,
+    "candidateValidationLoss": 2.372158875068029,
+    "validationLossDelta": -1.8087722758452095,
+    "relativeValidationImprovement": 0.43262426731186915,
+    "qwen15V7ValidationLoss": 2.429538,
+    "absoluteGainOverV7": 0.05737912493197106,
+    "relativeGainOverV7": 0.02361606442687309,
+    "byteIdenticalReplicas": 2
+  },
+  "artifact": {
+    "githubActionsRunId": "29963877007",
+    "githubActionsArtifactId": "8547389719",
+    "name": "hector-asi-qwen15-v8-29963877007",
+    "adapterPath": "adapter/adapter_model.safetensors",
+    "adapterBytes": 34895152,
+    "adapterSha256": "e8495fdf5cad56fad31371d8016753c549a38597da85bfaac27847d0082dfbb7",
+    "archiveBytes": 35962420,
+    "archiveSha256": "0c443a66e729b513e027214c4fe7b72b070a8469d2ee8cbd540645019a57709a",
+    "weightsCommittedToGit": false,
+    "expiresAt": "2026-10-20T22:44:12Z"
+  },
+  "promotionDecision": {
+    "decision": "retain-as-leading-qwen15-experimental-candidate",
+    "reason": "The candidate reproducibly beats Qwen15-v7 on the identical frozen base and hidden split, but the base is still Qwen2.5-1.5B rather than the planned Qwen3-4B champion and twelve hidden examples are insufficient for broad safety, calibration, transfer and regression claims.",
+    "rollback": "Do not load or delete the LoRA adapter; frozen base weights remain unchanged."
+  }
+}

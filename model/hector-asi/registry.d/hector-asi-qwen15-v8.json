@@ -1,0 +1,60 @@
+{
+  "schemaVersion": "1.0.0",
+  "candidate": {
+    "id": "hector-asi-qwen15-v8",
+    "status": "experimental-weights-generated-reproducibly",
+    "eligibleForChampion": false,
+    "baseModel": {
+      "repository": "Qwen/Qwen2.5-1.5B-Instruct",
+      "revision": "989aa7980e4cf806f80c7fef2b1adb7bc71aa306",
+      "license": "Apache-2.0",
+      "licenseUrl": "https://huggingface.co/Qwen/Qwen2.5-1.5B-Instruct"
+    },
+    "method": {
+      "stage": "sft",
+      "adapter": "lora",
+      "precision": "float32-cpu",
+      "targetModules": ["q_proj", "k_proj", "v_proj", "o_proj"],
+      "rank": 32,
+      "alpha": 64,
+      "epochs": 2,
+      "seed": 35
+    },
+    "dataset": {
+      "path": "model/hector-asi/data/qwen15-sft-v5.jsonl",
+      "validationPath": "model/hector-asi/evals/qwen15-held-out-v5.jsonl",
+      "trainExamples": 24,
+      "validationExamples": 12,
+      "containsPrivateUserData": false,
+      "deduplicated": true,
+      "splitContaminationChecked": true
+    },
+    "artifacts": {
+      "adapterPath": "GitHub Actions artifact 8547389719/adapter/adapter_model.safetensors",
+      "metricsPath": "model/hector-asi/runs/qwen15-v8-20260722.json",
+      "storage": "github-actions-artifact",
+      "committedToGit": false,
+      "adapterSha256": "e8495fdf5cad56fad31371d8016753c549a38597da85bfaac27847d0082dfbb7",
+      "archiveSha256": "0c443a66e729b513e027214c4fe7b72b070a8469d2ee8cbd540645019a57709a",
+      "adapterBytes": 34895152,
+      "expiresAt": "2026-10-20T22:44:12Z"
+    },
+    "evaluation": {
+      "baseValidationLoss": 4.1809311509132385,
+      "candidateValidationLoss": 2.372158875068029,
+      "validationLossDelta": -1.8087722758452095,
+      "relativeValidationImprovement": 0.43262426731186915,
+      "byteIdenticalReplicas": 2,
+      "parameterDeltaL2": 3.063180685043335,
+      "beatsQwen15V7OnIdenticalSplit": true
+    },
+    "promotionGate": {
+      "minimumHeldOutImprovement": 0.03,
+      "maximumSecondaryRegression": 0.01,
+      "criticalRegressionsAllowed": 0,
+      "requiresReproducibleRun": true,
+      "requiresRollbackArtifact": true,
+      "blockedBy": "Base is Qwen2.5-1.5B rather than the planned Qwen3-4B champion; twelve hidden examples do not establish broad adversarial safety, calibration, transfer, latency, cost or regression performance."
+    }
+  }
+}
