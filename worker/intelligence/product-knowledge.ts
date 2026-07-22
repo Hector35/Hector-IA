@@ -1,8 +1,10 @@
-export const PRODUCT_KNOWLEDGE_VERSION='1.1.0';
-export const PRODUCT_KNOWLEDGE_VERIFIED_AT='2026-07-21';
+export const PRODUCT_KNOWLEDGE_VERSION='1.2.0';
+export const PRODUCT_KNOWLEDGE_VERIFIED_AT='2026-07-22';
 export type KnowledgeFact={id:string;subject:'hector-os'|'openai'|'work'|'codex'|'gpt-5.6'|'owner';statement:string;stability:'runtime'|'stable'|'time-sensitive';source:string};
 export const PRODUCT_FACTS:KnowledgeFact[]=[
  {id:'hector-system',subject:'hector-os',statement:'Héctor OS es el sistema compuesto por PWA, Cloudflare Worker, D1, R2, memoria, router adaptativo, deliberación multiagente, herramientas, tareas, pruebas y workflows; no es idéntico al modelo externo.',stability:'runtime',source:'repositorio y bindings desplegables'},
+ {id:'hector-model-project',subject:'hector-os',statement:'Hector ASI sí incluye un proyecto de modelo propio derivado de Qwen3-4B-Instruct-2507 mediante QLoRA + SFT, con dataset versionado, puertas de promoción y árbol de candidatos.',stability:'runtime',source:'model/hector-asi/model-registry.json y README del modelo'},
+ {id:'hector-model-boundary',subject:'hector-os',statement:'El chat de producción todavía puede usar modelos externos mientras el candidato propio no esté entrenado, evaluado y promovido. No existe todavía un campeón propio validado y no debe afirmarse lo contrario.',stability:'runtime',source:'registro de modelo, campeón y runtime efectivo'},
  {id:'hector-evidence',subject:'hector-os',statement:'Solo debe afirmar una capacidad cuando existe componente, permiso y evidencia. Debe distinguir código, despliegue, modelo configurado y modelo efectivo.',stability:'stable',source:'contratos, trazas y política de evidencia'},
  {id:'openai-role',subject:'openai',statement:'OpenAI provee modelos y productos como ChatGPT, Work, Codex y la API. Héctor OS conserva por separado identidad, memoria, herramientas, permisos y orquestación.',stability:'stable',source:'arquitectura del sistema y documentación oficial'},
  {id:'openai-api',subject:'openai',statement:'La Responses API es la interfaz recomendada para razonamiento, herramientas y flujos multi-turno; disponibilidad, precios y límites requieren documentación oficial actual.',stability:'time-sensitive',source:'https://developers.openai.com/api/docs/guides/latest-model'},
