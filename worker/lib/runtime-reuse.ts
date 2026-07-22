@@ -8,6 +8,7 @@ export type RuntimeReuseCandidate={
  risk:ReuseRisk;
  confidence:number;
  successRate:number;
+ recencyScore?:number;
  estimatedCostUsd:number;
  trigger:string;
  procedure:string;
@@ -42,10 +43,17 @@ export function reuseSimilarity(a:string,b:string){
  return common/(left.size+right.size-common);
 }
 
+export function experienceRecencyScore(createdAt:string|null|undefined,nowMs=Date.now()){
+ const timestamp=createdAt?Date.parse(createdAt):NaN;
+ if(!Number.isFinite(timestamp))return .2;
+ const ageDays=Math.max(0,(nowMs-timestamp)/86_400_000);
+ return Math.exp(-ageDays/120);
+}
+
 function clamp(value:number){return Math.max(0,Math.min(1,Number.isFinite(value)?value:0));}
 function candidateScore(input:string,candidate:RuntimeReuseCandidate){
  const lexical=reuseSimilarity(input,`${candidate.trigger} ${candidate.taskType}`);
- return lexical*.55+clamp(candidate.confidence)*.25+clamp(candidate.successRate)*.2;
+ return lexical*.52+clamp(candidate.confidence)*.2+clamp(candidate.successRate)*.18+clamp(candidate.recencyScore??.5)*.1;
 }
 
 export function chooseRuntimeReuse(input:string,candidates:RuntimeReuseCandidate[],options:{authorizedHighRisk?:boolean;modelCostUsd?:number}={}):RuntimeReuseDecision{
@@ -84,11 +92,11 @@ function reusableOutput(result:string){const match=result.match(/(?:^|\n)REUSABL
 
 export async function loadRuntimeReuseCandidates(db:{prepare:(sql:string)=>{bind:(...values:unknown[])=>{all:<T>()=>Promise<{results:T[]}>}}},userId:string):Promise<RuntimeReuseCandidate[]>{
  try{
-  const rows=(await db.prepare("SELECT id,objective,result,skills_json,attempts FROM agent_experiences WHERE user_id=? AND status='completed' AND result IS NOT NULL ORDER BY created_at DESC LIMIT 60").bind(userId).all<{id:string;objective:string;result:string;skills_json:string|null;attempts:number}>()).results;
+  const rows=(await db.prepare("SELECT id,objective,result,skills_json,attempts,created_at,estimated_cost_usd FROM agent_experiences WHERE user_id=? AND status='completed' AND verified=1 AND result IS NOT NULL AND length(trim(result))>=20 ORDER BY created_at DESC LIMIT 120").bind(userId).all<{id:string;objective:string;result:string;skills_json:string|null;attempts:number;created_at:string|null;estimated_cost_usd:number|null}>()).results;
   return rows.map(row=>{
-   let skills:string[]=[];try{skills=JSON.parse(row.skills_json||'[]');}catch{}
-   const output=reusableOutput(row.result),attempts=Math.max(1,Number(row.attempts)||1),confidence=Math.max(.55,Math.min(.9,.92-(attempts-1)*.06));
-   return{id:row.id,source:'experience' as const,taskType:skills[0]||'general',risk:classifyReuseRisk(row.objective),confidence,successRate:confidence,estimatedCostUsd:0,trigger:row.objective,procedure:row.result.replace(/(?:^|\n)REUSABLE_OUTPUT\s*:[\s\S]+$/i,'').trim().slice(0,4000),mode:output?'deterministic' as const:'context' as const,deterministicOutput:output};
+   let skills:string[]=[];try{const parsed=JSON.parse(row.skills_json||'[]');skills=Array.isArray(parsed)?parsed.filter(item=>typeof item==='string').slice(0,12):[];}catch{}
+   const output=reusableOutput(row.result),attempts=Math.max(1,Number(row.attempts)||1),confidence=Math.max(.55,Math.min(.92,.94-(attempts-1)*.055));
+   return{id:row.id,source:'experience' as const,taskType:skills[0]||'general',risk:classifyReuseRisk(row.objective),confidence,successRate:confidence,recencyScore:experienceRecencyScore(row.created_at),estimatedCostUsd:Math.max(0,Number(row.estimated_cost_usd)||0),trigger:row.objective,procedure:row.result.replace(/(?:^|\n)REUSABLE_OUTPUT\s*:[\s\S]+$/i,'').trim().slice(0,4000),mode:output?'deterministic' as const:'context' as const,deterministicOutput:output};
   });
  }catch{return[];}
 }
