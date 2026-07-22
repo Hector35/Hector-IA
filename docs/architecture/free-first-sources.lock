@@ -1,0 +1,10 @@
+reviewed_at=2026-07-22
+cloudflare_workers_ai=https://developers.cloudflare.com/workers-ai/platform/pricing/
+cloudflare_d1_pricing=https://developers.cloudflare.com/d1/platform/pricing/
+cloudflare_d1_limits=https://developers.cloudflare.com/d1/platform/limits/
+cloudflare_r2=https://developers.cloudflare.com/r2/pricing/
+cloudflare_vectorize=https://developers.cloudflare.com/vectorize/platform/pricing/
+github_actions=https://docs.github.com/en/billing/concepts/product-billing/github-actions
+webkit_webgpu=https://webkit.org/blog/17333/webkit-features-in-safari-26-0/
+transformers_js=https://huggingface.co/docs/transformers.js/en/guides/webgpu
+onnx_runtime_web=https://onnxruntime.ai/docs/tutorials/web/
