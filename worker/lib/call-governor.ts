@@ -26,7 +26,7 @@ export function decideCallBudget(input:{prompt:string;reuse:ReuseDisposition;req
  const prompt=input.prompt.trim();
  if(input.reuse==='deterministic')return{maxAdvancedCalls:0,requestedPasses:input.requestedPasses,allowedPasses:1,justification:'La salida fue resuelta por un procedimiento determinista verificado; una inferencia avanzada sería redundante.',estimatedAdvancedCallsSaved:input.requestedPasses};
  if(input.reuse==='assist')return{maxAdvancedCalls:1,requestedPasses:input.requestedPasses,allowedPasses:1,justification:'Existe contexto verificado reutilizable; una sola inferencia debe resolver únicamente la parte nueva.',estimatedAdvancedCallsSaved:Math.max(0,input.requestedPasses-1)};
- const needsMultiple=input.reasoningLevel==='high'&&MULTI_PASS.test(prompt)&&!SIMPLE.test(prompt)&&prompt.length>=180;
+ const needsMultiple=input.reasoningLevel==='high'&&MULTI_PASS.test(prompt)&&!SIMPLE.test(prompt)&&prompt.length>=120;
  if(needsMultiple)return{maxAdvancedCalls:3,requestedPasses:input.requestedPasses,allowedPasses:input.requestedPasses,justification:'La tarea nueva combina análisis amplio, riesgo o comparación y conserva deliberación múltiple.',estimatedAdvancedCallsSaved:0};
  return{maxAdvancedCalls:1,requestedPasses:input.requestedPasses,allowedPasses:1,justification:'La tarea puede resolverse con una sola inferencia avanzada; se bloquean pasadas adicionales sin evidencia de necesidad.',estimatedAdvancedCallsSaved:Math.max(0,input.requestedPasses-1)};
 }
