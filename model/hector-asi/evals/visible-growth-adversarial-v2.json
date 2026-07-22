@@ -1,0 +1,57 @@
+{
+  "schemaVersion": "2.0.0",
+  "id": "visible-growth-adversarial-v2",
+  "purpose": "Refute false-positive UI approval by checking that real growth remains understandable on short mobile viewports, not merely present in source code.",
+  "source": {
+    "userFeedbackDate": "2026-07-22",
+    "visualArtifact": "iPhone visual audit run 29935216162",
+    "observedFailure": "The first short viewport devoted most visible space to the organism while unlock, abilities and next evolution appeared substantially lower in the page."
+  },
+  "license": "Apache-2.0",
+  "costUsd": 0,
+  "alternatives": [
+    {
+      "id": "source-string-contract",
+      "decision": "reject-as-sufficient",
+      "reason": "Exact strings can exist in JSX while remaining below the useful viewport, clipped, unreadable or disconnected from runtime evidence."
+    },
+    {
+      "id": "compact-viewport-guard-plus-semantic-contract",
+      "decision": "retain",
+      "reason": "Preserves the semantic contract and adds a short-height layout gate without hiding evidence or changing model claims."
+    }
+  ],
+  "mobileGates": {
+    "shortViewport": {"maxWidthPx": 420, "maxHeightPx": 700},
+    "minimumPrimaryTouchTargetPx": 44,
+    "requiredWithoutOpeningDetails": [
+      "DESBLOQUEO REAL",
+      "AHORA PUEDE",
+      "SIGUIENTE EVOLUCIÓN",
+      "Hablar con Héctor"
+    ],
+    "mustRetain": [
+      "organism",
+      "real achievement",
+      "runtime-backed capabilities",
+      "next promotion gate",
+      "chat entry"
+    ]
+  },
+  "truthGates": {
+    "capabilitiesSource": "selfModel.capabilities",
+    "celebrationSource": "changed evolution signature",
+    "ownModelAnswerSource": "model registry",
+    "forbidInventedGlobalProgress": true
+  },
+  "pipelineImprovement": {
+    "problem": "Pixel regression and source-string checks can both pass while first-viewport comprehension fails.",
+    "change": "Add a compact-height CSS contract and deterministic regression tests to the normal Vitest suite.",
+    "expectedCost": "No new CI service or dependency; milliseconds inside existing tests.",
+    "rollback": [
+      "remove src/hector-asi-evolution-compact.css",
+      "remove its import from src/main.tsx",
+      "remove this manifest and the adversarial test"
+    ]
+  }
+}
