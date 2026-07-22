@@ -4,6 +4,7 @@ import {CodexApp} from './CodexApp';
 import {installWorkModeEnhancer} from './work-mode-ui';
 import {installWorkEvidenceEnhancer} from './work-evidence-ui';
 import {installScheduledTasksEnhancer} from './scheduled-tasks-ui';
+import {installOneCommandEnhancer} from './one-command-ui';
 import {installMemoryControlEnhancer} from './memory-control-ui';
 import {installResponseAuditEnhancer} from './response-audit-ui';
 import {installIntelligenceStatusEnhancer} from './intelligence-status-ui';
@@ -26,6 +27,7 @@ import './project-ui.css';
 import './work-mode-ui.css';
 import './work-evidence-ui.css';
 import './scheduled-tasks-ui.css';
+import './one-command-ui.css';
 import './memory-control-ui.css';
 import './response-audit-ui.css';
 import './intelligence-status-ui.css';
@@ -48,6 +50,7 @@ ReactDOM.createRoot(document.getElementById('root')!).render(
 
 installWorkModeEnhancer();
 installScheduledTasksEnhancer();
+installOneCommandEnhancer();
 installWorkEvidenceEnhancer();
 installMemoryControlEnhancer();
 installResponseAuditEnhancer();
