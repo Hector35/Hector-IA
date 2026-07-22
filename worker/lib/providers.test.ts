@@ -1,5 +1,5 @@
 import {describe,expect,it} from 'vitest';
-import {chooseProvider} from './providers';
+import {callCloudflare,chooseProvider} from './providers';
 import type {ProviderHealth} from './provider-quality';
 import type {FeedbackRoutingProfile} from './feedback-routing';
 const health=(overrides:Partial<ProviderHealth>={}):ProviderHealth=>({sampleCount:12,acceptedRate:.95,fallbackRate:.05,averageLatencyMs:400,healthy:true,circuitOpen:false,reason:'calidad reciente dentro de umbrales',mostRecentAt:'2026-07-21 15:00:00',...overrides});
@@ -8,7 +8,9 @@ describe('chooseProvider',()=>{
  it('usa Cloudflare para consultas breves, no sensibles y saludables',()=>{expect(chooseProvider('hola, resume esto','fast',false,true,health(),feedback()).provider).toBe('cloudflare');});
  it('mantiene OpenAI para web, complejidad y datos sensibles',()=>{expect(chooseProvider('busca noticias de hoy','fast',true,true,health()).provider).toBe('openai');expect(chooseProvider('diseña la arquitectura completa','deep',false,true,health()).provider).toBe('openai');expect(chooseProvider('revisa mi saldo bancario','fast',false,true,health()).provider).toBe('openai');});
  it('permite apagar Workers AI sin cambiar código',()=>{expect(chooseProvider('hola','fast',false,false)).toEqual({provider:'openai',reason:'Workers AI desactivado'});});
+ it('resuelve utilidades deterministas aunque Workers AI esté apagado',()=>{const decision=chooseProvider('Clasifica: corrige un error de TypeScript','balanced',false,false);expect(decision.provider).toBe('cloudflare');expect(decision.reason).toMatch(/reglas locales/);});
  it('abre paso a OpenAI cuando el circuito de calidad está abierto',()=>{const decision=chooseProvider('hola','fast',false,true,health({healthy:false,circuitOpen:true,acceptedRate:.3,fallbackRate:.7,reason:'circuito abierto por calidad o fallback'}));expect(decision.provider).toBe('openai');expect(decision.reason).toMatch(/pausado/);});
  it('evita Cloudflare cuando el libro mayor demuestra baja utilidad',()=>{const decision=chooseProvider('hola','fast',false,true,health(),feedback({avoidCloudflare:true,reason:'las valoraciones recientes muestran baja utilidad de Workers AI'}));expect(decision.provider).toBe('openai');expect(decision.reason).toMatch(/libro mayor/);});
  it('permite una prueba controlada después del enfriamiento',()=>{const decision=chooseProvider('hola','fast',false,true,health({reason:'enfriamiento completado; se permite una prueba controlada'}));expect(decision).toEqual({provider:'cloudflare',reason:'prueba controlada tras enfriamiento'});});
+ it('ejecuta clasificación local con cero tokens y sin binding AI',async()=>{const out=await callCloudflare({} as any,'instrucciones','Clasifica: crea una API en TypeScript');expect(out).toMatchObject({model:'hector-rules-v1',usage:{input_tokens:0,output_tokens:0},capability:'classify'});expect(out.text).toContain('ingeniería de software');});
 });
