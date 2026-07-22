@@ -4,7 +4,7 @@ on:
   pull_request:
     branches: [main]
     paths:
-      - 'model/hector-asi/train_qwen05_dpo_v2.py'
+      - 'model/hector-asi/train_qwen05_dpo_v3.py'
       - 'model/hector-asi/data/qwen05-dpo-v1.jsonl'
       - 'model/hector-asi/evals/qwen05-dpo-held-out-v1.jsonl'
       - '.github/workflows/hector-model-qwen05-dpo.yml'
@@ -33,14 +33,14 @@ jobs:
           python -m pip install --upgrade pip
           python -m pip install --index-url https://download.pytorch.org/whl/cpu 'torch==2.7.1'
           python -m pip install 'transformers==4.53.2' 'peft==0.16.0' 'accelerate==1.8.1' 'safetensors==0.5.3'
-      - name: Train two normalized DPO LoRA replicas
+      - name: Train two anchored DPO LoRA replicas
         run: |
           for replica in a b; do
-            python model/hector-asi/train_qwen05_dpo_v2.py \
+            python model/hector-asi/train_qwen05_dpo_v3.py \
               --train-file model/hector-asi/data/qwen05-dpo-v1.jsonl \
               --eval-file model/hector-asi/evals/qwen05-dpo-held-out-v1.jsonl \
               --output-dir "artifacts/hector-asi-qwen05-dpo-v3-${replica}" \
-              --epochs 2 --max-length 160 --lr 2e-4 --beta 0.2 --seed 35
+              --epochs 8 --max-length 160 --lr 1e-4 --beta 0.3 --sft-weight 0.08 --seed 35
           done
       - name: Prove byte-identical reproducibility
         run: |
@@ -61,6 +61,7 @@ jobs:
           assert r['parameterDeltaL2'] > 0
           assert r['adapterBytes'] > 1_000_000
           assert r['candidatePreferenceAccuracy'] > r['basePreferenceAccuracy']
+          assert r['candidatePreferenceAccuracy'] >= 2/3
           assert r['candidateMeanPreferenceMargin'] > r['baseMeanPreferenceMargin']
           assert r['languageLossRelativeChange'] <= 0.05
           assert m['dataset']['trainPairs'] == 10
