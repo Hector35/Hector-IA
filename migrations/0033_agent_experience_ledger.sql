@@ -13,7 +13,7 @@ ALTER TABLE agent_experiences ADD COLUMN input_tokens INTEGER;
 ALTER TABLE agent_experiences ADD COLUMN cached_input_tokens INTEGER;
 ALTER TABLE agent_experiences ADD COLUMN output_tokens INTEGER;
 ALTER TABLE agent_experiences ADD COLUMN estimated_cost_usd REAL;
-ALTER TABLE agent_experiences ADD COLUMN updated_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP;
+ALTER TABLE agent_experiences ADD COLUMN updated_at TEXT;
 
 UPDATE agent_experiences
 SET objective_normalized=lower(trim(objective)),
