@@ -1,0 +1,11 @@
+import {describe,expect,it} from 'vitest';
+import {classifyFreeFirstTask,compactFreeFirstContext,createExactInferenceCacheKey,createFreeFirstPolicy,freeFirstBenchmark} from './free-first';
+describe('free-first runtime',()=>{
+ it('mantiene razonamiento alto en una sola llamada avanzada por defecto',()=>{expect(createFreeFirstPolicy({prompt:'Implementa y prueba una mejora compleja del repositorio',reasoningLevel:'high'})).toMatchObject({taskKind:'reasoning',baselineAdvancedCalls:3,maxAdvancedCalls:1,estimatedAdvancedCallsAvoided:2});});
+ it('conserva múltiples pasadas solo cuando se solicitan explícitamente',()=>{expect(createFreeFirstPolicy({prompt:'Haz doble verificación con dos soluciones independientes',reasoningLevel:'high'}).maxAdvancedCalls).toBe(3);});
+ it('envía clasificación y extracción no sensible a la capa gratuita',()=>{expect(classifyFreeFirstTask('Clasifica esta solicitud y elige la ruta')).toBe('classification');expect(createFreeFirstPolicy({prompt:'Extrae los campos y conviértelos a JSON'})).toMatchObject({freeProviderEligible:true,cacheable:true});});
+ it('bloquea caché y proveedor gratuito para alto riesgo',()=>{expect(createFreeFirstPolicy({prompt:'Elimina el despliegue y revoca el token'})).toMatchObject({risk:'high',cacheable:false,freeProviderEligible:false});});
+ it('deduplica y limita contexto',()=>{const compacted=compactFreeFirstContext('Bloque uno\n\nBloque uno\n\n'+`contenido ${'x'.repeat(200)}`,120);expect(compacted.match(/Bloque uno/g)).toHaveLength(1);expect(compacted.length).toBeLessThanOrEqual(120);});
+ it('genera claves exactas aisladas por usuario',async()=>{const a=await createExactInferenceCacheKey({userId:'u1',prompt:'  Resume   esto ',context:'A'}),b=await createExactInferenceCacheKey({userId:'u1',prompt:'resume esto',context:'A'}),c=await createExactInferenceCacheKey({userId:'u2',prompt:'resume esto',context:'A'});expect(a).toBe(b);expect(a).not.toBe(c);});
+ it('demuestra reducción reproducible',()=>{expect(freeFirstBenchmark()).toMatchObject({scenarios:5,successRate:1,baselineAdvancedCalls:15,advancedCalls:2,freeCalls:1,cacheHits:1,advancedCallsAvoided:13});expect(freeFirstBenchmark().reductionRate).toBeGreaterThan(.85);});
+});
