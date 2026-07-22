@@ -1,0 +1,55 @@
+{
+  "schemaVersion": "1.0.0",
+  "id": "hector-asi-qwen15-v4",
+  "status": "experimental-weights-generated-reproducibly",
+  "eligibleForChampion": false,
+  "baseModel": {
+    "repository": "Qwen/Qwen2.5-1.5B-Instruct",
+    "revision": "989aa7980e4cf806f80c7fef2b1adb7bc71aa306",
+    "license": "Apache-2.0"
+  },
+  "method": {
+    "stage": "sft",
+    "adapter": "lora",
+    "precision": "float32-cpu",
+    "targetModules": ["q_proj", "k_proj", "v_proj", "o_proj"],
+    "rank": 8,
+    "alpha": 16,
+    "epochs": 2,
+    "seed": 35
+  },
+  "dataset": {
+    "trainPath": "model/hector-asi/data/qwen05-sft-v3.jsonl",
+    "validationPath": "model/hector-asi/evals/qwen05-held-out-v3.jsonl",
+    "trainExamples": 20,
+    "validationExamples": 10,
+    "containsPrivateUserData": false,
+    "deduplicated": true,
+    "splitContaminationChecked": true
+  },
+  "artifacts": {
+    "adapterPath": "GitHub Actions artifact 8543927691/adapter/adapter_model.safetensors",
+    "metricsPath": "model/hector-asi/runs/qwen15-v4-20260722.json",
+    "storage": "github-actions-artifact",
+    "committedToGit": false,
+    "adapterSha256": "0a28d047939292c46ef1d4c5174718418e7a64df30917f948d6cf96dff07fc63",
+    "archiveSha256": "17e8d8ecd67135d2f148389a0fc44444c5ce8aca861cebd8c660fb5527959a30",
+    "adapterBytes": 8745704,
+    "expiresAt": "2026-10-20T20:22:05Z"
+  },
+  "evaluation": {
+    "baseValidationLoss": 4.130526232719421,
+    "candidateValidationLoss": 2.6888783454895018,
+    "relativeValidationImprovement": 0.3490228135606778,
+    "byteIdenticalReplicas": 2,
+    "parameterDeltaL2": 2.83457350730896
+  },
+  "promotionGate": {
+    "minimumHeldOutImprovement": 0.03,
+    "maximumSecondaryRegression": 0.01,
+    "criticalRegressionsAllowed": 0,
+    "requiresReproducibleRun": true,
+    "requiresRollbackArtifact": true,
+    "blockedBy": "Base is Qwen2.5-1.5B rather than Qwen3-4B and the hidden evaluation is not broad enough for champion promotion."
+  }
+}
