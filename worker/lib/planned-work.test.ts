@@ -2,8 +2,8 @@ import {describe,expect,it} from 'vitest';
 import {workResponseOptions} from './planned-work';
 
 describe('workResponseOptions',()=>{
- it('fuerza deliberación para trabajos de razonamiento alto',()=>{
-  expect(workResponseOptions({userId:'user-1',reasoningLevel:'high'})).toEqual({reasoning:'high',deliberation:'force',userId:'user-1'});
+ it('conserva razonamiento alto sin forzar tres inferencias',()=>{
+  expect(workResponseOptions({userId:'user-1',reasoningLevel:'high'})).toEqual({reasoning:'high',deliberation:'auto',userId:'user-1'});
  });
 
  it('mantiene selección automática para trabajos ordinarios',()=>{
