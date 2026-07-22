@@ -1,19 +1,12 @@
 {
-  "schemaVersion": "1.2.0",
+  "schemaVersion": "1.3.0",
   "project": "Hector ASI",
   "champion": null,
   "candidates": [
     {
       "id": "hector-asi-v0.1-qwen3-4b-sft",
       "status": "planned",
-      "baseModel": {
-        "repository": "Qwen/Qwen3-4B-Instruct-2507",
-        "revision": "main",
-        "license": "Apache-2.0",
-        "licenseUrl": "https://huggingface.co/Qwen/Qwen3-4B-Instruct-2507/blob/main/LICENSE",
-        "weightsHash": null,
-        "rationale": "4B open-weight instruction model with permissive Apache-2.0 licensing, multilingual capability and a size compatible with parameter-efficient tuning on limited GPUs."
-      },
+      "baseModel": {"repository":"Qwen/Qwen3-4B-Instruct-2507","revision":"main","license":"Apache-2.0","licenseUrl":"https://huggingface.co/Qwen/Qwen3-4B-Instruct-2507/blob/main/LICENSE","weightsHash":null,"rationale":"4B open-weight instruction model with permissive Apache-2.0 licensing, multilingual capability and a size compatible with parameter-efficient tuning on limited GPUs."},
       "method": {"stage":"sft","adapter":"qlora","precision":"4bit-nf4","targetModules":"all-linear"},
       "dataset": {"path":"model/hector-asi/data/sft-seed-v1.jsonl","manifest":"model/hector-asi/data/sft-seed-v1.manifest.json","containsPrivateUserData":false},
       "artifacts": {"adapterPath":"artifacts/hector-asi-v0.1-qwen3-4b-sft/adapter","metricsPath":"artifacts/hector-asi-v0.1-qwen3-4b-sft/metrics.json","storage":"external-r2-or-huggingface","committedToGit":false},
@@ -34,19 +27,23 @@
       "id": "hector-asi-smollm360-v1",
       "status": "experimental-weights-generated-reproducibly",
       "eligibleForChampion": false,
-      "baseModel": {
-        "repository": "HuggingFaceTB/SmolLM2-360M-Instruct",
-        "revision": "cbcad7f4d160a10174f725b968ab6faf2a76399e",
-        "license": "Apache-2.0",
-        "licenseUrl": "https://huggingface.co/HuggingFaceTB/SmolLM2-360M-Instruct",
-        "weightsHash": null,
-        "rationale": "A larger CPU-trainable instruct base used to move beyond the GPT-2 smoke test while retaining a fully reproducible zero-cost training path."
-      },
+      "baseModel": {"repository":"HuggingFaceTB/SmolLM2-360M-Instruct","revision":"cbcad7f4d160a10174f725b968ab6faf2a76399e","license":"Apache-2.0","licenseUrl":"https://huggingface.co/HuggingFaceTB/SmolLM2-360M-Instruct","weightsHash":null,"rationale":"A larger CPU-trainable instruct base used to move beyond the GPT-2 smoke test while retaining a fully reproducible zero-cost training path."},
       "method": {"stage":"sft","adapter":"lora","precision":"float32-cpu","targetModules":["q_proj","v_proj"]},
       "dataset": {"path":"model/hector-asi/data/smollm360-sft-v1.jsonl","validationPath":"model/hector-asi/evals/smollm360-held-out-v1.jsonl","containsPrivateUserData":false},
       "artifacts": {"adapterPath":"GitHub Actions artifacts 8538232154 and 8538326234/adapter/adapter_model.safetensors","metricsPath":"model/hector-asi/runs/smollm360-v1-20260722.json","storage":"github-actions-artifact","committedToGit":false,"adapterSha256":"dd365ae42f8178fee4650c9f7d2401e5c2e322036da333cbcb75120d49d59d0e","adapterBytes":3293480,"expiresAt":"2026-10-20T17:11:55Z"},
       "evaluation": {"baseValidationLoss":3.482965032259623,"candidateValidationLoss":3.2981255054473877,"validationLossDelta":-0.18483952681223537,"relativeValidationImprovement":0.053069590162470884,"byteIdenticalIndependentRuns":2},
       "promotionGate": {"minimumHeldOutImprovement":0.03,"maximumSecondaryRegression":0.01,"criticalRegressionsAllowed":0,"requiresReproducibleRun":true,"requiresRollbackArtifact":true,"blockedBy":"Base is 360M rather than the planned Qwen3-4B champion and evaluation breadth remains insufficient."}
+    },
+    {
+      "id": "hector-asi-qwen05-v1",
+      "status": "experimental-weights-generated",
+      "eligibleForChampion": false,
+      "baseModel": {"repository":"Qwen/Qwen2.5-0.5B-Instruct","revision":"7ae557604adf67be50417f59c2c2f167def9a775","license":"Apache-2.0","licenseUrl":"https://huggingface.co/Qwen/Qwen2.5-0.5B-Instruct","weightsHash":null,"rationale":"A CPU-trainable Qwen-family instruct model used to move the real-weight pipeline closer to the planned Qwen3-4B candidate."},
+      "method": {"stage":"sft","adapter":"lora","precision":"float32-cpu","targetModules":["q_proj","v_proj"]},
+      "dataset": {"path":"model/hector-asi/data/qwen05-sft-v1.jsonl","validationPath":"model/hector-asi/evals/qwen05-held-out-v1.jsonl","containsPrivateUserData":false},
+      "artifacts": {"adapterPath":"GitHub Actions artifact 8538950761/adapter/adapter_model.safetensors","metricsPath":"model/hector-asi/runs/qwen05-v1-20260722.json","storage":"github-actions-artifact","committedToGit":false,"adapterSha256":"fc2c8432ad401114c5a787afb4e8d32a59f0a2a82f1d0b5d2390f420444efb43","archiveSha256":"3e15e80c21642ac4ba45896691c306b59917f40782d828415abc2da091796d32","adapterBytes":2175168,"expiresAt":"2026-10-20T17:34:01Z"},
+      "evaluation": {"baseValidationLoss":4.247941613197327,"candidateValidationLoss":3.9061858654022217,"validationLossDelta":-0.341755747795105,"relativeValidationImprovement":0.0804520821880773},
+      "promotionGate": {"minimumHeldOutImprovement":0.03,"maximumSecondaryRegression":0.01,"criticalRegressionsAllowed":0,"requiresReproducibleRun":true,"requiresRollbackArtifact":true,"blockedBy":"Base is 0.5B rather than Qwen3-4B, only one training run exists, and evaluation breadth is insufficient."}
     }
   ]
 }
