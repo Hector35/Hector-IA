@@ -60,7 +60,7 @@ function extractResult(input:string):DeterministicFreeResult{
  const numbers=unique(body.match(/-?\d+(?:[.,]\d+)?/g)||[]);
  const isoDates=unique(body.match(/\b\d{4}-\d{2}-\d{2}\b/g)||[]);
  const slashDates=unique(body.match(/\b\d{1,2}[\/-]\d{1,2}[\/-]\d{2,4}\b/g)||[]);
- const lines=[`Correos: ${emails.length?emails.join(', '):'ninguno'}`,`Enlaces: ${urls.length?urls.join(', '):'ninguno'}`,`Números: ${numbers.length?numbers.join(', '):'ninguno'}`,`Fechas: ${[...isoDates,...slashDates].length?[...isoDates,...slashDates].join(', '):'ninguna'}`];
+ const lines=[`Correos: ${emails.length?emails.join(', '):'ninguno'}`,`Enlaces: ${urls.length?urls.join(', '):'ninguno'}`,`Números: ${numbers.length?numbers.join(', '):'ninguno'}`,`Fechas: ${[...isoDates,...slashDates].length?[...isoDates,...slashDates].join(', '):'ninguna'}`,'Resultado obtenido mediante extracción determinista local.'];
  return{capability:'extract',text:lines.join('\n'),confidence:.99,source:'rules',advancedCalls:0,freeModelCalls:0};
 }
 
@@ -72,13 +72,13 @@ function routeResult(input:string):DeterministicFreeResult{
 
 function verifyJsonResult(input:string):DeterministicFreeResult{
  const body=afterDirective(input);
- try{const parsed=JSON.parse(body);const type=Array.isArray(parsed)?'arreglo':parsed===null?'null':typeof parsed;return{capability:'verify',text:`JSON válido. Tipo raíz: ${type}.`,confidence:1,source:'rules',advancedCalls:0,freeModelCalls:0};}
- catch(error){return{capability:'verify',text:`JSON inválido: ${error instanceof Error?error.message:'error de sintaxis'}.`,confidence:1,source:'rules',advancedCalls:0,freeModelCalls:0};}
+ try{const parsed=JSON.parse(body);const type=Array.isArray(parsed)?'arreglo':parsed===null?'null':typeof parsed;return{capability:'verify',text:`JSON válido. Tipo raíz: ${type}. Verificación completada mediante parser local sin inferencia externa.`,confidence:1,source:'rules',advancedCalls:0,freeModelCalls:0};}
+ catch(error){return{capability:'verify',text:`JSON inválido: ${error instanceof Error?error.message:'error de sintaxis'}. Verificación completada mediante parser local sin inferencia externa.`,confidence:1,source:'rules',advancedCalls:0,freeModelCalls:0};}
 }
 
 export function tryDeterministicFreeInference(input:string):DeterministicFreeResult|null{
  const capability=detectFreeCapability(input),body=afterDirective(input);
- if(capability==='classify')return{capability,text:`Clasificación: ${taskCategory(body)}.`,confidence:.96,source:'rules',advancedCalls:0,freeModelCalls:0};
+ if(capability==='classify')return{capability,text:`Clasificación: ${taskCategory(body)}. Resultado obtenido mediante reglas locales verificables, sin llamadas a modelos externos.`,confidence:.96,source:'rules',advancedCalls:0,freeModelCalls:0};
  if(capability==='extract')return extractResult(input);
  if(capability==='route')return routeResult(input);
  if(capability==='verify')return verifyJsonResult(input);
