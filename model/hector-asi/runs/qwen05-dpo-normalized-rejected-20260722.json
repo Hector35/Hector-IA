@@ -1,0 +1,85 @@
+{
+  "schemaVersion": "1.0.0",
+  "experimentFamily": "hector-asi-qwen05-dpo-normalized",
+  "completedAt": "2026-07-22T18:40:38Z",
+  "decision": "reject-and-do-not-repeat",
+  "championPromoted": false,
+  "baseModel": {
+    "repository": "Qwen/Qwen2.5-0.5B-Instruct",
+    "revision": "a338b55dd21219a5f4da42bc11a9313d1a27d4cc",
+    "license": "Apache-2.0"
+  },
+  "data": {
+    "trainPath": "model/hector-asi/data/qwen05-dpo-v1.jsonl",
+    "trainPairs": 10,
+    "trainSha256": "d7792a17af04b0c295e9bb36041f5c9381ba4c497c181147e5fb899b42b1d4a4",
+    "hiddenPath": "model/hector-asi/evals/qwen05-dpo-held-out-v1.jsonl",
+    "hiddenPairs": 6,
+    "hiddenSha256": "ccfa1e6d86384c9cfc95e9c799d6cda6a65e6469ba13749bcc0800f36002c345",
+    "privateUserData": false,
+    "splitContaminationChecked": true
+  },
+  "experiments": [
+    {
+      "id": "hector-asi-qwen05-dpo-unnormalized-v1",
+      "method": "LoRA DPO with summed response log probability",
+      "epochs": 2,
+      "learningRate": 0.0001,
+      "beta": 0.1,
+      "artifact": {
+        "githubActionsArtifactId": "8540046972",
+        "archiveSha256": "fe35844bb6b92d5a8576ab743c05cc07c4159d885506888d6d60da7dc1fd1f4d",
+        "adapterSha256": "5acfa66c3da2b96e20676ae1bfa12f2b14d885a4ac8bc1dfb1fd02350b9669c5",
+        "adapterBytes": 1093728,
+        "expiresAt": "2026-10-20T18:08:11Z",
+        "byteIdenticalReplicas": 2
+      },
+      "evaluation": {
+        "basePreferenceAccuracy": 0.0,
+        "candidatePreferenceAccuracy": 0.0,
+        "baseMeanPreferenceMargin": -113.73649088541667,
+        "candidateMeanPreferenceMargin": -111.26139704386394,
+        "baseLanguageLoss": 4.246246099472046,
+        "candidateLanguageLoss": 4.212486743927002,
+        "languageLossRelativeChange": -0.007950400130892411,
+        "parameterDeltaL2": 0.36244225822199455
+      },
+      "rejectionReason": "Summed sequence log probability was dominated by response length; hidden accuracy remained zero despite a small margin change."
+    },
+    {
+      "id": "hector-asi-qwen05-dpo-normalized-v2",
+      "method": "Length-normalized LoRA DPO",
+      "epochs": 4,
+      "learningRate": 0.0002,
+      "beta": 0.2,
+      "artifact": {
+        "githubActionsArtifactId": "8540827528",
+        "archiveSha256": "7a631e38af304c2563ce78ab13a553c2c536582c55aa0ece00cbedb492c4616f",
+        "adapterSha256": "8d3077b00209fa3c914e7e08ce2dc234c9fd68534cd2b579e1776c887641121c",
+        "adapterBytes": 1093728,
+        "expiresAt": "2026-10-20T18:29:06Z",
+        "byteIdenticalReplicas": 2
+      },
+      "evaluation": {
+        "basePreferenceAccuracy": 0.0,
+        "candidatePreferenceAccuracy": 0.3333333333333333,
+        "baseMeanPreferenceMargin": -0.7684347629547119,
+        "candidateMeanPreferenceMargin": -0.24395589033762613,
+        "baseLanguageLoss": 4.246220787366231,
+        "candidateLanguageLoss": 4.558052937189738,
+        "languageLossRelativeChange": 0.07343757318302915,
+        "parameterDeltaL2": 1.6746958690997382
+      },
+      "rejectionReason": "Hidden preference accuracy improved to 33.3%, but language loss regressed 7.34%, exceeding the predeclared 5% maximum, and accuracy remained below a useful threshold."
+    }
+  ],
+  "learning": {
+    "doNotRepeat": [
+      "Do not evaluate preference pairs with raw summed log probabilities when chosen and rejected lengths differ materially.",
+      "Do not increase normalized DPO to four epochs at learning rate 2e-4 and beta 0.2 on this ten-pair dataset.",
+      "Do not promote a margin-only improvement when hidden pair accuracy remains low or language loss exceeds the regression gate."
+    ],
+    "nextHypothesis": "Start from the stronger Qwen2.5-1.5B SFT candidate or Qwen3-4B, expand balanced preference data, and tune DPO with a validation-driven early stop rather than fixed aggressive updates.",
+    "rollback": "Never load either rejected adapter; the frozen base and all previously registered candidates are unchanged."
+  }
+}
