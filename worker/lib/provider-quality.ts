@@ -1,4 +1,4 @@
-export type QualityProviderName='cloudflare'|'openai';
+export type QualityProviderName='cloudflare'|'huggingface'|'openai';
 export type ProviderQualityAssessment={accepted:boolean;score:number;reasons:string[]};
 export type ProviderQualityRow={accepted:number|boolean;fallback:number|boolean;latency_ms:number|null;created_at?:string|null};
 export type ProviderHealth={sampleCount:number;acceptedRate:number;fallbackRate:number;averageLatencyMs:number|null;healthy:boolean;circuitOpen:boolean;reason:string;mostRecentAt:string|null};
