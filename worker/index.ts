@@ -30,7 +30,7 @@ import {projectGovernance} from './routes/project-governance';
 import {conversations} from './routes/conversations';
 import {chatAgents,processChatAgentRuns} from './routes/chat-agents';
 import {executePlannedWork} from './lib/planned-work';
-import {parseWorkModeResult,renderWorkModePrompt} from './lib/work-mode';
+import {parseWorkModeResult,renderWorkModePrompt,workModeFailureTransition} from './lib/work-mode';
 import {buildPlan} from './agent/planner';
 import {recordExperience} from './agent/learning';
 import {canRetry,JOB_LEASE_SECONDS,retryDelaySeconds} from './lib/job-reliability';
@@ -80,7 +80,15 @@ async function processNext(env:Bindings){
   await env.DB.batch([env.DB.prepare("INSERT INTO work_events(id,job_id,message,progress) VALUES(?,?,?,100)").bind(crypto.randomUUID(),job.id,continuous?'Modo Trabajo completó y verificó el objetivo':'Resultado guardado bajo plan cognitivo verificado')]);
   await recordUsage(env,job,out,u,executionPlan,verification,continuous?'work-mode-completed':job.schedule_id?'scheduled-work-planned':'background-work-planned');
   await recordExperience(env,{jobId:job.id,userId:job.user_id,objective:job.prompt,status:'completed',result:out.text,skills:plan.skills,attempts:job.attempt_count,durationMs:Date.now()-started});
- }catch(e){const message=e instanceof Error?e.message:'Error',retry=canRetry(job.attempt_count,job.max_attempts),delay=retryDelaySeconds(job.attempt_count),status=retry?'queued':'blocked',nextRetry=retry?`datetime('now','+${delay} seconds')`:'NULL';const failed=await env.DB.prepare(`UPDATE work_jobs SET status=?,result=?,last_error=?,next_retry_at=${nextRetry},lease_token=NULL,lease_expires_at=NULL,heartbeat_at=CURRENT_TIMESTAMP,updated_at=CURRENT_TIMESTAMP WHERE id=? AND lease_token=?`).bind(status,message,message,job.id,leaseToken).run();if(failed.meta.changes){await event(env,job.id,retry?`Error detectado; se intentará una alternativa en ${delay}s`:'Límite de intentos alcanzado; trabajo bloqueado',25);await recordExperience(env,{jobId:job.id,userId:job.user_id,objective:job.prompt,status,result:message,skills:plan.skills,attempts:job.attempt_count,durationMs:Date.now()-started});}}
+ }catch(e){
+  const message=e instanceof Error?e.message:'Error';
+  if(continuous){
+   const retry=workModeFailureTransition(job.attempt_count),failed=await env.DB.prepare(`UPDATE work_jobs SET status='queued',last_error=?,next_retry_at=datetime('now','+${retry.delaySeconds} seconds'),lease_token=NULL,lease_expires_at=NULL,heartbeat_at=CURRENT_TIMESTAMP,updated_at=CURRENT_TIMESTAMP WHERE id=? AND lease_token=?`).bind(message,job.id,leaseToken).run();
+   if(failed.meta.changes){await event(env,job.id,`Error detectado; Modo Trabajo conservará el avance e intentará otra alternativa en ${retry.delaySeconds}s`,25);await recordExperience(env,{jobId:job.id,userId:job.user_id,objective:job.prompt,status:'queued',result:message,skills:plan.skills,attempts:job.attempt_count,durationMs:Date.now()-started});}
+   return;
+  }
+  const retry=canRetry(job.attempt_count,job.max_attempts),delay=retryDelaySeconds(job.attempt_count),status=retry?'queued':'blocked',nextRetry=retry?`datetime('now','+${delay} seconds')`:'NULL';const failed=await env.DB.prepare(`UPDATE work_jobs SET status=?,result=?,last_error=?,next_retry_at=${nextRetry},lease_token=NULL,lease_expires_at=NULL,heartbeat_at=CURRENT_TIMESTAMP,updated_at=CURRENT_TIMESTAMP WHERE id=? AND lease_token=?`).bind(status,message,message,job.id,leaseToken).run();if(failed.meta.changes){await event(env,job.id,retry?`Error detectado; se intentará una alternativa en ${delay}s`:'Límite de intentos alcanzado; trabajo bloqueado',25);await recordExperience(env,{jobId:job.id,userId:job.user_id,objective:job.prompt,status,result:message,skills:plan.skills,attempts:job.attempt_count,durationMs:Date.now()-started});}
+ }
 }
 
 async function processScheduledWork(env:Bindings){await processDueSchedules(env);await processNext(env);}

@@ -1,3 +1,5 @@
+import {retryDelaySeconds} from './job-reliability';
+
 export type WorkModeState='continue'|'waiting'|'complete';
 
 export type WorkModeResult={
@@ -7,12 +9,18 @@ export type WorkModeResult={
  explicit:boolean;
 };
 
+export type WorkModeFailureTransition={status:'queued';delaySeconds:number;preserveCheckpoint:true};
+
 const statePattern=/^WORK_STATE\s*:\s*(continue|waiting|complete)\s*$/im;
 const retryPattern=/^RETRY_AFTER_MINUTES\s*:\s*(\d{1,5})\s*$/im;
 
 export function workModeTitle(goal:string){
  const first=goal.replace(/\s+/g,' ').trim().split(/[.!?\n]/)[0]||'Trabajo continuo';
  return first.slice(0,96);
+}
+
+export function workModeFailureTransition(attempt:number):WorkModeFailureTransition{
+ return{status:'queued',delaySeconds:retryDelaySeconds(Math.max(1,Math.trunc(attempt)||1)),preserveCheckpoint:true};
 }
 
 export function renderWorkModePrompt(goal:string,previousResult:string|null|undefined,cycle:number){
