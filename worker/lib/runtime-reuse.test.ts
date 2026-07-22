@@ -5,11 +5,15 @@ const known:RuntimeReuseCandidate={id:'skill-known',source:'skill',taskType:'git
 
 const contextCandidate:RuntimeReuseCandidate={...known,id:'experience-context',mode:'context',deterministicOutput:undefined,confidence:.74,successRate:.8,trigger:'analiza error desconocido del repositorio',procedure:'Inspeccionar primero el error y los archivos relacionados.'};
 
+type ReuseDb=Parameters<typeof loadRuntimeReuseCandidates>[0];
+
 function dbWithRows(rows:unknown[]){
- const all=vi.fn(async()=>({results:rows}));
- const bind=vi.fn(()=>({all}));
- const prepare=vi.fn(()=>({bind}));
- return{db:{prepare},prepare,bind,all};
+ const prepare=vi.fn((_sql:string)=>({
+  bind:vi.fn((..._values:unknown[])=>({
+   all:async<T>()=>({results:rows as T[]})
+  }))
+ }));
+ return{db:{prepare} as unknown as ReuseDb,prepare};
 }
 
 describe('runtime reuse engine',()=>{
@@ -55,14 +59,14 @@ describe('runtime reuse engine',()=>{
   const unverified={...verified,id:'unverified',evidence_json:'[{"kind":"nota","verified":false}]'};
   const legacy={...verified,id:'legacy',evidence_json:'[]'};
   const {db,prepare}=dbWithRows([verified,unverified,legacy]);
-  const candidates=await loadRuntimeReuseCandidates(db as never,'user-1');
+  const candidates=await loadRuntimeReuseCandidates(db,'user-1');
   expect(candidates.map(item=>item.id)).toEqual(['verified']);
   expect(candidates[0]).toMatchObject({mode:'deterministic',deterministicOutput:'pruebas aprobadas'});
-  expect(prepare.mock.calls[0][0]).toContain("verified=1");
+  expect(String(prepare.mock.calls[0]?.[0])).toContain('verified=1');
  });
 
  it('mantiene fallback seguro si el esquema todavía no está disponible',async()=>{
-  const db={prepare:()=>({bind:()=>({all:async()=>{throw new Error('missing column');}})})};
-  await expect(loadRuntimeReuseCandidates(db as never,'user-1')).resolves.toEqual([]);
+  const db:ReuseDb={prepare:()=>({bind:()=>({all:async<T>()=>{throw new Error('missing column');}})})};
+  await expect(loadRuntimeReuseCandidates(db,'user-1')).resolves.toEqual([]);
  });
 });
