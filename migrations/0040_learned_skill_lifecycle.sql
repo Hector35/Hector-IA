@@ -7,7 +7,7 @@ CREATE TABLE learned_skills (
   procedure_text TEXT NOT NULL,
   skills_json TEXT NOT NULL DEFAULT '[]',
   status TEXT NOT NULL DEFAULT 'candidate' CHECK (status IN ('candidate','active','degraded','disabled')),
-  confidence REAL NOT NULL DEFAULT 0.40 CHECK (confidence BETWEEN 0 AND 1),
+  confidence REAL NOT NULL DEFAULT 0.40 CHECK (confidence >= 0 AND confidence <= 1),
   success_count INTEGER NOT NULL DEFAULT 0,
   failure_count INTEGER NOT NULL DEFAULT 0,
   version INTEGER NOT NULL DEFAULT 1,
@@ -16,9 +16,7 @@ CREATE TABLE learned_skills (
   disabled_reason TEXT,
   created_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP,
   updated_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP,
-  UNIQUE(user_id,fingerprint),
-  FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE,
-  FOREIGN KEY (last_experience_id) REFERENCES agent_experiences(id) ON DELETE SET NULL
+  UNIQUE(user_id,fingerprint)
 );
 
 CREATE TABLE learned_skill_versions (
@@ -31,9 +29,7 @@ CREATE TABLE learned_skill_versions (
   evidence_json TEXT NOT NULL DEFAULT '{}',
   source_experience_id TEXT,
   created_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP,
-  UNIQUE(learned_skill_id,version),
-  FOREIGN KEY (learned_skill_id) REFERENCES learned_skills(id) ON DELETE CASCADE,
-  FOREIGN KEY (source_experience_id) REFERENCES agent_experiences(id) ON DELETE SET NULL
+  UNIQUE(learned_skill_id,version)
 );
 
 CREATE TABLE learned_skill_events (
@@ -46,10 +42,7 @@ CREATE TABLE learned_skill_events (
   confidence REAL NOT NULL,
   experience_id TEXT,
   details_json TEXT NOT NULL DEFAULT '{}',
-  created_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP,
-  FOREIGN KEY (learned_skill_id) REFERENCES learned_skills(id) ON DELETE CASCADE,
-  FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE,
-  FOREIGN KEY (experience_id) REFERENCES agent_experiences(id) ON DELETE SET NULL
+  created_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP
 );
 
 CREATE INDEX idx_learned_skills_user_status ON learned_skills(user_id,status,confidence DESC,updated_at DESC);
