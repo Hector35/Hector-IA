@@ -1,0 +1,64 @@
+{
+  "schemaVersion": "1.0.0",
+  "experimentId": "hector-asi-qwen15-v5",
+  "runId": "29956340647",
+  "completedAt": "2026-07-22T21:05:04Z",
+  "status": "experimental-weights-generated-reproducibly",
+  "championPromoted": false,
+  "baseModel": {
+    "repository": "Qwen/Qwen2.5-1.5B-Instruct",
+    "revision": "989aa7980e4cf806f80c7fef2b1adb7bc71aa306",
+    "license": "Apache-2.0"
+  },
+  "training": {
+    "method": "LoRA SFT",
+    "hardware": "GitHub-hosted 4-vCPU Linux runner",
+    "replicas": 2,
+    "epochsPerReplica": 2,
+    "stepsPerReplica": 48,
+    "seed": 35,
+    "trainableParameters": 544768,
+    "parameterDeltaL2": 2.3860321044921875,
+    "secondsFirstReplica": 625.4859087467194
+  },
+  "datasets": {
+    "trainPath": "model/hector-asi/data/qwen15-sft-v5.jsonl",
+    "trainExamples": 24,
+    "trainSha256": "d508b6e89877a3fbbac5646fe730d405de239f9087549e9f43d8bcbebd3446c6",
+    "validationPath": "model/hector-asi/evals/qwen15-held-out-v5.jsonl",
+    "validationExamples": 12,
+    "validationSha256": "794eeb3c961b16f974a6241a38b62ef34c22b3482116406eff2f277528bb02c7",
+    "privateUserData": false,
+    "deduplicated": true,
+    "splitContaminationChecked": true
+  },
+  "evaluation": {
+    "baseValidationLoss": 4.1809311509132385,
+    "candidateValidationLoss": 3.2841206192970276,
+    "validationLossDelta": -0.8968105316162109,
+    "relativeValidationImprovement": 0.2145001912840208,
+    "firstTrainLoss": 3.8503541946411133,
+    "finalTrainLoss": 3.2501516342163086,
+    "byteIdenticalReplicas": 2,
+    "comparison": {
+      "qwen15V4RelativeImprovement": 0.348998,
+      "interpretation": "V5 uses a broader, different hidden split and is therefore not directly rank-comparable to V4. V5 improves its own broader split by 21.45%, but does not displace V4 as the controlled same-split leader."
+    }
+  },
+  "artifact": {
+    "githubActionsArtifactId": "8544725572",
+    "name": "hector-asi-qwen15-v5-29956340647",
+    "archiveBytes": 5939274,
+    "archiveSha256": "dbba50fe68cf740352485d22d81d732e4f6fe800950fc89eafb61d1fd81d6d39",
+    "adapterPath": "adapter/adapter_model.safetensors",
+    "adapterBytes": 2193720,
+    "adapterSha256": "985bcdad75074c1be10b907511240f17687438e54143b04f526700e255187d1c",
+    "weightsCommittedToGit": false,
+    "expiresAt": "2026-10-20T20:43:52Z"
+  },
+  "promotionDecision": {
+    "decision": "retain-as-broader-curriculum-specialist",
+    "reason": "The candidate produced reproducible real weights and improved a broader 12-case hidden split by 21.45%, but it uses Qwen2.5-1.5B rather than Qwen3-4B and lacks sufficiently broad behavioral, safety, calibration and cross-domain regression evaluation for global champion promotion.",
+    "rollback": "Do not load or delete the LoRA adapter; the frozen base weights remain unchanged."
+  }
+}
