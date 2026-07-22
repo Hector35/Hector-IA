@@ -70,6 +70,8 @@ type EvolutionModel={
   modules:EvolutionModule[];
 };
 
+type VisibleMilestone={title:string;detail:string};
+
 const modelRegistry=modelRegistryJson as ModelRegistry;
 
 async function jsonFetch(path:string,init?:RequestInit){
@@ -81,6 +83,10 @@ async function jsonFetch(path:string,init?:RequestInit){
 
 function asksForModel(value:string){
   return /(?:qué|que|cuál|cual).{0,30}(?:modelo|proveedor)|modelo.{0,20}(?:usas|usaste|utilizaste)|quién me respondió|quien me respondio/i.test(value);
+}
+
+function asksForOwnModelDevelopment(value:string){
+  return /(?:se|est[aá]).{0,24}(?:desarrollando|entrenando|creando).{0,36}(?:modelo|red neuronal)|(?:modelo|red neuronal).{0,28}(?:propio|de h[eé]ctor|hector asi)|como modelo/i.test(value);
 }
 
 function asksForSystemReport(value:string){
@@ -111,6 +117,53 @@ function statusLabel(status?:string){
   return labels[status||'']||'Construyendo la primera generación';
 }
 
+function plainCapability(value:string){
+  const names:Record<string,string>={
+    'Identidad y autoconocimiento':'Conoce su estado',
+    'Memoria personal':'Recuerda contexto',
+    'Inteligencia alta multiagente':'Usa varios agentes',
+    'Programación autónoma':'Mejora su código',
+    'Investigación actual':'Investiga en la web',
+    'Trabajo programado':'Trabaja por ciclos',
+    'Archivos y evidencia':'Usa archivos',
+    'Aprendizaje correctivo':'Aprende de fallos'
+  };
+  return names[value]||value;
+}
+
+function visibleAchievement(evolution:EvolutionModel,selfModel?:SelfModel|null):VisibleMilestone{
+  const status=evolution.candidate?.status;
+  if(evolution.championId)return{title:'Primera generación promovida',detail:`${evolution.championId} ya superó sus pruebas y quedó como campeón.`};
+  if(status==='evaluated')return{title:'Candidato evaluado',detail:'La comparación ya terminó y está listo para una decisión de promoción.'};
+  if(status==='evaluating')return{title:'Evaluación en marcha',detail:'El candidato se está intentando refutar antes de permitirle avanzar.'};
+  if(status==='trained')return{title:'Primer entrenamiento terminado',detail:'Ya existe un candidato que puede compararse contra la base.'};
+  if(status==='training')return{title:'Entrenamiento real iniciado',detail:'Los adaptadores del primer candidato se están ajustando.'};
+  const dataReady=evolution.modules.find(item=>item.id==='data')?.state==='active';
+  const evaluationReady=evolution.modules.find(item=>item.id==='evaluation')?.state==='active';
+  if(dataReady&&evaluationReady)return{title:'Datos y pruebas preparados',detail:'El primer candidato ya tiene dataset versionado y reglas para demostrar si mejora.'};
+  const count=selfModel?.capabilities?.length||0;
+  if(count>0)return{title:`${count} capacidades operativas activas`,detail:'La app ya puede mostrar qué hace el sistema mientras nace el primer modelo propio.'};
+  return{title:'Núcleo conectado',detail:'La base abierta del modelo ya está registrada y lista para evolucionar.'};
+}
+
+function nextEvolution(evolution:EvolutionModel):VisibleMilestone{
+  const status=evolution.candidate?.status;
+  if(evolution.championId)return{title:'Superar al campeón actual',detail:'La siguiente generación solo aparecerá si gana sin regresiones críticas.'};
+  if(status==='evaluated')return{title:'Promover o descartar',detail:'Solo se desbloqueará un campeón si la evidencia demuestra una mejora real.'};
+  if(status==='evaluating')return{title:'Superar las pruebas ocultas',detail:'Debe mejorar frente a la base y conservar las capacidades secundarias.'};
+  if(status==='trained')return{title:'Comprobar el candidato',detail:'Se medirá contra la base con pruebas no vistas.'};
+  if(status==='training')return{title:'Completar el entrenamiento',detail:'Después se medirá antes de permitirle crecer.'};
+  if(status==='data_ready')return{title:'Iniciar el primer entrenamiento',detail:'Los datos ya están listos para producir el primer candidato.'};
+  return{title:'Entrenar el primer candidato',detail:'Al terminar, se comparará contra la base y solo avanzará si gana.'};
+}
+
+function ownModelDevelopmentAnswer(evolution:EvolutionModel){
+  const candidate=evolution.candidate;
+  const dataset=candidate?.dataset?.manifest?'sí, versionado':'todavía no registrado';
+  const gates=candidate?.promotionGate?'sí, definidas':'todavía no definidas';
+  return `## Sí: Hector ASI tiene un modelo propio en desarrollo\n\n- **Base abierta:** ${candidate?.baseModel?.repository||evolution.baseName}\n- **Adaptación:** ${evolution.methodName}\n- **Estado real:** ${evolution.stage}\n- **Dataset:** ${dataset}\n- **Pruebas de promoción:** ${gates}\n- **Campeón propio:** ${evolution.championId||'aún no existe'}\n\nEl chat productivo todavía puede usar modelos externos mientras el candidato propio se entrena y demuestra que mejora. No se declarará como modelo de Hector hasta superar evaluación y promoción.`;
+}
+
 function buildEvolution(selfModel?:SelfModel|null):EvolutionModel{
   const candidates=modelRegistry.candidates||[];
   const candidate=candidates[0]||null;
@@ -136,7 +189,13 @@ function buildEvolution(selfModel?:SelfModel|null):EvolutionModel{
     stage:champion?`Campeón activo · ${statusLabel(status)}`:statusLabel(status),
     baseName,
     methodName,
-    signature:JSON.stringify({schema:modelRegistry.schemaVersion,champion:modelRegistry.champion,candidates:candidates.map(item=>({id:item.id,status:item.status,base:item.baseModel?.repository,method:item.method}))}),
+    signature:JSON.stringify({
+      schema:modelRegistry.schemaVersion,
+      champion:modelRegistry.champion,
+      candidates:candidates.map(item=>({id:item.id,status:item.status,base:item.baseModel?.repository,method:item.method})),
+      capabilities:selfModel?.capabilities?.map(item=>item.capability)||[],
+      latestEvaluation:selfModel?.runtime?.latestEvaluation||null
+    }),
     modules
   };
 }
@@ -223,12 +282,12 @@ function EvolutionWorkspace({user,onLogout}:{user:User;onLogout:()=>void}){
       const key='hector-asi-evolution-signature';
       const previous=window.localStorage.getItem(key);
       if(previous&&previous!==evolution.signature){
-        setEvolutionNotice('Hector ASI cambió desde tu última visita.');
-        navigator.vibrate?.(18);
+        setEvolutionNotice(visibleAchievement(evolution,selfModel).title);
+        navigator.vibrate?.([24,45,24]);
       }
       window.localStorage.setItem(key,evolution.signature);
     }catch{}
-  },[evolution.signature]);
+  },[evolution,selfModel]);
   useEffect(()=>{
     if(!conversationId)return;
     const timer=window.setInterval(()=>{
@@ -306,6 +365,8 @@ function EvolutionWorkspace({user,onLogout}:{user:User;onLogout:()=>void}){
         if(operation){
           setMessages(items=>[...items,{role:'assistant',...operation}]);
           setActivityRefresh(value=>value+1);
+        }else if(asksForOwnModelDevelopment(requestText)){
+          setMessages(items=>[...items,{role:'assistant',content:ownModelDevelopmentAnswer(evolution),provider:'system',model:'Hector ASI registry',modelTier:'verified'}]);
         }else if(asksForModel(requestText)){
           const result=await jsonFetch('/api/system/model');
           const current=result.current||{};
@@ -382,24 +443,43 @@ function EvolutionWorkspace({user,onLogout}:{user:User;onLogout:()=>void}){
 }
 
 function EvolutionHome({evolution,selfModel,busy,notice,talk,details}:{evolution:EvolutionModel;selfModel:SelfModel|null;busy:boolean;notice:string;talk:()=>void;details:()=>void}){
-  const completed=selfModel?.runtime?.workJobs?.completed||0;
-  return <section className="eaHome">
-    {notice&&<button className="eaEvolutionNotice" onClick={details}><Sparkles/>{notice}</button>}
-    <NeuralOrganism modules={evolution.modules} busy={busy}/>
+  const abilities=(selfModel?.capabilities||[]).slice(0,4);
+  const achievement=visibleAchievement(evolution,selfModel);
+  const next=nextEvolution(evolution);
+  const growth=evolution.modules.filter(item=>item.state==='active').length;
+  return <section className={`eaHome ${notice?'celebrating':''}`}>
+    {notice&&<div className="eaCelebration" role="status"><Sparkles/><span><small>HECTOR EVOLUCIONÓ</small><strong>{notice}</strong></span></div>}
+    <NeuralOrganism modules={evolution.modules} busy={busy} growth={growth} celebrating={Boolean(notice)}/>
     <div className="eaIdentity">
       <span>{evolution.generation}</span>
       <h1>Hector ASI</h1>
       <p>{evolution.stage}</p>
     </div>
+
+    <section className="eaVisibleGrowth" aria-label="Crecimiento visible de Hector ASI">
+      <article className="eaUnlockCard">
+        <div className="eaUnlockMark"><Sparkles/></div>
+        <div><span>DESBLOQUEO REAL</span><strong>{achievement.title}</strong><small>{achievement.detail}</small></div>
+      </article>
+
+      <div className="eaNowCan">
+        <header><span>AHORA PUEDE</span><strong>{abilities.length||'—'} activas</strong></header>
+        <div className="eaAbilityChips">
+          {abilities.length>0
+            ?abilities.map(item=><span className="eaAbilityChip" key={item.capability}><Check/>{plainCapability(item.capability)}</span>)
+            :<span className="eaAbilityChip waiting"><Clock3/>Leyendo capacidades reales</span>}
+        </div>
+      </div>
+
+      <article className="eaNextUnlock">
+        <Target/>
+        <div><span>SIGUIENTE EVOLUCIÓN</span><strong>{next.title}</strong><small>{next.detail}</small></div>
+      </article>
+    </section>
+
     <div className="eaPrimaryActions">
       <button className="eaTalk" onClick={talk}><Zap/>Hablar con Héctor</button>
-      <button className="eaDetails" onClick={details}><Network/>Ver cómo está creciendo</button>
-    </div>
-    <div className="eaTruthRail" aria-label="Estado real del modelo">
-      <div><Brain/><span>Núcleo</span><strong>{evolution.baseName}</strong></div>
-      <div><GitBranch/><span>Candidato</span><strong>{evolution.candidate?.status||'sin registrar'}</strong></div>
-      <div><Trophy/><span>Campeón</span><strong>{evolution.championId||'aún no promovido'}</strong></div>
-      <div><Check/><span>Trabajos comprobados</span><strong>{completed}</strong></div>
+      <button className="eaDetails" onClick={details}><Network/>Detalles técnicos</button>
     </div>
   </section>;
 }
@@ -412,9 +492,11 @@ function EvolutionStrip({evolution,busy,open}:{evolution:EvolutionModel;busy:boo
   </button>;
 }
 
-function NeuralOrganism({modules,busy=false,compact=false}:{modules:EvolutionModule[];busy?:boolean;compact?:boolean}){
+function NeuralOrganism({modules,busy=false,compact=false,growth,celebrating=false}:{modules:EvolutionModule[];busy?:boolean;compact?:boolean;growth?:number;celebrating?:boolean}){
   const state=(id:string)=>modules.find(module=>module.id===id)?.state||'locked';
-  return <div className={`eaOrganism ${compact?'compact':''} ${busy?'busy':''}`} aria-label="Organismo evolutivo de Hector ASI">
+  const resolvedGrowth=growth??modules.filter(module=>module.state==='active').length;
+  const particles=Array.from({length:Math.min(6,resolvedGrowth)},(_,index)=>index);
+  return <div className={`eaOrganism ${compact?'compact':''} ${busy?'busy':''} ${celebrating?'celebrating':''}`} data-growth={resolvedGrowth} aria-label="Organismo evolutivo de Hector ASI">
     <svg className="eaConnections" viewBox="0 0 300 300" aria-hidden="true">
       <line x1="150" y1="150" x2="150" y2="34" className={state('data')}/>
       <line x1="150" y1="150" x2="252" y2="92" className={state('training')}/>
@@ -423,6 +505,7 @@ function NeuralOrganism({modules,busy=false,compact=false}:{modules:EvolutionMod
       <line x1="150" y1="150" x2="48" y2="208" className={state('system')}/>
       <line x1="150" y1="150" x2="48" y2="92" className={state('core')}/>
     </svg>
+    {!compact&&<div className="eaParticles" aria-hidden="true">{particles.map(index=><i key={index} className={`eaParticle particle-${index+1}`}/>)}</div>}
     <div className="eaCore"><span>H</span><i/></div>
     <EvolutionNode id="data" state={state('data')} label="Datos" icon={<Database/>}/>
     <EvolutionNode id="training" state={state('training')} label="Entrenamiento" icon={<Activity/>}/>
