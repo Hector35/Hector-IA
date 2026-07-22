@@ -1,5 +1,5 @@
 {
-  "schemaVersion": "1.0.0",
+  "schemaVersion": "1.1.0",
   "project": "Hector ASI",
   "champion": null,
   "candidates": [
@@ -37,6 +37,54 @@
         "criticalRegressionsAllowed": 0,
         "requiresReproducibleRun": true,
         "requiresRollbackArtifact": true
+      }
+    },
+    {
+      "id": "hector-asi-cpu-smoke-v1",
+      "status": "experimental-weights-generated-reproducibly",
+      "eligibleForChampion": false,
+      "baseModel": {
+        "repository": "openai-community/gpt2",
+        "revision": "607a30d783dfa663caf39e06633721c8d4cfcd7e",
+        "license": "MIT",
+        "licenseUrl": "https://huggingface.co/openai-community/gpt2",
+        "weightsHash": null,
+        "rationale": "CPU-feasible base used only to prove the complete real-weight training and artifact pipeline."
+      },
+      "method": {
+        "stage": "sft",
+        "adapter": "lora",
+        "precision": "float32-cpu",
+        "targetModules": "c_attn"
+      },
+      "dataset": {
+        "path": "model/hector-asi/data/sft-seed-v1.jsonl",
+        "validationPath": "model/hector-asi/evals/cpu-smoke-held-out-v1.jsonl",
+        "manifest": "model/hector-asi/data/sft-seed-v1.manifest.json",
+        "containsPrivateUserData": false
+      },
+      "artifacts": {
+        "adapterPath": "GitHub Actions artifact 8537825991/adapter/adapter_model.safetensors",
+        "metricsPath": "model/hector-asi/runs/cpu-smoke-v1-20260722.json",
+        "storage": "github-actions-artifact",
+        "committedToGit": false,
+        "adapterSha256": "8d2c390f9d89da87a7fea66a4d972ff73bb6e6ff6094928ff9ee50e99029abb5",
+        "archiveSha256": "37dc85d2187c9f4b2e7b2dd3afd2056c99a6858a516ae021015b36577c3211bf",
+        "expiresAt": "2026-10-20T16:54:58Z"
+      },
+      "evaluation": {
+        "baseValidationLoss": 4.360095500946045,
+        "candidateValidationLoss": 4.256746768951416,
+        "validationLossDelta": -0.1033487319946289,
+        "byteIdenticalReplicas": 2
+      },
+      "promotionGate": {
+        "minimumHeldOutImprovement": 0.03,
+        "maximumSecondaryRegression": 0.01,
+        "criticalRegressionsAllowed": 0,
+        "requiresReproducibleRun": true,
+        "requiresRollbackArtifact": true,
+        "blockedBy": "Wrong base model for the planned champion and insufficient evaluation breadth."
       }
     }
   ]
