@@ -1,0 +1,70 @@
+{
+  "schemaVersion": "1.0.0",
+  "experimentId": "hector-asi-qwen05-v2",
+  "status": "experimental-weights-generated-reproducibly",
+  "eligibleForChampion": false,
+  "baseModel": {
+    "repository": "Qwen/Qwen2.5-0.5B-Instruct",
+    "revision": "a338b55dd21219a5f4da42bc11a9313d1a27d4cc",
+    "license": "Apache-2.0"
+  },
+  "method": {
+    "stage": "sft",
+    "adapter": "lora",
+    "precision": "float32-cpu",
+    "targetModules": ["q_proj", "v_proj"],
+    "rank": 8,
+    "alpha": 16,
+    "epochs": 2,
+    "learningRate": 0.0002,
+    "maxLength": 112,
+    "seed": 35
+  },
+  "dataset": {
+    "trainPath": "model/hector-asi/data/qwen05-sft-v2.jsonl",
+    "trainSha256": "87d3a9f2cb44d2579615398c2cff5985f456f12623026f238e829b12b1433b69",
+    "trainExamples": 12,
+    "validationPath": "model/hector-asi/evals/qwen05-held-out-v2.jsonl",
+    "validationSha256": "13cea3640af10d94d22f33bc3cd53260c5f9454fc08ec325e6c13d8ee6e32852",
+    "validationExamples": 7,
+    "containsPrivateUserData": false,
+    "deduplicated": true,
+    "splitContaminationChecked": true
+  },
+  "artifact": {
+    "githubActionsRunId": 29943890160,
+    "artifactId": 8539409539,
+    "name": "hector-asi-qwen05-v2-29943890160",
+    "adapterPath": "adapter/adapter_model.safetensors",
+    "adapterBytes": 2175168,
+    "adapterSha256": "ed2f170dd792f8ccc7d7fe924b94c95a21ecee4a96045182b632393b723eebae",
+    "archiveSha256": "624e3b64632a1e0f422dfb0bf4a36654ae66e2e748df80dd766c461c3199ff8b",
+    "expiresAt": "2026-10-20T17:47:59Z",
+    "storage": "github-actions-artifact",
+    "committedToGit": false
+  },
+  "evaluation": {
+    "baseValidationLoss": 4.501597029822213,
+    "candidateValidationLoss": 3.5735839775630405,
+    "validationLossDelta": -0.928013052259173,
+    "relativeValidationImprovement": 0.20615196031791944,
+    "firstTrainLoss": 4.290108680725098,
+    "finalTrainLoss": 3.732318162918091,
+    "parameterDeltaL2": 1.7699768543243408,
+    "trainableParameters": 540672,
+    "steps": 24,
+    "byteIdenticalReplicas": 2
+  },
+  "runtime": {
+    "secondsPerReplica": 78.68050336837769,
+    "python": "3.11.15",
+    "torch": "2.7.1+cpu",
+    "cpuCount": 4
+  },
+  "promotion": {
+    "decision": "retain-experimental-specialist",
+    "reason": "Large hidden-loss improvement and deterministic weights, but the base is not the planned Qwen3-4B champion and seven held-out examples do not establish broad capability, adversarial safety, calibration, latency or regression performance.",
+    "criticalRegressionsEvaluated": false,
+    "rollback": "Keep champion null and do not load this adapter; frozen base remains available."
+  }
+}

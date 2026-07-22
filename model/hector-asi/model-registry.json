@@ -1,5 +1,5 @@
 {
-  "schemaVersion": "1.3.0",
+  "schemaVersion": "1.4.0",
   "project": "Hector ASI",
   "champion": null,
   "candidates": [
@@ -44,6 +44,17 @@
       "artifacts": {"adapterPath":"GitHub Actions artifact 8538668082/adapter/adapter_model.safetensors","metricsPath":"model/hector-asi/runs/qwen05-v1-20260722.json","storage":"github-actions-artifact","committedToGit":false,"adapterSha256":"a45407c1abe3d411884f16f42324c1384b5d823e201b277315baac327940a867","archiveSha256":"38835811097a9dd5ca692c68166b0d6941f7c1333b6cb38998e81361b953eda1","adapterBytes":2175168,"expiresAt":"2026-10-20T17:23:15Z"},
       "evaluation": {"baseValidationLoss":4.585448066393535,"candidateValidationLoss":3.9348132610321045,"validationLossDelta":-0.6506348053614301,"relativeValidationImprovement":0.14189121672315785,"byteIdenticalReplicas":2},
       "promotionGate": {"minimumHeldOutImprovement":0.03,"maximumSecondaryRegression":0.01,"criticalRegressionsAllowed":0,"requiresReproducibleRun":true,"requiresRollbackArtifact":true,"blockedBy":"Base is Qwen2.5 0.5B rather than the planned Qwen3 4B champion and evaluation breadth remains insufficient."}
+    },
+    {
+      "id": "hector-asi-qwen05-v2",
+      "status": "experimental-weights-generated-reproducibly",
+      "eligibleForChampion": false,
+      "baseModel": {"repository":"Qwen/Qwen2.5-0.5B-Instruct","revision":"a338b55dd21219a5f4da42bc11a9313d1a27d4cc","license":"Apache-2.0","licenseUrl":"https://huggingface.co/Qwen/Qwen2.5-0.5B-Instruct","weightsHash":null,"rationale":"Second Qwen-family CPU experiment with a capability-balanced, contamination-checked dataset and independent hidden split."},
+      "method": {"stage":"sft","adapter":"lora","precision":"float32-cpu","targetModules":["q_proj","v_proj"],"epochs":2,"seed":35},
+      "dataset": {"path":"model/hector-asi/data/qwen05-sft-v2.jsonl","validationPath":"model/hector-asi/evals/qwen05-held-out-v2.jsonl","trainExamples":12,"validationExamples":7,"containsPrivateUserData":false,"deduplicated":true,"splitContaminationChecked":true},
+      "artifacts": {"adapterPath":"GitHub Actions artifact 8539409539/adapter/adapter_model.safetensors","metricsPath":"model/hector-asi/runs/qwen05-v2-20260722.json","storage":"github-actions-artifact","committedToGit":false,"adapterSha256":"ed2f170dd792f8ccc7d7fe924b94c95a21ecee4a96045182b632393b723eebae","archiveSha256":"624e3b64632a1e0f422dfb0bf4a36654ae66e2e748df80dd766c461c3199ff8b","adapterBytes":2175168,"expiresAt":"2026-10-20T17:47:59Z"},
+      "evaluation": {"baseValidationLoss":4.501597029822213,"candidateValidationLoss":3.5735839775630405,"validationLossDelta":-0.928013052259173,"relativeValidationImprovement":0.20615196031791944,"byteIdenticalReplicas":2,"parameterDeltaL2":1.7699768543243408},
+      "promotionGate": {"minimumHeldOutImprovement":0.03,"maximumSecondaryRegression":0.01,"criticalRegressionsAllowed":0,"requiresReproducibleRun":true,"requiresRollbackArtifact":true,"blockedBy":"Base is Qwen2.5 0.5B rather than the planned Qwen3 4B champion; seven hidden examples do not establish adversarial safety, calibration, latency, cost or broad regression performance."}
     }
   ]
 }
