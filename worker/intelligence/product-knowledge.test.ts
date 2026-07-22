@@ -7,7 +7,7 @@ describe('product knowledge',()=>{
   const rendered=renderProductKnowledge();
   expect(rendered).toContain('Héctor OS');
   expect(rendered).toContain('Héctor Base');
-  expect(rendered).toContain('motor avanzado externo');
+  expect(rendered).toContain('único runtime autorizado para el chat interactivo');
   expect(rendered).toContain('Qwen3-4B');
   expect(rendered).toContain('GPT‑5.6');
   expect(rendered).toContain(PRODUCT_KNOWLEDGE_VERIFIED_AT);
@@ -21,9 +21,19 @@ describe('product knowledge',()=>{
   expect(rendered).toContain('campeón propio validado');
  });
 
- it('incluye Work, Codex, Sol, Terra, Luna y deliberación multiagente',()=>{
+ it('reserva OpenAI para entrenamiento y evaluación, nunca para chat',()=>{
   const rendered=renderProductKnowledge();
-  for(const value of ['ChatGPT Work','Codex','gpt-5.6-sol','gpt-5.6-terra','gpt-5.6-luna','arquitecto','adversario','juez'])expect(rendered).toContain(value);
+  expect(rendered).toContain('OpenAI está reservado');
+  expect(rendered).toContain('No está autorizado para responder el chat interactivo');
+  expect(rendered).toContain('fuera del chat interactivo');
+  expect(rendered).toContain('generación de datos');
+  expect(rendered).toContain('evaluación');
+  expect(rendered).toContain('entrenamiento');
+ });
+
+ it('incluye Work, Codex y deliberación abierta multiagente',()=>{
+  const rendered=renderProductKnowledge();
+  for(const value of ['ChatGPT Work','Codex','Llama 3.2 3B Instruct','arquitecto','adversario','juez'])expect(rendered).toContain(value);
  });
 
  it('marca productos cambiantes para verificación actual',()=>{
