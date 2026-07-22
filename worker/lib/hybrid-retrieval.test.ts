@@ -28,7 +28,7 @@ describe('hybrid retrieval',()=>{
   const unverified=baseRow({id:'bad',source_id:'bad',evidence_verified:0,fts_rank:0});
   const ranked=rankRetrievalRows('corrige typecheck y build del repositorio',[old,unverified,recent],5,Date.parse('2026-07-22T00:00:00Z'));
   expect(ranked.map(item=>item.id)).toEqual(['exp-1','old']);
-  expect(ranked[0].score).toBeGreaterThan(ranked[1].score);
+  expect(ranked[0]!.score).toBeGreaterThan(ranked[1]!.score);
  });
 
  it('deduplica contenido equivalente aunque provenga de fuentes distintas',()=>{
@@ -42,7 +42,8 @@ describe('hybrid retrieval',()=>{
   const compressed=compressRetrievalContent('error TypeScript typecheck',content,320);
   expect(compressed.length).toBeLessThanOrEqual(320);
   expect(compressed).toContain('typecheck');
-  const context=buildRetrievalContext('error TypeScript',[{...rankRetrievalRows('error TypeScript',[baseRow()],1)[0],content:compressed}],600);
+  const item=rankRetrievalRows('error TypeScript',[baseRow()],1)[0]!;
+  const context=buildRetrievalContext('error TypeScript',[{...item,content:compressed}],600);
   expect(context.length).toBeLessThanOrEqual(600);
  });
 
