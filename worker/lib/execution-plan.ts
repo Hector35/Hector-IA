@@ -51,20 +51,23 @@ export async function createExecutionPlan(input:ExecutionPlanInput):Promise<Exec
  return Object.freeze({...normalized,version:'1.0.0',hash:await hashExecutionPlan(normalized),createdAt:new Date().toISOString()});
 }
 
+function isHectorBaseModel(model:string){return model==='hector-rules-v1'||model.startsWith('@cf/');}
+
 export function verifyExecutionPlan(plan:ExecutionPlan,actual:ObservedExecution):ExecutionVerification{
  const differences:string[]=[];
  const actualMode=String(actual.cognitiveMode||'single').startsWith('ensemble')?'ensemble':'single';
+ const openModelOverride=plan.provider.requested==='openai'&&actual.provider==='cloudflare'&&actual.fallback===true&&isHectorBaseModel(actual.model);
  if(actual.tier!==plan.route.tier)differences.push(`tier previsto ${plan.route.tier}, observado ${actual.tier}`);
- if(!plan.allowedModels.includes(actual.model))differences.push(`modelo no autorizado ${actual.model}`);
+ if(!plan.allowedModels.includes(actual.model)&&!openModelOverride)differences.push(`modelo no autorizado ${actual.model}`);
  if(actualMode!==plan.cognition.mode)differences.push(`modo previsto ${plan.cognition.mode}, observado ${actualMode}`);
  if(Number(actual.deliberationPasses||1)!==plan.cognition.passes){
   const degraded=plan.cognition.mode==='ensemble'&&actualMode==='ensemble'&&Number(actual.deliberationPasses||0)>=1&&Number(actual.deliberationPasses||0)<plan.cognition.passes;
   if(!degraded)differences.push(`pasadas previstas ${plan.cognition.passes}, observadas ${actual.deliberationPasses||1}`);
  }
  const providerExact=actual.provider===plan.provider.requested;
- const allowedFallback=plan.provider.requested==='cloudflare'&&actual.provider==='openai'&&actual.fallback===true;
+ const allowedFallback=openModelOverride;
  if(!providerExact&&!allowedFallback)differences.push(`proveedor previsto ${plan.provider.requested}, observado ${actual.provider}`);
  if(differences.length)return{status:'drift',ok:false,differences,summary:`Desviación del plan ${plan.hash.slice(0,12)}: ${differences.join('; ')}`};
- if(allowedFallback)return{status:'allowed-fallback',ok:true,differences:[],summary:`Plan ${plan.hash.slice(0,12)} cumplido mediante fallback permitido de Cloudflare a OpenAI.`};
+ if(allowedFallback)return{status:'allowed-fallback',ok:true,differences:[],summary:`Plan ${plan.hash.slice(0,12)} protegido: OpenAI fue sustituido por Héctor Base porque el chat solo permite modelos abiertos.`};
  return{status:'exact',ok:true,differences:[],summary:`Plan ${plan.hash.slice(0,12)} ejecutado exactamente.`};
 }
