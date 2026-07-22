@@ -81,14 +81,19 @@ export async function runWithRuntimeReuse<T>(input:{prompt:string;candidates:Run
 }
 
 function reusableOutput(result:string){const match=result.match(/(?:^|\n)REUSABLE_OUTPUT\s*:\s*([\s\S]+)$/i);return match?.[1]?.trim();}
+function parseJson(value:string|null,fallback:unknown){try{return JSON.parse(value||'');}catch{return fallback;}}
+function hasVerifiedEvidence(value:string|null){
+ const evidence=parseJson(value,[]);
+ return Array.isArray(evidence)&&evidence.some(item=>item&&typeof item==='object'&&(item as {verified?:unknown}).verified===true);
+}
 
-export async function loadRuntimeReuseCandidates(db:{prepare:(sql:string)=>{bind:(...values:unknown[])=>{all:<T>()=>Promise<{results:T[]}>}}},userId:string):Promise<RuntimeReuseCandidate[]>{
+export async function loadRuntimeReuseCandidates(db:{prepare:(sql:string)=>{bind:(...values:unknown[])=>{all:<T>()=>Promise<{results:T[]}>}}},userId:string):Promise<RuntimeReuseCandidate[]> {
  try{
-  const rows=(await db.prepare("SELECT id,objective,result,skills_json,attempts FROM agent_experiences WHERE user_id=? AND status='completed' AND result IS NOT NULL ORDER BY created_at DESC LIMIT 60").bind(userId).all<{id:string;objective:string;result:string;skills_json:string|null;attempts:number}>()).results;
-  return rows.map(row=>{
+  const rows=(await db.prepare("SELECT id,objective,objective_normalized,result,skills_json,attempts,evidence_json,verified FROM agent_experiences WHERE user_id=? AND status='completed' AND verified=1 AND result IS NOT NULL ORDER BY created_at DESC LIMIT 60").bind(userId).all<{id:string;objective:string;objective_normalized:string;result:string;skills_json:string|null;attempts:number;evidence_json:string|null;verified:number}>()).results;
+  return rows.filter(row=>row.verified===1&&hasVerifiedEvidence(row.evidence_json)).map(row=>{
    let skills:string[]=[];try{skills=JSON.parse(row.skills_json||'[]');}catch{}
    const output=reusableOutput(row.result),attempts=Math.max(1,Number(row.attempts)||1),confidence=Math.max(.55,Math.min(.9,.92-(attempts-1)*.06));
-   return{id:row.id,source:'experience' as const,taskType:skills[0]||'general',risk:classifyReuseRisk(row.objective),confidence,successRate:confidence,estimatedCostUsd:0,trigger:row.objective,procedure:row.result.replace(/(?:^|\n)REUSABLE_OUTPUT\s*:[\s\S]+$/i,'').trim().slice(0,4000),mode:output?'deterministic' as const:'context' as const,deterministicOutput:output};
+   return{id:row.id,source:'experience' as const,taskType:skills[0]||'general',risk:classifyReuseRisk(row.objective_normalized||row.objective),confidence,successRate:confidence,estimatedCostUsd:0,trigger:row.objective_normalized||row.objective,procedure:row.result.replace(/(?:^|\n)REUSABLE_OUTPUT\s*:[\s\S]+$/i,'').trim().slice(0,4000),mode:output?'deterministic' as const:'context' as const,deterministicOutput:output};
   });
  }catch{return[];}
 }
