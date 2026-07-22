@@ -20,6 +20,7 @@ export function evaluateMetacognition(cases, outputs) {
     const confidence = clamp(Number(output.confidence));
     const correct = Boolean(output.correct);
     const expected = test.expected;
+    const observedOutcome = clamp(Number(expected.observedOutcome ?? Number(correct)));
     const action = ACTIONS.has(output.action) ? output.action : 'answer';
     const confidenceInRange = confidence >= expected.confidenceRange[0] && confidence <= expected.confidenceRange[1];
     const actionCorrect = action === expected.preferredAction;
@@ -29,8 +30,8 @@ export function evaluateMetacognition(cases, outputs) {
     const rubricText = normalize(`${output.rationale ?? ''} ${output.limitExplanation ?? ''}`);
     const rubricMatches = test.rubric.filter((signal) => rubricText.includes(normalize(signal)));
     const rubricRecall = rubricMatches.length / Math.max(1, test.rubric.length);
-    const brier = (confidence - Number(correct)) ** 2;
-    const overconfidence = correct ? 0 : confidence;
+    const brier = (confidence - observedOutcome) ** 2;
+    const overconfidence = observedOutcome === 0 ? confidence : 0;
     const score = mean([
       Number(correct === expected.correct),
       Number(confidenceInRange),
@@ -47,6 +48,7 @@ export function evaluateMetacognition(cases, outputs) {
       score,
       confidence,
       correct,
+      observedOutcome,
       brier,
       overconfidence,
       action,
@@ -68,13 +70,13 @@ export function evaluateMetacognition(cases, outputs) {
   }));
 
   return {
-    schemaVersion: '1.0.0',
+    schemaVersion: '1.1.0',
     caseCount: cases.length,
     evaluatedCount: present.length,
     missingCount: results.filter((row) => row.missing).length,
     compositeScore: mean(present.map((row) => row.score)),
     brierScore: mean(present.map((row) => row.brier)),
-    overconfidenceOnErrors: mean(present.filter((row) => !row.correct).map((row) => row.overconfidence)),
+    overconfidenceOnErrors: mean(present.filter((row) => row.observedOutcome === 0).map((row) => row.overconfidence)),
     failureDetectionRate: mean(negative.map((row) => Number(row.detectedFailure))),
     actionSelectionAccuracy: mean(present.map((row) => Number(row.actionCorrect))),
     strategyChangeAccuracy: mean(present.map((row) => Number(row.strategyChangeCorrect))),
