@@ -1,0 +1,81 @@
+{
+  "schemaVersion": "1.0.0",
+  "roundId": "round-2026-07-22-01",
+  "integratedMainSha": "87194b3d8ca8745272054a9004f3227de994d1d4",
+  "decisionAt": "2026-07-22T15:18:00Z",
+  "budget": {
+    "approvedUsd": 5,
+    "spentUsd": 0,
+    "reason": "Deterministic benchmarks and repository validation were sufficient for the specialist integration decision; paid review could not change the non-promotion conclusion."
+  },
+  "decisions": [
+    {
+      "candidate": "metacognitive-controller-v1",
+      "sourcePr": 583,
+      "decision": "integrate-inactive-specialist",
+      "reason": "Selective controller beat the naive baseline on the contractual adversarial suite, retained zero API cost, passed repository and production audits, and has trivial rollback. The benchmark is too small and visible to justify runtime or global promotion.",
+      "runtimeEnabled": false,
+      "rollback": "Remove or stop importing model/hector-asi/metacognitive_controller.mjs and its manifest; no production route currently depends on it."
+    },
+    {
+      "candidate": "metacognition-cycle-2-data",
+      "sourcePr": 576,
+      "decision": "superseded-and-closed",
+      "reason": "Its useful artifacts were rebuilt and expanded in PR 583 on current main. Keeping both would duplicate evaluation assets."
+    },
+    {
+      "candidate": "constraint-aware-dag-planner-v1",
+      "sourcePr": 578,
+      "decision": "retain-unmerged-candidate",
+      "reason": "The branch preserves a useful planning hypothesis, but prior tests failed reproducibly and there is no independent hidden evaluation supporting integration."
+    },
+    {
+      "candidate": "hector-asi-v0.1-qwen3-4b-sft",
+      "decision": "remain-planned",
+      "reason": "No trained adapter, checkpoint or held-out model improvement exists."
+    }
+  ],
+  "validatedEvidence": {
+    "repositoryPrChecks": "success",
+    "productionAudit": "success",
+    "iphoneUiImpact": "none; candidate changes model assets and tests only",
+    "weightTraining": false,
+    "globalChampionPromoted": false
+  },
+  "pipelineEvaluation": {
+    "improvement": "incremental row-level evaluation cache",
+    "singleChangedCaseReuseRate": 0.9167,
+    "qualityGate": "full recomputation and cached evaluation are asserted equivalent in tests",
+    "decision": "keep"
+  },
+  "nextPriorities": [
+    {
+      "priority": 1,
+      "objective": "Create an independent shadow benchmark for metacognitive routing with cases not authored alongside the controller, then measure false verification, false escalation and unsafe answer rates."
+    },
+    {
+      "priority": 2,
+      "objective": "Rebuild or rebase the cognitive planner candidate on current main, fix its failing baseline assertion, and evaluate it on independently generated constraint conflicts before integration."
+    },
+    {
+      "priority": 3,
+      "objective": "Connect the evolution interface to the evolution tree so integrated inactive specialists are visible without implying they are production capabilities."
+    },
+    {
+      "priority": 4,
+      "objective": "Do not schedule GPU training until the licensed dataset is materially larger and the hidden evaluation can detect a minimum 3% improvement with critical regression gates."
+    }
+  ],
+  "handoff": {
+    "directorMustRead": [
+      "model/hector-asi/evolution-tree.json",
+      "model/hector-asi/rounds/round-2026-07-22-01-result.json",
+      "model/hector-asi/manifests/metacognitive-controller-v1.json"
+    ],
+    "doNotRepeat": [
+      "naive high-risk-only escalation baseline",
+      "duplicate metacognition cycle-2 branch",
+      "claiming the contractual suite is a hidden model benchmark"
+    ]
+  }
+}
