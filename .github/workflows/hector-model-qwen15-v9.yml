@@ -46,6 +46,9 @@ jobs:
           def sha(p): return hashlib.sha256(p.read_bytes()).hexdigest()
           metrics=[json.loads((r/'metrics.json').read_text()) for r in roots]
           hashes=[sha(r/'adapter'/'adapter_model.safetensors') for r in roots]
+          summary={'adapterSha256':hashes[0],'byteIdenticalReplicas':int(hashes[0]==hashes[1]),**{k:metrics[0]['results'][k] for k in ['baseValidationLoss','candidateValidationLoss','relativeValidationImprovement','parameterDeltaL2','trainableParameters','adapterBytes']},'trainExamples':metrics[0]['dataset']['trainExamples'],'validationExamples':metrics[0]['dataset']['validationExamples'],'controlledComparison':'same Qwen15 v5 train/validation split; rank-64 LoRA must beat v8 candidate loss 2.372159'}
+          Path('artifacts/hector-asi-qwen15-v9-a/reproducibility.json').write_text(json.dumps(summary,indent=2)+'\n')
+          print(json.dumps(summary,indent=2))
           assert hashes[0]==hashes[1], hashes
           for m,r in zip(metrics,roots):
             x=m['results']
@@ -57,11 +60,9 @@ jobs:
             assert (r/'SHA256SUMS').is_file()
           v8_loss=2.372159
           assert metrics[0]['results']['candidateValidationLoss'] < v8_loss, (metrics[0]['results']['candidateValidationLoss'],v8_loss)
-          summary={'adapterSha256':hashes[0],'byteIdenticalReplicas':2,**{k:metrics[0]['results'][k] for k in ['baseValidationLoss','candidateValidationLoss','relativeValidationImprovement','parameterDeltaL2','trainableParameters','adapterBytes']},'trainExamples':metrics[0]['dataset']['trainExamples'],'validationExamples':metrics[0]['dataset']['validationExamples'],'controlledComparison':'same Qwen15 v5 train/validation split; rank-64 LoRA must beat v8 candidate loss 2.372159'}
-          Path('artifacts/hector-asi-qwen15-v9-a/reproducibility.json').write_text(json.dumps(summary,indent=2)+'\n')
-          print(json.dumps(summary,indent=2))
           PY
       - name: Upload immutable adapter and evidence
+        if: always()
         uses: actions/upload-artifact@v4
         with:
           name: hector-asi-qwen15-v9-${{ github.run_id }}
