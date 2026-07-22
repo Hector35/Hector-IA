@@ -30,9 +30,11 @@ export function installChatBudgetForecastEnhancer(){
    render(`${model} · ${passes} pasada${passes===1?'':'s'} · ~${cost} · saldo posterior ${remaining} · ${status}`,degraded?'warning':protectedTask?'protected':'good');
   }catch(error){if((error as Error).name==='AbortError')return;render(error instanceof Error?error.message:'Pronóstico no disponible','error');}
  };
+ const refresh=()=>{const prompt=textarea?.value.trim()||'';lastPrompt=prompt;if(timer)window.clearTimeout(timer);if(prompt.length<3){clear();return;}void request(prompt);};
  const onInput=()=>{const prompt=textarea?.value.trim()||'';lastPrompt=prompt;if(timer)window.clearTimeout(timer);if(prompt.length<3){clear();return;}render('Preparando pronóstico…','loading');timer=window.setTimeout(()=>{if(prompt===lastPrompt)void request(prompt);},450);};
- const mount=(form:HTMLFormElement)=>{if(form.dataset.budgetForecastReady==='1')return;form.dataset.budgetForecastReady='1';composer=form;textarea=form.querySelector('textarea')||undefined;if(!textarea)return;bar=document.createElement('div');bar.className='cxChatForecast';bar.setAttribute('role','status');bar.setAttribute('aria-live','polite');form.insertAdjacentElement('beforebegin',bar);textarea.addEventListener('input',onInput);form.addEventListener('submit',clear);onInput();};
- const scan=()=>{const next=findComposer();if(next&&next!==composer)mount(next);if(composer&&!document.body.contains(composer)){clear();composer=undefined;textarea=undefined;bar=undefined;}};
+ const onPolicyChanged=()=>refresh();
+ const mount=(form:HTMLFormElement)=>{if(form.dataset.budgetForecastReady==='1')return;form.dataset.budgetForecastReady='1';composer=form;textarea=form.querySelector('textarea')||undefined;if(!textarea)return;bar=document.createElement('div');bar.className='cxChatForecast';bar.setAttribute('role','status');bar.setAttribute('aria-live','polite');form.insertAdjacentElement('beforebegin',bar);textarea.addEventListener('input',onInput);form.addEventListener('submit',clear);window.addEventListener('hector:budget-policy-changed',onPolicyChanged);onInput();};
+ const scan=()=>{const next=findComposer();if(next&&next!==composer)mount(next);if(composer&&!document.body.contains(composer)){clear();textarea?.removeEventListener('input',onInput);window.removeEventListener('hector:budget-policy-changed',onPolicyChanged);composer=undefined;textarea=undefined;bar=undefined;}};
  const observer=new MutationObserver(scan);observer.observe(document.body,{childList:true,subtree:true});scan();
- return()=>{observer.disconnect();clear();textarea?.removeEventListener('input',onInput);};
+ return()=>{observer.disconnect();clear();textarea?.removeEventListener('input',onInput);window.removeEventListener('hector:budget-policy-changed',onPolicyChanged);};
 }
