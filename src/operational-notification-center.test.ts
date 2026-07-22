@@ -1,0 +1,9 @@
+import {describe,expect,it} from 'vitest';
+import {badgeLabel,filterNotifications,notificationDestination,sortNotifications,type OperationalNotification} from './operational-notification-center';
+const item=(key:string,severity:'info'|'warning'|'critical',source:'quality'|'budget'|'work'|'runner',createdAt='2026-07-22T01:00:00Z'):OperationalNotification=>({key,severity,source,title:key,message:key,action:'Abrir',createdAt});
+describe('operational notification center',()=>{
+ it('ordena primero por severidad y después por fecha',()=>{const result=sortNotifications([item('old','warning','budget'),item('info','info','quality','2026-07-22T03:00:00Z'),item('new','critical','runner','2026-07-22T02:00:00Z')]);expect(result.map(x=>x.key)).toEqual(['new','old','info']);});
+ it('filtra sin mutar la colección original',()=>{const items=[item('a','critical','runner'),item('b','warning','budget')];expect(filterNotifications(items,'critical').map(x=>x.key)).toEqual(['a']);expect(items).toHaveLength(2);});
+ it('navega incidentes a Trabajo y políticas a Ajustes',()=>{expect(notificationDestination(item('a','critical','runner'))).toBe('Trabajo');expect(notificationDestination(item('b','warning','work'))).toBe('Trabajo');expect(notificationDestination(item('c','warning','budget'))).toBe('Ajustes');expect(notificationDestination(item('d','warning','quality'))).toBe('Ajustes');});
+ it('resume criticidad sin ocultar el total',()=>{expect(badgeLabel({total:0,critical:0,warning:0,info:0})).toBe('Operación estable');expect(badgeLabel({total:4,critical:2,warning:1,info:1})).toBe('Operación 2 críticas');expect(badgeLabel({total:3,critical:0,warning:3,info:0})).toBe('Operación 3');});
+});
