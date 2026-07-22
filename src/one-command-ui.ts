@@ -35,9 +35,10 @@ function showToast(message:string,tone:'good'|'bad'='good'){
 }
 
 function openWorkSection(selector:string){
- const workButton=[...document.querySelectorAll<HTMLButtonElement>('.cxSidebar nav button')].find(button=>button.textContent?.trim()==='Trabajo');
- workButton?.click();
- let attempts=0;const timer=window.setInterval(()=>{const target=document.querySelector<HTMLElement>(selector);if(target){window.clearInterval(timer);target.scrollIntoView({behavior:'smooth',block:'start'});target.querySelector<HTMLElement>('textarea,button')?.focus({preventScroll:true});}else if(++attempts>=30)window.clearInterval(timer);},100);
+ const workButton=[...document.querySelectorAll<HTMLButtonElement>('.cxSidebar nav button')].find(button=>normalize(button.textContent||'').startsWith('trabajo'));
+ if(!workButton){showToast('La acción se creó, pero no se pudo abrir Trabajo automáticamente.','bad');return;}
+ workButton.click();
+ let attempts=0;const timer=window.setInterval(()=>{const target=document.querySelector<HTMLElement>(selector);if(target){window.clearInterval(timer);target.scrollIntoView({behavior:'smooth',block:'start'});target.querySelector<HTMLElement>('textarea,button')?.focus({preventScroll:true});}else if(++attempts>=50){window.clearInterval(timer);showToast('La acción se creó, pero la sección tardó demasiado en abrir.','bad');}},100);
 }
 
 function decorateHome(){
