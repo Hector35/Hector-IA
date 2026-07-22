@@ -1,5 +1,5 @@
 import {FormEvent,useEffect,useMemo,useRef,useState} from 'react';
-import {ArrowUp,Check,Clock3,File,History,Image as ImageIcon,LogOut,Paperclip,Plus,Sparkles,X} from 'lucide-react';
+import {ArrowUp,Check,Clock3,File,History,LogOut,Paperclip,Plus,Sparkles,X} from 'lucide-react';
 import {api,type User} from './api';
 import {MarkdownMessage} from './MarkdownMessage';
 
@@ -16,7 +16,6 @@ type ChatMessage={
 };
 
 type PendingAttachment={file:File;preview?:string};
-
 type Overlay='history'|'account'|null;
 
 async function jsonFetch(path:string,init?:RequestInit){
@@ -116,8 +115,6 @@ function ChatWorkspace({user,onLogout}:{user:User;onLogout:()=>void}){
   useEffect(()=>{
     end.current?.scrollIntoView({behavior:messages.length?'smooth':'auto',block:'end'});
   },[messages,busy,notice]);
-
-  useEffect(()=>()=>{if(attachment?.preview)URL.revokeObjectURL(attachment.preview)},[attachment]);
 
   const title=useMemo(()=>{
     if(!conversationId)return 'Nueva conversación';
