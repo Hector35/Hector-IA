@@ -19,10 +19,10 @@ export function selectReusableExperience(input:{userId:string;objective:string;e
 
 export function promoteSkill(experience:CognitiveExperience,existing?:LearnedSkill):LearnedSkill|null{
  if(experience.status!=='completed'||!hasVerifiedEvidence(experience)||experience.procedure.length===0)return null;
- if(existing&&existing.userId!==experience.userId)return null;
+ if(existing&&(existing.userId!==experience.userId||objectiveSimilarity(existing.trigger,experience.objective)<.42))return null;
  const successes=(existing?.successes??0)+1,failures=existing?.failures??0,total=successes+failures;
  const confidence=Math.min(.98,Math.max(.5,successes/Math.max(1,total)));
- return{id:existing?.id??`skill:${experience.id}`,userId:experience.userId,trigger:normalize(experience.objective).slice(0,240),procedure:experience.procedure,version:(existing?.version??0)+1,confidence,successes,failures,status:successes>=2&&confidence>=.66?'active':'candidate'};
+ return{id:existing?.id??`skill:${experience.id}`,userId:experience.userId,trigger:existing?.trigger??normalize(experience.objective).slice(0,240),procedure:experience.procedure,version:(existing?.version??0)+1,confidence,successes,failures,status:successes>=2&&confidence>=.66?'active':'candidate'};
 }
 
 export function recordSkillOutcome(skill:LearnedSkill,succeeded:boolean):LearnedSkill{
