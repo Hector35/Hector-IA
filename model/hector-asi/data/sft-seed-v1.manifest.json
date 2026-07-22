@@ -1,0 +1,22 @@
+{
+  "schemaVersion": "1.0.0",
+  "datasetId": "hector-asi-sft-seed-v1",
+  "format": "chat-jsonl",
+  "language": ["es", "en"],
+  "license": "Apache-2.0",
+  "source": "Project-authored synthetic examples created for Hector ASI; no scraped or private user content.",
+  "containsPrivateUserData": false,
+  "containsModelOutputs": false,
+  "allowedUses": ["training", "evaluation-development", "redistribution"],
+  "prohibitedUses": ["claiming benchmark validity from this training split"],
+  "qualityGates": {
+    "requiredFields": ["id", "messages", "capability", "verification"],
+    "minimumMessages": 2,
+    "deduplicateBy": ["id", "normalizedUserPrompt"],
+    "rejectUnverifiedExamples": true
+  },
+  "splits": {
+    "train": "model/hector-asi/data/sft-seed-v1.jsonl",
+    "heldOut": "model/hector-asi/evals/held-out-v1.jsonl"
+  }
+}

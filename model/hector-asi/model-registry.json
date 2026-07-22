@@ -1,0 +1,43 @@
+{
+  "schemaVersion": "1.0.0",
+  "project": "Hector ASI",
+  "champion": null,
+  "candidates": [
+    {
+      "id": "hector-asi-v0.1-qwen3-4b-sft",
+      "status": "planned",
+      "baseModel": {
+        "repository": "Qwen/Qwen3-4B-Instruct-2507",
+        "revision": "main",
+        "license": "Apache-2.0",
+        "licenseUrl": "https://huggingface.co/Qwen/Qwen3-4B-Instruct-2507/blob/main/LICENSE",
+        "weightsHash": null,
+        "rationale": "4B open-weight instruction model with permissive Apache-2.0 licensing, multilingual capability and a size compatible with parameter-efficient tuning on limited GPUs."
+      },
+      "method": {
+        "stage": "sft",
+        "adapter": "qlora",
+        "precision": "4bit-nf4",
+        "targetModules": "all-linear"
+      },
+      "dataset": {
+        "path": "model/hector-asi/data/sft-seed-v1.jsonl",
+        "manifest": "model/hector-asi/data/sft-seed-v1.manifest.json",
+        "containsPrivateUserData": false
+      },
+      "artifacts": {
+        "adapterPath": "artifacts/hector-asi-v0.1-qwen3-4b-sft/adapter",
+        "metricsPath": "artifacts/hector-asi-v0.1-qwen3-4b-sft/metrics.json",
+        "storage": "external-r2-or-huggingface",
+        "committedToGit": false
+      },
+      "promotionGate": {
+        "minimumHeldOutImprovement": 0.03,
+        "maximumSecondaryRegression": 0.01,
+        "criticalRegressionsAllowed": 0,
+        "requiresReproducibleRun": true,
+        "requiresRollbackArtifact": true
+      }
+    }
+  ]
+}
