@@ -55,7 +55,7 @@ function deterministicWorkOutput(output:string,candidate:RuntimeReuseCandidate,p
 
 export async function executePlannedWork(env:Bindings,input:PlannedWorkInput){
  const prepared=await prepareWorkExecutionPlan(env,input);
- const candidates=await loadRuntimeReuseCandidates(env.DB,input.userId);
+ const candidates=await loadRuntimeReuseCandidates(env.DB,input.userId,input.prompt);
  const baseContext=input.context||'Trabajo persistente ejecutado fuera del chat.';
  const executed=candidates.length?await runWithRuntimeReuse({
   prompt:input.prompt,candidates,authorizedHighRisk:input.authorizedHighRisk,modelCostUsd:.02,
