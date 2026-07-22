@@ -1,7 +1,7 @@
 import {describe,expect,it,vi} from 'vitest';
-import {chooseRuntimeReuse,runWithRuntimeReuse,type RuntimeReuseCandidate} from './runtime-reuse';
+import {chooseRuntimeReuse,experienceRecencyScore,loadRuntimeReuseCandidates,runWithRuntimeReuse,type RuntimeReuseCandidate} from './runtime-reuse';
 
-const known:RuntimeReuseCandidate={id:'skill-known',source:'skill',taskType:'github-code',risk:'medium',confidence:.94,successRate:.92,estimatedCostUsd:0,trigger:'ejecuta typecheck pruebas y build del repositorio',procedure:'Ejecutar typecheck, pruebas y build; devolver evidencia.',mode:'deterministic',deterministicOutput:'Validación reutilizada y completada.'};
+const known:RuntimeReuseCandidate={id:'skill-known',source:'skill',taskType:'github-code',risk:'medium',confidence:.94,successRate:.92,recencyScore:1,estimatedCostUsd:0,trigger:'ejecuta typecheck pruebas y build del repositorio',procedure:'Ejecutar typecheck, pruebas y build; devolver evidencia.',mode:'deterministic',deterministicOutput:'Validación reutilizada y completada.'};
 
 const contextCandidate:RuntimeReuseCandidate={...known,id:'experience-context',mode:'context',deterministicOutput:undefined,confidence:.74,successRate:.8,trigger:'analiza error desconocido del repositorio',procedure:'Inspeccionar primero el error y los archivos relacionados.'};
 
@@ -41,5 +41,24 @@ describe('runtime reuse engine',()=>{
  it('permite evaluar alto riesgo cuando existe autorización explícita',()=>{
   const candidate={...known,risk:'high' as const,trigger:'elimina despliegue temporal verificado'};
   expect(chooseRuntimeReuse('Elimina el despliegue temporal verificado',[candidate],{authorizedHighRisk:true}).kind).not.toBe('blocked');
+ });
+
+ it('favorece una experiencia reciente cuando las demás señales empatan',()=>{
+  const recent={...contextCandidate,id:'recent',recencyScore:1};
+  const old={...contextCandidate,id:'old',recencyScore:.05};
+  const decision=chooseRuntimeReuse('Analiza un error desconocido del repositorio',[old,recent]);
+  expect(decision.kind).toBe('assist');
+  if(decision.kind==='assist')expect(decision.candidate.id).toBe('recent');
+  expect(experienceRecencyScore('2026-07-22T00:00:00Z',Date.parse('2026-07-22T00:00:00Z'))).toBe(1);
+ });
+
+ it('consulta únicamente experiencias verificadas y aisladas por usuario',async()=>{
+  let sql='',bindings:unknown[]=[];
+  const db={prepare:(statement:string)=>{sql=statement;return{bind:(...values:unknown[])=>{bindings=values;return{all:async()=>({results:[{id:'verified-1',objective:'Corrige repositorio',result:'Inspeccionar el error y ejecutar pruebas.',skills_json:'["github-code"]',attempts:1,created_at:'2026-07-22T00:00:00Z',estimated_cost_usd:.01}]})};}};}};
+  const items=await loadRuntimeReuseCandidates(db,'owner-1');
+  expect(sql).toContain("user_id=? AND status='completed' AND verified=1");
+  expect(bindings).toEqual(['owner-1']);
+  expect(items).toHaveLength(1);
+  expect(items[0]).toMatchObject({id:'verified-1',taskType:'github-code',estimatedCostUsd:.01});
  });
 });
