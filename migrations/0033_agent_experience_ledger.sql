@@ -17,7 +17,7 @@ ALTER TABLE agent_experiences ADD COLUMN updated_at TEXT;
 
 UPDATE agent_experiences
 SET objective_normalized=lower(trim(objective)),
-    execution_id=COALESCE(execution_id,job_id||':legacy'),
+    execution_id=COALESCE(execution_id,job_id||':legacy:'||id),
     verified=CASE WHEN status='completed' THEN 1 ELSE 0 END,
     updated_at=created_at
 WHERE objective_normalized='';
