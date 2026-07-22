@@ -10,23 +10,23 @@ describe('Hector ASI metacognition evaluator', () => {
     expect(report.caseCount).toBe(8);
     expect(report.missingCount).toBe(0);
     expect(report.compositeScore).toBe(1);
-    expect(report.brierScore).toBeLessThan(0.2);
+    expect(report.brierScore).toBeLessThan(0.05);
     expect(report.actionSelectionAccuracy).toBe(1);
     expect(report.strategyChangeAccuracy).toBe(1);
     expect(report.stoppingAccuracy).toBe(1);
     expect(report.failureDetectionRate).toBe(1);
   });
 
-  it('penalizes confident wrong answers and missing cases', () => {
+  it('penalizes confident claims after an observed failure and missing cases', () => {
     const outputs = [{
-      id: 'meta-cal-001',
+      id: 'meta-fail-001',
       confidence: 0.99,
       correct: false,
       action: 'answer',
       changedStrategy: false,
       stopped: false,
       detectedFailure: false,
-      rationale: 'No necesito verificar.',
+      rationale: 'No necesito revisar el fallo.',
     }];
     const report = evaluateMetacognition(cases, outputs);
     expect(report.missingCount).toBe(7);
@@ -39,6 +39,6 @@ describe('Hector ASI metacognition evaluator', () => {
     const report = evaluateMetacognition(cases, fixture);
     expect(report.byCapability.calibration.count).toBe(1);
     expect(report.byCapability['strategy-selection'].score).toBe(1);
-    expect(report.byCapability.overconfidence.brier).toBeLessThan(0.3);
+    expect(report.byCapability.overconfidence.brier).toBeLessThan(0.01);
   });
 });
