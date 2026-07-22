@@ -1,9 +1,9 @@
 {
-  "schemaVersion": "1.0.0",
+  "schemaVersion": "1.1.0",
   "experimentId": "hector-asi-qwen15-v1",
-  "runId": "29946227600",
-  "completedAt": "2026-07-22T18:23:05Z",
-  "status": "experimental-weights-generated",
+  "runIds": ["29946227600", "29946560377"],
+  "completedAt": "2026-07-22T18:27:45Z",
+  "status": "experimental-weights-generated-reproducibly",
   "championPromoted": false,
   "baseModel": {
     "repository": "Qwen/Qwen2.5-1.5B-Instruct",
@@ -12,13 +12,21 @@
   },
   "training": {
     "method": "LoRA SFT",
-    "hardware": "GitHub-hosted 4-vCPU Linux runner constrained to one CPU thread",
-    "epochs": 1,
-    "steps": 12,
+    "hardware": "Two independent GitHub-hosted 4-vCPU Linux runs constrained to one CPU thread",
+    "independentRuns": 2,
+    "epochsPerRun": 1,
+    "stepsPerRun": 12,
     "seed": 35,
-    "seconds": 119.42319345474243,
+    "secondsFirstRun": 119.42319345474243,
+    "secondsSecondRun": 118.78016901016235,
     "trainableParameters": 544768,
     "parameterDeltaL2": 1.0609352588653564
+  },
+  "reproducibility": {
+    "independentRuns": 2,
+    "byteIdenticalAdapters": true,
+    "adapterSha256": "47b883a2fb61e1618eaa4d7011903db8b5fd6abb03283cd109a67395bcfa1e20",
+    "scope": "Exact byte identity was demonstrated across two independent GitHub Actions runs with pinned model revision, software, dataset, seed and single-thread deterministic CPU execution."
   },
   "evaluation": {
     "baseValidationLoss": 4.705404111317226,
@@ -29,16 +37,27 @@
     "validationExamples": 7,
     "criticalRegressionAssessment": "not broad enough for champion eligibility"
   },
-  "artifact": {
-    "githubActionsArtifactId": "8540317926",
-    "name": "hector-asi-qwen15-29946227600",
-    "archiveBytes": 5936240,
-    "archiveSha256": "9f3d463481552975cd965f50b74a91e0224afc1b4846bc31b2073f31ece68c35",
-    "adapterPath": "adapter/adapter_model.safetensors",
-    "adapterBytes": 2193720,
-    "adapterSha256": "47b883a2fb61e1618eaa4d7011903db8b5fd6abb03283cd109a67395bcfa1e20",
-    "weightsCommittedToGit": false,
-    "expiresAt": "2026-10-20T18:20:21Z"
+  "artifacts": [
+    {
+      "githubActionsArtifactId": "8540317926",
+      "name": "hector-asi-qwen15-29946227600",
+      "archiveBytes": 5936240,
+      "archiveSha256": "9f3d463481552975cd965f50b74a91e0224afc1b4846bc31b2073f31ece68c35",
+      "expiresAt": "2026-10-20T18:20:21Z"
+    },
+    {
+      "githubActionsArtifactId": "8540448183",
+      "name": "hector-asi-qwen15-29946560377",
+      "archiveBytes": 5936238,
+      "archiveSha256": "a5db52963781598039911a6f39222e6f357ece942fb4a2943a01bca1ea750716",
+      "expiresAt": "2026-10-20T18:25:05Z"
+    }
+  ],
+  "adapter": {
+    "path": "adapter/adapter_model.safetensors",
+    "bytes": 2193720,
+    "sha256": "47b883a2fb61e1618eaa4d7011903db8b5fd6abb03283cd109a67395bcfa1e20",
+    "weightsCommittedToGit": false
   },
   "datasets": {
     "trainSha256": "87d3a9f2cb44d2579615398c2cff5985f456f12623026f238e829b12b1433b69",
@@ -46,8 +65,8 @@
     "privateUserData": false
   },
   "promotionDecision": {
-    "decision": "await-independent-replication",
-    "reason": "Real weights and lower hidden loss were produced, but an independent second run and broader regression evaluation are required.",
+    "decision": "retain-as-experimental-qwen-specialist",
+    "reason": "The candidate generated reproducible real weights and improved hidden loss, but the base is Qwen2.5 1.5B rather than Qwen3 4B and seven hidden cases cannot establish broad safety, calibration, transfer or regression performance.",
     "rollback": "Do not load or delete the adapter; the frozen base model remains unchanged."
   }
 }
