@@ -7,8 +7,9 @@ import {loadCloudflareHealth} from './provider-quality';
 import {chooseProvider} from './providers';
 import {chooseDeliberation} from './deliberation';
 import {createExecutionPlan,verifyExecutionPlan,type ExecutionPlan} from './execution-plan';
-import {loadRuntimeReuseCandidates,runWithRuntimeReuse,type RuntimeReuseCandidate} from './runtime-reuse';
-import {createCallGovernor,decideCallBudget,governExecutionPlan,type CallGovernorMetrics,type ReuseDisposition} from './call-governor';
+import {classifyReuseRisk,loadRuntimeReuseCandidates,runWithRuntimeReuse,type RuntimeReuseCandidate} from './runtime-reuse';
+import {createCallGovernor,decideCallBudget,governExecutionPlan,shouldUseExactCallCache,type CallGovernorMetrics,type ReuseDisposition} from './call-governor';
+import {recordCallGovernorEvent} from './call-governor-ledger';
 
 export type PlannedWorkInput={userId:string;prompt:string;allowWeb:boolean;reasoningLevel:'auto'|'high';context?:string;authorizedHighRisk?:boolean};
 
@@ -56,20 +57,27 @@ function deterministicWorkOutput(output:string,candidate:RuntimeReuseCandidate,p
 
 function zeroCallMetrics(plan:ExecutionPlan,prompt:string):CallGovernorMetrics{
  const decision=decideCallBudget({prompt,reuse:'deterministic',requestedPasses:plan.cognition.passes,reasoningLevel:'high'});
- return{advancedCalls:0,deduplicatedCalls:0,blockedCalls:0,requestedPasses:decision.requestedPasses,executedPasses:0,estimatedAdvancedCallsSaved:decision.estimatedAdvancedCallsSaved,justifications:[decision.justification]};
+ return{advancedCalls:0,deduplicatedCalls:0,cacheHits:0,blockedCalls:0,requestedPasses:decision.requestedPasses,executedPasses:0,estimatedAdvancedCallsSaved:decision.estimatedAdvancedCallsSaved,justifications:[decision.justification]};
 }
 
 export async function executePlannedWork(env:Bindings,input:PlannedWorkInput){
  const prepared=await prepareWorkExecutionPlan(env,input);
  const candidates=await loadRuntimeReuseCandidates(env.DB,input.userId);
  const baseContext=input.context||'Trabajo persistente ejecutado fuera del chat.';
+ const cacheable=shouldUseExactCallCache({prompt:input.prompt,allowWeb:input.allowWeb,risk:classifyReuseRisk(input.prompt)});
  let activePlan=prepared.plan,governorMetrics:CallGovernorMetrics|undefined;
  const executeModel=async(reuseContext:string,disposition:ReuseDisposition)=>{
   const governed=await governExecutionPlan(prepared.plan,{prompt:input.prompt,reuse:disposition,reasoningLevel:input.reasoningLevel});
   activePlan=governed.plan;
   const governor=createCallGovernor(governed.decision);
   const context=reuseContext?`${baseContext}\n\n${reuseContext}`:baseContext;
-  const value=await governor.advanced({key:`${input.userId}:${activePlan.hash}:${input.prompt}:${context}`,justification:`Ejecutar ${activePlan.route.model} para la parte no resuelta de ${activePlan.task}.`,execute:()=>executePlannedContextual(env,input.prompt,[],context,activePlan,{feedback:prepared.feedback,budgetDecision:prepared.budgetDecision})});
+  const value=await governor.advanced({
+   key:`${input.userId}:${activePlan.hash}:${input.prompt}:${context}`,
+   justification:`Ejecutar ${activePlan.route.model} para la parte no resuelta de ${activePlan.task}.`,
+   cacheable,
+   isCacheableResult:result=>result.qualityAccepted!==false&&!result.searchedWeb&&!result.fallback,
+   execute:()=>executePlannedContextual(env,input.prompt,[],context,activePlan,{feedback:prepared.feedback,budgetDecision:prepared.budgetDecision})
+  });
   governorMetrics=governor.metrics;
   return value;
  };
@@ -81,6 +89,9 @@ export async function executePlannedWork(env:Bindings,input:PlannedWorkInput){
  if(executed.decision.kind==='deterministic')governorMetrics=zeroCallMetrics(prepared.plan,input.prompt);
  const out=executed.value;
  const verification=verifyExecutionPlan(activePlan,{model:out.model,tier:out.modelTier,provider:out.provider,requestedProvider:out.requestedProvider,cognitiveMode:out.cognitiveMode,deliberationPasses:out.deliberationPasses,fallback:out.fallback});
- const usage=estimatePlannedCost(out.usage,out.model);if(out.searchedWeb)usage.costUsd+=.01;
+ let usage=estimatePlannedCost(out.usage,out.model);if(out.searchedWeb)usage.costUsd+=.01;
+ const reusedInference=Boolean(governorMetrics&&governorMetrics.advancedCalls===0&&(governorMetrics.cacheHits>0||governorMetrics.deduplicatedCalls>0));
+ if(reusedInference)usage={...usage,input:0,cached:0,cacheWrite:0,output:0,costUsd:0,longContext:false};
+ if(governorMetrics)await recordCallGovernorEvent(env.DB,{userId:input.userId,requestKey:activePlan.hash,metrics:governorMetrics});
  return{out,plan:activePlan,verification,usage,reuse:{kind:executed.decision.kind,candidateId:executed.decision.kind==='assist'||executed.decision.kind==='deterministic'?executed.decision.candidate.id:null,reusedFraction:executed.decision.reusedFraction,modelCalls:executed.modelCalls,reason:executed.decision.reason},callGovernor:governorMetrics};
 }
