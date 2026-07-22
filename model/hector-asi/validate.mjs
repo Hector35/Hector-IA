@@ -1,5 +1,7 @@
 import {readFileSync} from 'node:fs';
 import {resolve} from 'node:path';
+import {pathToFileURL} from 'node:url';
+import {evaluateOutputs} from './evaluate_outputs.mjs';
 
 const root=process.cwd();
 const readJson=(path)=>JSON.parse(readFileSync(resolve(root,path),'utf8'));
@@ -27,9 +29,14 @@ export function validateHectorAsiArtifacts(){
   if(candidate.dataset.containsPrivateUserData!==false||manifest.containsPrivateUserData!==false)throw new Error('private data is not allowed');
   if(candidate.artifacts.committedToGit!==false)throw new Error('large model artifacts must stay out of Git');
   if(candidate.promotionGate.minimumHeldOutImprovement<0.03)throw new Error('promotion gate is too weak');
-  return {candidate:candidate.id,trainExamples:train.length,heldOutExamples:heldOut.length};
+  const evaluatorCheck=evaluateOutputs(
+    [{id:'self-check',capability:'verification',expectedSignals:['revalidar sha actual','checks verdes']}],
+    [{id:'self-check',response:'Debes revalidar SHA actual y exigir checks verdes.'}],
+  );
+  if(evaluatorCheck.meanSignalRecall!==1)throw new Error('held-out evaluator self-check failed');
+  return {candidate:candidate.id,trainExamples:train.length,heldOutExamples:heldOut.length,evaluatorSelfCheck:true};
 }
 
-if(import.meta.url===`file://${process.argv[1]}`){
+if(import.meta.url===pathToFileURL(resolve(process.argv[1])).href){
   console.log(JSON.stringify(validateHectorAsiArtifacts(),null,2));
 }
