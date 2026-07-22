@@ -1,0 +1,37 @@
+{
+  "schemaVersion": "1.0.0",
+  "cycle": 2,
+  "status": "metacognition-evaluator-ready-training-not-run",
+  "capability": "metacognitive-control-and-calibration",
+  "branch": "agent/hector-asi-metacognition-cycle-2",
+  "baseMainSha": "0422ec4a7d062c2fc8f5c9513b3b0e465a976b6e",
+  "reusableArtifacts": [
+    "model/hector-asi/evaluate_metacognition.mjs",
+    "model/hector-asi/evals/metacognition-v1.jsonl",
+    "model/hector-asi/evals/metacognition-baseline-fixture.jsonl",
+    "model/hector-asi/data/metacognition-preferences-v1.jsonl",
+    "tests/hector-asi-metacognition.test.mjs",
+    "model/hector-asi/METACOGNITION.md"
+  ],
+  "metrics": [
+    "compositeScore",
+    "brierScore",
+    "overconfidenceOnErrors",
+    "failureDetectionRate",
+    "actionSelectionAccuracy",
+    "strategyChangeAccuracy",
+    "stoppingAccuracy",
+    "confidenceRangeAccuracy"
+  ],
+  "honestLimitations": [
+    "No model or adapter was trained in this cycle.",
+    "The committed fixture validates the evaluator, not model intelligence.",
+    "Eight held-out cases and eight preference pairs are schema seeds, not sufficient evidence for promotion.",
+    "The benchmark must be expanded and kept hidden from training before model comparisons."
+  ],
+  "nextPriorities": [
+    "Run the pinned open-weight base and first QLoRA adapter against the benchmark with identical decoding.",
+    "Expand licensed adversarial metacognition cases and create a private hidden split.",
+    "Train a small metacognitive controller or DPO adapter only after enough verified preference pairs exist."
+  ]
+}
