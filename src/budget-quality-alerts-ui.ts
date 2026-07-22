@@ -16,7 +16,7 @@ const money=(value:number)=>`US$${value.toFixed(value<.01?4:3)}`;
 export function activeVisibleAlerts(items:QualityAlert[],nowMs=Date.now()){return items.filter(item=>item.state==='active'&&(!item.mutedUntil||new Date(item.mutedUntil).getTime()<=nowMs));}
 export function qualityImpactRecommendation(summary:QualityImpactSummary){switch(summary.verdict){case'effective':return'Mantener protección y revisar de nuevo cuando aumente la muestra.';case'recovered-reasonable-cost':return'Conservar protección hasta ejecutar una prueba controlada.';case'high-cost-no-proof':return'Volver a automático o probar Terra de forma controlada.';case'candidate-probe':return'Iniciar una prueba controlada antes de mantener Sol.';case'too-early':return'Esperar más evidencia antes de cambiar el gobierno.';default:return'Mantener el modo actual y seguir observando.';}}
 export function qualityGovernanceProposal(summary:QualityImpactSummary,policy?:Policy):QualityGovernanceProposal|null{
- if(!policy||summary.verdict==='too-early'||summary.verdict==='inconclusive')return null;
+ if(!policy||summary.verdict==='too-early'||summary.verdict==='neutral')return null;
  const mode=policy.governance_mode||'auto';
  if(summary.verdict==='effective'){
   if(mode==='frozen')return null;
