@@ -1,3 +1,4 @@
+import type {Route} from './openai';
 export type CalibrationRow={predicted_confidence:number;correct:number|boolean;route_tier:string;provider:string;created_at?:string|null};
 export type MetacognitiveProfile={sampleCount:number;accuracy:number;meanConfidence:number;brierScore:number;calibrationGap:number;overconfidence:number;preferDeep:boolean;requireVerification:boolean;reason:string};
 export const METACOGNITIVE_POLICY={windowDays:45,sampleLimit:80,minSamples:8,maxBrier:.22,maxOverconfidence:.16,minAccuracyForFast:.72};
@@ -8,7 +9,7 @@ export function summarizeMetacognitiveCalibration(rows:CalibrationRow[]):Metacog
  const confidences=rows.map(row=>clamp(Number(row.predicted_confidence))),outcomes=rows.map(row=>Number(row.correct)?1:0),accuracy=outcomes.reduce((a,b)=>a+b,0)/sampleCount,meanConfidence=confidences.reduce((a,b)=>a+b,0)/sampleCount,brierScore=confidences.reduce((sum,confidence,index)=>sum+(confidence-outcomes[index])**2,0)/sampleCount,calibrationGap=Math.abs(meanConfidence-accuracy),overconfidence=Math.max(0,meanConfidence-accuracy),enough=sampleCount>=METACOGNITIVE_POLICY.minSamples,preferDeep=enough&&(brierScore>METACOGNITIVE_POLICY.maxBrier||overconfidence>METACOGNITIVE_POLICY.maxOverconfidence||accuracy<METACOGNITIVE_POLICY.minAccuracyForFast),requireVerification=enough&&(calibrationGap>.1||brierScore>.18),reason=!enough?'muestras insuficientes; exploración controlada':preferDeep?`confianza mal calibrada: Brier ${brierScore.toFixed(3)}, exceso ${overconfidence.toFixed(3)}, precisión ${accuracy.toFixed(3)}`:requireVerification?`calibración moderada; exige verificación adicional (gap ${calibrationGap.toFixed(3)})`:'confianza reciente calibrada dentro de umbrales';
  return{sampleCount,accuracy,meanConfidence,brierScore,calibrationGap,overconfidence,preferDeep,requireVerification,reason};
 }
-export function applyMetacognitiveRouting<T extends {tier:'fast'|'balanced'|'deep';reasoning:'low'|'medium'|'high';reason:string}>(route:T,profile:MetacognitiveProfile):T{
+export function applyMetacognitiveRouting(route:Route,profile:MetacognitiveProfile):Route{
  if(!profile.preferDeep||route.tier==='deep')return route;
  return{...route,tier:'deep',reasoning:'high',reason:`${route.reason}; escalamiento metacognitivo: ${profile.reason}`};
 }
