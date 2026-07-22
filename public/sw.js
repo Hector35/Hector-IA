@@ -1,4 +1,4 @@
-const CACHE='hector-os-static-shell-v6';
+const CACHE='hector-asi-evolution-shell-v7';
 const SHELL=['/','/manifest.webmanifest','/icons/icon-192.png','/icons/icon-512.png'];
 const PRIVATE_PREFIXES=['/api/','/control/','/generated/','/runner/','/evidence/','/self-improve/'];
 
@@ -12,8 +12,10 @@ function isCacheable(response){
   const policy=(response.headers.get('Cache-Control')||'').toLowerCase();
   return response.ok&&!policy.includes('no-store')&&!policy.includes('private')&&!response.headers.has('Set-Cookie');
 }
+
 self.addEventListener('install',event=>event.waitUntil(caches.open(CACHE).then(cache=>cache.addAll(SHELL)).then(()=>self.skipWaiting())));
 self.addEventListener('activate',event=>event.waitUntil(caches.keys().then(keys=>Promise.all(keys.filter(key=>key!==CACHE).map(key=>caches.delete(key)))).then(()=>self.clients.claim())));
+self.addEventListener('message',event=>{if(event.data?.type==='SKIP_WAITING')self.skipWaiting();});
 self.addEventListener('fetch',event=>{
   const request=event.request,url=new URL(request.url);
   if(request.method!=='GET'||url.origin!==self.location.origin||isPrivateRequest(request,url))return;
