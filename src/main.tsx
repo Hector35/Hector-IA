@@ -1,4 +1,4 @@
-// Deliberate Hector ASI evolution redesign, guarded by the visual-change-approved PR label.
+// Deliberate Hector ASI evolution and visible-growth redesign, guarded by visual-change-approved.
 import React from 'react';
 import ReactDOM from 'react-dom/client';
 import {HectorASIEvolutionApp} from './HectorASIEvolutionApp';
