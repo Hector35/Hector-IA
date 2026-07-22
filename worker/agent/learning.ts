@@ -11,7 +11,7 @@ export async function repeatedFailures(env:Bindings,userId:string){
  return rows.map(x=>({objective:x.objective,result:x.result,skills:JSON.parse(x.skills_json||'[]'),occurrences:x.occurrences}));
 }
 
-export function learningCandidate(input:{objective:string;result:string;skills:string[];status:string}){
- if(input.status!=='completed')return null;
+export function learningCandidate(input:{objective:string;result:string;skills:string[];status:string;verified?:boolean}){
+ if(input.status!=='completed'||input.verified!==true)return null;
  return{title:`Patrón aprendido: ${input.skills.join(' + ')||'general'}`,trigger:input.objective.slice(0,240),procedure:input.result.slice(0,2000),confidence:.6,status:'candidate' as const};
 }
