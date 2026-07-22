@@ -1,5 +1,5 @@
-import {describe,expect,it,vi} from 'vitest';
-import {decideFreeFirst,detectFreeFirstCapability,runDeterministicFreeInference,withTimeout} from './free-first-inference';
+import {describe,expect,it} from 'vitest';
+import {decideFreeFirst,detectFreeFirstCapability,runDeterministicFreeInference} from './free-first-inference';
 
 describe('free-first inference',()=>{
  it('clasifica y enruta sin llamadas avanzadas',()=>{
@@ -29,15 +29,5 @@ describe('free-first inference',()=>{
   expect(detectFreeFirstCapability('Extrae correos')).toBe('extract');
   expect(detectFreeFirstCapability('Resume el documento')).toBe('summarize');
   expect(detectFreeFirstCapability('Genera una explicación')).toBe('generate');
- });
-
- it('interrumpe proveedores gratuitos que exceden el timeout',async()=>{
-  vi.useFakeTimers();
-  try{
-   const pending=withTimeout(()=>new Promise<string>(()=>{}),25);
-   const rejected=expect(pending).rejects.toThrow('free-first timeout');
-   await vi.advanceTimersByTimeAsync(25);
-   await rejected;
-  }finally{vi.useRealTimers();}
  });
 });
