@@ -1,9 +1,9 @@
 {
   "schemaVersion": "1.0.0",
   "experimentId": "hector-asi-cpu-smoke-v1",
-  "runId": "29939685316",
-  "completedAt": "2026-07-22T16:50:14Z",
-  "status": "experimental-weights-generated",
+  "runId": "29940095403",
+  "completedAt": "2026-07-22T16:56:23Z",
+  "status": "experimental-weights-generated-reproducibly",
   "championPromoted": false,
   "baseModel": {
     "repository": "openai-community/gpt2",
@@ -12,31 +12,38 @@
   },
   "training": {
     "method": "LoRA SFT",
-    "hardware": "GitHub-hosted 4-vCPU Linux runner",
-    "epochs": 2,
-    "steps": 12,
+    "hardware": "GitHub-hosted 4-vCPU Linux runner constrained to one CPU core per replica",
+    "replicas": 2,
+    "epochsPerReplica": 2,
+    "stepsPerReplica": 12,
     "seed": 35,
-    "seconds": 12.106102228164673,
-    "parameterDeltaL2": 0.19884741306304932
+    "secondsFirstReplica": 20.696895122528076,
+    "parameterDeltaL2": 0.19884970784187317
+  },
+  "reproducibility": {
+    "sameRunnerReplicas": 2,
+    "byteIdenticalAdapters": true,
+    "adapterSha256": "8d2c390f9d89da87a7fea66a4d972ff73bb6e6ff6094928ff9ee50e99029abb5",
+    "scope": "Exact reproduction was proven twice on the same pinned software and runner environment; cross-hardware byte identity is not claimed."
   },
   "evaluation": {
-    "baseValidationLoss": 4.36010217666626,
-    "candidateValidationLoss": 4.256761431694031,
-    "validationLossDelta": -0.103340744972229,
+    "baseValidationLoss": 4.360095500946045,
+    "candidateValidationLoss": 4.256746768951416,
+    "validationLossDelta": -0.1033487319946289,
     "trainExamples": 6,
     "validationExamples": 2,
     "criticalRegressionAssessment": "not broad enough for champion eligibility"
   },
   "artifact": {
-    "githubActionsArtifactId": "8537649017",
-    "name": "hector-asi-cpu-smoke-29939685316",
-    "archiveBytes": 1739549,
-    "archiveSha256": "e4b765daf290ca9e443b9f7551570b99dc378b9e2ecb321bd3322fdcad8d25d7",
+    "githubActionsArtifactId": "8537825991",
+    "name": "hector-asi-cpu-smoke-29940095403",
+    "archiveBytes": 1739821,
+    "archiveSha256": "37dc85d2187c9f4b2e7b2dd3afd2056c99a6858a516ae021015b36577c3211bf",
     "adapterPath": "adapter/adapter_model.safetensors",
     "adapterBytes": 592848,
-    "adapterSha256": "ecee7147b8805c94ffbfd953fb4e229270a0936e4d36d2a07607d2aee044397d",
+    "adapterSha256": "8d2c390f9d89da87a7fea66a4d972ff73bb6e6ff6094928ff9ee50e99029abb5",
     "weightsCommittedToGit": false,
-    "expiresAt": "2026-07-29T16:50:13Z"
+    "expiresAt": "2026-10-20T16:54:58Z"
   },
   "datasets": {
     "trainSha256": "3d4c011604721ba176dca32d8bb28b1182d9323d5bc2b4cbb51240f04f66cf79",
@@ -45,7 +52,7 @@
   },
   "promotionDecision": {
     "decision": "retain-as-experimental-smoke-candidate",
-    "reason": "Real weights and a lower held-out loss were verified, but the base is GPT-2 rather than the registered Qwen3-4B model and the evaluation set is too small for a champion claim.",
+    "reason": "Real reproducible weights and a lower held-out loss were verified, but the base is GPT-2 rather than the registered Qwen3-4B model and the evaluation set is too small for a champion claim.",
     "rollback": "Stop loading or delete the LoRA adapter; base weights were frozen and unchanged."
   }
 }
