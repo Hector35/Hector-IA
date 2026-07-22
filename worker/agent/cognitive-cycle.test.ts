@@ -1,0 +1,13 @@
+import {describe,expect,it} from 'vitest';
+import {cognitiveCycleMetrics,decideReuse,promoteSkill,recordSkillOutcome,selectReusableExperience,type CognitiveExperience} from './cognitive-cycle';
+
+const experience=(overrides:Partial<CognitiveExperience>={}):CognitiveExperience=>({id:'exp-1',userId:'user-a',objective:'corregir error de compilacion del repositorio',procedure:['leer error','localizar archivo','corregir','ejecutar pruebas'],status:'completed',evidence:[{kind:'test',value:'npm test passed',verified:true}],modelCalls:2,inputTokens:1200,outputTokens:400,costMicros:3200,createdAt:'2026-07-22T10:00:00Z',...overrides});
+
+describe('cognitive learning integration',()=>{
+ it('recupera solo experiencia verificada del mismo usuario',()=>{const other=experience({id:'other',userId:'user-b'}),unverified=experience({id:'bad',evidence:[{kind:'claim',value:'parece funcionar',verified:false}]});const match=selectReusableExperience({userId:'user-a',objective:'corrige el error de compilacion en mi repositorio',experiences:[other,unverified,experience()]});expect(match?.item.id).toBe('exp-1');});
+ it('no aprende de fallos ni de resultados sin evidencia',()=>{expect(promoteSkill(experience({status:'failed'}))).toBeNull();expect(promoteSkill(experience({evidence:[]}))).toBeNull();});
+ it('promueve tras éxitos repetidos y conserva versiones',()=>{const first=promoteSkill(experience())!;expect(first.status).toBe('candidate');const second=promoteSkill(experience({id:'exp-2'}),first)!;expect(second.status).toBe('active');expect(second.version).toBe(2);});
+ it('degrada y desactiva una habilidad que falla repetidamente',()=>{let skill=promoteSkill(experience())!;skill=promoteSkill(experience({id:'exp-2'}),skill)!;expect(skill.status).toBe('active');skill=recordSkillOutcome(skill,false);skill=recordSkillOutcome(skill,false);expect(skill.status).toBe('disabled');});
+ it('reutiliza una tarea conocida y mide costo evitado',()=>{const base=experience(),candidate=promoteSkill(base)!,active=promoteSkill(experience({id:'exp-2'}),candidate)!;const decision=decideReuse({userId:'user-a',objective:'corrige un error de compilacion del repositorio',experiences:[base],skills:[active]});expect(decision.mode).toBe('reuse');const metrics=cognitiveCycleMetrics([decision]);expect(metrics).toMatchObject({tasks:1,reusedTasks:1,modelCallsSaved:2,tokensSaved:1600,costMicrosSaved:3200});});
+ it('escala tareas ambiguas o nuevas',()=>{const decision=decideReuse({userId:'user-a',objective:'analiza una estrategia médica completamente nueva',experiences:[experience()],skills:[]});expect(decision.mode).toBe('escalate');expect(decision.estimatedModelCallsSaved).toBe(0);});
+});
