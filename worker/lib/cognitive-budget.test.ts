@@ -1,5 +1,5 @@
 import {describe,expect,it} from 'vitest';
-import {budgetAction,evaluateCognitiveBudget,isBudgetProtectedTask,normalizeCognitiveBudgetSettings,normalizeCognitiveBudgetUsage,projectCognitiveCost,summarizeBudgetDecision} from './cognitive-budget';
+import {budgetAction,evaluateCognitiveBudget,forecastCalibration,isBudgetProtectedTask,normalizeCognitiveBudgetSettings,normalizeCognitiveBudgetUsage,projectCognitiveCost,summarizeBudgetDecision,type CognitiveBudgetStatus} from './cognitive-budget';
 
 const settings={dailyLimitUsd:1,monthlyLimitUsd:20,warnPercent:80,enforcementMode:'protect' as const};
 
@@ -21,6 +21,19 @@ describe('evaluateCognitiveBudget',()=>{
  it('nunca propaga NaN desde configuración o uso corruptos',()=>{const out=evaluateCognitiveBudget({dailyLimitUsd:NaN,monthlyLimitUsd:Infinity,warnPercent:NaN,enforcementMode:'protect'},{todayUsd:NaN,monthUsd:-1});expect(out.dailyPercent).toBe(0);expect(out.monthlyPercent).toBe(0);expect(Number.isFinite(out.remainingTodayUsd)).toBe(true);});
 });
 
+describe('forecastCalibration',()=>{
+ const base=evaluateCognitiveBudget(settings,{todayUsd:.2,monthUsd:3});
+ it('prioriza una calibración específica del modelo con cinco muestras',()=>{
+  const status={...base,forecastAccuracy:{sampleCount:12,meanAbsolutePercentError:20,biasPercent:-15,medianRatio:1.3,recommendedMultiplier:1.3,calibrationReady:true,byModel:[{model:'gpt-5.6-terra',sampleCount:6,meanAbsolutePercentError:10,biasPercent:-20,medianRatio:1.5,recommendedMultiplier:1.5}]}} as CognitiveBudgetStatus;
+  expect(forecastCalibration(status,'gpt-5.6-terra')).toEqual({multiplier:1.5,sampleCount:6,specificToModel:true,source:'model'});
+ });
+ it('usa calibración global cuando el modelo no tiene suficientes muestras',()=>{
+  const status={...base,forecastAccuracy:{sampleCount:8,meanAbsolutePercentError:20,biasPercent:-10,medianRatio:1.25,recommendedMultiplier:1.25,calibrationReady:true,byModel:[]}} as CognitiveBudgetStatus;
+  expect(forecastCalibration(status,'gpt-5.6-sol')).toEqual({multiplier:1.25,sampleCount:8,specificToModel:false,source:'global'});
+ });
+ it('mantiene multiplicador neutro con poca evidencia',()=>expect(forecastCalibration({...base,forecastAccuracy:{sampleCount:4,meanAbsolutePercentError:0,biasPercent:0,medianRatio:1.8,recommendedMultiplier:1,calibrationReady:false,byModel:[]}},'gpt-5.6-luna').multiplier).toBe(1));
+});
+
 describe('projectCognitiveCost',()=>{
  const available=evaluateCognitiveBudget(settings,{todayUsd:.2,monthUsd:3});
  it('proyecta más costo para deliberación de tres pasadas que para una respuesta simple',()=>{
@@ -28,6 +41,11 @@ describe('projectCognitiveCost',()=>{
   expect(ensemble.estimatedInputTokens).toBeGreaterThan(single.estimatedInputTokens);
   expect(ensemble.estimatedOutputTokens).toBeGreaterThan(single.estimatedOutputTokens);
   expect(ensemble.estimatedCostUsd).toBeGreaterThan(single.estimatedCostUsd);
+ });
+ it('aplica el multiplicador histórico antes de decidir si cabe',()=>{
+  const calibrated={...available,forecastAccuracy:{sampleCount:7,meanAbsolutePercentError:30,biasPercent:-50,medianRatio:2,recommendedMultiplier:2,calibrationReady:true,byModel:[]}},projection=projectCognitiveCost(calibrated,'gpt-5.6-terra','balanced',800,4000,1);
+  expect(projection.estimatedCostUsd).toBeCloseTo(projection.baseEstimatedCostUsd*2,10);
+  expect(projection.calibration).toMatchObject({multiplier:2,source:'global'});
  });
  it('calcula el saldo posterior y detecta cuando la respuesta no cabe',()=>{
   const tight=evaluateCognitiveBudget({...settings,dailyLimitUsd:.01},{todayUsd:.009,monthUsd:1}),projection=projectCognitiveCost(tight,'gpt-5.6-sol','deep',4000,12000,3);
@@ -51,9 +69,9 @@ describe('budgetAction',()=>{
   const available=evaluateCognitiveBudget(settings,{todayUsd:.1,monthUsd:3}),projection=projectCognitiveCost(available,'gpt-5.6-luna','fast',100,0,1);
   expect(budgetAction(available,false,false,projection).action).toBe('allow');
  });
- it('resume una decisión sin contenido privado e incluye la proyección',()=>{
+ it('resume una decisión sin contenido privado e incluye la calibración',()=>{
   const projection=projectCognitiveCost(exceeded,'gpt-5.6-terra','balanced',500,1000,1);
-  expect(summarizeBudgetDecision(exceeded,budgetAction(exceeded,false,false,projection),projection)).toMatchObject({state:'exceeded',action:'degrade',dailyPercent:120,projection:{model:'gpt-5.6-terra',passes:1}});
+  expect(summarizeBudgetDecision(exceeded,budgetAction(exceeded,false,false,projection),projection)).toMatchObject({state:'exceeded',action:'degrade',dailyPercent:120,projection:{model:'gpt-5.6-terra',passes:1,calibration:{multiplier:1,source:'none'}}});
  });
 });
 
