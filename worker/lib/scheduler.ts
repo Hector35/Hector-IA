@@ -1,4 +1,4 @@
-export type ScheduleCadence='once'|'hourly'|'every_2_hours'|'every_6_hours'|'daily'|'weekly';
+export type ScheduleCadence='once'|'custom_minutes'|'hourly'|'every_2_hours'|'every_6_hours'|'daily'|'weekly';
 export type ReasoningLevel='standard'|'high';
 export type AutonomyMode='guided'|'independent'|'continuous';
 
@@ -8,6 +8,7 @@ export type ScheduledTaskDefinition={
  prompt:string;
  kind:string;
  cadence:ScheduleCadence;
+ interval_minutes?:number|null;
  reasoning_level:ReasoningLevel;
  autonomy_mode:AutonomyMode;
  allow_web:number|boolean;
@@ -17,10 +18,19 @@ export type ScheduledTaskDefinition={
 
 export type PreviousScheduledRun={status?:string|null;result?:string|null;last_error?:string|null;updated_at?:string|null};
 
-const cadenceMap:Record<ScheduleCadence,number|null>={once:null,hourly:60,every_2_hours:120,every_6_hours:360,daily:1440,weekly:10080};
+const cadenceMap:Record<Exclude<ScheduleCadence,'custom_minutes'>,number|null>={once:null,hourly:60,every_2_hours:120,every_6_hours:360,daily:1440,weekly:10080};
 const activeStatuses=new Set(['queued','working','testing','repairing']);
 
-export function intervalMinutesFor(cadence:ScheduleCadence){return cadenceMap[cadence];}
+export function normalizeIntervalMinutes(value:number|undefined|null){
+ if(value===undefined||value===null||!Number.isFinite(value))throw new Error('El intervalo en minutos es inválido');
+ const minutes=Math.round(value);
+ if(minutes<1||minutes>10080)throw new Error('El intervalo debe estar entre 1 minuto y 7 días');
+ return minutes;
+}
+
+export function intervalMinutesFor(cadence:ScheduleCadence,customMinutes?:number|null){
+ return cadence==='custom_minutes'?normalizeIntervalMinutes(customMinutes):cadenceMap[cadence];
+}
 export function isActiveScheduledJob(status:string|undefined|null){return !!status&&activeStatuses.has(status);}
 
 export async function scheduledJobId(taskId:string,scheduledFor:string){
@@ -39,8 +49,8 @@ export function normalizeRunAt(value:string,nowMs=Date.now()){
  return new Date(ms).toISOString();
 }
 
-export function nextScheduledRun(cadence:ScheduleCadence,scheduledAt:string,nowMs=Date.now()):string|null{
- const minutes=intervalMinutesFor(cadence);
+export function nextScheduledRun(cadence:ScheduleCadence,scheduledAt:string,nowMs=Date.now(),customMinutes?:number|null):string|null{
+ const minutes=intervalMinutesFor(cadence,customMinutes);
  if(minutes===null)return null;
  const base=Date.parse(scheduledAt);
  if(!Number.isFinite(base))throw new Error('Fecha programada inválida');
