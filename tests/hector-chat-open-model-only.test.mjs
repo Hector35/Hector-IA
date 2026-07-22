@@ -33,7 +33,8 @@ describe('Hector chat open-model-only policy',()=>{
 
  it('forbids the previous Cloudflare to OpenAI fallback direction',()=>{
   expect(executionPlan).not.toContain("plan.provider.requested==='cloudflare'&&actual.provider==='openai'");
-  expect(executionPlan).toContain("plan.provider.requested==='openai'&&actual.provider==='cloudflare'");
+  expect(executionPlan).toContain("plan.provider.requested==='openai'&&openModelExecution");
+  expect(executionPlan).toContain("actual.provider==='cloudflare'&&isHectorBaseModel(actual.model)");
  });
 
  it('records the capability and honesty tradeoffs',()=>{
