@@ -1,29 +1,29 @@
 {
-  "schemaVersion": "1.2.0",
+  "schemaVersion": "1.3.0",
   "project": "Hector ASI",
   "operationalBase": {
-    "id": "hector-base",
-    "name": "Héctor Base",
+    "id": "hector-base-qwen3",
+    "name": "Héctor Base · Qwen3",
     "status": "active",
-    "deployment": "open-model-runtime",
+    "deployment": "cloudflare-workers-ai",
     "customWeights": false,
     "identityAndOrchestrationOwnedByHector": true,
     "models": {
-      "preferredConversation": "Qwen/Qwen3-4B-Instruct-2507",
-      "fallbackConversation": "@cf/meta/llama-3.2-3b-instruct",
+      "primaryConversation": "@cf/qwen/qwen3-30b-a3b-fp8",
+      "optionalExactBase": "Qwen/Qwen3-4B-Instruct-2507 via Hugging Face when configured",
       "utility": "@cf/ibm-granite/granite-4.0-h-micro",
       "deterministic": "hector-rules-v1"
     },
     "routing": {
       "interactiveChat": "open-model-only",
-      "ordinaryConversation": "Qwen first when configured, otherwise Workers AI",
-      "advancedConversation": "open-model architect, adversary and judge passes",
+      "ordinaryConversation": "Qwen3 30B on Workers AI",
+      "advancedConversation": "Qwen3 open-model architect, adversary and judge passes",
       "currentInformation": "no live web in chat; disclose the limit or request evidence",
       "sensitiveRequests": "conservative open-model response with explicit limits",
       "failurePolicy": "fail closed; never fallback to OpenAI"
     },
     "evidence": [
-      "worker/routes/intelligence.ts",
+      "wrangler.jsonc",
       "worker/lib/free-first.ts",
       "worker/lib/providers.ts",
       "worker/lib/planned-response.ts",
@@ -33,24 +33,17 @@
     ]
   },
   "provisionalQwenChat": {
-    "id": "hector-qwen-base",
-    "name": "Héctor Qwen Base",
-    "status": "awaiting-secret",
+    "id": "hector-qwen-base-4b",
+    "name": "Héctor Qwen 4B Base",
+    "status": "optional-awaiting-secret",
     "deployment": "huggingface-inference-providers",
     "model": "Qwen/Qwen3-4B-Instruct-2507",
     "customWeights": false,
-    "activation": "automatic when HUGGINGFACE_TOKEN is configured; explicit phrase remains supported",
+    "activation": "automatic only when HUGGINGFACE_TOKEN is configured",
     "requiredSecret": "HUGGINGFACE_TOKEN",
     "silentFallbackAllowed": true,
-    "fallbackTarget": "Cloudflare open models only",
-    "purpose": "Hablar con la base abierta elegida antes de que exista el adaptador promovido de Héctor ASI",
-    "evidence": [
-      "worker/routes/intelligence.ts",
-      "worker/lib/providers.ts",
-      "worker/lib/planned-response.ts",
-      "worker/lib/providers.test.ts",
-      "wrangler.jsonc"
-    ]
+    "fallbackTarget": "Qwen3 30B on Cloudflare Workers AI",
+    "purpose": "Comparar la base exacta del futuro adaptador con el Qwen3 operativo de mayor capacidad"
   },
   "openAI": {
     "interactiveChatAllowed": false,
