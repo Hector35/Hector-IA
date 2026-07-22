@@ -38,7 +38,8 @@ async function waitForHome(page){
 }
 
 async function runScheduleFlow(page){
- const textarea=page.locator('.cxComposer textarea');
+ const textarea=page.locator('.cxComposer textarea'),handle=await textarea.elementHandle();
+ if(!handle)throw new Error('No se encontró el cuadro principal para Programados');
  const command='Cada 15 minutos revisa el estado del proyecto y reporta avances.';
  await textarea.fill(command);
  const [request]=await Promise.all([
@@ -48,14 +49,16 @@ async function runScheduleFlow(page){
  const payload=request.postDataJSON();
  if(payload.cadence!=='custom_minutes'||payload.intervalMinutes!==15||payload.reasoningLevel!=='high'||payload.autonomyMode!=='continuous')throw new Error(`Payload de Programados incorrecto: ${JSON.stringify(payload)}`);
  await page.getByText(/Programado creado:/).waitFor({state:'visible',timeout:10000});
+ const cleared=await handle.evaluate(node=>node.value);
+ if(cleared!=='')throw new Error('El cuadro no se limpió después de crear el Programado');
  await page.locator('.cxSchedules').waitFor({state:'visible',timeout:10000});
- if(await textarea.inputValue()!=='')throw new Error('El cuadro no se limpió después de crear el Programado');
- return{command,payload,sectionVisible:true};
+ return{command,payload,sectionVisible:true,inputCleared:true};
 }
 
 async function runWorkFlow(page){
  await waitForHome(page);
- const textarea=page.locator('.cxComposer textarea');
+ const textarea=page.locator('.cxComposer textarea'),handle=await textarea.elementHandle();
+ if(!handle)throw new Error('No se encontró el cuadro principal para Trabajo');
  const command='Termina la aplicación y no te detengas hasta dejarla funcionando.';
  await textarea.fill(command);
  const [request]=await Promise.all([
@@ -65,9 +68,10 @@ async function runWorkFlow(page){
  const payload=request.postDataJSON();
  if(payload.goal!==command)throw new Error(`Objetivo de Trabajo incorrecto: ${JSON.stringify(payload)}`);
  await page.getByText(/Modo Trabajo activado/).waitFor({state:'visible',timeout:10000});
+ const cleared=await handle.evaluate(node=>node.value);
+ if(cleared!=='')throw new Error('El cuadro no se limpió después de activar Trabajo');
  await page.locator('.hxWorkMode').waitFor({state:'visible',timeout:10000});
- if(await textarea.inputValue()!=='')throw new Error('El cuadro no se limpió después de activar Trabajo');
- return{command,payload,sectionVisible:true};
+ return{command,payload,sectionVisible:true,inputCleared:true};
 }
 
 await mkdir(outputDir,{recursive:true});
