@@ -12,6 +12,7 @@ export type CallGovernorDecision={
 export type CallGovernorMetrics={
  advancedCalls:number;
  deduplicatedCalls:number;
+ cacheHits:number;
  blockedCalls:number;
  requestedPasses:number;
  executedPasses:number;
@@ -21,6 +22,11 @@ export type CallGovernorMetrics={
 
 const MULTI_PASS=/\b(compara|evalua|audita|arquitectura|estrategia|migracion|seguridad|riesgo|contradiccion|investiga|diagnostica|causa raiz|trade[- ]?off)\b/i;
 const SIMPLE=/\b(clasifica|extrae|formatea|resume|convierte|valida|verifica|lista|normaliza|parsea|busca|encuentra)\b/i;
+const VOLATILE=/\b(hoy|ahora|actual|reciente|[uú]ltim|precio|clima|cotizaci[oó]n|estado\s+actual|en\s+vivo)\b/i;
+const SHARED_INFLIGHT=new Map<string,Promise<unknown>>();
+const EXACT_CACHE=new Map<string,{value:unknown;expiresAt:number}>();
+const MAX_CACHE_ENTRIES=128;
+const DEFAULT_TTL_MS=5*60_000;
 
 export function decideCallBudget(input:{prompt:string;reuse:ReuseDisposition;requestedPasses:1|3;reasoningLevel:'auto'|'high'}):CallGovernorDecision{
  const prompt=input.prompt.trim();
@@ -45,29 +51,45 @@ export async function governExecutionPlan(plan:ExecutionPlan,input:{prompt:strin
  return{plan:governed,decision};
 }
 
-function stableKey(value:string){
- let hash=2166136261;
- for(let index=0;index<value.length;index++){hash^=value.charCodeAt(index);hash=Math.imul(hash,16777619);}
- return(hash>>>0).toString(16).padStart(8,'0');
+async function stableKey(value:string){
+ const digest=await crypto.subtle.digest('SHA-256',new TextEncoder().encode(value));
+ return[...new Uint8Array(digest)].map(item=>item.toString(16).padStart(2,'0')).join('');
+}
+
+function pruneExactCache(now:number){
+ for(const[key,item]of EXACT_CACHE)if(item.expiresAt<=now)EXACT_CACHE.delete(key);
+ while(EXACT_CACHE.size>=MAX_CACHE_ENTRIES){const oldest=EXACT_CACHE.keys().next().value as string|undefined;if(!oldest)break;EXACT_CACHE.delete(oldest);}
+}
+
+export function shouldUseExactCallCache(input:{prompt:string;allowWeb:boolean;risk:'low'|'medium'|'high'}){
+ return input.risk==='low'&&!input.allowWeb&&!VOLATILE.test(input.prompt);
 }
 
 export function createCallGovernor(decision:CallGovernorDecision){
- const inflight=new Map<string,Promise<unknown>>();
- const metrics:CallGovernorMetrics={advancedCalls:0,deduplicatedCalls:0,blockedCalls:0,requestedPasses:decision.requestedPasses,executedPasses:0,estimatedAdvancedCallsSaved:decision.estimatedAdvancedCallsSaved,justifications:[decision.justification]};
+ const metrics:CallGovernorMetrics={advancedCalls:0,deduplicatedCalls:0,cacheHits:0,blockedCalls:0,requestedPasses:decision.requestedPasses,executedPasses:0,estimatedAdvancedCallsSaved:decision.estimatedAdvancedCallsSaved,justifications:[decision.justification]};
  return{
   metrics,
-  async advanced<T>(input:{key:string;justification:string;execute:()=>Promise<T>}):Promise<T>{
-   const key=stableKey(input.key);
-   const existing=inflight.get(key) as Promise<T>|undefined;
-   if(existing){metrics.deduplicatedCalls++;return existing;}
+  async advanced<T>(input:{key:string;justification:string;execute:()=>Promise<T>;cacheable?:boolean;ttlMs?:number;isCacheableResult?:(value:T)=>boolean}):Promise<T>{
+   const key=await stableKey(input.key),now=Date.now();pruneExactCache(now);
+   if(input.cacheable){
+    const cached=EXACT_CACHE.get(key);
+    if(cached&&cached.expiresAt>now){metrics.cacheHits++;metrics.estimatedAdvancedCallsSaved+=decision.allowedPasses;metrics.justifications.push(`Cache exacta: ${input.justification}`);return cached.value as T;}
+   }
+   const existing=SHARED_INFLIGHT.get(key) as Promise<T>|undefined;
+   if(existing){metrics.deduplicatedCalls++;metrics.estimatedAdvancedCallsSaved+=decision.allowedPasses;metrics.justifications.push(`Inferencia en vuelo reutilizada: ${input.justification}`);return existing;}
    if(metrics.advancedCalls>=decision.maxAdvancedCalls){metrics.blockedCalls++;throw new Error(`Call governor bloqueó una inferencia avanzada redundante: ${input.justification}`);}
    metrics.advancedCalls++;metrics.executedPasses+=decision.allowedPasses;metrics.justifications.push(input.justification);
-   const pending=input.execute().finally(()=>inflight.delete(key));
-   inflight.set(key,pending);
+   const pending=input.execute().then(value=>{
+    if(input.cacheable&&(input.isCacheableResult?.(value)??true)){pruneExactCache(now);EXACT_CACHE.set(key,{value,expiresAt:now+Math.max(1,input.ttlMs??DEFAULT_TTL_MS)});}
+    return value;
+   }).finally(()=>SHARED_INFLIGHT.delete(key));
+   SHARED_INFLIGHT.set(key,pending);
    return pending;
   }
  };
 }
+
+export function resetCallGovernorState(){SHARED_INFLIGHT.clear();EXACT_CACHE.clear();}
 
 export function benchmarkCallReduction(){
  const scenarios=[
