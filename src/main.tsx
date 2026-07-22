@@ -1,3 +1,4 @@
+// Deliberate Hector ASI evolution redesign, guarded by the visual-change-approved PR label.
 import React from 'react';
 import ReactDOM from 'react-dom/client';
 import {HectorASIEvolutionApp} from './HectorASIEvolutionApp';
