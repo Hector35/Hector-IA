@@ -1,0 +1,69 @@
+{
+  "schemaVersion": "1.0.0",
+  "project": "Hector ASI",
+  "updatedAt": "2026-07-22T15:18:00Z",
+  "champion": null,
+  "nodes": [
+    {
+      "id": "qwen3-4b-instruct-2507",
+      "kind": "base-model",
+      "status": "available",
+      "parent": null,
+      "artifact": "Qwen/Qwen3-4B-Instruct-2507",
+      "evidence": ["model/hector-asi/model-registry.json"],
+      "claim": "Base open-weight seleccionada; no equivale a un checkpoint Hector entrenado."
+    },
+    {
+      "id": "hector-asi-v0.1-qwen3-4b-sft",
+      "kind": "model-candidate",
+      "status": "planned",
+      "parent": "qwen3-4b-instruct-2507",
+      "artifact": "model/hector-asi/model-registry.json",
+      "evidence": ["model/hector-asi/data/sft-seed-v1.manifest.json"],
+      "claim": "Pipeline y contratos preparados; no existe adaptador entrenado ni promoción."
+    },
+    {
+      "id": "metacognitive-controller-v1",
+      "kind": "specialist-component",
+      "status": "integrated-inactive",
+      "parent": "qwen3-4b-instruct-2507",
+      "artifact": "model/hector-asi/metacognitive_controller.mjs",
+      "manifest": "model/hector-asi/manifests/metacognitive-controller-v1.json",
+      "evidence": [
+        "model/hector-asi/evals/metacognitive-controller-v1.jsonl",
+        "tests/hector-asi-metacognitive-controller.test.mjs",
+        "tests/hector-asi-metacognition.test.mjs"
+      ],
+      "metrics": {
+        "contractActionSelectionAccuracy": 1,
+        "contractBrierScore": 0.10578,
+        "usefulEscalationRate": 1,
+        "unnecessaryEscalationRate": 0,
+        "correctAbstentionRate": 1,
+        "unnecessaryAbstentionRate": 0,
+        "incrementalReuseRateSingleChange": 0.9167,
+        "apiCostUsd": 0
+      },
+      "claim": "Componente determinista especialista con benchmarks contractuales pequeños; no está conectado al runtime y no demuestra mejora general de inteligencia."
+    },
+    {
+      "id": "constraint-aware-dag-planner-v1",
+      "kind": "cognitive-candidate",
+      "status": "held-unmerged",
+      "parent": "qwen3-4b-instruct-2507",
+      "artifact": "PR-578",
+      "evidence": ["https://github.com/Hector35/Hector-IA/pull/578"],
+      "claim": "Candidato conservado fuera de main por falta de validación integrable; no promovido."
+    }
+  ],
+  "promotionPolicy": {
+    "globalChampionRequires": [
+      "evaluación independiente no usada para diseñar el candidato",
+      "mejora reproducible frente al baseline",
+      "sin regresiones críticas",
+      "rollback identificable",
+      "checks y despliegue verdes cuando afecte runtime"
+    ],
+    "specialistMayRemainInactive": true
+  }
+}
