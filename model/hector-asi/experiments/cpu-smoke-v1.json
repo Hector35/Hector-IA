@@ -1,0 +1,31 @@
+{
+  "schemaVersion": "1.0.0",
+  "experimentId": "hector-asi-cpu-smoke-v1",
+  "purpose": "Generate the first verifiable Hector LoRA weight artifact on free CPU compute without claiming Qwen champion status.",
+  "status": "ready-to-run",
+  "baseModel": {
+    "repository": "openai-community/gpt2",
+    "revision": "607a30d783dfa663caf39e06633721c8d4cfcd7e",
+    "license": "MIT",
+    "role": "CPU-feasible experimental base only"
+  },
+  "training": {
+    "script": "model/hector-asi/train_cpu_smoke.py",
+    "trainSplit": "model/hector-asi/data/sft-seed-v1.jsonl",
+    "validationSplit": "model/hector-asi/evals/cpu-smoke-held-out-v1.jsonl",
+    "method": "LoRA SFT",
+    "epochs": 2,
+    "seed": 35,
+    "maxLength": 128
+  },
+  "artifact": {
+    "path": "artifacts/hector-asi-cpu-smoke-v1",
+    "storage": "GitHub Actions artifact",
+    "weightsCommittedToGit": false,
+    "requiresSha256": true
+  },
+  "promotion": {
+    "eligibleForChampion": false,
+    "reason": "This experiment validates real weight generation on CPU. The registered champion candidate remains Qwen/Qwen3-4B-Instruct-2507 and requires GPU QLoRA plus broader evaluation."
+  }
+}
