@@ -1,12 +1,13 @@
 import React from 'react';
 import ReactDOM from 'react-dom/client';
-import {HectorASIApp} from './HectorASIApp';
+import {HectorASIEvolutionApp} from './HectorASIEvolutionApp';
 import './hector-asi.css';
 import './hector-asi-markdown.css';
 import './hector-asi-operations.css';
+import './hector-asi-evolution.css';
 
 ReactDOM.createRoot(document.getElementById('root')!).render(
-  <React.StrictMode><HectorASIApp/></React.StrictMode>
+  <React.StrictMode><HectorASIEvolutionApp/></React.StrictMode>
 );
 
 if('serviceWorker' in navigator){
