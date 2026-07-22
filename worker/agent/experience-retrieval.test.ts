@@ -1,5 +1,5 @@
 import {describe,expect,it} from 'vitest';
-import {classifyExperienceRisk,normalizeObjective,rankExperiences,renderExperienceContext,type ExperienceRow} from './experience-retrieval';
+import {classifyExperienceRisk,normalizeObjective,rankExperiences,renderExperienceContext,retrieveSimilarExperiences,type ExperienceRow} from './experience-retrieval';
 
 const now=Date.parse('2026-07-22T10:00:00Z');
 const row=(input:Partial<ExperienceRow>&Pick<ExperienceRow,'id'|'objective'|'result'>):ExperienceRow=>({skills_json:'[]',attempts:1,duration_ms:1000,created_at:'2026-07-21T10:00:00Z',...input});
@@ -35,10 +35,19 @@ describe('experience retrieval',()=>{
 
  it('limita contexto y conserva identificadores trazables',()=>{
   const items=rankExperiences([
-   row({id:'trace-1',objective:'Revisar error de repositorio',result:'x'.repeat(2000),skills_json:'["github-code"]'})
+   row({id:'trace-1',objective:'Revisar error de repositorio',result:'Aplicar una corrección mínima y ejecutar todas las pruebas.',skills_json:'["github-code"]'})
   ],{objective:'Revisar error de repositorio',skills:['github-code'],nowMs:now});
   const context=renderExperienceContext(items,900);
   expect(context.length).toBeLessThanOrEqual(900);
-  expect(context).toContain('EXPERIENCIAS VERIFICADAS SIMILARES');
+  expect(context).toContain('[experiencia:trace-1');
+ });
+
+ it('consulta exclusivamente las experiencias completadas del usuario solicitado',async()=>{
+  let sql='',bindings:unknown[]=[];
+  const env={DB:{prepare:(statement:string)=>{sql=statement;return{bind:(...values:unknown[])=>{bindings=values;return{all:async()=>({results:[row({id:'mine',objective:'Corregir repositorio',result:'Corregir y probar.',skills_json:'["github-code"]'})]})};}};}}} as any;
+  const result=await retrieveSimilarExperiences(env,{userId:'owner-1',objective:'Corregir repositorio',skills:['github-code']});
+  expect(sql).toContain("WHERE user_id=? AND status='completed'");
+  expect(bindings[0]).toBe('owner-1');
+  expect(result.traceIds).toEqual(['mine']);
  });
 });
