@@ -1,0 +1,60 @@
+{
+  "schemaVersion": "1.0.0",
+  "experimentId": "hector-asi-qwen05-v1",
+  "runId": "29942111075",
+  "completedAt": "2026-07-22T17:25:34Z",
+  "status": "experimental-weights-generated-reproducibly",
+  "championPromoted": false,
+  "baseModel": {
+    "repository": "Qwen/Qwen2.5-0.5B-Instruct",
+    "revision": "a338b55dd21219a5f4da42bc11a9313d1a27d4cc",
+    "license": "Apache-2.0"
+  },
+  "training": {
+    "method": "LoRA SFT",
+    "hardware": "GitHub-hosted 4-vCPU Linux runner constrained to one CPU thread per replica",
+    "replicas": 2,
+    "epochsPerReplica": 1,
+    "stepsPerReplica": 12,
+    "seed": 35,
+    "secondsFirstReplica": 48.341639041900635,
+    "trainableParameters": 540672,
+    "parameterDeltaL2": 0.9191189408302307
+  },
+  "reproducibility": {
+    "sameRunnerReplicas": 2,
+    "byteIdenticalAdapters": true,
+    "adapterSha256": "a45407c1abe3d411884f16f42324c1384b5d823e201b277315baac327940a867",
+    "scope": "Exact reproduction was proven twice with pinned model revision, software, seed and runner environment; cross-hardware byte identity is not claimed."
+  },
+  "evaluation": {
+    "baseValidationLoss": 4.585448066393535,
+    "candidateValidationLoss": 3.9348132610321045,
+    "validationLossDelta": -0.6506348053614301,
+    "relativeValidationImprovement": 0.14189121672315785,
+    "trainExamples": 12,
+    "validationExamples": 6,
+    "criticalRegressionAssessment": "Evaluation breadth is insufficient for champion eligibility. Losses are not directly comparable across different tokenizers or base architectures."
+  },
+  "artifact": {
+    "githubActionsArtifactId": "8538668082",
+    "name": "hector-asi-qwen05-29942111075",
+    "archiveBytes": 5926797,
+    "archiveSha256": "38835811097a9dd5ca692c68166b0d6941f7c1333b6cb38998e81361b953eda1",
+    "adapterPath": "adapter/adapter_model.safetensors",
+    "adapterBytes": 2175168,
+    "adapterSha256": "a45407c1abe3d411884f16f42324c1384b5d823e201b277315baac327940a867",
+    "weightsCommittedToGit": false,
+    "expiresAt": "2026-10-20T17:23:15Z"
+  },
+  "datasets": {
+    "trainSha256": "d2437913f8f5730fca532f98c4d8167489f331417c13ea9488d9dd4078ceb1f3",
+    "validationSha256": "e28a9e87253d8ca95a15b304e47c177d3e3130786c2eb396f236ff831789e3ab",
+    "privateUserData": false
+  },
+  "promotionDecision": {
+    "decision": "retain-as-experimental-qwen-family-candidate",
+    "reason": "Real reproducible weights and a 14.19% held-out loss reduction were verified. It is closer to the target architecture than prior smoke candidates, but it is Qwen2.5 0.5B rather than Qwen3 4B and the evaluation set is too small for a champion claim.",
+    "rollback": "Stop loading or delete the LoRA adapter; frozen base weights remain unchanged."
+  }
+}
