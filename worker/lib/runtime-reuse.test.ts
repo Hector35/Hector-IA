@@ -55,7 +55,7 @@ describe('runtime reuse engine',()=>{
   const unverified={...verified,id:'unverified',evidence_json:'[{"kind":"nota","verified":false}]'};
   const legacy={...verified,id:'legacy',evidence_json:'[]'};
   const {db,prepare}=dbWithRows([verified,unverified,legacy]);
-  const candidates=await loadRuntimeReuseCandidates(db,'user-1');
+  const candidates=await loadRuntimeReuseCandidates(db as never,'user-1');
   expect(candidates.map(item=>item.id)).toEqual(['verified']);
   expect(candidates[0]).toMatchObject({mode:'deterministic',deterministicOutput:'pruebas aprobadas'});
   expect(prepare.mock.calls[0][0]).toContain("verified=1");
@@ -63,6 +63,6 @@ describe('runtime reuse engine',()=>{
 
  it('mantiene fallback seguro si el esquema todavía no está disponible',async()=>{
   const db={prepare:()=>({bind:()=>({all:async()=>{throw new Error('missing column');}})})};
-  await expect(loadRuntimeReuseCandidates(db,'user-1')).resolves.toEqual([]);
+  await expect(loadRuntimeReuseCandidates(db as never,'user-1')).resolves.toEqual([]);
  });
 });
