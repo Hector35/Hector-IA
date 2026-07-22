@@ -35,7 +35,13 @@ describe('execution plan',()=>{
   expect(result.summary).toMatch(/OpenAI fue sustituido por Héctor Base/);
  });
 
- it('bloquea cambios de modelo, nivel o modo cognitivo',async()=>{
+ it('acepta modelos abiertos registrados para conversación y utilidades',async()=>{
+  const plan=await createExecutionPlan(input({route:{model:'@cf/meta/llama-3.2-3b-instruct',tier:'fast',reasoning:'low',needsWeb:false},provider:{requested:'cloudflare',reason:'Héctor Base'},allowedModels:['@cf/meta/llama-3.2-3b-instruct']}));
+  expect(verifyExecutionPlan(plan,{model:'@cf/ibm-granite/granite-4.0-h-micro',tier:'fast',provider:'cloudflare',cognitiveMode:'single',deliberationPasses:1}).ok).toBe(true);
+  expect(verifyExecutionPlan(plan,{model:'hector-rules-v1',tier:'fast',provider:'cloudflare',cognitiveMode:'single',deliberationPasses:1}).ok).toBe(true);
+ });
+
+ it('bloquea cambios de modelo, nivel o modo cognitivo fuera de Héctor Base',async()=>{
   const plan=await createExecutionPlan(input());
   const result=verifyExecutionPlan(plan,{model:'otro-modelo',tier:'deep',provider:'openai',cognitiveMode:'ensemble',deliberationPasses:3});
   expect(result.ok).toBe(false);
