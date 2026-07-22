@@ -37,7 +37,10 @@ describe('metacognitive control',()=>{
  });
 
  it('registra solo métricas aisladas por usuario y no contenido',async()=>{
-  const run=vi.fn(async()=>({success:true})),bind=vi.fn(()=>({run})),prepare=vi.fn(()=>({bind})),db={prepare} as any,strategy={routeTier:'fast',provider:'cloudflare',cognitiveMode:'single'} as const,decision={version:'1.0.0',action:'monitor',currentStrategy:'fast:cloudflare:single',selectedStrategy:'fast:cloudflare:single',predictedSuccess:.8,lowerBound:.6,uncertainty:.1,sampleCount:3,expectedBenefit:0,requiresVerification:false,reason:'estable'} as const;
+  const run=vi.fn(async()=>({success:true}));
+  const bind=vi.fn((..._values:unknown[])=>({run}));
+  const prepare=vi.fn((_sql:string)=>({bind}));
+  const db={prepare} as any,strategy={routeTier:'fast',provider:'cloudflare',cognitiveMode:'single'} as const,decision={version:'1.0.0',action:'monitor',currentStrategy:'fast:cloudflare:single',selectedStrategy:'fast:cloudflare:single',predictedSuccess:.8,lowerBound:.6,uncertainty:.1,sampleCount:3,expectedBenefit:0,requiresVerification:false,reason:'estable'} as const;
   await recordMetacognitiveOutcome(db,{userId:'user-1',task:'clasificación',strategy,plannedStrategy:decision.selectedStrategy,predictedSuccess:.8,observedSuccess:true,verificationOk:true,qualityScore:92,fallback:false,advancedCalls:0,inputTokens:0,outputTokens:0,costUsd:0,durationMs:20,decision});
   const sql=prepare.mock.calls[0][0],values=bind.mock.calls[0];
   expect(sql).toContain('metacognitive_outcomes');
