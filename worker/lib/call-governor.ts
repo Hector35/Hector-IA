@@ -27,8 +27,9 @@ export function governInference(input:{prompt:string;candidates:RuntimeReuseCand
  if(reuse.kind==='blocked')return{reuse,capability,inferenceTier:'none',maxAdvancedCalls:0,reason:reuse.reason};
  if(reuse.kind==='deterministic')return{reuse,capability,inferenceTier:'none',maxAdvancedCalls:0,reason:'La habilidad verificada resuelve la tarea sin inferencia.'};
  const resource=selectFreeResource({capability,allowBrowserLocal:input.allowBrowserLocal,allowCloudflareAi:input.allowCloudflareAi});
- if(resource&&resource.tier==='browser-local')return{reuse,capability,inferenceTier:'browser-local',maxAdvancedCalls:0,reason:`Capacidad cubierta localmente por ${resource.id}.`};
- if(resource&&resource.tier==='cloudflare-free'&&capability!=='generation')return{reuse,capability,inferenceTier:'cloudflare-free',maxAdvancedCalls:0,reason:`Capacidad cubierta dentro del free tier por ${resource.id}.`};
+ if(resource?.tier==='deterministic')return{reuse,capability,inferenceTier:'none',maxAdvancedCalls:0,reason:`Capacidad cubierta por reglas deterministas: ${resource.id}.`};
+ if(resource?.tier==='browser-local')return{reuse,capability,inferenceTier:'browser-local',maxAdvancedCalls:0,reason:`Capacidad cubierta localmente por ${resource.id}.`};
+ if(resource?.tier==='cloudflare-free'&&capability!=='generation')return{reuse,capability,inferenceTier:'cloudflare-free',maxAdvancedCalls:0,reason:`Capacidad cubierta dentro del free tier por ${resource.id}.`};
  return{reuse,capability,inferenceTier:resource?.tier==='cloudflare-free'?'cloudflare-free':'advanced',maxAdvancedCalls:1,reason:reuse.kind==='assist'?'Se reutiliza contexto y se limita la parte nueva a una sola llamada avanzada.':'La tarea nueva se limita a una llamada avanzada antes de cualquier reintento.'};
 }
 
@@ -38,5 +39,5 @@ export function summarizeGovernor(plans:GovernedExecutionPlan[],baselineAdvanced
  const advancedCalls=plans.reduce((sum,item)=>sum+item.maxAdvancedCalls,0);
  const baseline=plans.length*Math.max(1,baselineAdvancedCallsPerTask);
  const avoided=Math.max(0,baseline-advancedCalls);
- return{tasks:plans.length,deterministic:plans.filter(item=>item.inferenceTier==='none'&&item.reuse.kind==='deterministic').length,freeTier:plans.filter(item=>item.inferenceTier==='browser-local'||item.inferenceTier==='cloudflare-free'&&item.maxAdvancedCalls===0).length,advancedCalls,advancedCallsAvoided:avoided,estimatedTokensSaved:avoided*800,estimatedCostUsdSaved:Number((avoided*.0016).toFixed(6))};
+ return{tasks:plans.length,deterministic:plans.filter(item=>item.inferenceTier==='none'&&item.maxAdvancedCalls===0).length,freeTier:plans.filter(item=>(item.inferenceTier==='browser-local'||item.inferenceTier==='cloudflare-free')&&item.maxAdvancedCalls===0).length,advancedCalls,advancedCallsAvoided:avoided,estimatedTokensSaved:avoided*800,estimatedCostUsdSaved:Number((avoided*.0016).toFixed(6))};
 }
