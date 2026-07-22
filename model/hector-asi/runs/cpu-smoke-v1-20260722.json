@@ -1,0 +1,51 @@
+{
+  "schemaVersion": "1.0.0",
+  "experimentId": "hector-asi-cpu-smoke-v1",
+  "runId": "29939685316",
+  "completedAt": "2026-07-22T16:50:14Z",
+  "status": "experimental-weights-generated",
+  "championPromoted": false,
+  "baseModel": {
+    "repository": "openai-community/gpt2",
+    "revision": "607a30d783dfa663caf39e06633721c8d4cfcd7e",
+    "license": "MIT"
+  },
+  "training": {
+    "method": "LoRA SFT",
+    "hardware": "GitHub-hosted 4-vCPU Linux runner",
+    "epochs": 2,
+    "steps": 12,
+    "seed": 35,
+    "seconds": 12.106102228164673,
+    "parameterDeltaL2": 0.19884741306304932
+  },
+  "evaluation": {
+    "baseValidationLoss": 4.36010217666626,
+    "candidateValidationLoss": 4.256761431694031,
+    "validationLossDelta": -0.103340744972229,
+    "trainExamples": 6,
+    "validationExamples": 2,
+    "criticalRegressionAssessment": "not broad enough for champion eligibility"
+  },
+  "artifact": {
+    "githubActionsArtifactId": "8537649017",
+    "name": "hector-asi-cpu-smoke-29939685316",
+    "archiveBytes": 1739549,
+    "archiveSha256": "e4b765daf290ca9e443b9f7551570b99dc378b9e2ecb321bd3322fdcad8d25d7",
+    "adapterPath": "adapter/adapter_model.safetensors",
+    "adapterBytes": 592848,
+    "adapterSha256": "ecee7147b8805c94ffbfd953fb4e229270a0936e4d36d2a07607d2aee044397d",
+    "weightsCommittedToGit": false,
+    "expiresAt": "2026-07-29T16:50:13Z"
+  },
+  "datasets": {
+    "trainSha256": "3d4c011604721ba176dca32d8bb28b1182d9323d5bc2b4cbb51240f04f66cf79",
+    "validationSha256": "e722ebd6aebd9f2fd6e3006cfbd9a2e07af4319f7029d308fefd1844b68183ba",
+    "privateUserData": false
+  },
+  "promotionDecision": {
+    "decision": "retain-as-experimental-smoke-candidate",
+    "reason": "Real weights and a lower held-out loss were verified, but the base is GPT-2 rather than the registered Qwen3-4B model and the evaluation set is too small for a champion claim.",
+    "rollback": "Stop loading or delete the LoRA adapter; base weights were frozen and unchanged."
+  }
+}
