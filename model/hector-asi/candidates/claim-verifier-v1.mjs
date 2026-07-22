@@ -1,11 +1,11 @@
 const ACTIONS=[
- {id:'deploy',pattern:/\b(desplegu[eé]|deploy(?:ed)?|publicad[oa] en producci[oó]n)\b/i,evidence:/\b(deploy|deployment|preview|production|workers\.dev|commit sha)\b/i},
- {id:'merge',pattern:/\b(fusion[eé]|merge(?:d)?|integrad[oa] a main)\b/i,evidence:/\b(pull request|\bpr\b|merge commit|merged|main)\b/i},
- {id:'test',pattern:/\b(prob[eé]|tests? pasaron|validaci[oó]n completada|checks? verdes)\b/i,evidence:/\b(test|vitest|typecheck|build|workflow|check|exit code)\b/i},
- {id:'train',pattern:/\b(entren[eé]|fine[- ]?tun(?:e|ed)|qlora|lora entrenad[oa]|checkpoint generado)\b/i,evidence:/\b(checkpoint|adapter|loss|epoch|training run|artifact hash|sha256)\b/i}
+ {id:'deploy',pattern:/(desplegu[eé]|deploy(?:ed)?|publicad[oa] en producci[oó]n)/i,evidence:/(deploy|deployment|preview|production|workers\.dev|commit sha)/i},
+ {id:'merge',pattern:/(fusion[eé]|merge(?:d)?|integrad[oa] a main)/i,evidence:/(pull request|\bpr\b|merge commit|merged|main)/i},
+ {id:'test',pattern:/(prob[eé]|tests? pasaron|validaci[oó]n completada|checks? verdes)/i,evidence:/(test|vitest|typecheck|build|workflow|check|exit code)/i},
+ {id:'train',pattern:/(entren[eé]|fine[- ]?tun(?:e|ed)|qlora|lora entrenad[oa]|checkpoint generado)/i,evidence:/(checkpoint|adapter|loss|epoch|training run|artifact hash|sha256)/i}
 ];
-const CURRENT=/\b(hoy|actual(?:mente)?|m[aá]s reciente|[uú]ltim[oa]|ahora mismo|vigente)\b/i;
-const ABSOLUTE=/\b(100\s*%|garantizad[oa]|sin ninguna duda|siempre|nunca falla|completamente seguro)\b/i;
+const CURRENT=/(hoy|actual(?:mente)?|m[aá]s reciente|[uú]ltim[oa]|ahora mismo|vigente)/i;
+const ABSOLUTE=/(100\s*%|garantizad[oa]|sin ninguna duda|siempre|nunca falla|completamente seguro)/i;
 const numberTokens=text=>[...String(text).matchAll(/(?<![\w.])-?\d+(?:[.,]\d+)?%?/g)].map(x=>x[0].replace(',','.'));
 const evidenceText=evidence=>evidence.map(item=>typeof item==='string'?item:[item.type,item.text,item.url,item.sha,item.date].filter(Boolean).join(' ')).join('\n');
 const dateMs=value=>{const t=Date.parse(value||'');return Number.isFinite(t)?t:null};
@@ -23,8 +23,8 @@ export function verifyClaim({answer,evidence=[],now='2026-07-22T16:00:00Z'}){
  const nums=numberTokens(text).filter(n=>!/^20\d{2}$/.test(n));
  const proofNums=new Set(numberTokens(proof));
  const unsupported=[...new Set(nums.filter(n=>!proofNums.has(n)))];
- if(unsupported.length){score-=Math.min(30,unsupported.length*10);reasons.push(`unsupported-numbers:${unsupported.join(',')}`);}
- if(/\b(checkpoint|campe[oó]n|custom weights?|pesos propios)\b/i.test(text)&&/\b(planned|none|null|false|sin checkpoint|no existe)\b/i.test(proof)&&!/\b(no existe|todav[ií]a no|sin checkpoint|champion:\s*null)\b/i.test(text)){score-=60;reasons.push('registry-contradiction');}
+ if(unsupported.length){score-=Math.min(60,unsupported.length*40);reasons.push(`unsupported-numbers:${unsupported.join(',')}`);}
+ if(/(checkpoint|campe[oó]n|custom weights?|pesos propios)/i.test(text)&&/(planned|none|null|false|sin checkpoint|no existe)/i.test(proof)&&!/(no existe|todav[ií]a no|sin checkpoint|champion:\s*null)/i.test(text)){score-=60;reasons.push('registry-contradiction');}
  score=Math.max(0,Math.min(100,score));
  const confidence=Math.round((.35+.0065*score)*100)/100;
  return{accepted:score>=70,score,confidence:Math.min(.99,confidence),reasons};
