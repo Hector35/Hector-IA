@@ -14,12 +14,13 @@ export function chooseProvider(input:string,tier:'fast'|'balanced'|'deep',needsW
  if(needsWeb)return{provider:'openai',reason:'requiere búsqueda web integrada'};
  if(feedback?.avoidCloudflare)return{provider:'openai',reason:`aprendizaje del libro mayor: ${feedback.reason}`};
  if(health?.circuitOpen)return{provider:'openai',reason:`Workers AI pausado: ${health.reason}`};
+ if(health?.reason==='enfriamiento completado; se permite una prueba controlada'&&tier==='fast'&&!sensitiveSignals.test(input)&&!complexSignals.test(input))return{provider:'cloudflare',reason:'prueba controlada tras enfriamiento'};
  const freeFirst=decideFreeFirst(input,{freeProviderHealthy:true});
  if(freeFirst.tier==='free-model'&&tier!=='deep'&&!sensitiveSignals.test(input)&&!complexSignals.test(input))return{provider:'cloudflare',reason:freeFirst.reason};
  if(tier!=='fast')return{provider:'openai',reason:'requiere razonamiento balanceado o profundo'};
  if(sensitiveSignals.test(input))return{provider:'openai',reason:'contenido sensible o privado'};
  if(complexSignals.test(input))return{provider:'openai',reason:'tarea técnica o compleja'};
- return{provider:'cloudflare',reason:health?.reason==='enfriamiento completado; se permite una prueba controlada'?'prueba controlada tras enfriamiento':'consulta breve, no sensible y de bajo costo'};
+ return{provider:'cloudflare',reason:'consulta breve, no sensible y de bajo costo'};
 }
 
 export async function callCloudflare(env:Bindings,instructions:string,input:string){
