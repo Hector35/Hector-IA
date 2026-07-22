@@ -2,6 +2,7 @@ import React from 'react';
 import ReactDOM from 'react-dom/client';
 import {CodexApp} from './CodexApp';
 import {installWorkEvidenceEnhancer} from './work-evidence-ui';
+import {installWorkModeEnhancer} from './work-mode-ui';
 import {installScheduledTasksEnhancer} from './scheduled-tasks-ui';
 import {installMemoryControlEnhancer} from './memory-control-ui';
 import {installResponseAuditEnhancer} from './response-audit-ui';
@@ -23,6 +24,7 @@ import './codex-mobile.css';
 import './chat-content.css';
 import './project-ui.css';
 import './work-evidence-ui.css';
+import './work-mode-ui.css';
 import './scheduled-tasks-ui.css';
 import './memory-control-ui.css';
 import './response-audit-ui.css';
@@ -45,6 +47,7 @@ ReactDOM.createRoot(document.getElementById('root')!).render(
 );
 
 installWorkEvidenceEnhancer();
+installWorkModeEnhancer();
 installScheduledTasksEnhancer();
 installMemoryControlEnhancer();
 installResponseAuditEnhancer();
