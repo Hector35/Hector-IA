@@ -7,8 +7,9 @@ import {loadCloudflareHealth} from './provider-quality';
 import {chooseProvider} from './providers';
 import {chooseDeliberation} from './deliberation';
 import {createExecutionPlan,verifyExecutionPlan,type ExecutionPlan} from './execution-plan';
+import {loadRuntimeReuseCandidates,runWithRuntimeReuse,type RuntimeReuseCandidate} from './runtime-reuse';
 
-export type PlannedWorkInput={userId:string;prompt:string;allowWeb:boolean;reasoningLevel:'auto'|'high';context?:string};
+export type PlannedWorkInput={userId:string;prompt:string;allowWeb:boolean;reasoningLevel:'auto'|'high';context?:string;authorizedHighRisk?:boolean};
 
 export function workResponseOptions(input:Pick<PlannedWorkInput,'userId'|'reasoningLevel'>):ResponseOptions{
  return{reasoning:input.reasoningLevel,deliberation:input.reasoningLevel==='high'?'force':'auto',userId:input.userId};
@@ -40,10 +41,29 @@ export async function prepareWorkExecutionPlan(env:Bindings,input:PlannedWorkInp
  return{plan,feedback,budgetDecision};
 }
 
+function deterministicWorkOutput(output:string,candidate:RuntimeReuseCandidate,prepared:Awaited<ReturnType<typeof prepareWorkExecutionPlan>>){
+ return{
+  id:`reuse:${candidate.id}`,text:output,usage:{input_tokens:0,output_tokens:0},searchedWeb:false,
+  model:'hector-runtime-reuse',provider:'cloudflare' as const,requestedProvider:'cloudflare' as const,
+  providerReason:'Procedimiento determinista local reutilizado',fallback:false,qualityScore:1,qualityAccepted:true,
+  cognitiveMode:'single' as const,deliberationPasses:0,deliberationReason:'No fue necesaria inferencia del modelo.',
+  modelTier:prepared.plan.route.tier,modelReason:prepared.plan.policySummary,task:prepared.plan.task,
+  feedbackAdaptation:{sampleCount:prepared.feedback.sampleCount,preferDeep:prepared.feedback.preferDeep,avoidCloudflare:prepared.feedback.avoidCloudflare,guidanceApplied:prepared.feedback.guidance.length,reason:prepared.feedback.reason},
+  budgetDecision:prepared.budgetDecision
+ };
+}
+
 export async function executePlannedWork(env:Bindings,input:PlannedWorkInput){
  const prepared=await prepareWorkExecutionPlan(env,input);
- const out=await executePlannedContextual(env,input.prompt,[],input.context||'Trabajo persistente ejecutado fuera del chat.',prepared.plan,{feedback:prepared.feedback,budgetDecision:prepared.budgetDecision});
+ const candidates=await loadRuntimeReuseCandidates(env.DB,input.userId);
+ const baseContext=input.context||'Trabajo persistente ejecutado fuera del chat.';
+ const executed=candidates.length?await runWithRuntimeReuse({
+  prompt:input.prompt,candidates,authorizedHighRisk:input.authorizedHighRisk,modelCostUsd:.02,
+  model:async reuseContext=>executePlannedContextual(env,input.prompt,[],reuseContext?`${baseContext}\n\n${reuseContext}`:baseContext,prepared.plan,{feedback:prepared.feedback,budgetDecision:prepared.budgetDecision}),
+  deterministic:(output,candidate)=>deterministicWorkOutput(output,candidate,prepared)
+ }):{value:await executePlannedContextual(env,input.prompt,[],baseContext,prepared.plan,{feedback:prepared.feedback,budgetDecision:prepared.budgetDecision}),decision:{kind:'escalate' as const,reason:'No había experiencias reutilizables.',risk:'low' as const,candidate:null,reusedFraction:0},modelCalls:1};
+ const out=executed.value;
  const verification=verifyExecutionPlan(prepared.plan,{model:out.model,tier:out.modelTier,provider:out.provider,requestedProvider:out.requestedProvider,cognitiveMode:out.cognitiveMode,deliberationPasses:out.deliberationPasses,fallback:out.fallback});
  const usage=estimatePlannedCost(out.usage,out.model);if(out.searchedWeb)usage.costUsd+=.01;
- return{out,plan:prepared.plan,verification,usage};
+ return{out,plan:prepared.plan,verification,usage,reuse:{kind:executed.decision.kind,candidateId:executed.decision.kind==='assist'||executed.decision.kind==='deterministic'?executed.decision.candidate.id:null,reusedFraction:executed.decision.reusedFraction,modelCalls:executed.modelCalls,reason:executed.decision.reason}};
 }
