@@ -1,0 +1,69 @@
+{
+  "schemaVersion": "1.0.0",
+  "experimentId": "hector-asi-qwen15-v2",
+  "status": "experimental-weights-generated-reproducibly",
+  "championPromoted": false,
+  "baseModel": {
+    "repository": "Qwen/Qwen2.5-1.5B-Instruct",
+    "revision": "989aa7980e4cf806f80c7fef2b1adb7bc71aa306",
+    "license": "Apache-2.0"
+  },
+  "training": {
+    "method": "LoRA SFT",
+    "hardware": "GitHub-hosted 4-vCPU Linux runner",
+    "replicas": 2,
+    "epochsPerReplica": 2,
+    "stepsPerReplica": 32,
+    "trainableParameters": 544768,
+    "targetModules": ["q_proj", "v_proj"],
+    "loraRank": 4,
+    "loraAlpha": 8,
+    "learningRate": 0.00015,
+    "maxLength": 96,
+    "seed": 35,
+    "secondsFirstReplica": 304.3678867816925
+  },
+  "datasets": {
+    "trainPath": "model/hector-asi/data/qwen15-sft-v2.jsonl",
+    "trainExamples": 16,
+    "trainSha256": "662913d9e5c39baf2b55c254435916836fb8b9946d90d9bd8c53f00535622bf6",
+    "validationPath": "model/hector-asi/evals/qwen15-held-out-v2.jsonl",
+    "validationExamples": 8,
+    "validationSha256": "a292af93f4ef7649b0c025d66efb5a0a018be1928171eb6abf03f21384128ec4",
+    "deduplicated": true,
+    "splitContaminationChecked": true,
+    "privateUserData": false
+  },
+  "evaluation": {
+    "baseValidationLoss": 4.212214648723602,
+    "candidateValidationLoss": 3.498935267329216,
+    "validationLossDelta": -0.7132793813943863,
+    "relativeValidationImprovement": 0.16933595290793796,
+    "firstTrainLoss": 4.617568492889404,
+    "finalTrainLoss": 3.9127678871154785,
+    "parameterDeltaL2": 2.071495294570923,
+    "criticalRegressionAssessment": "Evaluation breadth is insufficient for champion eligibility."
+  },
+  "reproducibility": {
+    "byteIdenticalReplicas": 2,
+    "adapterSha256": "28d6e877a4d90cbee4b161c9a29de148f0e43e94d133ec55dd4f97be0cb83a17",
+    "scope": "Two replicas used the same pinned model, data, software, seed and CPU workflow."
+  },
+  "artifact": {
+    "githubActionsRunId": "29950607967",
+    "githubActionsArtifactId": "8542241149",
+    "name": "hector-asi-qwen15-v2-29950607967",
+    "adapterPath": "adapter/adapter_model.safetensors",
+    "adapterBytes": 2193720,
+    "adapterSha256": "28d6e877a4d90cbee4b161c9a29de148f0e43e94d133ec55dd4f97be0cb83a17",
+    "archiveBytes": 5939075,
+    "archiveSha256": "44b588c89be29bc602f3e3c5e90b11a05dc75538d9834ee5bb8e81c5d5bd98a9",
+    "weightsCommittedToGit": false,
+    "expiresAt": "2026-10-20T19:21:20Z"
+  },
+  "promotionDecision": {
+    "decision": "retain-as-leading-qwen15-experimental-candidate",
+    "reason": "The candidate exceeds its predefined 3% held-out-loss gate with reproducible weights, but it is Qwen2.5 1.5B rather than the planned Qwen3 4B champion and eight hidden cases cannot establish broad safety, calibration, transfer, latency or regression performance.",
+    "rollback": "Do not load or delete the adapter; the frozen base model remains unchanged."
+  }
+}
