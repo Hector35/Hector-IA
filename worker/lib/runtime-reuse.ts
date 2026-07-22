@@ -53,6 +53,7 @@ export function experienceRecencyScore(createdAt:string|null|undefined,nowMs=Dat
 function clamp(value:number){return Math.max(0,Math.min(1,Number.isFinite(value)?value:0));}
 function candidateScore(input:string,candidate:RuntimeReuseCandidate){
  const lexical=reuseSimilarity(input,`${candidate.trigger} ${candidate.taskType}`);
+ if(lexical<.12)return 0;
  return lexical*.52+clamp(candidate.confidence)*.2+clamp(candidate.successRate)*.18+clamp(candidate.recencyScore??.5)*.1;
 }
 
