@@ -1,0 +1,32 @@
+name: Free First Diagnostic
+on:
+  push:
+    branches:
+      - agent/free-first-inference-utility-v2
+jobs:
+  diagnose:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+      - run: npm ci
+      - name: Capture tests
+        id: tests
+        shell: bash
+        run: |
+          set +e
+          npm test > test-output.log 2>&1
+          code=$?
+          echo "exit_code=$code" >> "$GITHUB_OUTPUT"
+          exit 0
+      - uses: actions/upload-artifact@v4
+        with:
+          name: free-first-test-output
+          path: test-output.log
+          retention-days: 1
+      - name: Preserve failure
+        if: steps.tests.outputs.exit_code != '0'
+        run: exit 1
