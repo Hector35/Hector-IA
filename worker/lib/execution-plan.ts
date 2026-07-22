@@ -1,6 +1,8 @@
 export type PlannedTier='fast'|'balanced'|'deep';
-export type PlannedProvider='cloudflare'|'openai';
+export type PlannedProvider='cloudflare'|'huggingface'|'openai';
 export type PlannedCognitiveMode='single'|'ensemble';
+
+const HECTOR_QWEN_BASE_MODEL='Qwen/Qwen3-4B-Instruct-2507';
 
 export type ExecutionPlanInput={
  task:string;
@@ -47,7 +49,13 @@ export async function hashExecutionPlan(input:ExecutionPlanInput){
 }
 
 export async function createExecutionPlan(input:ExecutionPlanInput):Promise<ExecutionPlan>{
- const normalized:ExecutionPlanInput={...input,allowedModels:[...new Set(input.allowedModels)].sort()};
+ const qwen=input.provider.requested==='huggingface';
+ const normalized:ExecutionPlanInput={
+  ...input,
+  route:qwen?{...input.route,model:HECTOR_QWEN_BASE_MODEL}:input.route,
+  cognition:qwen?{mode:'single',passes:1,reason:`${input.cognition.reason}; Qwen provisional usa una inferencia`}:input.cognition,
+  allowedModels:[...new Set(qwen?[...input.allowedModels,HECTOR_QWEN_BASE_MODEL]:input.allowedModels)].sort()
+ };
  return Object.freeze({...normalized,version:'1.0.0',hash:await hashExecutionPlan(normalized),createdAt:new Date().toISOString()});
 }
 

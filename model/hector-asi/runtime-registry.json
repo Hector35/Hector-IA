@@ -1,5 +1,5 @@
 {
-  "schemaVersion": "1.0.0",
+  "schemaVersion": "1.1.0",
   "project": "Hector ASI",
   "operationalBase": {
     "id": "hector-base",
@@ -24,6 +24,24 @@
       "wrangler.jsonc",
       "response_traces.provider",
       "response_traces.model"
+    ]
+  },
+  "provisionalQwenChat": {
+    "id": "hector-qwen-base",
+    "name": "Héctor Qwen Base",
+    "status": "awaiting-secret",
+    "deployment": "huggingface-inference-providers",
+    "model": "Qwen/Qwen3-4B-Instruct-2507",
+    "customWeights": false,
+    "activationPhrase": "Héctor Qwen:",
+    "requiredSecret": "HUGGINGFACE_TOKEN",
+    "silentFallbackAllowed": false,
+    "purpose": "Hablar con la base abierta elegida antes de que exista el adaptador entrenado de Héctor ASI",
+    "evidence": [
+      "worker/lib/providers.ts",
+      "worker/lib/openai.ts",
+      "worker/lib/providers.test.ts",
+      "wrangler.jsonc"
     ]
   },
   "customCandidate": {

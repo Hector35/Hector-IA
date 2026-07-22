@@ -23,6 +23,14 @@ describe('execution plan',()=>{
   expect(result).toMatchObject({ok:true,status:'exact'});
  });
 
+ it('normaliza un plan Qwen a su modelo real y una sola inferencia',async()=>{
+  const plan=await createExecutionPlan(input({provider:{requested:'huggingface',reason:'solicitud explícita'},cognition:{mode:'ensemble',passes:3,reason:'profundo'},allowedModels:['gpt-balanced']}));
+  expect(plan.route.model).toBe('Qwen/Qwen3-4B-Instruct-2507');
+  expect(plan.allowedModels).toContain('Qwen/Qwen3-4B-Instruct-2507');
+  expect(plan.cognition).toMatchObject({mode:'single',passes:1});
+  expect(verifyExecutionPlan(plan,{model:'Qwen/Qwen3-4B-Instruct-2507',tier:'balanced',provider:'huggingface',cognitiveMode:'single',deliberationPasses:1})).toMatchObject({ok:true,status:'exact'});
+ });
+
  it('acepta únicamente el fallback explícito Cloudflare a OpenAI',async()=>{
   const plan=await createExecutionPlan(input({route:{model:'cf-fast',tier:'fast',reasoning:'low',needsWeb:false},provider:{requested:'cloudflare',reason:'consulta breve'},allowedModels:['cf-fast']}));
   expect(verifyExecutionPlan(plan,{model:'cf-fast',tier:'fast',provider:'openai',fallback:true,cognitiveMode:'single',deliberationPasses:1}).status).toBe('allowed-fallback');
