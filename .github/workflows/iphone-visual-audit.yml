@@ -8,6 +8,7 @@ on:
       - 'scripts/iphone-visual-audit.mjs'
       - 'scripts/iphone-visual-regression.mjs'
       - 'scripts/iphone-visual-summary.mjs'
+      - 'scripts/one-command-iphone-audit.mjs'
       - '.github/workflows/iphone-visual-audit.yml'
       - 'package.json'
       - 'package-lock.json'
@@ -50,6 +51,11 @@ jobs:
           VISUAL_AUDIT_URL: http://127.0.0.1:4173
           VISUAL_AUDIT_OUTPUT: visual-current
         run: node scripts/iphone-visual-audit.mjs
+      - name: Probar entrada única en iPhone
+        env:
+          ONE_COMMAND_AUDIT_URL: http://127.0.0.1:4173
+          ONE_COMMAND_AUDIT_OUTPUT: one-command-audit
+        run: node scripts/one-command-iphone-audit.mjs
       - name: Preparar rama base
         env:
           BASE_REF: ${{ github.base_ref || 'main' }}
@@ -130,6 +136,7 @@ jobs:
             visual-current
             visual-baseline
             visual-diff
+            one-command-audit
           if-no-files-found: warn
           retention-days: 14
       - name: Aplicar resultado de regresión
