@@ -1,4 +1,4 @@
-.hxFileSearch{display:grid;grid-template-columns:1fr auto;gap:6px 12px;align-items:end;margin:0 0 14px;padding:12px 14px;border:1px solid rgba(255,255,255,.08);border-radius:16px;background:rgba(255,255,255,.035)}
+.hxFileSearch{display:grid;grid-template-columns:1fr auto;gap:6px 12px;align-items:end;margin:0 0 14px;padding:12px 14px;border:1px solid rgba(255,255,255,.08);border-radius:16px;background:rgba(255,255,255,.035);contain:layout paint}
 .hxFileSearch>span{grid-column:1/-1;font-size:12px;font-weight:700;color:var(--cx-muted,#9ca3af)}
 .hxFileSearch input{min-width:0;height:44px;border:1px solid rgba(255,255,255,.1);border-radius:12px;background:rgba(7,10,18,.72);color:inherit;padding:0 13px;font:inherit}
 .hxFileSearch input:focus{outline:2px solid rgba(108,99,255,.7);outline-offset:2px}
