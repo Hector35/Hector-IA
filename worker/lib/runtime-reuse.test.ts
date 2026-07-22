@@ -5,6 +5,17 @@ const known:RuntimeReuseCandidate={id:'skill-known',source:'skill',taskType:'git
 
 const contextCandidate:RuntimeReuseCandidate={...known,id:'experience-context',mode:'context',deterministicOutput:undefined,confidence:.74,successRate:.8,trigger:'analiza error desconocido del repositorio',procedure:'Inspeccionar primero el error y los archivos relacionados.'};
 
+type ReuseDb=Parameters<typeof loadRuntimeReuseCandidates>[0];
+
+function dbWithRows(rows:unknown[]){
+ const prepare=vi.fn((_sql:string)=>({
+  bind:vi.fn((..._values:unknown[])=>({
+   all:async<T>()=>({results:rows as T[]})
+  }))
+ }));
+ return{db:{prepare} as unknown as ReuseDb,prepare};
+}
+
 describe('runtime reuse engine',()=>{
  it('resuelve una tarea conocida sin llamar al modelo',async()=>{
   const model=vi.fn(async()=>({text:'modelo'}));
@@ -52,13 +63,20 @@ describe('runtime reuse engine',()=>{
   expect(experienceRecencyScore('2026-07-22T00:00:00Z',Date.parse('2026-07-22T00:00:00Z'))).toBe(1);
  });
 
- it('consulta únicamente experiencias verificadas y aisladas por usuario',async()=>{
-  let sql='',bindings:unknown[]=[];
-  const db={prepare:(statement:string)=>{sql=statement;return{bind:(...values:unknown[])=>{bindings=values;return{all:async()=>({results:[{id:'verified-1',objective:'Corrige repositorio',result:'Inspeccionar el error y ejecutar pruebas.',skills_json:'["github-code"]',attempts:1,created_at:'2026-07-22T00:00:00Z',estimated_cost_usd:.01}]})};}};}} as any;
+ it('carga únicamente experiencias con evidencia objetivamente verificada y aisladas por usuario',async()=>{
+  const verified={id:'verified',objective:'Ejecuta pruebas del repositorio',objective_normalized:'ejecuta pruebas del repositorio',result:'Procedimiento comprobado\nREUSABLE_OUTPUT: pruebas aprobadas',skills_json:'["github-code"]',attempts:1,created_at:'2026-07-22T00:00:00Z',estimated_cost_usd:.01,evidence_json:'[{"kind":"test","verified":true}]',verified:1};
+  const unverified={...verified,id:'unverified',evidence_json:'[{"kind":"nota","verified":false}]'};
+  const legacy={...verified,id:'legacy',evidence_json:'[]'};
+  const {db,prepare}=dbWithRows([verified,unverified,legacy]);
   const items=await loadRuntimeReuseCandidates(db,'owner-1');
+  const sql=String(prepare.mock.calls[0]?.[0]);
   expect(sql).toContain("user_id=? AND status='completed' AND verified=1");
-  expect(bindings).toEqual(['owner-1']);
-  expect(items).toHaveLength(1);
-  expect(items[0]).toMatchObject({id:'verified-1',taskType:'github-code',estimatedCostUsd:.01});
+  expect(items.map(item=>item.id)).toEqual(['verified']);
+  expect(items.at(0)).toMatchObject({id:'verified',taskType:'github-code',estimatedCostUsd:.01,mode:'deterministic',deterministicOutput:'pruebas aprobadas'});
+ });
+
+ it('mantiene fallback seguro si el esquema todavía no está disponible',async()=>{
+  const db:ReuseDb={prepare:()=>({bind:()=>({all:async<T>()=>{throw new Error('missing column');}})})};
+  await expect(loadRuntimeReuseCandidates(db,'user-1')).resolves.toEqual([]);
  });
 });
