@@ -1,0 +1,129 @@
+{
+  "schemaVersion": "1.0.0",
+  "roundId": "round-2026-07-22-01",
+  "createdAt": "2026-07-22T14:28:47Z",
+  "mainSha": "02ac5fd9bbabaeb0252922ece89527c09dd30389",
+  "mode": "stable-autonomous-double-loop",
+  "champion": null,
+  "candidateTree": {
+    "foundation": "hector-asi-v0.1-qwen3-4b-sft",
+    "activePullRequests": [576, 578, 579],
+    "trainingAuthorized": false
+  },
+  "selectedObjective": {
+    "capabilityKey": "promotion-quality-evaluation-and-integration",
+    "benchmarkKey": "hector-asi-round-01-hidden-integration-v1",
+    "hypothesis": "Integrating the current cognitive and metacognitive candidates behind one hidden adversarial promotion harness will produce more reliable capability gain per hour than starting another training run, while preventing false promotion and preserving reusable specialists.",
+    "primaryWeakness": "There is no promoted Hector ASI checkpoint and the current candidates are validated mainly on small visible contract benchmarks; the highest-value next step is independent hidden evaluation, compatibility testing and conservative integration.",
+    "successThresholds": {
+      "minimumHeldOutImprovement": 0.03,
+      "maximumSecondaryRegression": 0.01,
+      "criticalRegressionsAllowed": 0,
+      "minimumActionAccuracy": 0.8,
+      "maximumUnnecessaryEscalationRate": 0.1,
+      "requiresReproducibleRun": true,
+      "requiresRollback": true
+    },
+    "earlyStop": [
+      "Stop a candidate after focused evaluation if held-out delta is below 0.01 and no specialist value is demonstrated.",
+      "Stop immediately on benchmark contamination, unverifiable provenance, critical regression or missing rollback.",
+      "Do not run GPU training until licensed data volume, immutable base revision and hidden evaluation are sufficient."
+    ]
+  },
+  "lease": {
+    "ownerSlot": "director-autonomous-cycle-1",
+    "capabilityKey": "promotion-quality-evaluation-and-integration",
+    "status": "planned-for-d1-claim",
+    "leaseMinutes": 55,
+    "files": [
+      "model/hector-asi/rounds/round-2026-07-22-01.json",
+      "model/hector-asi/evals/hidden-integration-v1.jsonl",
+      "model/hector-asi/evaluate_round_candidate.mjs",
+      "model/hector-asi/reports/round-2026-07-22-01-promotion.json"
+    ]
+  },
+  "baseline": {
+    "modelChampion": null,
+    "foundationCandidateStatus": "planned-not-trained",
+    "knownEvidence": {
+      "metacognitiveBenchmarkCases": 12,
+      "metacognitiveActionAccuracyCandidate": 1.0,
+      "metacognitiveBrierCandidate": 0.10578,
+      "cognitivePlannerBenchmarkCases": 5
+    },
+    "limitations": [
+      "No real QLoRA adapter or checkpoint has been trained.",
+      "Current candidate benchmarks are small and visible.",
+      "No independent combined hidden evaluation has promoted a global champion."
+    ]
+  },
+  "budget": {
+    "approvedUsd": 5.0,
+    "defaultSpendUsd": 0.0,
+    "allowedUses": [
+      "One batched master-model critique only if deterministic evaluators disagree or leave an ambiguous promotion decision.",
+      "Small storage or CI artifact costs required to preserve reproducible evidence."
+    ],
+    "disallowedUses": [
+      "GPU training before the data and promotion gates are satisfied.",
+      "Paid classification, deduplication, calculation or deterministic validation.",
+      "Repeated judging of cases already decided by objective tests."
+    ],
+    "stopRule": "Stop paid evaluation when the next dollar is not expected to change the promotion decision or create a reusable asset."
+  },
+  "occupiedFiles": {
+    "cycle2": [
+      "model/hector-asi/METACOGNITION.md",
+      "model/hector-asi/data/metacognition-preferences-v1.jsonl",
+      "model/hector-asi/evals/metacognition-v1.jsonl",
+      "model/hector-asi/evaluate_metacognition.mjs"
+    ],
+    "cycle3": [
+      "model/hector-asi/candidates/cognitive-plan-v1.mjs",
+      "model/hector-asi/evals/cognitive-planning-v1.jsonl",
+      "model/hector-asi/evals/run_cognitive_planner_benchmark.mjs",
+      "package.json"
+    ],
+    "cycle4": [
+      "model/hector-asi/candidates/metacognitive-controller-v1.mjs",
+      "model/hector-asi/evals/metacognitive-controller-v1.jsonl",
+      "model/hector-asi/evaluate_metacognitive_controller.mjs"
+    ]
+  },
+  "assignments": {
+    "cycle2": {
+      "objective": "Finish and validate the licensed metacognition preference data and held-out evaluator in PR 576; do not expand into runtime integration.",
+      "deliverables": ["dataset manifest", "held-out benchmark", "evaluation command", "handoff"]
+    },
+    "cycle3": {
+      "objective": "Finish the constraint-aware cognitive planner candidate in PR 578 and provide reproducible focused metrics; do not promote it.",
+      "deliverables": ["candidate module", "benchmark report", "rollback boundary", "handoff"]
+    },
+    "cycle4": {
+      "objective": "Finish the selective metacognitive controller and incremental evaluator in PR 579; keep it shadow-only and quantify cache reuse.",
+      "deliverables": ["controller candidate", "adversarial metrics", "pipeline speedup evidence", "handoff"]
+    },
+    "cycle5": {
+      "objective": "Integrate PRs in dependency order 576 -> retarget/rebase 579 -> 578, build an independent hidden combined evaluator, attempt to refute both candidates, and promote only global or specialist improvements that meet all gates.",
+      "deliverables": ["hidden evaluation report", "promotion or rejection decision", "specialist registry updates", "verified main SHA", "next-round handoff"]
+    }
+  },
+  "risks": [
+    "PR 579 is stacked on PR 576 and must be retargeted only after 576 merges.",
+    "PR 578 edits package.json and can conflict with later integration commands.",
+    "Visible micro-benchmarks can overstate intelligence gains.",
+    "The absence of a GPU must not be represented as completed training."
+  ],
+  "nextRoundInput": {
+    "readFirst": [
+      "model/hector-asi/rounds/round-2026-07-22-01.json",
+      "model/hector-asi/model-registry.json",
+      "model/hector-asi/experiment-handoff.json"
+    ],
+    "priorityAfterIntegration": [
+      "Create a sealed base-versus-candidate inference harness with immutable model revision and hashes.",
+      "Expand licensed training data from verified failure clusters rather than random volume.",
+      "Authorize the first QLoRA run only after hidden evaluation and compute gates are satisfied."
+    ]
+  }
+}
