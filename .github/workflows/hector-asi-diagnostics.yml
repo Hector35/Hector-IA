@@ -1,0 +1,47 @@
+name: Hector ASI Diagnostics
+
+on:
+  push:
+    branches:
+      - redesign/hector-asi-chat
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  diagnose:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+      - name: Install dependencies
+        run: npm ci
+      - name: Capture tests
+        shell: bash
+        run: |
+          set +e
+          npm test > test-output.log 2>&1
+          echo "$?" > test-exit.txt
+          find src -type f \( -name '*.test.*' -o -name '*.spec.*' \) | sort > test-files.txt
+          exit 0
+      - name: Capture build
+        shell: bash
+        run: |
+          set +e
+          npm run build > build-output.log 2>&1
+          echo "$?" > build-exit.txt
+          exit 0
+      - uses: actions/upload-artifact@v4
+        with:
+          name: hector-asi-diagnostics
+          path: |
+            test-output.log
+            test-exit.txt
+            test-files.txt
+            build-output.log
+            build-exit.txt
+          if-no-files-found: error
