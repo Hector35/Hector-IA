@@ -1,0 +1,78 @@
+name: Hector model SmolLM2 CPU training
+
+on:
+  pull_request:
+    branches: [main]
+    paths:
+      - "model/hector-asi/data/smollm-hector-sft-v1.jsonl"
+      - "model/hector-asi/evals/smollm-hector-held-out-v1.jsonl"
+      - "model/hector-asi/train_smollm_cpu.py"
+      - "model/hector-asi/experiments/smollm2-135m-lora-v1.manifest.json"
+      - ".github/workflows/hector-model-smollm-cpu.yml"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  train-smollm2-real-lora:
+    runs-on: ubuntu-latest
+    timeout-minutes: 45
+    env:
+      HF_HUB_DISABLE_TELEMETRY: "1"
+      TOKENIZERS_PARALLELISM: "false"
+    steps:
+      - name: Checkout candidate branch
+        uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+
+      - name: Install CPU training stack
+        run: |
+          python -m pip install --upgrade pip
+          python -m pip install --index-url https://download.pytorch.org/whl/cpu "torch==2.7.1"
+          python -m pip install "transformers==4.53.2" "peft==0.16.0" "accelerate==1.8.1" "safetensors==0.5.3"
+
+      - name: Train real SmolLM2 LoRA adapter
+        run: |
+          python model/hector-asi/train_smollm_cpu.py \
+            --model HuggingFaceTB/SmolLM2-135M-Instruct \
+            --revision 12fd25f \
+            --train-file model/hector-asi/data/smollm-hector-sft-v1.jsonl \
+            --validation-file model/hector-asi/evals/smollm-hector-held-out-v1.jsonl \
+            --output-dir artifacts/hector-asi-smollm2-135m-lora-v1 \
+            --epochs 2 \
+            --max-length 192 \
+            --learning-rate 3e-4 \
+            --seed 35
+
+      - name: Verify generated weights, comparison and hashes
+        run: |
+          python - <<'PY'
+          import json
+          from pathlib import Path
+
+          root = Path("artifacts/hector-asi-smollm2-135m-lora-v1")
+          metrics = json.loads((root / "metrics.json").read_text())
+          results = metrics["results"]
+          assert results["weightsGenerated"] is True
+          assert results["parameterDeltaL2"] > 0
+          assert results["adapterBytes"] > 0
+          assert (root / "adapter" / "adapter_model.safetensors").is_file()
+          assert (root / "run-manifest.json").is_file()
+          assert (root / "SHA256SUMS").is_file()
+          assert isinstance(results["baselineValidationLoss"], float)
+          assert isinstance(results["candidateValidationLoss"], float)
+          print(json.dumps(results, indent=2, sort_keys=True))
+          PY
+
+      - name: Upload immutable training artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: hector-asi-smollm2-135m-lora-${{ github.run_id }}
+          path: artifacts/hector-asi-smollm2-135m-lora-v1
+          if-no-files-found: error
+          retention-days: 30
