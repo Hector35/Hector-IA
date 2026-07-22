@@ -1,5 +1,0 @@
-- [x] reglas locales
-- [x] modelo gratuito de utilidad
-- [x] timeout y fallback
-- [x] pruebas unitarias
-- [ ] checks de CI
