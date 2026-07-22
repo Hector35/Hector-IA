@@ -39,5 +39,5 @@ export function summarizeGovernor(plans:GovernedExecutionPlan[],baselineAdvanced
  const advancedCalls=plans.reduce((sum,item)=>sum+item.maxAdvancedCalls,0);
  const baseline=plans.length*Math.max(1,baselineAdvancedCallsPerTask);
  const avoided=Math.max(0,baseline-advancedCalls);
- return{tasks:plans.length,deterministic:plans.filter(item=>item.inferenceTier==='none'&&item.maxAdvancedCalls===0).length,freeTier:plans.filter(item=>(item.inferenceTier==='browser-local'||item.inferenceTier==='cloudflare-free')&&item.maxAdvancedCalls===0).length,advancedCalls,advancedCallsAvoided:avoided,estimatedTokensSaved:avoided*800,estimatedCostUsdSaved:Number((avoided*.0016).toFixed(6))};
+ return{tasks:plans.length,deterministic:plans.filter(item=>item.reuse.kind==='deterministic').length,freeTier:plans.filter(item=>item.maxAdvancedCalls===0&&item.reuse.kind!=='blocked'&&item.reuse.kind!=='deterministic').length,advancedCalls,advancedCallsAvoided:avoided,estimatedTokensSaved:avoided*800,estimatedCostUsdSaved:Number((avoided*.0016).toFixed(6))};
 }
