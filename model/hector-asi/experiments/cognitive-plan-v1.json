@@ -1,0 +1,59 @@
+{
+  "schemaVersion": "1.0.0",
+  "experimentId": "hector-asi-cognitive-plan-v1",
+  "status": "candidate",
+  "baseCommit": "02ac5fd9bbabaeb0252922ece89527c09dd30389",
+  "modelBase": {
+    "repository": "Qwen/Qwen3-4B-Instruct-2507",
+    "license": "Apache-2.0",
+    "revision": null,
+    "weightHash": null
+  },
+  "intervention": {
+    "type": "runtime-cognitive-planner",
+    "weightsTrained": false,
+    "reason": "No GPU and the seed dataset is insufficient for a defensible weight update.",
+    "candidate": "model/hector-asi/candidates/cognitive-plan-v1.mjs",
+    "discardedApproach": "generic-linear baseline planner"
+  },
+  "capabilities": [
+    "hierarchical-planning",
+    "constraint-tracking",
+    "conflict-avoidance",
+    "progressive-validation",
+    "risk-aware-verification",
+    "reusable-handoff"
+  ],
+  "benchmark": {
+    "cases": "model/hector-asi/evals/cognitive-planning-v1.jsonl",
+    "runner": "model/hector-asi/evals/run_cognitive_planner_benchmark.mjs",
+    "caseCount": 5,
+    "hidden": false,
+    "purpose": "Pipeline and runtime candidate evaluation; not a claim of general intelligence improvement."
+  },
+  "reproducibility": {
+    "seed": 42,
+    "compute": "CPU deterministic Node.js",
+    "advancedModelCalls": 0,
+    "estimatedCostUsd": 0,
+    "commands": [
+      "node model/hector-asi/evals/run_cognitive_planner_benchmark.mjs",
+      "npx vitest run tests/hector-asi-cognitive-planner.test.mjs"
+    ]
+  },
+  "promotion": {
+    "allowed": false,
+    "owner": "cycle-5-evaluator",
+    "required": [
+      "independent hidden evaluation",
+      "runtime integration review",
+      "regression suite",
+      "measured latency",
+      "rollback validation"
+    ]
+  },
+  "rollback": {
+    "method": "Disable the cognitive-plan-v1 route and retain the previous planner.",
+    "artifactsRequired": false
+  }
+}
