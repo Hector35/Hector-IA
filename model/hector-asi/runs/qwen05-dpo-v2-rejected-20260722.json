@@ -1,0 +1,54 @@
+{
+  "schemaVersion": "1.0.0",
+  "experimentId": "hector-asi-qwen05-dpo-v2",
+  "status": "rejected-after-hidden-evaluation",
+  "championPromoted": false,
+  "baseModel": {
+    "repository": "Qwen/Qwen2.5-0.5B-Instruct",
+    "revision": "a338b55dd21219a5f4da42bc11a9313d1a27d4cc",
+    "license": "Apache-2.0"
+  },
+  "training": {
+    "method": "length-normalized LoRA DPO",
+    "trainPairs": 10,
+    "hiddenPairs": 6,
+    "epochs": 4,
+    "steps": 40,
+    "seed": 35,
+    "trainableParameters": 270336,
+    "parameterDeltaL2": 1.6746958690997382,
+    "byteIdenticalReplicas": 2,
+    "runtimeSecondsFirstReplica": 328.30924248695374
+  },
+  "evaluation": {
+    "basePreferenceAccuracy": 0.0,
+    "candidatePreferenceAccuracy": 0.3333333333333333,
+    "baseMeanPreferenceMargin": -0.7684347629547119,
+    "candidateMeanPreferenceMargin": -0.24395589033762613,
+    "baseLanguageLoss": 4.246220787366231,
+    "candidateLanguageLoss": 4.558052937189738,
+    "languageLossRelativeChange": 0.07343757318302915,
+    "predefinedPreferenceAccuracyGate": 0.6666666666666666,
+    "predefinedMaximumLanguageRegression": 0.05
+  },
+  "artifact": {
+    "githubActionsRunId": "29946848636",
+    "githubActionsArtifactId": "8540827528",
+    "name": "hector-asi-qwen05-dpo-v2-29946848636",
+    "adapterBytes": 1093728,
+    "adapterSha256": "8d3077b00209fa3c914e7e08ce2dc234c9fd68534cd2b579e1776c887641121c",
+    "archiveSha256": "7a631e38af304c2563ce78ab13a553c2c536582c55aa0ece00cbedb492c4616f",
+    "weightsCommittedToGit": false,
+    "expiresAt": "2026-10-20T18:29:06Z"
+  },
+  "decision": {
+    "result": "reject",
+    "reasons": [
+      "Hidden preference accuracy reached only 33.3%, below the predefined two-thirds gate.",
+      "Language loss regressed 7.34%, exceeding the predefined 5% maximum.",
+      "Byte-identical real weights demonstrate reproducibility, not utility or promotion eligibility."
+    ],
+    "rollback": "Do not load the adapter; the frozen base model is unchanged.",
+    "negativeLearning": "Length normalization improved hidden preference accuracy from zero to one third, but stronger direct DPO overfit preferences and harmed language modeling. Future DPO must use an SFT anchoring or KL regularization term and preserve the same hidden split for a clean comparison."
+  }
+}
