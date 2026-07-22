@@ -1,0 +1,54 @@
+{
+  "schemaVersion": "1.0.0",
+  "experimentId": "hector-asi-qwen05-v1",
+  "runId": "29942883350",
+  "completedAt": "2026-07-22T17:35:23Z",
+  "status": "experimental-weights-generated",
+  "championPromoted": false,
+  "baseModel": {
+    "repository": "Qwen/Qwen2.5-0.5B-Instruct",
+    "requestedRevision": "main",
+    "resolvedRevision": "7ae557604adf67be50417f59c2c2f167def9a775",
+    "license": "Apache-2.0"
+  },
+  "training": {
+    "method": "LoRA SFT",
+    "hardware": "GitHub-hosted 4-vCPU Linux runner constrained to one CPU thread",
+    "epochs": 1,
+    "steps": 8,
+    "seed": 35,
+    "seconds": 37.29528498649597,
+    "trainableParameters": 540672,
+    "parameterDeltaL2": 0.6292198896408081
+  },
+  "evaluation": {
+    "baseValidationLoss": 4.247941613197327,
+    "candidateValidationLoss": 3.9061858654022217,
+    "validationLossDelta": -0.341755747795105,
+    "relativeValidationImprovement": 0.0804520821880773,
+    "trainExamples": 8,
+    "validationExamples": 4,
+    "criticalRegressionAssessment": "not broad enough for champion eligibility"
+  },
+  "artifact": {
+    "githubActionsArtifactId": "8538950761",
+    "name": "hector-asi-qwen05-29942883350",
+    "archiveBytes": 5922628,
+    "archiveSha256": "3e15e80c21642ac4ba45896691c306b59917f40782d828415abc2da091796d32",
+    "adapterPath": "adapter/adapter_model.safetensors",
+    "adapterBytes": 2175168,
+    "adapterSha256": "fc2c8432ad401114c5a787afb4e8d32a59f0a2a82f1d0b5d2390f420444efb43",
+    "weightsCommittedToGit": false,
+    "expiresAt": "2026-10-20T17:34:01Z"
+  },
+  "datasets": {
+    "trainSha256": "673db95cb769777ddc68e9ea99067fb44488b3a6f4425093bfac127ff7987f7c",
+    "validationSha256": "8d275edabd5b5c36d1914e40c7935a0c7c21f4fcab0fa6b25bd41ed5c86905c4",
+    "privateUserData": false
+  },
+  "promotionDecision": {
+    "decision": "retain-as-experimental-qwen-candidate",
+    "reason": "Real Qwen-family weights and lower held-out loss were verified, but the base is 0.5B rather than Qwen3-4B and four validation cases cannot exclude broad regressions.",
+    "rollback": "Do not load or delete the LoRA adapter; frozen base weights remain unchanged."
+  }
+}
