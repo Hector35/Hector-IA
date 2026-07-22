@@ -33,6 +33,7 @@ import {executePlannedWork} from './lib/planned-work';
 import {parseWorkModeResult,renderWorkModePrompt,workModeFailureTransition} from './lib/work-mode';
 import {buildPlan} from './agent/planner';
 import {recordExperience} from './agent/learning';
+import {safeRetrieveSimilarExperiences} from './agent/experience-retrieval';
 import {canRetry,JOB_LEASE_SECONDS,retryDelaySeconds} from './lib/job-reliability';
 
 const app=new Hono<{Bindings:Bindings;Variables:Variables}>();
@@ -50,12 +51,16 @@ async function recordUsage(env:Bindings,job:any,out:any,u:any,executionPlan:any,
 async function processNext(env:Bindings){
  await recoverExpiredLeases(env);const claimed=await claimNextJob(env);if(!claimed)return;
  const {job,leaseToken}=claimed,started=Date.now(),plan=buildPlan(job.prompt),continuous=job.kind==='work';
+ const retrieval=await safeRetrieveSimilarExperiences(env,{userId:job.user_id,objective:job.prompt,skills:plan.skills,limit:3});
  await event(env,job.id,continuous?`Modo Trabajo: ciclo ${job.attempt_count} iniciado`:`Inspección iniciada. Intento ${job.attempt_count}/${job.max_attempts}. Skills: ${plan.skills.join(', ')||'general-analysis'}`,10);
+ if(retrieval.items.length)await event(env,job.id,`Recuperadas ${retrieval.items.length} experiencia${retrieval.items.length===1?'':'s'} verificadas similares: ${retrieval.traceIds.join(', ')}`,18);
  try{
   const high=continuous||job.reasoning_level==='high';
   await event(env,job.id,continuous?'Revisando progreso anterior y preparando la siguiente estrategia':high?'Preparando plan cognitivo inmutable con deliberación multiagente':'Preparando plan cognitivo inmutable',25);
-  const workPrompt=continuous?renderWorkModePrompt(job.prompt,job.result,job.attempt_count):`Ejecuta según el protocolo y entrega evidencia por criterio.\n\n${job.prompt}`;
-  const execution=await executePlannedWork(env,{userId:job.user_id,prompt:workPrompt,allowWeb:Boolean(job.allow_web??1),reasoningLevel:high?'high':'auto',context:`Trabajo ${job.id}. Tipo: ${job.kind}. Intento ${job.attempt_count}/${job.max_attempts}.`});
+  const basePrompt=continuous?renderWorkModePrompt(job.prompt,job.result,job.attempt_count):`Ejecuta según el protocolo y entrega evidencia por criterio.\n\n${job.prompt}`;
+  const workPrompt=retrieval.context?`${basePrompt}\n\n${retrieval.context}`:basePrompt;
+  const traceContext=retrieval.traceIds.length?` Experiencias recuperadas: ${retrieval.traceIds.join(', ')}.`:'';
+  const execution=await executePlannedWork(env,{userId:job.user_id,prompt:workPrompt,allowWeb:Boolean(job.allow_web??1),reasoningLevel:high?'high':'auto',context:`Trabajo ${job.id}. Tipo: ${job.kind}. Intento ${job.attempt_count}/${job.max_attempts}.${traceContext}`});
   const {out,plan:executionPlan,verification,usage:u}=execution;
   await event(env,job.id,`Plan ${executionPlan.hash.slice(0,12)} ${verification.status==='exact'?'ejecutado exactamente':verification.status==='allowed-fallback'?'cumplido mediante fallback autorizado':'presentó desviación'}`,55);
   if(!verification.ok){
