@@ -1,0 +1,68 @@
+name: Hector model Qwen15 v2 training
+on:
+  pull_request:
+    branches: [main]
+    paths:
+      - 'model/hector-asi/data/qwen15-sft-v2.jsonl'
+      - 'model/hector-asi/evals/qwen15-held-out-v2.jsonl'
+      - 'model/hector-asi/train_qwen15.py'
+      - '.github/workflows/hector-model-qwen15-v2.yml'
+  workflow_dispatch:
+permissions:
+  contents: read
+jobs:
+  train-qwen15-v2:
+    runs-on: ubuntu-latest
+    timeout-minutes: 180
+    env:
+      HF_HUB_DISABLE_TELEMETRY: '1'
+      TOKENIZERS_PARALLELISM: 'false'
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+      - name: Install pinned CPU stack
+        run: |
+          python -m pip install --upgrade pip
+          python -m pip install --index-url https://download.pytorch.org/whl/cpu 'torch==2.7.1'
+          python -m pip install 'transformers==4.53.2' 'peft==0.16.0' 'accelerate==1.8.1' 'safetensors==0.5.3'
+      - name: Train two real Qwen 1.5B LoRA replicas
+        run: |
+          for replica in a b; do
+            python model/hector-asi/train_qwen15.py \
+              --train-file model/hector-asi/data/qwen15-sft-v2.jsonl \
+              --validation-file model/hector-asi/evals/qwen15-held-out-v2.jsonl \
+              --experiment-id hector-asi-qwen15-v2 \
+              --output-dir artifacts/hector-asi-qwen15-v2-$replica \
+              --epochs 2 --max-length 96 --lr 1.5e-4 --seed 35
+          done
+      - name: Verify reproducibility and promotion gates
+        run: |
+          python - <<'PY'
+          import hashlib,json
+          from pathlib import Path
+          roots=[Path('artifacts/hector-asi-qwen15-v2-a'),Path('artifacts/hector-asi-qwen15-v2-b')]
+          def sha(p): return hashlib.sha256(p.read_bytes()).hexdigest()
+          metrics=[json.loads((r/'metrics.json').read_text()) for r in roots]
+          hashes=[sha(r/'adapter'/'adapter_model.safetensors') for r in roots]
+          assert hashes[0]==hashes[1], hashes
+          for m,r in zip(metrics,roots):
+            x=m['results']
+            assert x['weightsGenerated'] is True
+            assert x['parameterDeltaL2']>0
+            assert x['candidateValidationLoss']<x['baseValidationLoss']
+            assert x['relativeValidationImprovement']>=0.03
+            assert x['adapterBytes']>1000000
+            assert (r/'SHA256SUMS').is_file()
+          summary={'adapterSha256':hashes[0],'byteIdenticalReplicas':2,'baseValidationLoss':metrics[0]['results']['baseValidationLoss'],'candidateValidationLoss':metrics[0]['results']['candidateValidationLoss'],'relativeValidationImprovement':metrics[0]['results']['relativeValidationImprovement'],'parameterDeltaL2':metrics[0]['results']['parameterDeltaL2'],'trainExamples':metrics[0]['dataset']['trainExamples'],'validationExamples':metrics[0]['dataset']['validationExamples']}
+          Path('artifacts/hector-asi-qwen15-v2-a/reproducibility.json').write_text(json.dumps(summary,indent=2)+'\n')
+          print(json.dumps(summary,indent=2))
+          PY
+      - name: Upload immutable adapter and evidence
+        uses: actions/upload-artifact@v4
+        with:
+          name: hector-asi-qwen15-v2-${{ github.run_id }}
+          path: artifacts/hector-asi-qwen15-v2-a
+          if-no-files-found: error
+          retention-days: 90
