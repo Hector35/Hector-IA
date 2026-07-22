@@ -1,5 +1,5 @@
 export type PlannedTier='fast'|'balanced'|'deep';
-export type PlannedProvider='cloudflare'|'openai';
+export type PlannedProvider='cloudflare'|'huggingface'|'openai';
 export type PlannedCognitiveMode='single'|'ensemble';
 
 export type ExecutionPlanInput={
