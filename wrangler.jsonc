@@ -13,7 +13,6 @@
     "CLOUDFLARE_MODEL_FAST": "@cf/meta/llama-3.2-3b-instruct",
     "CLOUDFLARE_MODEL_UTILITY": "@cf/ibm-granite/granite-4.0-h-micro",
     "CLOUDFLARE_AI_ENABLED": "true",
-    "HECTOR_FREE_FIRST_ENABLED": "true",
     "HECTOR_FREE_FIRST_TIMEOUT_MS": "8000",
     "APP_NAME": "Héctor OS"
   },
