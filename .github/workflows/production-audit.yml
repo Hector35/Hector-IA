@@ -9,6 +9,7 @@ on:
       - 'worker/**'
       - 'tests/**'
       - 'migrations/**'
+      - 'wrangler.jsonc'
       - '.github/workflows/production-audit.yml'
 
 permissions:
@@ -44,11 +45,19 @@ jobs:
           assert prefixes==sorted(prefixes), 'Migrations are not ordered'
           print(f'Validated {len(files)} migrations')
           PY
+      - name: Apply migrations and verify custom minute cadence
+        run: |
+          set -euo pipefail
+          rm -rf .wrangler/state
+          npx wrangler d1 migrations apply hector-os-db --local
+          npx wrangler d1 execute hector-os-db --local --command="INSERT INTO users(id,email,name,password_hash,password_salt) VALUES('migration-test-user','migration-test@hectoros.invalid','Migration Test','x','y'); INSERT INTO scheduled_tasks(id,user_id,title,prompt,kind,cadence,interval_minutes,next_run_at) VALUES('migration-test-schedule','migration-test-user','Cada minuto','Ejecuta una comprobación segura cada minuto','agent','custom_minutes',1,datetime('now','+1 minute')); SELECT cadence,interval_minutes FROM scheduled_tasks WHERE id='migration-test-schedule';" --json | tee /tmp/custom-minutes.json
+          grep -q 'custom_minutes' /tmp/custom-minutes.json
       - name: Validate protected routes
         run: |
           grep -Fq "projectGovernance.use('*',requireAuth)" worker/routes/project-governance.ts
           grep -Fq "projects.use('*',requireAuth)" worker/routes/projects.ts
           grep -Fq "conversations.use('*',requireAuth)" worker/routes/conversations.ts
+          grep -Fq "workMode.use('*',requireAuth)" worker/routes/work-mode.ts
       - name: Public production smoke test
         if: github.event_name != 'pull_request'
         run: |
