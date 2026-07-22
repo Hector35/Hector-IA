@@ -1,0 +1,73 @@
+name: Hector Qwen05 v3 training
+
+on:
+  pull_request:
+    branches: [main]
+    paths:
+      - "model/hector-asi/data/qwen05-sft-v3.jsonl"
+      - "model/hector-asi/evals/qwen05-held-out-v3.jsonl"
+      - "model/hector-asi/train_qwen05.py"
+      - ".github/workflows/hector-model-qwen05-v3.yml"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  train-qwen05-v3:
+    runs-on: ubuntu-latest
+    timeout-minutes: 90
+    env:
+      HF_HUB_DISABLE_TELEMETRY: "1"
+      TOKENIZERS_PARALLELISM: "false"
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+      - name: Install pinned CPU stack
+        run: |
+          python -m pip install --upgrade pip
+          python -m pip install --index-url https://download.pytorch.org/whl/cpu "torch==2.7.1"
+          python -m pip install "transformers==4.53.2" "peft==0.16.0" "accelerate==1.8.1" "safetensors==0.5.3"
+      - name: Train replica A
+        run: |
+          python model/hector-asi/train_qwen05.py \
+            --experiment-id hector-asi-qwen05-v3 \
+            --train-file model/hector-asi/data/qwen05-sft-v3.jsonl \
+            --validation-file model/hector-asi/evals/qwen05-held-out-v3.jsonl \
+            --output-dir artifacts/hector-asi-qwen05-v3-a \
+            --epochs 2 --max-length 96 --lr 0.00018 --seed 35
+      - name: Train replica B
+        run: |
+          python model/hector-asi/train_qwen05.py \
+            --experiment-id hector-asi-qwen05-v3 \
+            --train-file model/hector-asi/data/qwen05-sft-v3.jsonl \
+            --validation-file model/hector-asi/evals/qwen05-held-out-v3.jsonl \
+            --output-dir artifacts/hector-asi-qwen05-v3-b \
+            --epochs 2 --max-length 96 --lr 0.00018 --seed 35
+      - name: Verify reproducibility and held-out improvement
+        run: |
+          python - <<'PY'
+          import hashlib,json
+          from pathlib import Path
+          roots=[Path('artifacts/hector-asi-qwen05-v3-a'),Path('artifacts/hector-asi-qwen05-v3-b')]
+          def digest(p): return hashlib.sha256(p.read_bytes()).hexdigest()
+          metrics=[json.loads((r/'metrics.json').read_text()) for r in roots]
+          weights=[r/'adapter'/'adapter_model.safetensors' for r in roots]
+          assert all(p.is_file() for p in weights)
+          assert digest(weights[0])==digest(weights[1]), 'replicas are not byte-identical'
+          assert all(m['results']['weightsGenerated'] for m in metrics)
+          assert all(m['results']['parameterDeltaL2']>0 for m in metrics)
+          assert all(m['results']['candidateValidationLoss']<m['results']['baseValidationLoss'] for m in metrics)
+          summary={'adapterSha256':digest(weights[0]),'adapterBytes':weights[0].stat().st_size,'baseValidationLoss':metrics[0]['results']['baseValidationLoss'],'candidateValidationLoss':metrics[0]['results']['candidateValidationLoss'],'relativeValidationImprovement':metrics[0]['results']['relativeValidationImprovement'],'parameterDeltaL2':metrics[0]['results']['parameterDeltaL2'],'trainExamples':metrics[0]['dataset']['trainExamples'],'validationExamples':metrics[0]['dataset']['validationExamples'],'byteIdenticalReplicas':2}
+          (roots[0]/'verified-summary.json').write_text(json.dumps(summary,indent=2,sort_keys=True)+'\n')
+          print(json.dumps(summary,indent=2))
+          PY
+      - name: Upload immutable adapter
+        uses: actions/upload-artifact@v4
+        with:
+          name: hector-asi-qwen05-v3-${{ github.run_id }}
+          path: artifacts/hector-asi-qwen05-v3-a
+          retention-days: 90
+          if-no-files-found: error
