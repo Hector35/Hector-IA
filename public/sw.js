@@ -1,4 +1,4 @@
-const CACHE='hector-asi-static-shell-v1';
+const CACHE='hector-os-static-shell-v6';
 const SHELL=['/','/manifest.webmanifest','/icons/icon-192.png','/icons/icon-512.png'];
 const PRIVATE_PREFIXES=['/api/','/control/','/generated/','/runner/','/evidence/','/self-improve/'];
 
