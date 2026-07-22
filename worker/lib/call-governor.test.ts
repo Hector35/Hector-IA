@@ -1,5 +1,5 @@
-import {describe,expect,it,vi} from 'vitest';
-import {benchmarkCallReduction,createCallGovernor,decideCallBudget,governExecutionPlan} from './call-governor';
+import {beforeEach,describe,expect,it,vi} from 'vitest';
+import {benchmarkCallReduction,createCallGovernor,decideCallBudget,governExecutionPlan,resetCallGovernorState} from './call-governor';
 import {createExecutionPlan} from './execution-plan';
 
 async function ensemblePlan(){
@@ -7,6 +7,8 @@ async function ensemblePlan(){
 }
 
 describe('free-first call governor',()=>{
+ beforeEach(()=>resetCallGovernorState());
+
  it('usa cero llamadas avanzadas para un flujo determinista',()=>{
   const decision=decideCallBudget({prompt:'ejecuta procedimiento conocido',reuse:'deterministic',requestedPasses:3,reasoningLevel:'high'});
   expect(decision).toMatchObject({maxAdvancedCalls:0,allowedPasses:1,estimatedAdvancedCallsSaved:3});
@@ -24,16 +26,20 @@ describe('free-first call governor',()=>{
   expect(decideCallBudget({prompt:complex,reuse:'escalate',requestedPasses:3,reasoningLevel:'high'}).maxAdvancedCalls).toBe(3);
  });
 
- it('deduplica inferencias idénticas mientras están en vuelo',async()=>{
+ it('deduplica inferencias idénticas entre solicitudes distintas',async()=>{
   const decision=decideCallBudget({prompt:'valida datos',reuse:'escalate',requestedPasses:1,reasoningLevel:'auto'});
-  const governor=createCallGovernor(decision),execute=vi.fn(async()=>{await Promise.resolve();return'ok';});
-  const [first,second]=await Promise.all([
-   governor.advanced({key:'same',justification:'resolver',execute}),
-   governor.advanced({key:'same',justification:'resolver',execute})
-  ]);
-  expect([first,second]).toEqual(['ok','ok']);
+  const firstGovernor=createCallGovernor(decision),secondGovernor=createCallGovernor(decision);
+  let release=()=>{};const gate=new Promise<void>(resolve=>{release=resolve;});
+  const execute=vi.fn(async()=>{await gate;return'ok';});
+  const first=firstGovernor.advanced({key:'same',justification:'resolver',execute});
+  await new Promise(resolve=>setTimeout(resolve,0));
+  const second=secondGovernor.advanced({key:'same',justification:'resolver',execute});
+  await new Promise(resolve=>setTimeout(resolve,0));
+  release();
+  expect(await Promise.all([first,second])).toEqual(['ok','ok']);
   expect(execute).toHaveBeenCalledTimes(1);
-  expect(governor.metrics).toMatchObject({advancedCalls:1,deduplicatedCalls:1,blockedCalls:0});
+  expect(firstGovernor.metrics.advancedCalls).toBe(1);
+  expect(secondGovernor.metrics).toMatchObject({advancedCalls:0,deduplicatedCalls:1,blockedCalls:0,estimatedAdvancedCallsSaved:1});
  });
 
  it('bloquea llamadas que exceden el presupuesto',async()=>{

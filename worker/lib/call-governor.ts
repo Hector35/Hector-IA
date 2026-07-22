@@ -21,6 +21,7 @@ export type CallGovernorMetrics={
 
 const MULTI_PASS=/\b(compara|evalua|audita|arquitectura|estrategia|migracion|seguridad|riesgo|contradiccion|investiga|diagnostica|causa raiz|trade[- ]?off)\b/i;
 const SIMPLE=/\b(clasifica|extrae|formatea|resume|convierte|valida|verifica|lista|normaliza|parsea|busca|encuentra)\b/i;
+const SHARED_INFLIGHT=new Map<string,Promise<unknown>>();
 
 export function decideCallBudget(input:{prompt:string;reuse:ReuseDisposition;requestedPasses:1|3;reasoningLevel:'auto'|'high'}):CallGovernorDecision{
  const prompt=input.prompt.trim();
@@ -45,29 +46,29 @@ export async function governExecutionPlan(plan:ExecutionPlan,input:{prompt:strin
  return{plan:governed,decision};
 }
 
-function stableKey(value:string){
- let hash=2166136261;
- for(let index=0;index<value.length;index++){hash^=value.charCodeAt(index);hash=Math.imul(hash,16777619);}
- return(hash>>>0).toString(16).padStart(8,'0');
+async function stableKey(value:string){
+ const digest=await crypto.subtle.digest('SHA-256',new TextEncoder().encode(value));
+ return[...new Uint8Array(digest)].map(item=>item.toString(16).padStart(2,'0')).join('');
 }
 
 export function createCallGovernor(decision:CallGovernorDecision){
- const inflight=new Map<string,Promise<unknown>>();
  const metrics:CallGovernorMetrics={advancedCalls:0,deduplicatedCalls:0,blockedCalls:0,requestedPasses:decision.requestedPasses,executedPasses:0,estimatedAdvancedCallsSaved:decision.estimatedAdvancedCallsSaved,justifications:[decision.justification]};
  return{
   metrics,
   async advanced<T>(input:{key:string;justification:string;execute:()=>Promise<T>}):Promise<T>{
-   const key=stableKey(input.key);
-   const existing=inflight.get(key) as Promise<T>|undefined;
-   if(existing){metrics.deduplicatedCalls++;return existing;}
+   const key=await stableKey(input.key);
+   const existing=SHARED_INFLIGHT.get(key) as Promise<T>|undefined;
+   if(existing){metrics.deduplicatedCalls++;metrics.estimatedAdvancedCallsSaved+=decision.allowedPasses;metrics.justifications.push(`Inferencia en vuelo reutilizada: ${input.justification}`);return existing;}
    if(metrics.advancedCalls>=decision.maxAdvancedCalls){metrics.blockedCalls++;throw new Error(`Call governor bloqueó una inferencia avanzada redundante: ${input.justification}`);}
    metrics.advancedCalls++;metrics.executedPasses+=decision.allowedPasses;metrics.justifications.push(input.justification);
-   const pending=input.execute().finally(()=>inflight.delete(key));
-   inflight.set(key,pending);
+   const pending=input.execute().finally(()=>SHARED_INFLIGHT.delete(key));
+   SHARED_INFLIGHT.set(key,pending);
    return pending;
   }
  };
 }
+
+export function resetCallGovernorState(){SHARED_INFLIGHT.clear();}
 
 export function benchmarkCallReduction(){
  const scenarios=[
