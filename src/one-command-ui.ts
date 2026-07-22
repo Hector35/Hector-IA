@@ -51,11 +51,9 @@ function decorateHome(){
 
 export function installOneCommandEnhancer(){
  let processing=false;
- const submit=async(event:Event)=>{
-  const form=event.target instanceof HTMLFormElement?event.target:null;if(!form?.matches('.cxComposer'))return;
-  const textarea=form.querySelector<HTMLTextAreaElement>('textarea');if(!textarea)return;
-  const command=textarea.value.trim(),intent=classifyOneCommand(command);if(intent==='chat')return;
-  event.preventDefault();event.stopImmediatePropagation();if(processing)return;processing=true;form.classList.add('hxRouting');
+ const execute=async(event:Event,form:HTMLFormElement,textarea:HTMLTextAreaElement)=>{
+  const command=textarea.value.trim(),intent=classifyOneCommand(command);if(intent==='chat')return false;
+  event.preventDefault();event.stopImmediatePropagation();if(processing)return true;processing=true;form.classList.add('hxRouting');
   const button=form.querySelector<HTMLButtonElement>('button[type="submit"],button');if(button)button.disabled=true;
   try{
    if(intent==='work'){
@@ -68,8 +66,18 @@ export function installOneCommandEnhancer(){
    }
   }catch(error){setTextareaValue(textarea,command);showToast(error instanceof Error?error.message:'No se pudo completar la orden','bad');}
   finally{processing=false;form.classList.remove('hxRouting');if(button)button.disabled=!textarea.value.trim();}
+  return true;
  };
- document.addEventListener('submit',submit,true);
+ const submit=(event:Event)=>{
+  const form=event.target instanceof HTMLFormElement?event.target:null;if(!form?.matches('.cxComposer'))return;
+  const textarea=form.querySelector<HTMLTextAreaElement>('textarea');if(textarea)void execute(event,form,textarea);
+ };
+ const keydown=(event:KeyboardEvent)=>{
+  if(event.key!=='Enter'||event.shiftKey||event.isComposing)return;
+  const textarea=event.target instanceof HTMLTextAreaElement?event.target:null,form=textarea?.closest<HTMLFormElement>('.cxComposer');
+  if(form&&textarea)void execute(event,form,textarea);
+ };
+ document.addEventListener('submit',submit,true);document.addEventListener('keydown',keydown,true);
  const observer=new MutationObserver(decorateHome);observer.observe(document.body,{childList:true,subtree:true});decorateHome();
- return()=>{document.removeEventListener('submit',submit,true);observer.disconnect();};
+ return()=>{document.removeEventListener('submit',submit,true);document.removeEventListener('keydown',keydown,true);observer.disconnect();};
 }
