@@ -1,5 +1,5 @@
 import {describe,expect,it} from 'vitest';
-import {parseWorkModeResult,renderWorkModePrompt,workModeTitle} from './work-mode';
+import {parseWorkModeResult,renderWorkModePrompt,workModeFailureTransition,workModeTitle} from './work-mode';
 
 describe('work mode protocol',()=>{
  it('construye una instrucción continua sin preguntas de conveniencia',()=>{
@@ -23,6 +23,12 @@ describe('work mode protocol',()=>{
  it('solo completa con marcador explícito',()=>{
   expect(parseWorkModeResult('Todo validado.\nWORK_STATE: complete')).toMatchObject({state:'complete',explicit:true,text:'Todo validado.'});
   expect(parseWorkModeResult('Parece listo, pero falta evidencia.')).toMatchObject({state:'continue',explicit:false});
+ });
+
+ it('reintenta errores sin límite terminal y conserva el checkpoint',()=>{
+  expect(workModeFailureTransition(1)).toEqual({status:'queued',delaySeconds:30,preserveCheckpoint:true});
+  expect(workModeFailureTransition(1001)).toMatchObject({status:'queued',preserveCheckpoint:true});
+  expect(workModeFailureTransition(1001).delaySeconds).toBeGreaterThan(0);
  });
 
  it('deriva un título corto del objetivo',()=>{
