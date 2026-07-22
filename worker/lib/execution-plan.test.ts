@@ -23,10 +23,16 @@ describe('execution plan',()=>{
   expect(result).toMatchObject({ok:true,status:'exact'});
  });
 
- it('acepta únicamente el fallback explícito Cloudflare a OpenAI',async()=>{
-  const plan=await createExecutionPlan(input({route:{model:'cf-fast',tier:'fast',reasoning:'low',needsWeb:false},provider:{requested:'cloudflare',reason:'consulta breve'},allowedModels:['cf-fast']}));
-  expect(verifyExecutionPlan(plan,{model:'cf-fast',tier:'fast',provider:'openai',fallback:true,cognitiveMode:'single',deliberationPasses:1}).status).toBe('allowed-fallback');
-  expect(verifyExecutionPlan(plan,{model:'cf-fast',tier:'fast',provider:'openai',fallback:false,cognitiveMode:'single',deliberationPasses:1}).status).toBe('drift');
+ it('prohíbe fallback de Héctor Base hacia OpenAI',async()=>{
+  const plan=await createExecutionPlan(input({route:{model:'@cf/meta/llama-3.2-3b-instruct',tier:'fast',reasoning:'low',needsWeb:false},provider:{requested:'cloudflare',reason:'chat abierto'},allowedModels:['@cf/meta/llama-3.2-3b-instruct']}));
+  expect(verifyExecutionPlan(plan,{model:'gpt-balanced',tier:'fast',provider:'openai',fallback:true,cognitiveMode:'single',deliberationPasses:1}).status).toBe('drift');
+ });
+
+ it('permite sustituir un plan legado de OpenAI por Héctor Base, nunca al revés',async()=>{
+  const plan=await createExecutionPlan(input());
+  const result=verifyExecutionPlan(plan,{model:'@cf/meta/llama-3.2-3b-instruct',tier:'balanced',provider:'cloudflare',fallback:true,cognitiveMode:'single',deliberationPasses:1});
+  expect(result).toMatchObject({ok:true,status:'allowed-fallback'});
+  expect(result.summary).toMatch(/OpenAI fue sustituido por Héctor Base/);
  });
 
  it('bloquea cambios de modelo, nivel o modo cognitivo',async()=>{
@@ -39,7 +45,7 @@ describe('execution plan',()=>{
  });
 
  it('permite degradación interna del ensemble sin cambiar la ruta',async()=>{
-  const plan=await createExecutionPlan(input({route:{model:'gpt-deep',tier:'deep',reasoning:'high',needsWeb:false},provider:{requested:'openai',reason:'profundo'},cognition:{mode:'ensemble',passes:3,reason:'doble resolución'},allowedModels:['gpt-deep','gpt-critic']}));
-  expect(verifyExecutionPlan(plan,{model:'gpt-deep',tier:'deep',provider:'openai',cognitiveMode:'ensemble-degraded',deliberationPasses:2,fallback:true}).ok).toBe(true);
+  const plan=await createExecutionPlan(input({route:{model:'@cf/meta/llama-3.2-3b-instruct',tier:'deep',reasoning:'high',needsWeb:false},provider:{requested:'cloudflare',reason:'profundo abierto'},cognition:{mode:'ensemble',passes:3,reason:'doble resolución'},allowedModels:['@cf/meta/llama-3.2-3b-instruct']}));
+  expect(verifyExecutionPlan(plan,{model:'@cf/meta/llama-3.2-3b-instruct',tier:'deep',provider:'cloudflare',cognitiveMode:'ensemble-degraded',deliberationPasses:2,fallback:true}).ok).toBe(true);
  });
 });
