@@ -9,13 +9,13 @@ function makeButton(){
 }
 
 export function installChatJumpLatestEnhancer(){
- let current:HTMLElement|undefined,button:HTMLButtonElement|undefined,messagesObserver:MutationObserver|undefined;
- const detach=()=>{messagesObserver?.disconnect();messagesObserver=undefined;button?.remove();button=undefined;current=undefined;};
+ let current:HTMLElement|undefined,button:HTMLButtonElement|undefined,messagesObserver:MutationObserver|undefined,scrollHandler:(()=>void)|undefined;
+ const detach=()=>{if(current&&scrollHandler)current.removeEventListener('scroll',scrollHandler);messagesObserver?.disconnect();messagesObserver=undefined;scrollHandler=undefined;button?.remove();button=undefined;current=undefined;};
  const mount=(messages:HTMLElement)=>{
-  if(current===messages)return;detach();current=messages;const conversation=messages.closest<HTMLElement>('.cxConversation');if(!conversation)return;
-  button=makeButton();conversation.append(button);
+  if(current===messages)return;detach();current=messages;
+  button=makeButton();document.body.append(button);
   const update=()=>{if(!button||!current)return;const visible=shouldShowJump(current.scrollTop,current.clientHeight,current.scrollHeight);button.classList.toggle('visible',visible);if(!visible)button.classList.remove('unread');};
-  button.onclick=()=>{messages.scrollTo({top:messages.scrollHeight,behavior:'smooth'});button?.classList.remove('unread');};
+  scrollHandler=update;button.onclick=()=>{messages.scrollTo({top:messages.scrollHeight,behavior:'smooth'});button?.classList.remove('unread');};
   messages.addEventListener('scroll',update,{passive:true});
   messagesObserver=new MutationObserver(()=>{const away=shouldShowJump(messages.scrollTop,messages.clientHeight,messages.scrollHeight);if(away)button?.classList.add('unread');requestAnimationFrame(update);});
   messagesObserver.observe(messages,{childList:true,subtree:true,characterData:true});
