@@ -1,0 +1,45 @@
+{
+  "schemaVersion": "1.0.0",
+  "cycle": 3,
+  "candidate": "hector-asi-cognitive-plan-v1",
+  "branch": "agent/hector-asi-cognitive-planner-cycle-3",
+  "headSha": "34435b0fce5d51f897445be0b319397393262b0d",
+  "objective": "Finish the constraint-aware cognitive planner candidate without training weights or promoting it.",
+  "approaches": {
+    "discarded": "generic-linear",
+    "candidate": "constraint-aware-dag"
+  },
+  "changesThisRun": [
+    "Removed rollback false positives from the planning evaluator.",
+    "Replaced text-search scoring with structural action and dependency checks.",
+    "Removed conflict false positives caused by task identifiers containing the word conflict."
+  ],
+  "validation": {
+    "typecheck": "passed",
+    "iphoneVisualAudit": "passed",
+    "productionAudit": "passed",
+    "repositoryTests": "failed; remaining failure is outside the two corrected false-positive assertions or requires fuller log access"
+  },
+  "cost": {
+    "apiUsd": 0,
+    "gpuUsd": 0,
+    "weightsTrained": false
+  },
+  "promotion": {
+    "allowed": false,
+    "decisionOwner": "cycle-5-evaluator",
+    "reason": "Repository test gate is not green and no hidden evaluation has been completed."
+  },
+  "commands": [
+    "npm run model:cognitive-benchmark",
+    "npx vitest run tests/hector-asi-cognitive-planner.test.mjs",
+    "npm test",
+    "npm run typecheck",
+    "npm run build"
+  ],
+  "next": [
+    "Extract the exact remaining Vitest failure from Repository PR Checks.",
+    "Repair only the failing contract without weakening the suite.",
+    "Run independent hidden planning cases before runtime integration."
+  ]
+}
