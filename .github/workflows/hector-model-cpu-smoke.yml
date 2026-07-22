@@ -68,4 +68,4 @@ jobs:
           name: hector-asi-cpu-smoke-${{ github.run_id }}
           path: artifacts/hector-asi-cpu-smoke-v1
           if-no-files-found: error
-          retention-days: 7
+          retention-days: 90
