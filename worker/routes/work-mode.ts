@@ -32,6 +32,14 @@ workMode.get('/:id',async c=>{
  return c.json({job,events});
 });
 
+workMode.post('/:id/pause',async c=>{
+ const id=c.req.param('id');
+ const result=await c.env.DB.prepare("UPDATE work_jobs SET status='blocked',next_retry_at=NULL,last_error='Pausado por el usuario',lease_token=NULL,lease_expires_at=NULL,updated_at=CURRENT_TIMESTAMP WHERE id=? AND user_id=? AND kind='work' AND status IN ('queued','working','testing','repairing')").bind(id,c.get('userId')).run();
+ if(!result.meta.changes)return c.json({error:'El trabajo ya está pausado, terminó o no existe'},409);
+ await c.env.DB.prepare("INSERT INTO work_events(id,job_id,message,progress) SELECT ?,id,'Modo Trabajo pausado por el usuario',progress FROM work_jobs WHERE id=?").bind(crypto.randomUUID(),id).run();
+ return c.json({ok:true});
+});
+
 workMode.post('/:id/resume',async c=>{
  const result=await c.env.DB.prepare("UPDATE work_jobs SET status='queued',next_retry_at=CURRENT_TIMESTAMP,last_error=NULL,lease_token=NULL,lease_expires_at=NULL,updated_at=CURRENT_TIMESTAMP WHERE id=? AND user_id=? AND kind='work' AND status IN ('blocked','completed')").bind(c.req.param('id'),c.get('userId')).run();
  if(!result.meta.changes)return c.json({error:'El trabajo ya está activo o no existe'},409);
