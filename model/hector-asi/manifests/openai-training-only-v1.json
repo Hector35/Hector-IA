@@ -1,0 +1,52 @@
+{
+  "schemaVersion": "1.0.0",
+  "policyId": "openai-training-only-v1",
+  "status": "candidate",
+  "effectiveScope": "interactive-chat",
+  "decision": {
+    "chatProvider": "Héctor Base through open models and local rules",
+    "openAIChatAllowed": false,
+    "openAIFallbackAllowed": false,
+    "failClosed": true
+  },
+  "openAIAllowedRoles": [
+    "licensed dataset generation",
+    "teacher critique",
+    "preference generation",
+    "candidate evaluation",
+    "training pipeline diagnostics"
+  ],
+  "enforcement": [
+    "worker/routes/intelligence.ts",
+    "worker/lib/providers.ts",
+    "worker/lib/planned-response.ts",
+    "worker/lib/execution-plan.ts",
+    "model/hector-asi/runtime-registry.json"
+  ],
+  "adversarialGates": [
+    "ordinary chat never selects OpenAI",
+    "complex chat never selects OpenAI",
+    "sensitive chat never selects OpenAI",
+    "current-information chat never selects OpenAI",
+    "provider degradation never selects OpenAI",
+    "open-model failure is visible and does not invoke OpenAI",
+    "Qwen is preferred when configured",
+    "deep deliberation uses open-model architect, adversary and judge passes"
+  ],
+  "knownTradeoffs": [
+    "open models may be materially less capable than the prior external chat model on some tasks",
+    "interactive chat has no live web search after this policy",
+    "complex requests may be slower when open-model deliberation uses several passes",
+    "the custom Qwen adapter remains unpromoted and the current Qwen endpoint may still use base weights"
+  ],
+  "cost": {
+    "implementationUsd": 0,
+    "newRecurringCommitmentUsd": 0,
+    "chatOpenAIExpectedUsd": 0
+  },
+  "rollback": {
+    "strategy": "revert this policy commit and restore the prior provider and planned-response implementations",
+    "dataMigrationRequired": false,
+    "credentialChangeRequired": false
+  }
+}
