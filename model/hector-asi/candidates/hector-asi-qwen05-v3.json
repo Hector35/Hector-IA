@@ -1,0 +1,60 @@
+{
+  "schemaVersion": "1.0.0",
+  "id": "hector-asi-qwen05-v3",
+  "status": "experimental-weights-generated-reproducibly",
+  "eligibleForChampion": false,
+  "baseModel": {
+    "repository": "Qwen/Qwen2.5-0.5B-Instruct",
+    "revision": "a338b55dd21219a5f4da42bc11a9313d1a27d4cc",
+    "license": "Apache-2.0",
+    "licenseUrl": "https://huggingface.co/Qwen/Qwen2.5-0.5B-Instruct"
+  },
+  "method": {
+    "stage": "sft",
+    "adapter": "lora",
+    "precision": "float32-cpu",
+    "targetModules": ["q_proj", "v_proj"],
+    "rank": 8,
+    "alpha": 16,
+    "epochs": 2,
+    "seed": 35
+  },
+  "dataset": {
+    "trainPath": "model/hector-asi/data/qwen05-sft-v3.jsonl",
+    "validationPath": "model/hector-asi/evals/qwen05-held-out-v3.jsonl",
+    "trainExamples": 20,
+    "validationExamples": 10,
+    "containsPrivateUserData": false,
+    "deduplicated": true,
+    "splitContaminationChecked": true
+  },
+  "artifact": {
+    "storage": "github-actions-artifact",
+    "artifactId": "8541421245",
+    "adapterPath": "adapter/adapter_model.safetensors",
+    "adapterBytes": 2175168,
+    "adapterSha256": "ee46491cb47f141b4f03695f9b007cbf435941c2138c9abc851975560699ff9a",
+    "archiveSha256": "0bc95fd886d243c10c3393ac239a2e132668fc03212da1ccf61e74527e2bff1b",
+    "expiresAt": "2026-10-20T18:56:30Z",
+    "committedToGit": false
+  },
+  "evaluation": {
+    "baseValidationLoss": 4.33625738620758,
+    "candidateValidationLoss": 2.918143367767334,
+    "validationLossDelta": -1.4181140184402463,
+    "relativeValidationImprovement": 0.3270364030859583,
+    "byteIdenticalReplicas": 2,
+    "parameterDeltaL2": 2.457864999771118
+  },
+  "decision": {
+    "classification": "leading-qwen05-sft-experimental-candidate",
+    "promoted": false,
+    "blockedBy": [
+      "Base is Qwen2.5 0.5B rather than the planned Qwen3 4B champion.",
+      "Ten hidden examples are insufficient to establish broad transfer, calibration, safety and regression performance.",
+      "Aggregate loss improvement is not equivalent to verified behavioral correctness."
+    ],
+    "rollback": "Do not load or delete the adapter; frozen base weights are unchanged."
+  },
+  "evidence": "model/hector-asi/runs/qwen05-v3-20260722.json"
+}
