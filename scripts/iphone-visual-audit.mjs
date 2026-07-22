@@ -8,13 +8,7 @@ const devices=[
  {id:'iphone-se',label:'iPhone SE',viewport:{width:320,height:568}},
  {id:'iphone-13-pro',label:'iPhone 13 Pro',viewport:{width:390,height:844}}
 ];
-const views=[
- {label:'Inicio',candidates:[]},
- {label:'Chat',candidates:['Chatear','Chat']},
- {label:'Archivos',candidates:['Explorar archivos','Archivos']},
- {label:'Trabajo',candidates:['Trabajo'],menu:true},
- {label:'Ajustes',candidates:['Ajustes'],menu:true}
-];
+const views=[{label:'Chat único'}];
 
 function json(body,status=200){return{status,contentType:'application/json',body:JSON.stringify(body)};}
 function responseFor(url,method){
@@ -30,8 +24,9 @@ function responseFor(url,method){
  if(path==='/api/files')return json({items:[{id:'file-1',name:'evidence.png',size_bytes:32768}]});
  if(path==='/api/usage')return json({summary:[{provider:'OpenAI',service:'contextual-chat',calls:4,input_units:9000,output_units:2500,cost_usd:0.14}]});
  if(path==='/api/work/jobs')return json({items:[{id:'job-1',title:'Validar interfaz iPhone',kind:'browser',status:'completed',progress:100,result:'Sin desbordamientos detectados',created_at:fixedTimestamp}]});
+ if(path==='/api/work-mode')return json({items:[]});
  if(path==='/api/work-evidence/jobs/job-1')return json({items:[]});
- if(path==='/api/intelligence/self-model')return json({identity:{name:'Héctor OS',mission:'Asistente privado y verificable',knowledgeVersion:'visual-test'},models:{fast:'gpt-5.6-luna',balanced:'gpt-5.6-terra',reasoning:'gpt-5.6-sol',critic:'gpt-5.6-sol'},runtime:{memories:12,workJobs:{total:4,completed:3,blocked:0},scheduledTasks:{total:2,active:2},responseTraces:8,activeSystemContexts:5},architecture:['PWA','Cloudflare Worker','D1','R2'],capabilities:[{capability:'Auditoría visual',components:['Playwright'],evidence:'capturas por viewport',limit:'entorno simulado'}],limitations:['La auditoría local usa respuestas API controladas.']});
+ if(path==='/api/intelligence/self-model')return json({identity:{name:'Hector ASI',mission:'Inteligencia privada y verificable',knowledgeVersion:'visual-test'},models:{fast:'gpt-5.6-luna',balanced:'gpt-5.6-terra',reasoning:'gpt-5.6-sol',critic:'gpt-5.6-sol'},runtime:{memories:12,workJobs:{total:4,completed:3,blocked:0},scheduledTasks:{total:2,active:2},responseTraces:8,activeSystemContexts:5},architecture:['PWA','Cloudflare Worker','D1','R2'],capabilities:[{capability:'Auditoría visual',components:['Playwright'],evidence:'capturas por viewport',limit:'entorno simulado'}],limitations:['La auditoría local usa respuestas API controladas.']});
  if(path==='/api/intelligence/status')return json({models:{fast:'gpt-5.6-luna',balanced:'gpt-5.6-terra',reasoning:'gpt-5.6-sol'}});
  if(path==='/api/intelligence/deliberation-status')return json({enabled:true,mode:'adaptive',budget:{remainingUsd:5}});
  if(path.startsWith('/api/schedules'))return json({items:[]});
@@ -62,40 +57,6 @@ async function auditOverflow(page,viewport){
   }).map(element=>({tag:element.tagName.toLowerCase(),className:String(element.className||'').slice(0,120)}));
   return{documentOverflow,offenders:offenders.slice(0,20),fixedBlocking};
  },viewport);
-}
-
-async function clickFirstVisible(page,names){
- for(const name of names){
-  const matcher=new RegExp(`^${name.replace(/[.*+?^${}()|[\]\\]/g,'\\$&')}$`,'i');
-  for(const role of ['button','link']){
-   const items=page.getByRole(role,{name:matcher});
-   for(let index=0;index<await items.count();index++){
-    const item=items.nth(index);
-    if(await item.isVisible()){await item.click();return true;}
-   }
-  }
-  const texts=page.getByText(matcher,{exact:true});
-  for(let index=0;index<await texts.count();index++){
-   const item=texts.nth(index),box=await item.boundingBox();
-   if(await item.isVisible()&&box&&box.x+box.width>0&&box.x<page.viewportSize().width){await item.click();return true;}
-  }
- }
- return false;
-}
-
-async function openMenu(page){
- const menuButtons=page.getByRole('button',{name:/men[uú]|navegaci[oó]n/i});
- for(let index=0;index<await menuButtons.count();index++){
-  const button=menuButtons.nth(index);
-  if(await button.isVisible()){await button.click();await page.waitForTimeout(150);return;}
- }
-}
-
-async function navigate(page,view){
- if(!view.candidates.length)return;
- if(view.menu)await openMenu(page);
- if(await clickFirstVisible(page,view.candidates))return;
- throw new Error(`No se pudo abrir la vista ${view.label}`);
 }
 
 async function auditFocus(page){
@@ -129,9 +90,9 @@ try{
   const deviceReport={id:device.id,label:device.label,viewport:device.viewport,views:[],consoleErrors,mockedRequests};
   try{
    await page.goto(baseUrl,{waitUntil:'domcontentloaded',timeout:45000});
-   await page.getByText('Tu asistente inteligente',{exact:false}).last().waitFor({state:'visible',timeout:15000});
+   await page.getByText(/Hector ASI|Héctor OS/i).last().waitFor({state:'visible',timeout:15000});
+   await page.locator('.haComposer textarea, .cxComposer textarea').first().waitFor({state:'visible',timeout:15000});
    for(const view of views){
-    await navigate(page,view);
     await page.waitForTimeout(350);
     const overflow=await auditOverflow(page,device.viewport);
     const focus=await auditFocus(page);

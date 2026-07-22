@@ -21,10 +21,10 @@ function responseFor(url,method){
  if(path==='/api/usage')return json({summary:[]});
  if(path==='/api/work/jobs')return json({items:[]});
  if(path==='/api/work-mode'&&method==='GET')return json({items:[]});
- if(path==='/api/work-mode'&&method==='POST')return json({item:{id:'work-from-home',title:'Terminar aplicación',status:'queued',progress:0}},201);
+ if(path==='/api/work-mode'&&method==='POST')return json({item:{id:'work-from-chat',title:'Terminar aplicación',status:'queued',progress:0}},201);
  if(path==='/api/schedules'&&method==='GET')return json({items:[]});
- if(path==='/api/schedules'&&method==='POST')return json({item:{id:'schedule-from-home',title:'Revisar proyecto',enabled:true}},201);
- if(path==='/api/intelligence/self-model')return json({identity:{name:'Héctor OS',mission:'Asistente privado',knowledgeVersion:'test'},models:{fast:'gpt-5.6-luna',balanced:'gpt-5.6-terra',reasoning:'gpt-5.6-sol',critic:'gpt-5.6-sol'},runtime:{memories:0,workJobs:{total:0,completed:0,blocked:0},scheduledTasks:{total:0,active:0},responseTraces:0,activeSystemContexts:0},architecture:['PWA'],capabilities:[],limitations:[]});
+ if(path==='/api/schedules'&&method==='POST')return json({item:{id:'schedule-from-chat',title:'Revisar proyecto',enabled:true}},201);
+ if(path==='/api/intelligence/self-model')return json({identity:{name:'Hector ASI',mission:'Inteligencia privada',knowledgeVersion:'test'},models:{fast:'gpt-5.6-luna',balanced:'gpt-5.6-terra',reasoning:'gpt-5.6-sol',critic:'gpt-5.6-sol'},runtime:{memories:0,workJobs:{total:0,completed:0,blocked:0},scheduledTasks:{total:0,active:0},responseTraces:0,activeSystemContexts:0},architecture:['PWA'],capabilities:[],limitations:[]});
  if(path==='/api/intelligence/status')return json({models:{fast:'gpt-5.6-luna',balanced:'gpt-5.6-terra',reasoning:'gpt-5.6-sol'}});
  if(path==='/api/intelligence/deliberation-status')return json({enabled:true,mode:'adaptive',budget:{remainingUsd:5}});
  if(path.startsWith('/api/chat-agents/'))return json({items:[],agents:[],turns:[],run:null});
@@ -32,14 +32,15 @@ function responseFor(url,method){
  return null;
 }
 
-async function waitForHome(page){
+async function waitForChat(page){
  await page.goto(baseUrl,{waitUntil:'domcontentloaded',timeout:45000});
- await page.locator('.cxComposer textarea').waitFor({state:'visible',timeout:15000});
+ await page.locator('.haComposer textarea').waitFor({state:'visible',timeout:15000});
+ await page.getByText('Hector ASI',{exact:true}).last().waitFor({state:'visible',timeout:15000});
 }
 
 async function runScheduleFlow(page){
- const textarea=page.locator('.cxComposer textarea'),handle=await textarea.elementHandle();
- if(!handle)throw new Error('No se encontró el cuadro principal para Programados');
+ const textarea=page.locator('.haComposer textarea'),handle=await textarea.elementHandle();
+ if(!handle)throw new Error('No se encontró la entrada única para Programaciones');
  const command='Cada 15 minutos revisa el estado del proyecto y reporta avances.';
  await textarea.fill(command);
  const [request]=await Promise.all([
@@ -47,18 +48,19 @@ async function runScheduleFlow(page){
   textarea.press('Enter')
  ]);
  const payload=request.postDataJSON();
- if(payload.cadence!=='custom_minutes'||payload.intervalMinutes!==15||payload.reasoningLevel!=='high'||payload.autonomyMode!=='continuous')throw new Error(`Payload de Programados incorrecto: ${JSON.stringify(payload)}`);
- await page.getByText(/Programado creado:/).waitFor({state:'visible',timeout:10000});
+ if(payload.cadence!=='custom_minutes'||payload.intervalMinutes!==15||payload.reasoningLevel!=='high'||payload.autonomyMode!=='continuous')throw new Error(`Payload de Programaciones incorrecto: ${JSON.stringify(payload)}`);
+ await page.getByText('Programación creada',{exact:true}).waitFor({state:'visible',timeout:10000});
+ await page.getByText(/sus ejecuciones y resultados aparecerán aquí mismo/i).waitFor({state:'visible',timeout:10000});
  const cleared=await handle.evaluate(node=>node.value);
- if(cleared!=='')throw new Error('El cuadro no se limpió después de crear el Programado');
- await page.locator('.cxSchedules').waitFor({state:'visible',timeout:10000});
- return{command,payload,sectionVisible:true,inputCleared:true};
+ if(cleared!=='')throw new Error('La entrada no se limpió después de crear la programación');
+ await page.locator('.haMessages').waitFor({state:'visible',timeout:10000});
+ return{command,payload,receiptVisible:true,inputCleared:true,sameChat:true};
 }
 
 async function runWorkFlow(page){
- await waitForHome(page);
- const textarea=page.locator('.cxComposer textarea'),handle=await textarea.elementHandle();
- if(!handle)throw new Error('No se encontró el cuadro principal para Trabajo');
+ await waitForChat(page);
+ const textarea=page.locator('.haComposer textarea'),handle=await textarea.elementHandle();
+ if(!handle)throw new Error('No se encontró la entrada única para Trabajo');
  const command='Termina la aplicación y no te detengas hasta dejarla funcionando.';
  await textarea.fill(command);
  const [request]=await Promise.all([
@@ -67,11 +69,12 @@ async function runWorkFlow(page){
  ]);
  const payload=request.postDataJSON();
  if(payload.goal!==command)throw new Error(`Objetivo de Trabajo incorrecto: ${JSON.stringify(payload)}`);
- await page.getByText(/Modo Trabajo activado/).waitFor({state:'visible',timeout:10000});
+ await page.getByText('Trabajo autónomo iniciado',{exact:true}).waitFor({state:'visible',timeout:10000});
+ await page.getByText(/el seguimiento aparecerá automáticamente dentro de este chat/i).waitFor({state:'visible',timeout:10000});
  const cleared=await handle.evaluate(node=>node.value);
- if(cleared!=='')throw new Error('El cuadro no se limpió después de activar Trabajo');
- await page.locator('.hxWorkMode').waitFor({state:'visible',timeout:10000});
- return{command,payload,sectionVisible:true,inputCleared:true};
+ if(cleared!=='')throw new Error('La entrada no se limpió después de activar Trabajo');
+ await page.locator('.haMessages').waitFor({state:'visible',timeout:10000});
+ return{command,payload,receiptVisible:true,inputCleared:true,sameChat:true};
 }
 
 await mkdir(outputDir,{recursive:true});
@@ -85,11 +88,11 @@ try{
   await page.route('**/*',async route=>{const fixture=responseFor(route.request().url(),route.request().method());if(fixture)await route.fulfill(fixture);else await route.continue();});
   const result={id:device.id,label:device.label,viewport:device.viewport,schedule:null,work:null,errors:[],passed:true};
   try{
-   await waitForHome(page);
+   await waitForChat(page);
    result.schedule=await runScheduleFlow(page);
    result.work=await runWorkFlow(page);
    if(errors.length)throw new Error(`Errores de página: ${errors.join(' | ')}`);
-   await page.screenshot({path:`${outputDir}/${device.id}-work-result.png`,fullPage:true,animations:'disabled'});
+   await page.screenshot({path:`${outputDir}/${device.id}-chat-results.png`,fullPage:true,animations:'disabled'});
   }catch(error){result.passed=false;result.errors.push(error instanceof Error?error.message:String(error));report.passed=false;await page.screenshot({path:`${outputDir}/${device.id}-failure.png`,fullPage:true,animations:'disabled'}).catch(()=>{});}
   report.devices.push(result);await context.close();
  }
