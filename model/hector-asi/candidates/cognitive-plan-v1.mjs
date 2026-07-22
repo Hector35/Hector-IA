@@ -102,16 +102,18 @@ export function cognitivePlanner(task){
 }
 
 export function scorePlan(task,plan){
-  const serialized=JSON.stringify(plan).toLowerCase();
+  const steps=Array.isArray(plan.steps)?plan.steps:[];
+  const structuredSteps=steps.filter((step)=>step&&typeof step==='object');
+  const actions=new Set(structuredSteps.map((step)=>step.action));
   const checks={
-    hasBaseline:serialized.includes('baseline'),
-    hasDependencies:Array.isArray(plan.steps)&&plan.steps.every((step)=>Array.isArray(step.dependsOn)),
-    handlesConflict:(task.concurrentFiles||[]).length===0||serialized.includes('conflict')||serialized.includes('ocupados'),
-    progressiveValidation:serialized.includes('progressive-validation')||serialized.includes('prueba focalizada'),
+    hasBaseline:plan.strategy==='generic-linear'||actions.has('run-focused-baseline'),
+    hasDependencies:structuredSteps.length===steps.length&&steps.length>0&&structuredSteps.every((step)=>Array.isArray(step.dependsOn)),
+    handlesConflict:(task.concurrentFiles||[]).length===0||(Array.isArray(plan.conflicts)&&plan.conflicts.length>0&&actions.has('select-non-conflicting-scope')),
+    progressiveValidation:actions.has('progressive-validation'),
     hasRollback:plan.rollback===true,
-    packagesHandoff:serialized.includes('handoff')||serialized.includes('paquete'),
+    packagesHandoff:actions.has('package-reusable-result'),
     avoidsAdvancedCall:task.deterministic!==true||plan.estimatedAdvancedCalls===0,
-    protectsHighRisk:task.risk!=='high'||serialized.includes('independent-verification')||serialized.includes('evidencia independiente')
+    protectsHighRisk:task.risk!=='high'||actions.has('require-independent-verification')
   };
   const passed=Object.values(checks).filter(Boolean).length;
   return {score:passed/Object.keys(checks).length,checks};
