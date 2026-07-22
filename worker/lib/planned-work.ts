@@ -8,8 +8,9 @@ import {chooseProvider} from './providers';
 import {chooseDeliberation} from './deliberation';
 import {createExecutionPlan,verifyExecutionPlan,type ExecutionPlan} from './execution-plan';
 import {loadRuntimeReuseCandidates,runWithRuntimeReuse,type RuntimeReuseCandidate} from './runtime-reuse';
+import {governInference} from './call-governor';
 
-export type PlannedWorkInput={userId:string;prompt:string;allowWeb:boolean;reasoningLevel:'auto'|'high';context?:string;authorizedHighRisk?:boolean};
+export type PlannedWorkInput={userId:string;prompt:string;allowWeb:boolean;reasoningLevel:'auto'|'high';context?:string;authorizedHighRisk?:boolean;maxModelCalls?:1|3};
 
 export function workResponseOptions(input:Pick<PlannedWorkInput,'userId'|'reasoningLevel'>):ResponseOptions{
  return{reasoning:input.reasoningLevel,deliberation:input.reasoningLevel==='high'?'force':'auto',userId:input.userId};
@@ -19,7 +20,7 @@ function forecastPasses(env:Bindings,input:string,route:ReturnType<typeof routeM
  return chooseDeliberation(input,route.tier,options,env.HECTOR_DELIBERATION_ENABLED!=='false').mode==='ensemble'?3:1;
 }
 
-export async function prepareWorkExecutionPlan(env:Bindings,input:PlannedWorkInput):Promise<{plan:ExecutionPlan;feedback:Awaited<ReturnType<typeof loadFeedbackRoutingProfile>>;budgetDecision:unknown}>{
+export async function prepareWorkExecutionPlan(env:Bindings,input:PlannedWorkInput):Promise<{plan:ExecutionPlan;feedback:Awaited<ReturnType<typeof loadFeedbackRoutingProfile>>;budgetDecision:unknown}> {
  const options=workResponseOptions(input);
  const base=routeModel(env,input.prompt,input.allowWeb);
  const forced=options.reasoning==='high'?{...base,model:env.OPENAI_MODEL_REASONING||base.model,tier:'deep' as const,reasoning:'high' as const,reason:'trabajo persistente con razonamiento alto solicitado'}:base;
@@ -33,11 +34,12 @@ export async function prepareWorkExecutionPlan(env:Bindings,input:PlannedWorkInp
  const enabled=env.CLOUDFLARE_AI_ENABLED!=='false';
  const health=route.tier==='fast'&&enabled?await loadCloudflareHealth(env.DB):undefined;
  const provider=chooseProvider(input.prompt,route.tier,route.needsWeb,enabled,health,feedback);
- const cognition=chooseDeliberation(input.prompt,route.tier,options,env.HECTOR_DELIBERATION_ENABLED!=='false');
+ const selectedCognition=chooseDeliberation(input.prompt,route.tier,options,env.HECTOR_DELIBERATION_ENABLED!=='false');
+ const cognition=input.maxModelCalls===1?{mode:'single' as const,reason:'Gobernador free-first: máximo de una llamada para la parte nueva.'}:selectedCognition;
  const allowedModels=[route.model];
  if(provider.provider==='cloudflare')allowedModels.push(env.CLOUDFLARE_MODEL_FAST||'@cf/meta/llama-3.1-8b-instruct-fast');
  if(cognition.mode==='ensemble')allowedModels.push(env.OPENAI_MODEL_CRITIC||route.model);
- const plan=await createExecutionPlan({task:route.task,route:{model:route.model,tier:route.tier,reasoning:route.reasoning,needsWeb:route.needsWeb},provider:{requested:provider.provider,reason:provider.reason},cognition:{mode:cognition.mode,passes:cognition.mode==='ensemble'?3:1,reason:cognition.reason},allowedModels,policySummary:`Trabajo persistente. Feedback: ${feedback.reason}. Presupuesto: ${budgetSummary}.`});
+ const plan=await createExecutionPlan({task:route.task,route:{model:route.model,tier:route.tier,reasoning:route.reasoning,needsWeb:route.needsWeb},provider:{requested:provider.provider,reason:provider.reason},cognition:{mode:cognition.mode,passes:cognition.mode==='ensemble'?3:1,reason:cognition.reason},allowedModels,policySummary:`Trabajo persistente. Feedback: ${feedback.reason}. Presupuesto: ${budgetSummary}. Límite de llamadas: ${input.maxModelCalls||3}.`});
  return{plan,feedback,budgetDecision};
 }
 
@@ -54,8 +56,10 @@ function deterministicWorkOutput(output:string,candidate:RuntimeReuseCandidate,p
 }
 
 export async function executePlannedWork(env:Bindings,input:PlannedWorkInput){
- const prepared=await prepareWorkExecutionPlan(env,input);
  const candidates=await loadRuntimeReuseCandidates(env.DB,input.userId);
+ const governor=governInference({prompt:input.prompt,candidates,authorizedHighRisk:input.authorizedHighRisk,allowCloudflareAi:env.CLOUDFLARE_AI_ENABLED!=='false',modelCostUsd:.02});
+ const governedInput:PlannedWorkInput={...input,reasoningLevel:governor.inferenceTier==='cloudflare-free'?'auto':input.reasoningLevel,maxModelCalls:governor.maxAdvancedCalls===1?1:input.maxModelCalls};
+ const prepared=await prepareWorkExecutionPlan(env,governedInput);
  const baseContext=input.context||'Trabajo persistente ejecutado fuera del chat.';
  const executed=candidates.length?await runWithRuntimeReuse({
   prompt:input.prompt,candidates,authorizedHighRisk:input.authorizedHighRisk,modelCostUsd:.02,
@@ -65,5 +69,5 @@ export async function executePlannedWork(env:Bindings,input:PlannedWorkInput){
  const out=executed.value;
  const verification=verifyExecutionPlan(prepared.plan,{model:out.model,tier:out.modelTier,provider:out.provider,requestedProvider:out.requestedProvider,cognitiveMode:out.cognitiveMode,deliberationPasses:out.deliberationPasses,fallback:out.fallback});
  const usage=estimatePlannedCost(out.usage,out.model);if(out.searchedWeb)usage.costUsd+=.01;
- return{out,plan:prepared.plan,verification,usage,reuse:{kind:executed.decision.kind,candidateId:executed.decision.kind==='assist'||executed.decision.kind==='deterministic'?executed.decision.candidate.id:null,reusedFraction:executed.decision.reusedFraction,modelCalls:executed.modelCalls,reason:executed.decision.reason}};
+ return{out,plan:prepared.plan,verification,usage,reuse:{kind:executed.decision.kind,candidateId:executed.decision.kind==='assist'||executed.decision.kind==='deterministic'?executed.decision.candidate.id:null,reusedFraction:executed.decision.reusedFraction,modelCalls:executed.modelCalls,reason:executed.decision.reason},governor:{capability:governor.capability,inferenceTier:governor.inferenceTier,maxAdvancedCalls:governor.maxAdvancedCalls,advancedCallsUsed:governor.inferenceTier==='advanced'?executed.modelCalls:0,reason:governor.reason}};
 }
