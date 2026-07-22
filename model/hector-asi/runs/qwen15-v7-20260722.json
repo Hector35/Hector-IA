@@ -1,0 +1,71 @@
+{
+  "schemaVersion": "1.0.0",
+  "experimentId": "hector-asi-qwen15-v7",
+  "status": "experimental-weights-generated-reproducibly",
+  "championPromoted": false,
+  "baseModel": {
+    "repository": "Qwen/Qwen2.5-1.5B-Instruct",
+    "revision": "989aa7980e4cf806f80c7fef2b1adb7bc71aa306",
+    "license": "Apache-2.0"
+  },
+  "training": {
+    "method": "LoRA SFT",
+    "hardware": "GitHub-hosted CPU runner",
+    "replicas": 2,
+    "epochsPerReplica": 2,
+    "stepsPerReplica": 48,
+    "seed": 35,
+    "maxLength": 112,
+    "learningRate": 0.00007,
+    "loraRank": 16,
+    "loraAlpha": 32,
+    "targetModules": ["q_proj", "k_proj", "v_proj", "o_proj"],
+    "trainableParameters": 4358144,
+    "parameterDeltaL2": 3.121196985244751,
+    "secondsFirstReplica": 464.4174659252167
+  },
+  "datasets": {
+    "trainPath": "model/hector-asi/data/qwen15-sft-v5.jsonl",
+    "trainExamples": 24,
+    "trainSha256": "d508b6e89877a3fbbac5646fe730d405de239f9087549e9f43d8bcbebd3446c6",
+    "validationPath": "model/hector-asi/evals/qwen15-held-out-v5.jsonl",
+    "validationExamples": 12,
+    "validationSha256": "794eeb3c961b16f974a6241a38b62ef34c22b3482116406eff2f277528bb02c7",
+    "containsPrivateUserData": false,
+    "controlledComparison": "Same frozen base, tokenizer and train/validation split as qwen15-v6; only LoRA capacity and learning rate changed."
+  },
+  "evaluation": {
+    "baseValidationLoss": 4.1809311509132385,
+    "candidateValidationLoss": 2.4295381009578705,
+    "validationLossDelta": -1.751393049955368,
+    "relativeValidationImprovement": 0.4189002369897462,
+    "qwen15V6CandidateLoss": 2.492658,
+    "lossAdvantageVsV6": 0.06311989904212945,
+    "relativeLossReductionVsV6": 0.02532231598130348,
+    "byteIdenticalReplicas": 2,
+    "firstTrainLoss": 3.8503541946411133,
+    "finalTrainLoss": 2.277433156967163
+  },
+  "artifact": {
+    "githubActionsRunId": "29961920110",
+    "githubActionsArtifactId": "8546657836",
+    "name": "hector-asi-qwen15-v7-29961920110",
+    "archiveBytes": 19944611,
+    "archiveSha256": "3f8ae6f5f8bbc394183fc5147d153f04d15b759bd2e5899ef8af54aead1116b5",
+    "adapterPath": "adapter/adapter_model.safetensors",
+    "adapterBytes": 17462432,
+    "adapterSha256": "1d838435f673db00cf2f045f8182ba31391b58cea3aa2d98af00e11c9d5b4836",
+    "weightsCommittedToGit": false,
+    "expiresAt": "2026-10-20T22:10:23Z"
+  },
+  "promotionDecision": {
+    "decision": "retain-as-leading-qwen15-experimental-candidate",
+    "reason": "The candidate reproducibly beats qwen15-v6 on an identical hidden split, but it is still Qwen2.5-1.5B rather than the planned Qwen3-4B champion and twelve hidden examples do not establish broad behavioral accuracy, safety, calibration, latency, cost or regression performance.",
+    "rollback": "Do not load or delete this LoRA adapter; the frozen base model remains unchanged.",
+    "blockedBy": [
+      "Target champion base Qwen3-4B has not been trained",
+      "Hidden evaluation contains only 12 cases",
+      "No broad sealed behavioral, safety, calibration, latency and cost evaluation"
+    ]
+  }
+}
