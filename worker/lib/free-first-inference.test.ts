@@ -33,9 +33,11 @@ describe('free-first inference',()=>{
 
  it('interrumpe proveedores gratuitos que exceden el timeout',async()=>{
   vi.useFakeTimers();
-  const pending=withTimeout(()=>new Promise<string>(()=>{}),25);
-  await vi.advanceTimersByTimeAsync(25);
-  await expect(pending).rejects.toThrow('free-first timeout');
-  vi.useRealTimers();
+  try{
+   const pending=withTimeout(()=>new Promise<string>(()=>{}),25);
+   const rejected=expect(pending).rejects.toThrow('free-first timeout');
+   await vi.advanceTimersByTimeAsync(25);
+   await rejected;
+  }finally{vi.useRealTimers();}
  });
 });
