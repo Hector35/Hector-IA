@@ -4,13 +4,23 @@
 
 ## Operational base available now
 
-`Héctor Base` is already operational for ordinary conversation and utility tasks. It uses open models already trained and hosted through Cloudflare Workers AI:
+`Héctor Base` is already operational for interactive conversation and utility tasks. It uses open models already trained and hosted through Cloudflare Workers AI:
 
-- `@cf/meta/llama-3.2-3b-instruct` for short general conversation;
+- `@cf/meta/llama-3.2-3b-instruct` for general conversation;
 - `@cf/ibm-granite/granite-4.0-h-micro` for utility tasks;
 - `hector-rules-v1` for deterministic local operations.
 
-This operational base runs under Hector OS identity, memory, tools, routing and evidence controls, but it does **not** contain custom Hector weights yet. Complex, sensitive or web-dependent tasks may escalate to the configured advanced external provider. Its machine-readable status lives in `runtime-registry.json`.
+This operational base runs under Hector OS identity, memory, tools, routing and evidence controls, but it does **not** contain custom Hector weights yet.
+
+The interactive chat is open-model-only:
+
+- OpenAI is not authorized to answer chat messages;
+- complex tasks may use multiple open-model passes for architect, adversary and judge roles;
+- current information is not searched live by the chat, so the model must disclose the limit, abstain or request evidence;
+- sensitive requests receive a conservative open-model response with explicit limits;
+- if Workers AI is unavailable or fails, the chat fails visibly instead of silently forwarding the message to OpenAI.
+
+OpenAI remains available outside the interactive chat as a teacher and evaluator for licensed dataset generation, preference data, critique, candidate evaluation and training-pipeline diagnostics. Its machine-readable boundary lives in `runtime-registry.json`.
 
 The custom Qwen candidate described below continues in parallel and only becomes a Hector-trained champion after real training and promotion.
 
@@ -22,7 +32,7 @@ The initial seed is intentionally small. It validates the pipeline and contracts
 
 ## Repository layout
 
-- `runtime-registry.json`: active operational base and its boundary from custom weights.
+- `runtime-registry.json`: active operational base, chat-provider boundary and training-provider roles.
 - `model-registry.json`: champion/candidate state, legal metadata and promotion gates.
 - `data/*.manifest.json`: provenance, license and privacy metadata.
 - `data/*.jsonl`: verified training examples.
