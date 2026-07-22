@@ -24,9 +24,12 @@ describe('runtime reuse engine',()=>{
   expect(result.decision.kind).toBe('assist');expect(result.modelCalls).toBe(1);expect(model.mock.calls[0][0]).toContain('Procedimiento verificado');
  });
 
- it('degrada una habilidad fallida al no superar los umbrales',()=>{
+ it('degrada una habilidad fallida y evita que omita el modelo',async()=>{
   const weak={...known,confidence:.35,successRate:.2};
-  expect(chooseRuntimeReuse('Ejecuta typecheck pruebas y build del repositorio',[weak]).kind).toBe('escalate');
+  const model=vi.fn(async()=>({text:'revisado por modelo'}));
+  const result=await runWithRuntimeReuse({prompt:'Ejecuta typecheck pruebas y build del repositorio',candidates:[weak],model,deterministic:output=>({text:output})});
+  expect(chooseRuntimeReuse('Ejecuta typecheck pruebas y build del repositorio',[weak]).kind).toBe('assist');
+  expect(result.modelCalls).toBe(1);expect(model).toHaveBeenCalledOnce();
  });
 
  it('bloquea acciones de alto riesgo sin autorización',async()=>{
