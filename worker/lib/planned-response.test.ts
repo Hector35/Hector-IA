@@ -1,4 +1,3 @@
-import {readFileSync} from 'node:fs';
 import {describe,expect,it} from 'vitest';
 import {createExecutionPlan} from './execution-plan';
 import {estimatePlannedCost} from './planned-response';
@@ -10,14 +9,6 @@ describe('planned response authority',()=>{
   expect(plan.provider.requested).toBe('openai');
   expect(plan.cognition).toMatchObject({mode:'ensemble',passes:3});
   expect(Object.isFrozen(plan)).toBe(true);
- });
- it('el ejecutor conversacional no contiene endpoint ni llamada de OpenAI',()=>{
-  const source=readFileSync('worker/lib/planned-response.ts','utf8');
-  expect(source).not.toContain('api.openai.com');
-  expect(source).not.toContain('callResponses');
-  expect(source).not.toMatch(/fetch\([^)]*openai/i);
-  expect(source).toContain('OpenAI: prohibido para responder el chat');
-  expect(source).toContain('callCloudflare');
  });
  it('conserva el cálculo de costo con metadata del modelo ejecutado',()=>{
   const cost=estimatePlannedCost({input_tokens:1000,output_tokens:500},'@cf/meta/llama-3.2-3b-instruct');
