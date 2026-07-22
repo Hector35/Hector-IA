@@ -1,10 +1,13 @@
 export type BudgetQualitySample={qualityAccepted?:boolean|number|null;feedbackRating?:number|null;correction?:string|null;createdAt?:string|null};
-export type BudgetQualityPolicy={state:'healthy'|'suspended'|'probe';sampleCount:number;acceptedCount:number;negativeCount:number;correctionCount:number;acceptanceRate:number|null;negativeRate:number|null;correctionRate:number|null;lastDegradedAt:string|null;reason:string};
+export type BudgetQualityTrigger='acceptance'|'negative'|'correction';
+export type BudgetQualityPolicy={state:'healthy'|'suspended'|'probe';sampleCount:number;acceptedCount:number;negativeCount:number;correctionCount:number;acceptanceRate:number|null;negativeRate:number|null;correctionRate:number|null;lastDegradedAt:string|null;nextProbeAt:string|null;triggeredBy:BudgetQualityTrigger[];reason:string};
 export type BudgetQualityCategory=BudgetQualityPolicy&{task:string};
 
 export const BUDGET_QUALITY_BREAKER={windowDays:14,minSamples:5,maxSamples:20,maxCategories:12,minAcceptanceRate:.75,maxNegativeRate:.35,maxCorrectionRate:.3,probeAfterHours:24} as const;
 
 function validDate(value:unknown){const date=new Date(String(value||''));return Number.isNaN(date.getTime())?null:date;}
+function nextProbe(lastDate:Date|null){return lastDate?new Date(lastDate.getTime()+BUDGET_QUALITY_BREAKER.probeAfterHours*3_600_000).toISOString():null;}
+function triggers(acceptanceRate:number|null,negativeRate:number|null,correctionRate:number|null):BudgetQualityTrigger[]{const items:BudgetQualityTrigger[]=[];if(Number(acceptanceRate)<BUDGET_QUALITY_BREAKER.minAcceptanceRate)items.push('acceptance');if(Number(negativeRate)>=BUDGET_QUALITY_BREAKER.maxNegativeRate)items.push('negative');if(Number(correctionRate)>=BUDGET_QUALITY_BREAKER.maxCorrectionRate)items.push('correction');return items;}
 
 export function evaluateBudgetQuality(samples:BudgetQualitySample[],nowMs=Date.now()):BudgetQualityPolicy{
  const rows=samples.slice(0,BUDGET_QUALITY_BREAKER.maxSamples),sampleCount=rows.length;
@@ -15,13 +18,12 @@ export function evaluateBudgetQuality(samples:BudgetQualitySample[],nowMs=Date.n
   if(negative||corrected)negativeCount++;
   if(corrected)correctionCount++;
  }
- const acceptanceRate=sampleCount?acceptedCount/sampleCount:null,negativeRate=sampleCount?negativeCount/sampleCount:null,correctionRate=sampleCount?correctionCount/sampleCount:null,lastDate=validDate(rows[0]?.createdAt),lastDegradedAt=lastDate?.toISOString()||null;
- if(sampleCount<BUDGET_QUALITY_BREAKER.minSamples)return{state:'healthy',sampleCount,acceptedCount,negativeCount,correctionCount,acceptanceRate,negativeRate,correctionRate,lastDegradedAt,reason:`muestras insuficientes (${sampleCount}/${BUDGET_QUALITY_BREAKER.minSamples})`};
- const unhealthy=Number(acceptanceRate)<BUDGET_QUALITY_BREAKER.minAcceptanceRate||Number(negativeRate)>=BUDGET_QUALITY_BREAKER.maxNegativeRate||Number(correctionRate)>=BUDGET_QUALITY_BREAKER.maxCorrectionRate;
- if(!unhealthy)return{state:'healthy',sampleCount,acceptedCount,negativeCount,correctionCount,acceptanceRate,negativeRate,correctionRate,lastDegradedAt,reason:'la calidad observada permite mantener degradaciones presupuestarias'};
- const elapsedHours=lastDate?(nowMs-lastDate.getTime())/3_600_000:0;
- if(lastDate&&elapsedHours>=BUDGET_QUALITY_BREAKER.probeAfterHours)return{state:'probe',sampleCount,acceptedCount,negativeCount,correctionCount,acceptanceRate,negativeRate,correctionRate,lastDegradedAt,reason:`calidad degradada; se permite una prueba controlada tras ${Math.floor(elapsedHours)} h sin degradaciones`};
- return{state:'suspended',sampleCount,acceptedCount,negativeCount,correctionCount,acceptanceRate,negativeRate,correctionRate,lastDegradedAt,reason:'degradaciones suspendidas para proteger calidad: aceptación o correcciones fuera de umbral'};
+ const acceptanceRate=sampleCount?acceptedCount/sampleCount:null,negativeRate=sampleCount?negativeCount/sampleCount:null,correctionRate=sampleCount?correctionCount/sampleCount:null,lastDate=validDate(rows[0]?.createdAt),lastDegradedAt=lastDate?.toISOString()||null,triggeredBy=triggers(acceptanceRate,negativeRate,correctionRate);
+ if(sampleCount<BUDGET_QUALITY_BREAKER.minSamples)return{state:'healthy',sampleCount,acceptedCount,negativeCount,correctionCount,acceptanceRate,negativeRate,correctionRate,lastDegradedAt,nextProbeAt:null,triggeredBy:[],reason:`muestras insuficientes (${sampleCount}/${BUDGET_QUALITY_BREAKER.minSamples})`};
+ if(!triggeredBy.length)return{state:'healthy',sampleCount,acceptedCount,negativeCount,correctionCount,acceptanceRate,negativeRate,correctionRate,lastDegradedAt,nextProbeAt:null,triggeredBy,reason:'la calidad observada permite mantener degradaciones presupuestarias'};
+ const elapsedHours=lastDate?(nowMs-lastDate.getTime())/3_600_000:0,probeAt=nextProbe(lastDate);
+ if(lastDate&&elapsedHours>=BUDGET_QUALITY_BREAKER.probeAfterHours)return{state:'probe',sampleCount,acceptedCount,negativeCount,correctionCount,acceptanceRate,negativeRate,correctionRate,lastDegradedAt,nextProbeAt:null,triggeredBy,reason:`calidad degradada; se permite una prueba controlada tras ${Math.floor(elapsedHours)} h sin degradaciones`};
+ return{state:'suspended',sampleCount,acceptedCount,negativeCount,correctionCount,acceptanceRate,negativeRate,correctionRate,lastDegradedAt,nextProbeAt:probeAt,triggeredBy,reason:'degradaciones suspendidas para proteger calidad: aceptación o correcciones fuera de umbral'};
 }
 
 export function sortBudgetQualityCategories(items:BudgetQualityCategory[]){const priority={suspended:0,probe:1,healthy:2};return [...items].sort((a,b)=>priority[a.state]-priority[b.state]||b.sampleCount-a.sampleCount||a.task.localeCompare(b.task,'es'));}
