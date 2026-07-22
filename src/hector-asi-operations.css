@@ -1,0 +1,37 @@
+.haActivity{margin:34px 0 0;padding-top:24px;border-top:1px solid rgba(255,255,255,.06)}
+.haActivity>header{display:flex;align-items:end;justify-content:space-between;gap:18px;margin-bottom:14px}
+.haActivity>header span{color:#6f7684;font-size:10px;font-weight:760;letter-spacing:.14em;text-transform:uppercase}
+.haActivity>header strong{color:#aeb4c1;font-size:12px;font-weight:650}
+.haActivityList{display:grid;gap:9px}
+.haOperation{display:grid;grid-template-columns:38px minmax(0,1fr);gap:12px;align-items:start;padding:14px;border:1px solid rgba(255,255,255,.065);border-radius:18px;background:linear-gradient(145deg,rgba(23,25,33,.82),rgba(15,17,23,.78));box-shadow:0 12px 34px rgba(0,0,0,.12)}
+.haOperationIcon{width:38px;height:38px;display:grid;place-items:center;border-radius:13px;background:rgba(143,153,255,.1);color:#9da5ff}
+.haOperationIcon svg{width:18px;height:18px}
+.haOperation.running .haOperationIcon svg{animation:haOperationSpin 2.6s linear infinite}
+@keyframes haOperationSpin{to{transform:rotate(360deg)}}
+.haOperation.completed .haOperationIcon{background:rgba(94,224,177,.1);color:#72e2ba}
+.haOperation.failed .haOperationIcon{background:rgba(255,102,129,.1);color:#ff8ea3}
+.haOperation.paused .haOperationIcon{background:rgba(255,190,92,.09);color:#eabf76}
+.haOperationTop{display:flex;align-items:flex-start;justify-content:space-between;gap:12px}
+.haOperationTop strong{min-width:0;color:#e8eaf1;font-size:13px;font-weight:720;line-height:1.35;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.haOperationTop span{flex:0 0 auto;padding:4px 7px;border-radius:999px;background:rgba(143,153,255,.09);color:#a8afff;font-size:9px;font-weight:760;letter-spacing:.035em;text-transform:uppercase}
+.haOperation.completed .haOperationTop span{background:rgba(94,224,177,.09);color:#75dcb8}
+.haOperation.failed .haOperationTop span{background:rgba(255,102,129,.09);color:#ff91a5}
+.haOperation.paused .haOperationTop span{background:rgba(255,190,92,.08);color:#e6b96c}
+.haOperation p{margin:6px 0 8px;color:#858c99;font-size:12px;line-height:1.45;display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;overflow:hidden}
+.haOperation small{display:block;color:#626975;font-size:10px;line-height:1.4}
+.haOperation progress{display:block;width:100%;height:3px;margin:9px 0 7px;border:0;border-radius:999px;overflow:hidden;background:#242731;appearance:none}
+.haOperation progress::-webkit-progress-bar{background:#242731;border-radius:999px}
+.haOperation progress::-webkit-progress-value{background:linear-gradient(90deg,#8f98ff,#6ee7b7);border-radius:999px}
+.haOperation progress::-moz-progress-bar{background:linear-gradient(90deg,#8f98ff,#6ee7b7);border-radius:999px}
+.haOperation.schedule{background:rgba(16,18,24,.7)}
+.haOperation.schedule .haOperationIcon{background:rgba(255,255,255,.045);color:#9aa1ae}
+@media(max-width:760px){
+ .haActivity{margin-top:26px;padding-top:20px}
+ .haActivity>header{align-items:center;margin-bottom:11px}
+ .haActivity>header strong{display:none}
+ .haOperation{grid-template-columns:34px minmax(0,1fr);gap:10px;padding:12px;border-radius:16px}
+ .haOperationIcon{width:34px;height:34px;border-radius:11px}
+ .haOperationTop strong{font-size:12px}
+ .haOperationTop span{font-size:8px}
+}
+@media(prefers-reduced-motion:reduce){.haOperation.running .haOperationIcon svg{animation:none}}
