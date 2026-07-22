@@ -6,3 +6,9 @@ dist
 !.env.example
 *.log
 .DS_Store
+artifacts/
+model/hector-asi/.venv/
+model/hector-asi/__pycache__/
+*.safetensors
+*.gguf
+*.bin
