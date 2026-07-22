@@ -36,7 +36,7 @@ export async function prepareWorkExecutionPlan(env:Bindings,input:PlannedWorkInp
  const provider=chooseProvider(input.prompt,route.tier,route.needsWeb,enabled,health,feedback);
  const cognition=chooseDeliberation(input.prompt,route.tier,options,env.HECTOR_DELIBERATION_ENABLED!=='false');
  const allowedModels=[route.model];
- if(provider.provider==='cloudflare')allowedModels.push(env.CLOUDFLARE_MODEL_FAST||'@cf/meta/llama-3.1-8b-instruct-fast');
+ if(provider.provider==='cloudflare')allowedModels.push('hector-rules-v1',env.CLOUDFLARE_MODEL_UTILITY||'@cf/ibm-granite/granite-4.0-h-micro',env.CLOUDFLARE_MODEL_FAST||'@cf/meta/llama-3.2-3b-instruct');
  if(cognition.mode==='ensemble')allowedModels.push(env.OPENAI_MODEL_CRITIC||route.model);
  const plan=await createExecutionPlan({task:route.task,route:{model:route.model,tier:route.tier,reasoning:route.reasoning,needsWeb:route.needsWeb},provider:{requested:provider.provider,reason:provider.reason},cognition:{mode:cognition.mode,passes:cognition.mode==='ensemble'?3:1,reason:cognition.reason},allowedModels,policySummary:`Trabajo persistente. Feedback: ${feedback.reason}. Presupuesto: ${budgetSummary}.`});
  return{plan,feedback,budgetDecision};
