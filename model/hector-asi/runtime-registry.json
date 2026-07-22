@@ -1,27 +1,33 @@
 {
-  "schemaVersion": "1.1.0",
+  "schemaVersion": "1.2.0",
   "project": "Hector ASI",
   "operationalBase": {
     "id": "hector-base",
     "name": "Héctor Base",
     "status": "active",
-    "deployment": "cloudflare-workers-ai",
+    "deployment": "open-model-runtime",
     "customWeights": false,
     "identityAndOrchestrationOwnedByHector": true,
     "models": {
-      "conversation": "@cf/meta/llama-3.2-3b-instruct",
+      "preferredConversation": "Qwen/Qwen3-4B-Instruct-2507",
+      "fallbackConversation": "@cf/meta/llama-3.2-3b-instruct",
       "utility": "@cf/ibm-granite/granite-4.0-h-micro",
       "deterministic": "hector-rules-v1"
     },
     "routing": {
-      "ordinaryConversation": "operational-base-first",
-      "explicitRequest": "say Héctor Base or request the open model",
-      "advancedEscalation": "OpenAI for web, sensitive or complex tasks"
+      "interactiveChat": "open-model-only",
+      "ordinaryConversation": "Qwen first when configured, otherwise Workers AI",
+      "advancedConversation": "open-model architect, adversary and judge passes",
+      "currentInformation": "no live web in chat; disclose the limit or request evidence",
+      "sensitiveRequests": "conservative open-model response with explicit limits",
+      "failurePolicy": "fail closed; never fallback to OpenAI"
     },
     "evidence": [
+      "worker/routes/intelligence.ts",
       "worker/lib/free-first.ts",
       "worker/lib/providers.ts",
-      "wrangler.jsonc",
+      "worker/lib/planned-response.ts",
+      "worker/lib/execution-plan.ts",
       "response_traces.provider",
       "response_traces.model"
     ]
@@ -33,15 +39,32 @@
     "deployment": "huggingface-inference-providers",
     "model": "Qwen/Qwen3-4B-Instruct-2507",
     "customWeights": false,
-    "activationPhrase": "Héctor Qwen:",
+    "activation": "automatic when HUGGINGFACE_TOKEN is configured; explicit phrase remains supported",
     "requiredSecret": "HUGGINGFACE_TOKEN",
-    "silentFallbackAllowed": false,
-    "purpose": "Hablar con la base abierta elegida antes de que exista el adaptador entrenado de Héctor ASI",
+    "silentFallbackAllowed": true,
+    "fallbackTarget": "Cloudflare open models only",
+    "purpose": "Hablar con la base abierta elegida antes de que exista el adaptador promovido de Héctor ASI",
     "evidence": [
+      "worker/routes/intelligence.ts",
       "worker/lib/providers.ts",
-      "worker/lib/openai.ts",
+      "worker/lib/planned-response.ts",
       "worker/lib/providers.test.ts",
       "wrangler.jsonc"
+    ]
+  },
+  "openAI": {
+    "interactiveChatAllowed": false,
+    "role": "training-and-evaluation-only",
+    "allowedUses": [
+      "licensed dataset generation",
+      "teacher critique and preference generation",
+      "candidate evaluation",
+      "training pipeline diagnostics"
+    ],
+    "forbiddenUses": [
+      "answering interactive chat",
+      "fallback after an open-model error",
+      "silent escalation for complex, sensitive or current requests"
     ]
   },
   "customCandidate": {
