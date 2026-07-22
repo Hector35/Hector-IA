@@ -46,7 +46,7 @@ function taskCategory(text:string){if(software.test(text))return'ingeniería de 
 export function detectFreeCapability(input:string):FreeCapability{
  const text=normalize(input);
  if(/^(clasifica|clasificar)(\b|\s)/.test(text)||/^tipo de tarea\b/.test(text))return'classify';
- if(/^(extrae|extraer|encuentra)\b/.test(text)&&/\b(email|correo|url|enlace|numero|número|fecha|dato|entidad|entidades)\b/.test(text))return'extract';
+ if(/^(extrae|extraer|encuentra)\b/.test(text)&&/\b(emails?|correos?|urls?|enlaces?|numeros?|fechas?|datos?|entidades?)\b/.test(text))return'extract';
  if(/^(enruta|enrutar|elige ruta|decide ruta)\b/.test(text))return'route';
  if(/^(verifica|validar|valida)\b/.test(text)&&/\bjson\b/.test(text))return'verify';
  if(/^(resume|resumir|haz un resumen|sintetiza)\b/.test(text))return'summarize';
