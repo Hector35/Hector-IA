@@ -1,0 +1,47 @@
+{
+  "schemaVersion": "1.0.0",
+  "experimentId": "hector-asi-smollm2-135m-lora-v1",
+  "status": "trained-not-promoted",
+  "executedAt": "2026-07-22T16:57:59Z",
+  "source": {
+    "pullRequest": 602,
+    "branch": "model-train-3/20260722-1053",
+    "headSha": "cb7263df6b2ed4d841f5eb91ce45d6c7c514d1b6",
+    "workflowRunId": 29940213619
+  },
+  "artifact": {
+    "githubArtifactId": 8537871994,
+    "name": "hector-asi-smollm2-135m-lora-29940213619",
+    "expiresAt": "2026-08-21T16:57:58Z",
+    "archiveDigest": "sha256:12daada1394b9cc606cb137476c5caf5876448e71f971e9f38897922b97e8652",
+    "adapterPath": "adapter/adapter_model.safetensors",
+    "adapterBytes": 9823216,
+    "adapterSha256": "973035b1ab095d911d93e3e764a62fa400ce36fd4de87f02fd106730a6fa8f9a"
+  },
+  "training": {
+    "baseModel": "HuggingFaceTB/SmolLM2-135M-Instruct",
+    "baseRevision": "12fd25f",
+    "method": "LoRA SFT",
+    "device": "CPU",
+    "epochs": 2,
+    "seed": 35,
+    "trainExamples": 13,
+    "hiddenValidationExamples": 6,
+    "trainableParameters": 2442240,
+    "parameterDeltaL2": 5.259191513061523,
+    "runtimeSeconds": 37.09520959854126
+  },
+  "evaluation": {
+    "baselineValidationLoss": 3.540324052174886,
+    "candidateValidationLoss": 2.8020008405049643,
+    "relativeValidationLossImprovement": 0.2085467885959073,
+    "trainLossByEpoch": [3.5207292483403134, 3.0263050152705264]
+  },
+  "decision": {
+    "promoted": false,
+    "championChanged": false,
+    "reason": "Real and reproducible improvement on a small hidden split, but the 135M experimental model and 13-example dataset are insufficient for champion promotion. The registered Qwen3-4B candidate remains the target.",
+    "rollback": "Discard the external LoRA artifact; no production runtime or champion registry was modified."
+  },
+  "nextCommand": "python model/hector-asi/train_sft.py --model Qwen/Qwen3-4B-Instruct-2507 --train-file model/hector-asi/data/sft-seed-v1.jsonl --output-dir artifacts/hector-asi-v0.1-qwen3-4b-sft/adapter"
+}
