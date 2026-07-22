@@ -1,0 +1,93 @@
+import type {DeliberationProfile} from './deliberation';
+import type {FeedbackRoutingProfile} from './feedback-routing';
+import type {Route} from './openai';
+import type {ProviderHealth} from './provider-quality';
+import type {ProviderDecision,ProviderName} from './providers';
+
+export type MetacognitiveRisk='low'|'medium'|'high';
+export type MetacognitiveAction='monitor'|'conserve'|'escalate'|'verify';
+export type MetacognitiveStrategy={routeTier:'fast'|'balanced'|'deep';provider:ProviderName;cognitiveMode:'single'|'ensemble'};
+export type MetacognitiveOutcomeRow={strategy_key:string;route_tier:string;provider:string;cognitive_mode:string;predicted_success:number;observed_success:number;quality_score:number;fallback:number;advanced_calls:number;cost_usd:number;duration_ms:number;created_at?:string|null};
+export type MetacognitiveProfile=MetacognitiveStrategy&{strategyKey:string;sampleCount:number;successes:number;failures:number;posteriorMean:number;lowerBound:number;uncertainty:number;brierScore:number;averageCostUsd:number;averageAdvancedCalls:number;averageDurationMs:number;utility:number};
+export type MetacognitiveDecision={version:'1.0.0';action:MetacognitiveAction;currentStrategy:string;selectedStrategy:string;predictedSuccess:number;lowerBound:number;uncertainty:number;sampleCount:number;expectedBenefit:number;requiresVerification:boolean;reason:string};
+
+type ModelEnv={OPENAI_MODEL:string;OPENAI_MODEL_FAST?:string;OPENAI_MODEL_BALANCED?:string;OPENAI_MODEL_REASONING?:string};
+type CurrentPlan={route:Route;provider:ProviderDecision;cognition:DeliberationProfile};
+
+const clamp=(value:number)=>Math.max(0,Math.min(1,Number.isFinite(value)?value:0));
+const routeRank=(tier:MetacognitiveStrategy['routeTier'])=>tier==='fast'?0:tier==='balanced'?1:2;
+const strategyStrength=(strategy:MetacognitiveStrategy)=>routeRank(strategy.routeTier)+(strategy.provider==='openai'?1:0)+(strategy.cognitiveMode==='ensemble'?2:0);
+const strategyCalls=(strategy:MetacognitiveStrategy)=>strategy.provider==='cloudflare'?1:strategy.cognitiveMode==='ensemble'?3:1;
+
+export function metacognitiveStrategyKey(strategy:MetacognitiveStrategy){return`${strategy.routeTier}:${strategy.provider}:${strategy.cognitiveMode}`;}
+
+function parseStrategy(row:MetacognitiveOutcomeRow):MetacognitiveStrategy|null{
+ const routeTier=row.route_tier==='fast'||row.route_tier==='balanced'||row.route_tier==='deep'?row.route_tier:null;
+ const provider=row.provider==='cloudflare'||row.provider==='openai'?row.provider:null;
+ const cognitiveMode=row.cognitive_mode==='single'||row.cognitive_mode==='ensemble'?row.cognitive_mode:null;
+ return routeTier&&provider&&cognitiveMode?{routeTier,provider,cognitiveMode}:null;
+}
+
+export function summarizeMetacognitiveProfiles(rows:MetacognitiveOutcomeRow[]):MetacognitiveProfile[]{
+ const groups=new Map<string,{strategy:MetacognitiveStrategy;rows:MetacognitiveOutcomeRow[]}>();
+ for(const row of rows){const strategy=parseStrategy(row);if(!strategy)continue;const key=metacognitiveStrategyKey(strategy),group=groups.get(key)||{strategy,rows:[]};group.rows.push(row);groups.set(key,group);}
+ return[...groups.entries()].map(([strategyKey,group])=>{
+  const sampleCount=group.rows.length,successes=group.rows.filter(row=>Number(row.observed_success)===1).length,failures=sampleCount-successes,alpha=successes+1,beta=failures+1,posteriorMean=alpha/(alpha+beta),variance=(alpha*beta)/((alpha+beta)**2*(alpha+beta+1)),uncertainty=Math.sqrt(variance),lowerBound=clamp(posteriorMean-1.64*uncertainty),brierScore=group.rows.reduce((sum,row)=>{const predicted=clamp(Number(row.predicted_success)),observed=Number(row.observed_success)===1?1:0;return sum+(predicted-observed)**2;},0)/Math.max(1,sampleCount),averageCostUsd=group.rows.reduce((sum,row)=>sum+Math.max(0,Number(row.cost_usd)||0),0)/Math.max(1,sampleCount),averageAdvancedCalls=group.rows.reduce((sum,row)=>sum+Math.max(0,Number(row.advanced_calls)||0),0)/Math.max(1,sampleCount),averageDurationMs=group.rows.reduce((sum,row)=>sum+Math.max(0,Number(row.duration_ms)||0),0)/Math.max(1,sampleCount),utility=clamp(posteriorMean-Math.min(.25,averageCostUsd*4)-Math.min(.18,averageAdvancedCalls*.04)-Math.min(.12,brierScore*.2));
+  return{...group.strategy,strategyKey,sampleCount,successes,failures,posteriorMean,lowerBound,uncertainty,brierScore,averageCostUsd,averageAdvancedCalls,averageDurationMs,utility};
+ }).sort((a,b)=>b.utility-a.utility||b.sampleCount-a.sampleCount);
+}
+
+function priorSuccess(input:{route:Route;provider:ProviderDecision;cognition:DeliberationProfile;feedback:FeedbackRoutingProfile;health?:ProviderHealth}){
+ const routePrior=input.route.tier==='fast'?.72:input.route.tier==='balanced'?.81:.88,feedbackPrior=clamp(1-input.feedback.negativeRate),healthPrior=input.provider.provider==='cloudflare'?clamp(input.health?.acceptedRate??.72):.86,ensembleBonus=input.cognition.mode==='ensemble'?.04:0;
+ return clamp(routePrior*.45+feedbackPrior*.3+healthPrior*.25+ensembleBonus);
+}
+
+function currentStrategy(input:CurrentPlan):MetacognitiveStrategy{return{routeTier:input.route.tier,provider:input.provider.provider,cognitiveMode:input.cognition.mode};}
+function compatible(profile:MetacognitiveProfile,input:{risk:MetacognitiveRisk;needsWeb:boolean;reasoningLevel:'auto'|'high'}){
+ if(input.needsWeb&&profile.provider!=='openai')return false;
+ if(input.risk!=='low'&&profile.provider==='cloudflare')return false;
+ if(input.reasoningLevel==='high'&&profile.routeTier!=='deep')return false;
+ return true;
+}
+
+export function recommendMetacognitiveControl(input:CurrentPlan&{profiles:MetacognitiveProfile[];risk:MetacognitiveRisk;reasoningLevel:'auto'|'high';feedback:FeedbackRoutingProfile;health?:ProviderHealth}):MetacognitiveDecision{
+ const current=currentStrategy(input),currentKey=metacognitiveStrategyKey(current),profile=input.profiles.find(item=>item.strategyKey===currentKey),prior=priorSuccess(input),weight=profile?profile.sampleCount/(profile.sampleCount+5):0,predictedSuccess=clamp((profile?.posteriorMean||prior)*weight+prior*(1-weight)),uncertainty=profile?.uncertainty??.24,lowerBound=profile?.lowerBound??clamp(predictedSuccess-1.64*uncertainty),sampleCount=profile?.sampleCount||0,requiresVerification=input.risk!=='low'||uncertainty>.16||predictedSuccess<.72;
+ const candidates=input.profiles.filter(item=>item.sampleCount>=5&&compatible(item,input));
+ if(input.reasoningLevel==='auto'&&input.risk==='low'&&!input.route.needsWeb){
+  const cheaper=candidates.filter(item=>item.lowerBound>=.72&&strategyCalls(item)<strategyCalls(current)&&item.utility>=(profile?.utility??0)-.03).sort((a,b)=>b.utility-a.utility||a.averageAdvancedCalls-b.averageAdvancedCalls)[0];
+  if(cheaper)return{version:'1.0.0',action:'conserve',currentStrategy:currentKey,selectedStrategy:cheaper.strategyKey,predictedSuccess:cheaper.posteriorMean,lowerBound:cheaper.lowerBound,uncertainty:cheaper.uncertainty,sampleCount:cheaper.sampleCount,expectedBenefit:Math.max(0,strategyCalls(current)-strategyCalls(cheaper)),requiresVerification:false,reason:`La estrategia ${cheaper.strategyKey} mantiene éxito calibrado con menor costo (${cheaper.sampleCount} resultados).`};
+ }
+ if(profile&&profile.sampleCount>=4&&profile.lowerBound<.55){
+  const stronger=candidates.filter(item=>strategyStrength(item)>strategyStrength(current)&&item.posteriorMean>=profile.posteriorMean+.12).sort((a,b)=>b.utility-a.utility)[0];
+  const selected=stronger?.strategyKey||(current.routeTier==='fast'?'balanced:openai:single':current.routeTier==='balanced'?'deep:openai:single':current.cognitiveMode==='single'?'deep:openai:ensemble':currentKey),benefit=stronger?stronger.posteriorMean-profile.posteriorMean:.15;
+  return{version:'1.0.0',action:selected===currentKey?'verify':'escalate',currentStrategy:currentKey,selectedStrategy:selected,predictedSuccess:stronger?.posteriorMean??clamp(predictedSuccess+benefit),lowerBound:stronger?.lowerBound??lowerBound,uncertainty:stronger?.uncertainty??uncertainty,sampleCount:profile.sampleCount,expectedBenefit:benefit,requiresVerification:true,reason:`La estrategia actual acumula fallos calibrados (${profile.successes}/${profile.sampleCount}); se exige una ruta más fuerte o verificación adicional.`};
+ }
+ return{version:'1.0.0',action:requiresVerification?'verify':'monitor',currentStrategy:currentKey,selectedStrategy:currentKey,predictedSuccess,lowerBound,uncertainty,sampleCount,expectedBenefit:0,requiresVerification,reason:sampleCount<4?'Evidencia insuficiente: conservar la ruta y medir el resultado sin añadir llamadas por reflexión.':'La estrategia permanece dentro de sus umbrales calibrados.'};
+}
+
+function parseStrategyKey(value:string):MetacognitiveStrategy|null{const[routeTier,provider,cognitiveMode]=value.split(':');return parseStrategy({strategy_key:value,route_tier:routeTier,provider,cognitive_mode:cognitiveMode,predicted_success:0,observed_success:0,quality_score:0,fallback:0,advanced_calls:0,cost_usd:0,duration_ms:0});}
+function modelForTier(env:ModelEnv,tier:MetacognitiveStrategy['routeTier']){return tier==='fast'?env.OPENAI_MODEL_FAST||env.OPENAI_MODEL:tier==='balanced'?env.OPENAI_MODEL_BALANCED||env.OPENAI_MODEL:env.OPENAI_MODEL_REASONING||env.OPENAI_MODEL_BALANCED||env.OPENAI_MODEL;}
+
+export function applyMetacognitiveControl(env:ModelEnv,current:CurrentPlan,decision:MetacognitiveDecision):CurrentPlan{
+ const selected=parseStrategyKey(decision.selectedStrategy);if(!selected||decision.selectedStrategy===decision.currentStrategy)return current;
+ const route:Route={...current.route,tier:selected.routeTier,model:modelForTier(env,selected.routeTier),reason:`${current.route.reason}; control metacognitivo: ${decision.reason}`,reasoning:selected.routeTier==='fast'?'low':selected.routeTier==='balanced'?'medium':'high'};
+ const provider:ProviderDecision={provider:selected.provider,reason:`control metacognitivo calibrado: ${decision.reason}`};
+ const cognition:DeliberationProfile={...current.cognition,mode:selected.cognitiveMode,candidateCount:selected.cognitiveMode==='ensemble'?2:1,reason:`control metacognitivo calibrado: ${decision.reason}`};
+ return{route,provider,cognition};
+}
+
+export async function loadMetacognitiveProfiles(db:D1Database,userId:string,task:string){
+ try{const result=await db.prepare(`SELECT strategy_key,route_tier,provider,cognitive_mode,predicted_success,observed_success,quality_score,fallback,advanced_calls,cost_usd,duration_ms,created_at FROM metacognitive_outcomes WHERE user_id=? AND task=? AND created_at>=datetime('now','-120 days') ORDER BY created_at DESC LIMIT 180`).bind(userId,task).all<MetacognitiveOutcomeRow>();return summarizeMetacognitiveProfiles(result.results||[]);}catch{return[];}
+}
+
+export async function recordMetacognitiveOutcome(db:D1Database,input:{userId:string;task:string;strategy:MetacognitiveStrategy;plannedStrategy:string;predictedSuccess:number;observedSuccess:boolean;verificationOk:boolean;qualityScore:number;fallback:boolean;advancedCalls:number;inputTokens:number;outputTokens:number;costUsd:number;durationMs:number;decision:MetacognitiveDecision}){
+ try{await db.prepare(`INSERT INTO metacognitive_outcomes(id,user_id,task,strategy_key,planned_strategy_key,route_tier,provider,cognitive_mode,predicted_success,observed_success,verification_ok,quality_score,fallback,advanced_calls,input_tokens,output_tokens,cost_usd,duration_ms,action,decision_reason,created_at) VALUES(?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,datetime('now'))`).bind(crypto.randomUUID(),input.userId,input.task,metacognitiveStrategyKey(input.strategy),input.plannedStrategy,input.strategy.routeTier,input.strategy.provider,input.strategy.cognitiveMode,clamp(input.predictedSuccess),input.observedSuccess?1:0,input.verificationOk?1:0,Math.max(0,Math.min(100,input.qualityScore)),input.fallback?1:0,Math.max(0,input.advancedCalls),Math.max(0,input.inputTokens),Math.max(0,input.outputTokens),Math.max(0,input.costUsd),Math.max(0,input.durationMs),input.decision.action,input.decision.reason.slice(0,1000)).run();return true;}catch{return false;}
+}
+
+export function metacognitiveBenchmark(){
+ const rows:MetacognitiveOutcomeRow[]=[];const add=(strategy:MetacognitiveStrategy,successes:number,failures:number,calls:number)=>{for(let i=0;i<successes+failures;i++)rows.push({strategy_key:metacognitiveStrategyKey(strategy),route_tier:strategy.routeTier,provider:strategy.provider,cognitive_mode:strategy.cognitiveMode,predicted_success:.8,observed_success:i<successes?1:0,quality_score:i<successes?90:30,fallback:0,advanced_calls:calls,cost_usd:calls*.01,duration_ms:calls*1000});};
+ add({routeTier:'fast',provider:'cloudflare',cognitiveMode:'single'},9,1,1);add({routeTier:'balanced',provider:'openai',cognitiveMode:'single'},8,2,1);add({routeTier:'deep',provider:'openai',cognitiveMode:'single'},6,1,1);add({routeTier:'deep',provider:'openai',cognitiveMode:'ensemble'},5,0,3);
+ const profiles=summarizeMetacognitiveProfiles(rows),feedback={sampleCount:0,negativeRate:0,nonDeepSampleCount:0,nonDeepNegativeRate:0,cloudflareSampleCount:0,cloudflareNegativeRate:0,preferDeep:false,avoidCloudflare:false,guidance:[],reason:'benchmark'},base={reasoningLevel:'auto' as const,feedback,health:undefined};
+ const conserve=recommendMetacognitiveControl({...base,risk:'low',profiles,route:{model:'deep',tier:'deep',reason:'benchmark',reasoning:'high',task:'general',needsWeb:false},provider:{provider:'openai',reason:'benchmark'},cognition:{mode:'ensemble',reason:'benchmark',candidateCount:2,highStakes:false}}),escalate=recommendMetacognitiveControl({...base,risk:'low',profiles:summarizeMetacognitiveProfiles(rows.filter(row=>row.strategy_key!=='fast:cloudflare:single').concat(Array.from({length:6},(_,i)=>({strategy_key:'fast:cloudflare:single',route_tier:'fast',provider:'cloudflare',cognitive_mode:'single',predicted_success:.8,observed_success:i===0?1:0,quality_score:i===0?80:20,fallback:0,advanced_calls:1,cost_usd:0,duration_ms:500})))),route:{model:'fast',tier:'fast',reason:'benchmark',reasoning:'low',task:'code',needsWeb:false},provider:{provider:'cloudflare',reason:'benchmark'},cognition:{mode:'single',reason:'benchmark',candidateCount:1,highStakes:false}});
+ return{conserveAction:conserve.action,conserveSelected:conserve.selectedStrategy,escalateAction:escalate.action,escalateSelected:escalate.selectedStrategy,baselineAdvancedCalls:4,controlledAdvancedCalls:strategyCalls(parseStrategyKey(conserve.selectedStrategy)!),advancedCallsAvoided:4-strategyCalls(parseStrategyKey(conserve.selectedStrategy)!),confidentFailuresBefore:1,confidentFailuresAfter:escalate.action==='escalate'?0:1};
+}
