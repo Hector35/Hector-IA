@@ -1,3 +1,4 @@
+-- D1-safe append-only lifecycle schema. Referential integrity is enforced by user-scoped service queries.
 CREATE TABLE learned_skills (
   id TEXT PRIMARY KEY,
   user_id TEXT NOT NULL,
