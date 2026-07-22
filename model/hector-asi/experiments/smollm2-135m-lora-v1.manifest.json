@@ -1,0 +1,44 @@
+{
+  "schemaVersion": "1.0.0",
+  "experimentId": "hector-asi-smollm2-135m-lora-v1",
+  "status": "ready-to-run",
+  "purpose": "Produce and evaluate real Hector LoRA weights on a modern small instruct model using free CPU compute.",
+  "baseModel": {
+    "repository": "HuggingFaceTB/SmolLM2-135M-Instruct",
+    "revision": "12fd25f",
+    "license": "Apache-2.0",
+    "parameterScale": "135M"
+  },
+  "method": {
+    "stage": "sft",
+    "adapter": "lora",
+    "precision": "float32",
+    "rank": 8,
+    "alpha": 16,
+    "targetModules": ["q_proj", "k_proj", "v_proj", "o_proj", "gate_proj", "up_proj", "down_proj"]
+  },
+  "dataset": {
+    "train": "model/hector-asi/data/smollm-hector-sft-v1.jsonl",
+    "validation": "model/hector-asi/evals/smollm-hector-held-out-v1.jsonl",
+    "source": "Project-authored synthetic verified examples",
+    "license": "Apache-2.0",
+    "containsPrivateUserData": false,
+    "deduplicated": true,
+    "validationSeparatedBeforeTraining": true
+  },
+  "compute": {
+    "provider": "GitHub Actions hosted runner",
+    "device": "CPU",
+    "newPaidService": false
+  },
+  "artifacts": {
+    "committedToGit": false,
+    "workflowArtifactPattern": "hector-asi-smollm2-135m-lora-*",
+    "requiredFiles": ["adapter/adapter_model.safetensors", "metrics.json", "run-manifest.json", "SHA256SUMS"]
+  },
+  "promotion": {
+    "eligibleForChampion": false,
+    "reason": "Experimental 135M candidate; the registered champion track remains Qwen3-4B.",
+    "usefulEvidence": ["real parameter change", "base-vs-candidate hidden validation loss", "reproducible hashes", "artifact recovery"]
+  }
+}
