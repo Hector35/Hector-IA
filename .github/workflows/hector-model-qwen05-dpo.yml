@@ -72,6 +72,7 @@ jobs:
           print(json.dumps(m,indent=2))
           PY
       - name: Upload immutable adapter and metrics
+        if: always()
         uses: actions/upload-artifact@v4
         with:
           name: hector-asi-qwen05-dpo-v2-${{ github.run_id }}
