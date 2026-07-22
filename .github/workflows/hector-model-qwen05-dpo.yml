@@ -4,7 +4,7 @@ on:
   pull_request:
     branches: [main]
     paths:
-      - 'model/hector-asi/train_qwen05_dpo.py'
+      - 'model/hector-asi/train_qwen05_dpo_v2.py'
       - 'model/hector-asi/data/qwen05-dpo-v1.jsonl'
       - 'model/hector-asi/evals/qwen05-dpo-held-out-v1.jsonl'
       - '.github/workflows/hector-model-qwen05-dpo.yml'
@@ -33,34 +33,35 @@ jobs:
           python -m pip install --upgrade pip
           python -m pip install --index-url https://download.pytorch.org/whl/cpu 'torch==2.7.1'
           python -m pip install 'transformers==4.53.2' 'peft==0.16.0' 'accelerate==1.8.1' 'safetensors==0.5.3'
-      - name: Train two real DPO LoRA replicas
+      - name: Train two normalized DPO LoRA replicas
         run: |
           for replica in a b; do
-            python model/hector-asi/train_qwen05_dpo.py \
+            python model/hector-asi/train_qwen05_dpo_v2.py \
               --train-file model/hector-asi/data/qwen05-dpo-v1.jsonl \
               --eval-file model/hector-asi/evals/qwen05-dpo-held-out-v1.jsonl \
-              --output-dir "artifacts/hector-asi-qwen05-dpo-v1-${replica}" \
-              --epochs 2 --max-length 160 --lr 1e-4 --beta 0.1 --seed 35
+              --output-dir "artifacts/hector-asi-qwen05-dpo-v2-${replica}" \
+              --epochs 4 --max-length 160 --lr 2e-4 --beta 0.2 --seed 35
           done
       - name: Prove byte-identical reproducibility
         run: |
-          A=$(sha256sum artifacts/hector-asi-qwen05-dpo-v1-a/adapter/adapter_model.safetensors | cut -d' ' -f1)
-          B=$(sha256sum artifacts/hector-asi-qwen05-dpo-v1-b/adapter/adapter_model.safetensors | cut -d' ' -f1)
+          A=$(sha256sum artifacts/hector-asi-qwen05-dpo-v2-a/adapter/adapter_model.safetensors | cut -d' ' -f1)
+          B=$(sha256sum artifacts/hector-asi-qwen05-dpo-v2-b/adapter/adapter_model.safetensors | cut -d' ' -f1)
           test "$A" = "$B"
-          cp -R artifacts/hector-asi-qwen05-dpo-v1-a artifacts/hector-asi-qwen05-dpo-v1
-          printf '{"replicas":2,"byteIdentical":true,"adapterSha256":"%s"}\n' "$A" > artifacts/hector-asi-qwen05-dpo-v1/reproduction.json
+          cp -R artifacts/hector-asi-qwen05-dpo-v2-a artifacts/hector-asi-qwen05-dpo-v2
+          printf '{"replicas":2,"byteIdentical":true,"adapterSha256":"%s"}\n' "$A" > artifacts/hector-asi-qwen05-dpo-v2/reproduction.json
       - name: Refute candidate and verify artifact
         run: |
           python - <<'PY'
           import json
           from pathlib import Path
-          root=Path('artifacts/hector-asi-qwen05-dpo-v1')
+          root=Path('artifacts/hector-asi-qwen05-dpo-v2')
           m=json.loads((root/'metrics.json').read_text())
           r=m['results']
           assert r['weightsGenerated'] is True
           assert r['parameterDeltaL2'] > 0
           assert r['adapterBytes'] > 1_000_000
-          assert r['candidatePreferenceAccuracy'] >= r['basePreferenceAccuracy']
+          assert r['candidatePreferenceAccuracy'] > r['basePreferenceAccuracy']
+          assert r['candidatePreferenceAccuracy'] >= 2/3
           assert r['candidateMeanPreferenceMargin'] > r['baseMeanPreferenceMargin']
           assert r['languageLossRelativeChange'] <= 0.05
           assert m['dataset']['trainPairs'] == 10
@@ -73,7 +74,7 @@ jobs:
       - name: Upload immutable adapter and metrics
         uses: actions/upload-artifact@v4
         with:
-          name: hector-asi-qwen05-dpo-v1-${{ github.run_id }}
-          path: artifacts/hector-asi-qwen05-dpo-v1
+          name: hector-asi-qwen05-dpo-v2-${{ github.run_id }}
+          path: artifacts/hector-asi-qwen05-dpo-v2
           if-no-files-found: error
           retention-days: 90
