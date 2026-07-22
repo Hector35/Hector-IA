@@ -2,14 +2,27 @@
 
 `Hector ASI` is the name of an open-weight derived model project. The name does not claim that the model is an actual artificial superintelligence.
 
+## Operational base available now
+
+`Héctor Base` is already operational for ordinary conversation and utility tasks. It uses open models already trained and hosted through Cloudflare Workers AI:
+
+- `@cf/meta/llama-3.2-3b-instruct` for short general conversation;
+- `@cf/ibm-granite/granite-4.0-h-micro` for utility tasks;
+- `hector-rules-v1` for deterministic local operations.
+
+This operational base runs under Hector OS identity, memory, tools, routing and evidence controls, but it does **not** contain custom Hector weights yet. Complex, sensitive or web-dependent tasks may escalate to the configured advanced external provider. Its machine-readable status lives in `runtime-registry.json`.
+
+The custom Qwen candidate described below continues in parallel and only becomes a Hector-trained champion after real training and promotion.
+
 ## Cycle 1 decision
 
-The first candidate uses `Qwen/Qwen3-4B-Instruct-2507` as its base because it is a compact multilingual instruction model released under Apache-2.0. The first adaptation method is QLoRA supervised fine-tuning (SFT), which keeps the base weights frozen and trains a small adapter in 4-bit mode.
+The first custom candidate uses `Qwen/Qwen3-4B-Instruct-2507` as its base because it is a compact multilingual instruction model released under Apache-2.0. The first adaptation method is QLoRA supervised fine-tuning (SFT), which keeps the base weights frozen and trains a small adapter in 4-bit mode.
 
 The initial seed is intentionally small. It validates the pipeline and contracts; it is not sufficient to claim a capability improvement. A candidate may become champion only after training on a larger licensed dataset and beating the base model on held-out evaluation without critical regressions.
 
 ## Repository layout
 
+- `runtime-registry.json`: active operational base and its boundary from custom weights.
 - `model-registry.json`: champion/candidate state, legal metadata and promotion gates.
 - `data/*.manifest.json`: provenance, license and privacy metadata.
 - `data/*.jsonl`: verified training examples.
@@ -58,4 +71,4 @@ Before a real promotion run:
 
 ## Next experiment
 
-The next highest-value step is a reproducible evaluator that runs base and candidate against the held-out set and emits a signed promotion report. Actual training should wait until sufficient licensed data and GPU compute are available; the current seed exists to verify the pipeline, not to overfit a six-example dataset.
+The next highest-value step is a reproducible evaluator that runs base and candidate against the held-out set and emits a signed promotion report. Actual custom-weight training should wait until sufficient licensed data and GPU compute are available; the current seed exists to verify the pipeline, not to overfit a six-example dataset.

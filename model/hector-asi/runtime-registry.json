@@ -1,0 +1,36 @@
+{
+  "schemaVersion": "1.0.0",
+  "project": "Hector ASI",
+  "operationalBase": {
+    "id": "hector-base",
+    "name": "Héctor Base",
+    "status": "active",
+    "deployment": "cloudflare-workers-ai",
+    "customWeights": false,
+    "identityAndOrchestrationOwnedByHector": true,
+    "models": {
+      "conversation": "@cf/meta/llama-3.2-3b-instruct",
+      "utility": "@cf/ibm-granite/granite-4.0-h-micro",
+      "deterministic": "hector-rules-v1"
+    },
+    "routing": {
+      "ordinaryConversation": "operational-base-first",
+      "explicitRequest": "say Héctor Base or request the open model",
+      "advancedEscalation": "OpenAI for web, sensitive or complex tasks"
+    },
+    "evidence": [
+      "worker/lib/free-first.ts",
+      "worker/lib/providers.ts",
+      "wrangler.jsonc",
+      "response_traces.provider",
+      "response_traces.model"
+    ]
+  },
+  "customCandidate": {
+    "registry": "model/hector-asi/model-registry.json",
+    "id": "hector-asi-v0.1-qwen3-4b-sft",
+    "status": "planned",
+    "customWeightsAvailable": false
+  },
+  "champion": null
+}
