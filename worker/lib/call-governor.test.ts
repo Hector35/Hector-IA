@@ -32,7 +32,9 @@ describe('free-first call governor',()=>{
   let release=()=>{};const gate=new Promise<void>(resolve=>{release=resolve;});
   const execute=vi.fn(async()=>{await gate;return'ok';});
   const first=firstGovernor.advanced({key:'same',justification:'resolver',execute});
+  await new Promise(resolve=>setTimeout(resolve,0));
   const second=secondGovernor.advanced({key:'same',justification:'resolver',execute});
+  await new Promise(resolve=>setTimeout(resolve,0));
   release();
   expect(await Promise.all([first,second])).toEqual(['ok','ok']);
   expect(execute).toHaveBeenCalledTimes(1);
