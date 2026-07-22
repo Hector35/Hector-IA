@@ -14,6 +14,10 @@
     "CLOUDFLARE_MODEL_UTILITY": "@cf/ibm-granite/granite-4.0-h-micro",
     "CLOUDFLARE_AI_ENABLED": "true",
     "HECTOR_FREE_FIRST_TIMEOUT_MS": "8000",
+    "HECTOR_QWEN_ENABLED": "true",
+    "HECTOR_QWEN_MODEL": "Qwen/Qwen3-4B-Instruct-2507",
+    "HECTOR_QWEN_BASE_URL": "https://router.huggingface.co/v1",
+    "HECTOR_QWEN_TIMEOUT_MS": "30000",
     "APP_NAME": "Héctor OS"
   },
   "ai": { "binding": "AI" },
