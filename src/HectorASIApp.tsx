@@ -238,6 +238,7 @@ function ChatWorkspace({user,onLogout}:{user:User;onLogout:()=>void}){
       {messages.length===0&&<section className="haWelcome">
         <div className="haWelcomeMark">H</div>
         <h1>Hector ASI</h1>
+        <span className="haWelcomeDescriptor">Tu asistente inteligente</span>
         <p>Dime el resultado que quieres. El sistema debe pensar, actuar y mostrarte aquí mismo cómo lo comprobó.</p>
       </section>}
 
