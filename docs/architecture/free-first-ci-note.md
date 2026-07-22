@@ -1,1 +1,0 @@
-Este cambio debe fusionarse únicamente después de que Repository PR Checks y Production Audit validen el SHA de la rama. El benchmark está versionado; las métricas observadas de producción se almacenan en `inference_events` y no deben confundirse con las expectativas del benchmark.
