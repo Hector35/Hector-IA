@@ -30,8 +30,8 @@ jobs:
           python -m pip install "transformers==4.53.2" "peft==0.16.0" "accelerate==1.8.1" "safetensors==0.5.3"
       - name: Train two deterministic DPO replicas
         run: |
-          python model/hector-asi/train_qwen05_dpo.py --output-dir artifacts/hector-asi-qwen05-dpo-v1-a
-          python model/hector-asi/train_qwen05_dpo.py --output-dir artifacts/hector-asi-qwen05-dpo-v1-b
+          python model/hector-asi/train_qwen05_dpo.py --output-dir artifacts/hector-asi-qwen05-dpo-v1-a --epochs 6 --lr 0.00012
+          python model/hector-asi/train_qwen05_dpo.py --output-dir artifacts/hector-asi-qwen05-dpo-v1-b --epochs 6 --lr 0.00012
       - name: Verify real weights, evaluation and byte identity
         run: |
           python - <<'PY'
