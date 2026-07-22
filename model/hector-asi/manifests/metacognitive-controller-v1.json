@@ -1,0 +1,53 @@
+{
+  "schemaVersion": "1.0.0",
+  "candidateId": "hector-asi-metacognitive-controller-v1",
+  "parent": "hector-asi-metacognition-v1",
+  "type": "deterministic-metacognitive-controller",
+  "status": "candidate",
+  "weightsChanged": false,
+  "approaches": {
+    "naive": "killed-early",
+    "selective": "candidate"
+  },
+  "benchmark": {
+    "path": "model/hector-asi/evals/metacognitive-controller-v1.jsonl",
+    "caseCount": 12
+  },
+  "preliminaryMetrics": {
+    "naiveActionSelectionAccuracy": 0.25,
+    "candidateActionSelectionAccuracy": 1.0,
+    "naiveBrierScore": 0.11388333333333335,
+    "candidateBrierScore": 0.10577709591071231,
+    "usefulEscalationRate": 1.0,
+    "unnecessaryEscalationRate": 0.0,
+    "correctAbstentionRate": 1.0,
+    "unnecessaryAbstentionRate": 0.0
+  },
+  "outerLoop": {
+    "name": "fingerprinted-incremental-evaluation-v1",
+    "fullRunRecomputed": 12,
+    "unchangedRunRecomputed": 0,
+    "singleChangeRecomputed": 1,
+    "singleChangeReuseRate": 0.9166666666666666
+  },
+  "budget": {
+    "authorizedUsd": 0,
+    "actualUsd": 0,
+    "reason": "Paid resources offered no marginal value for deterministic comparison"
+  },
+  "rollback": {
+    "runtimeDefaultChanged": false,
+    "strategy": "keep the existing runtime selector until shadow evaluation passes"
+  },
+  "limitations": [
+    "The structured benchmark validates the contract but does not prove broad intelligence improvement",
+    "Runtime latency and upstream signal quality still require validation",
+    "The candidate is not wired into production routing"
+  ],
+  "promotionGate": [
+    "focused tests green",
+    "full suite, typecheck and build green",
+    "no regression on the existing metacognition benchmark",
+    "shadow evaluation before active routing"
+  ]
+}
