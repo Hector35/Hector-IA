@@ -8,6 +8,7 @@ export type ScheduledTaskDefinition={
  prompt:string;
  kind:string;
  cadence:ScheduleCadence;
+ interval_minutes?:number|null;
  reasoning_level:ReasoningLevel;
  autonomy_mode:AutonomyMode;
  allow_web:number|boolean;
@@ -20,7 +21,11 @@ export type PreviousScheduledRun={status?:string|null;result?:string|null;last_e
 const cadenceMap:Record<ScheduleCadence,number|null>={once:null,hourly:60,every_2_hours:120,every_6_hours:360,daily:1440,weekly:10080};
 const activeStatuses=new Set(['queued','working','testing','repairing']);
 
-export function intervalMinutesFor(cadence:ScheduleCadence){return cadenceMap[cadence];}
+export function intervalMinutesFor(cadence:ScheduleCadence,custom?:number|null){
+ if(cadence==='once')return null;
+ if(custom!==undefined&&custom!==null&&Number.isFinite(custom))return Math.max(1,Math.min(10080,Math.trunc(custom)));
+ return cadenceMap[cadence];
+}
 export function isActiveScheduledJob(status:string|undefined|null){return !!status&&activeStatuses.has(status);}
 
 export async function scheduledJobId(taskId:string,scheduledFor:string){
@@ -39,8 +44,8 @@ export function normalizeRunAt(value:string,nowMs=Date.now()){
  return new Date(ms).toISOString();
 }
 
-export function nextScheduledRun(cadence:ScheduleCadence,scheduledAt:string,nowMs=Date.now()):string|null{
- const minutes=intervalMinutesFor(cadence);
+export function nextScheduledRun(cadence:ScheduleCadence,scheduledAt:string,nowMs=Date.now(),customMinutes?:number|null):string|null{
+ const minutes=intervalMinutesFor(cadence,customMinutes);
  if(minutes===null)return null;
  const base=Date.parse(scheduledAt);
  if(!Number.isFinite(base))throw new Error('Fecha programada inválida');
