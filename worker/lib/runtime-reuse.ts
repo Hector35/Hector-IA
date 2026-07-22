@@ -90,14 +90,16 @@ export async function runWithRuntimeReuse<T>(input:{prompt:string;candidates:Run
 }
 
 function reusableOutput(result:string){const match=result.match(/(?:^|\n)REUSABLE_OUTPUT\s*:\s*([\s\S]+)$/i);return match?.[1]?.trim();}
+function parseJson(value:string|null,fallback:unknown){try{return JSON.parse(value||'');}catch{return fallback;}}
+function hasVerifiedEvidence(value:string|null){const evidence=parseJson(value,[]);return Array.isArray(evidence)&&evidence.some(item=>item&&typeof item==='object'&&(item as {verified?:unknown}).verified===true);}
 
-export async function loadRuntimeReuseCandidates(db:{prepare:(sql:string)=>{bind:(...values:unknown[])=>{all:<T>()=>Promise<{results:T[]}>}}},userId:string):Promise<RuntimeReuseCandidate[]>{
+export async function loadRuntimeReuseCandidates(db:{prepare:(sql:string)=>{bind:(...values:unknown[])=>{all:<T>()=>Promise<{results:T[]}>}}},userId:string):Promise<RuntimeReuseCandidate[]> {
  try{
-  const rows=(await db.prepare("SELECT id,objective,result,skills_json,attempts,created_at,estimated_cost_usd FROM agent_experiences WHERE user_id=? AND status='completed' AND verified=1 AND result IS NOT NULL AND length(trim(result))>=20 ORDER BY created_at DESC LIMIT 120").bind(userId).all<{id:string;objective:string;result:string;skills_json:string|null;attempts:number;created_at:string|null;estimated_cost_usd:number|null}>()).results;
-  return rows.map(row=>{
+  const rows=(await db.prepare("SELECT id,objective,objective_normalized,result,skills_json,attempts,created_at,estimated_cost_usd,evidence_json,verified FROM agent_experiences WHERE user_id=? AND status='completed' AND verified=1 AND result IS NOT NULL AND length(trim(result))>=20 ORDER BY created_at DESC LIMIT 120").bind(userId).all<{id:string;objective:string;objective_normalized:string;result:string;skills_json:string|null;attempts:number;created_at:string|null;estimated_cost_usd:number|null;evidence_json:string|null;verified:number}>()).results;
+  return rows.filter(row=>row.verified===1&&hasVerifiedEvidence(row.evidence_json)).map(row=>{
    let skills:string[]=[];try{const parsed=JSON.parse(row.skills_json||'[]');skills=Array.isArray(parsed)?parsed.filter(item=>typeof item==='string').slice(0,12):[];}catch{}
-   const output=reusableOutput(row.result),attempts=Math.max(1,Number(row.attempts)||1),confidence=Math.max(.55,Math.min(.92,.94-(attempts-1)*.055));
-   return{id:row.id,source:'experience' as const,taskType:skills[0]||'general',risk:classifyReuseRisk(row.objective),confidence,successRate:confidence,recencyScore:experienceRecencyScore(row.created_at),estimatedCostUsd:Math.max(0,Number(row.estimated_cost_usd)||0),trigger:row.objective,procedure:row.result.replace(/(?:^|\n)REUSABLE_OUTPUT\s*:[\s\S]+$/i,'').trim().slice(0,4000),mode:output?'deterministic' as const:'context' as const,deterministicOutput:output};
+   const output=reusableOutput(row.result),attempts=Math.max(1,Number(row.attempts)||1),confidence=Math.max(.55,Math.min(.92,.94-(attempts-1)*.055)),trigger=row.objective_normalized||row.objective;
+   return{id:row.id,source:'experience' as const,taskType:skills[0]||'general',risk:classifyReuseRisk(trigger),confidence,successRate:confidence,recencyScore:experienceRecencyScore(row.created_at),estimatedCostUsd:Math.max(0,Number(row.estimated_cost_usd)||0),trigger,procedure:row.result.replace(/(?:^|\n)REUSABLE_OUTPUT\s*:[\s\S]+$/i,'').trim().slice(0,4000),mode:output?'deterministic' as const:'context' as const,deterministicOutput:output};
   });
  }catch{return[];}
 }
