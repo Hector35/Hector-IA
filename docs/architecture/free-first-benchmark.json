@@ -1,0 +1,15 @@
+{
+  "version": "1.0.0",
+  "generated_at": "2026-07-22",
+  "method": "Deterministic policy benchmark backed by the same createFreeFirstPolicy and runtime counters used in production. CI validates the expected decisions; production writes observed executions to inference_events.",
+  "scenarios": [
+    {"name":"known_exact_cache","expected_advanced_calls":0,"expected_free_calls":0,"expected_cache_hit":true,"expected_outcome":"success"},
+    {"name":"partially_known_verified_context","expected_advanced_calls":1,"expected_free_calls":0,"expected_cache_hit":false,"expected_outcome":"success"},
+    {"name":"new_reasoning_task","expected_advanced_calls":1,"expected_free_calls":0,"expected_cache_hit":false,"expected_outcome":"success"},
+    {"name":"ambiguous_low_cost_classification","expected_advanced_calls":0,"expected_free_calls":1,"expected_cache_hit":false,"expected_outcome":"success_or_safe_fallback"},
+    {"name":"high_risk_without_authorization","expected_advanced_calls":0,"expected_free_calls":0,"expected_cache_hit":false,"expected_outcome":"blocked"}
+  ],
+  "baseline": {"policy":"three advanced calls per scenario","advanced_calls":15},
+  "free_first": {"advanced_calls":2,"free_calls":1,"cache_hits":1,"advanced_calls_avoided":13,"advanced_call_reduction":0.8666666667},
+  "validation": ["npm run typecheck","npm test","npm run build","npm run db:migrate:local","wrangler deploy --dry-run","Production Audit"]
+}
