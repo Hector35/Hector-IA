@@ -2,6 +2,7 @@ import {FormEvent,useEffect,useMemo,useRef,useState} from 'react';
 import {ArrowUp,Check,Clock3,File,History,LogOut,Paperclip,Plus,Sparkles,X} from 'lucide-react';
 import {api,type User} from './api';
 import {MarkdownMessage} from './MarkdownMessage';
+import {AutonomousActivity,executeOperation} from './hector-asi-operations';
 
 type ChatMessage={
   id?:string;
@@ -98,6 +99,7 @@ function ChatWorkspace({user,onLogout}:{user:User;onLogout:()=>void}){
   const [overlay,setOverlay]=useState<Overlay>(null);
   const [attachment,setAttachment]=useState<PendingAttachment>();
   const [notice,setNotice]=useState('');
+  const [activityRefresh,setActivityRefresh]=useState(0);
   const fileInput=useRef<HTMLInputElement>(null);
   const end=useRef<HTMLDivElement>(null);
 
@@ -114,7 +116,7 @@ function ChatWorkspace({user,onLogout}:{user:User;onLogout:()=>void}){
 
   useEffect(()=>{
     end.current?.scrollIntoView({behavior:messages.length?'smooth':'auto',block:'end'});
-  },[messages,busy,notice]);
+  },[messages,busy,notice,activityRefresh]);
 
   const title=useMemo(()=>{
     if(!conversationId)return 'Nueva conversación';
@@ -185,7 +187,11 @@ function ChatWorkspace({user,onLogout}:{user:User;onLogout:()=>void}){
           requestText=`${userContent}\n\nArchivo privado disponible: ${selected.file.name}. Trabaja con él cuando la capacidad correspondiente esté disponible y confirma qué pudiste comprobar.`;
         }
 
-        if(asksForModel(requestText)){
+        const operation=!selected?await executeOperation(requestText):null;
+        if(operation){
+          setMessages(items=>[...items,{role:'assistant',...operation}]);
+          setActivityRefresh(value=>value+1);
+        }else if(asksForModel(requestText)){
           const result=await jsonFetch('/api/system/model');
           const current=result.current||{};
           const content=current.model
@@ -239,8 +245,9 @@ function ChatWorkspace({user,onLogout}:{user:User;onLogout:()=>void}){
         {messages.map((message,index)=><Message key={message.id||`${message.role}-${index}`} message={message}/>)}
         {busy&&<article className="haMessage assistant thinking" aria-label="Hector ASI está trabajando"><div><span/><span/><span/></div></article>}
         {notice&&<div className="haNotice"><Clock3/>{notice}</div>}
-        <div ref={end}/>
       </section>
+      <AutonomousActivity refreshToken={activityRefresh}/>
+      <div ref={end}/>
     </main>
 
     <form className="haComposer" onSubmit={send}>
