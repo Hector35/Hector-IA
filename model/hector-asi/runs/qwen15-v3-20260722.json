@@ -1,0 +1,76 @@
+{
+  "schemaVersion": "1.0.0",
+  "experimentId": "hector-asi-qwen15-v3",
+  "status": "experimental-weights-generated-reproducibly",
+  "championPromoted": false,
+  "baseModel": {
+    "repository": "Qwen/Qwen2.5-1.5B-Instruct",
+    "revision": "989aa7980e4cf806f80c7fef2b1adb7bc71aa306",
+    "license": "Apache-2.0"
+  },
+  "training": {
+    "method": "LoRA SFT",
+    "hardware": "GitHub-hosted 4-vCPU Linux runner",
+    "replicas": 2,
+    "epochsPerReplica": 2,
+    "stepsPerReplica": 40,
+    "trainableParameters": 544768,
+    "targetModules": ["q_proj", "v_proj"],
+    "loraRank": 4,
+    "loraAlpha": 8,
+    "loraDropout": 0.0,
+    "learningRate": 0.00015,
+    "maxLength": 96,
+    "seed": 35,
+    "secondsFirstReplica": 255.3418471813202
+  },
+  "datasets": {
+    "trainPath": "model/hector-asi/data/qwen05-sft-v3.jsonl",
+    "trainExamples": 20,
+    "trainSha256": "dae6d3481e29a5c40514443db538c478532790ea7e18984a0674e8a81da6ce17",
+    "validationPath": "model/hector-asi/evals/qwen05-held-out-v3.jsonl",
+    "validationExamples": 10,
+    "validationSha256": "c72d0ad2c78b666c9d26dac14bb1a5ee181f476ce1ee2d7bd9d9d1d2c3a234b2",
+    "deduplicated": true,
+    "splitContaminationChecked": true,
+    "privateUserData": false
+  },
+  "evaluation": {
+    "baseValidationLoss": 4.130526208877564,
+    "candidateValidationLoss": 3.2483962297439577,
+    "validationLossDelta": -0.8821299791336061,
+    "relativeValidationImprovement": 0.21356358355448316,
+    "firstTrainLoss": 4.056962013244629,
+    "finalTrainLoss": 3.4188714027404785,
+    "parameterDeltaL2": 2.42510724067688,
+    "criticalRegressionAssessment": "Aggregate hidden loss improved, but ten cases do not establish broad safety, calibration, exact-task accuracy, latency or cross-domain transfer."
+  },
+  "reproducibility": {
+    "byteIdenticalReplicas": 2,
+    "adapterSha256": "135c708ffeef3d3e0040e34e5fa05cff91f8d8bb9d9698157837fde9fcac3baf",
+    "scope": "Two replicas used the same pinned model, data, software, seed and CPU workflow. Cross-hardware byte identity is not claimed."
+  },
+  "artifact": {
+    "githubActionsRunId": "29953113383",
+    "githubActionsArtifactId": "8543150853",
+    "name": "hector-asi-qwen15-v3-29953113383",
+    "adapterPath": "adapter/adapter_model.safetensors",
+    "adapterBytes": 2193720,
+    "adapterSha256": "135c708ffeef3d3e0040e34e5fa05cff91f8d8bb9d9698157837fde9fcac3baf",
+    "archiveBytes": 5938856,
+    "archiveSha256": "c580148d747794e3f38fdf2f5cc063ce9688d80ac1d79dc2156e5e31a4ef12fa",
+    "weightsCommittedToGit": false,
+    "expiresAt": "2026-10-20T19:57:19Z"
+  },
+  "comparison": {
+    "qwen15V2RelativeValidationImprovement": 0.16933595290793796,
+    "qwen15V3RelativeValidationImprovement": 0.21356358355448316,
+    "directlyComparable": false,
+    "reason": "The candidates use different hidden splits; the percentages support prioritization but not a head-to-head promotion claim."
+  },
+  "promotionDecision": {
+    "decision": "retain-as-leading-qwen15-experimental-candidate",
+    "reason": "The candidate exceeded its predefined 3% gate with reproducible weights and the broadest Qwen 1.5B curriculum so far, but it is not the planned Qwen3-4B base and the hidden evaluation is too small for a champion claim.",
+    "rollback": "Do not load or delete the adapter; the frozen base model remains unchanged."
+  }
+}
