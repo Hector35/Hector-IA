@@ -1,0 +1,69 @@
+{
+  "schemaVersion": "1.0.0",
+  "experimentId": "hector-asi-qwen05-v3",
+  "runId": "29948860804",
+  "completedAt": "2026-07-22T19:01:40Z",
+  "status": "experimental-weights-generated-reproducibly",
+  "championPromoted": false,
+  "baseModel": {
+    "repository": "Qwen/Qwen2.5-0.5B-Instruct",
+    "revision": "a338b55dd21219a5f4da42bc11a9313d1a27d4cc",
+    "license": "Apache-2.0"
+  },
+  "training": {
+    "method": "LoRA SFT",
+    "hardware": "GitHub-hosted 4-vCPU Linux runner using pinned CPU software",
+    "replicas": 2,
+    "epochsPerReplica": 2,
+    "stepsPerReplica": 40,
+    "seed": 35,
+    "trainableParameters": 540672,
+    "parameterDeltaL2": 2.457864999771118
+  },
+  "reproducibility": {
+    "byteIdenticalAdapters": true,
+    "replicas": 2,
+    "adapterSha256": "ee46491cb47f141b4f03695f9b007cbf435941c2138c9abc851975560699ff9a",
+    "scope": "Exact byte identity was required by the workflow on the pinned runner and software environment; cross-hardware byte identity is not claimed."
+  },
+  "datasets": {
+    "trainPath": "model/hector-asi/data/qwen05-sft-v3.jsonl",
+    "trainExamples": 20,
+    "trainSha256": "dae6d3481e29a5c40514443db538c478532790ea7e18984a0674e8a81da6ce17",
+    "validationPath": "model/hector-asi/evals/qwen05-held-out-v3.jsonl",
+    "validationExamples": 10,
+    "validationSha256": "c72d0ad2c78b666c9d26dac14bb1a5ee181f476ce1ee2d7bd9d9d1d2c3a234b2",
+    "deduplicated": true,
+    "splitContaminationChecked": true,
+    "containsPrivateUserData": false
+  },
+  "evaluation": {
+    "baseValidationLoss": 4.33625738620758,
+    "candidateValidationLoss": 2.918143367767334,
+    "validationLossDelta": -1.4181140184402463,
+    "relativeValidationImprovement": 0.3270364030859583,
+    "firstTrainLoss": 4.410004615783691,
+    "finalTrainLoss": 3.0587706565856934,
+    "criticalRegressionAssessment": "Not broad enough for champion eligibility; aggregate language-model loss does not establish behavioral accuracy, safety, calibration or transfer."
+  },
+  "artifact": {
+    "githubActionsArtifactId": "8541421245",
+    "name": "hector-asi-qwen05-v3-29948860804",
+    "archiveBytes": 5929348,
+    "archiveSha256": "0bc95fd886d243c10c3393ac239a2e132668fc03212da1ccf61e74527e2bff1b",
+    "adapterPath": "adapter/adapter_model.safetensors",
+    "adapterBytes": 2175168,
+    "adapterSha256": "ee46491cb47f141b4f03695f9b007cbf435941c2138c9abc851975560699ff9a",
+    "weightsCommittedToGit": false,
+    "expiresAt": "2026-10-20T18:56:30Z"
+  },
+  "promotionDecision": {
+    "decision": "retain-as-leading-qwen05-sft-experimental-candidate",
+    "reason": "It produced real reproducible weights and reduced loss by 32.70% on its independent ten-example hidden split, but the 0.5B base is not the planned Qwen3-4B model and the evaluation does not establish broad behavioral transfer or absence of critical regressions.",
+    "rollback": "Do not load or delete the adapter; the frozen base model remains unchanged."
+  },
+  "nextExperiment": {
+    "objective": "Evaluate generated responses on a larger sealed adversarial test and train the registered Qwen3-4B candidate on GPU when sufficient licensed data and compute are available.",
+    "command": "python model/hector-asi/train_sft.py --model Qwen/Qwen3-4B-Instruct-2507 --train-file model/hector-asi/data/qwen05-sft-v3.jsonl --output-dir artifacts/hector-asi-v0.1-qwen3-4b-sft/adapter"
+  }
+}
