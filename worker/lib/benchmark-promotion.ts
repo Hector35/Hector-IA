@@ -1,8 +1,10 @@
 import {applyGovernance,normalizeGovernanceMode,type GovernanceMode} from './strategy-governance';
 import {loadBudgetQualityPolicy,type BudgetQualityPolicy} from './budget-quality-breaker';
+import {aggregateDriftContainment,type DriftContainmentGroup} from './plan-drift-containment';
+import {latestActions,normalizeDriftIncident} from './plan-drift-incidents';
 
 export type BenchmarkAggregateRow={winner:'baseline'|'adaptive'|'tie';baseline_score:number;adaptive_score:number;baseline_cost_usd:number;adaptive_cost_usd:number;created_at?:string};
-export type BenchmarkPolicy={strategy:'baseline'|'adaptive';status:string;sampleCount:number;adaptiveWinRate:number;averageScoreDelta:number;averageCostMultiplier:number;reason:string;governanceMode?:GovernanceMode;governanceReason?:string|null;budgetQuality?:BudgetQualityPolicy|null};
+export type BenchmarkPolicy={strategy:'baseline'|'adaptive';status:string;sampleCount:number;adaptiveWinRate:number;averageScoreDelta:number;averageCostMultiplier:number;reason:string;governanceMode?:GovernanceMode;governanceReason?:string|null;budgetQuality?:BudgetQualityPolicy|null;driftContainment?:DriftContainmentGroup[]};
 
 export const BENCHMARK_PROMOTION_POLICY={windowDays:90,sampleLimit:40,minSamples:5,minAdaptiveWinRate:.6,minAverageScoreDelta:2,maxAverageCostMultiplier:4,rollbackWindow:3,rollbackBaselineWinRate:.5};
 
@@ -25,12 +27,36 @@ export function applyBudgetQualityProtection(policy:BenchmarkPolicy,quality:Budg
  return{...policy,strategy:'adaptive',status:'promoted',reason:`protección temporal de calidad presupuestaria: ${quality.reason}`,budgetQuality:quality};
 }
 
+export function applyDriftContainmentProtection(policy:BenchmarkPolicy,groups:DriftContainmentGroup[],governanceMode:GovernanceMode='auto'):BenchmarkPolicy{
+ const relevant=groups.filter(group=>group.status==='contained'||group.status==='probe-ready');
+ if(governanceMode!=='auto'||!relevant.length)return{...policy,driftContainment:groups};
+ const contained=relevant.filter(group=>group.status==='contained');
+ if(contained.length){
+  const causes=contained.map(group=>group.cause).join(', '),incidents=contained.reduce((sum,group)=>sum+group.incidents,0);
+  return{...policy,strategy:'adaptive',status:'promoted',reason:`contención cognitiva automática: ${incidents} desviaciones repetidas en ${causes}; se fuerza la ruta protegida hasta terminar el enfriamiento`,driftContainment:groups};
+ }
+ if(policy.budgetQuality?.state==='suspended')return{...policy,driftContainment:groups,reason:`${policy.reason}; la prueba de desviación se aplaza porque la calidad presupuestaria sigue protegida`};
+ const ready=relevant.filter(group=>group.status==='probe-ready'),causes=ready.map(group=>group.cause).join(', ');
+ return{...policy,strategy:'baseline',status:'containment_probe',reason:`prueba controlada automática tras enfriamiento de ${causes}; cualquier nueva desviación reactivará la contención`,driftContainment:groups};
+}
+
+async function loadDriftContainment(db:D1Database,userId:string){
+ try{
+  const [drifts,actions]=await Promise.all([
+   db.prepare("SELECT id,model,estimated_cost_usd,metadata_json,created_at FROM api_usage WHERE user_id=? AND service='policy-drift-blocked' AND created_at>=datetime('now','-30 days') ORDER BY created_at DESC LIMIT 100").bind(userId).all(),
+   db.prepare("SELECT metadata_json,created_at FROM api_usage WHERE user_id=? AND service='policy-drift-action' AND created_at>=datetime('now','-30 days') ORDER BY created_at DESC LIMIT 300").bind(userId).all()
+  ]);
+  const actionMap=latestActions((actions.results||[]) as any[]),items=(drifts.results||[]).map(row=>normalizeDriftIncident(row,actionMap)).filter((item):item is NonNullable<typeof item>=>!!item);
+  return aggregateDriftContainment(items);
+ }catch{return[];}
+}
+
 export async function loadBenchmarkPolicy(db:D1Database,userId:string,category:string):Promise<BenchmarkPolicy|null>{
  try{
   const row=await db.prepare('SELECT strategy,status,sample_count,adaptive_win_rate,average_score_delta,average_cost_multiplier,reason,governance_mode,governance_reason FROM intelligence_strategy_policies WHERE user_id=? AND category=?').bind(userId,category).first<any>();
   const governanceMode=normalizeGovernanceMode(row?.governance_mode),base:BenchmarkPolicy=row?{strategy:row.strategy,status:row.status,sampleCount:Number(row.sample_count),adaptiveWinRate:Number(row.adaptive_win_rate),averageScoreDelta:Number(row.average_score_delta),averageCostMultiplier:Number(row.average_cost_multiplier),reason:String(row.reason),governanceMode,governanceReason:row.governance_reason?String(row.governance_reason):null}:{strategy:'baseline',status:'observing',sampleCount:0,adaptiveWinRate:0,averageScoreDelta:0,averageCostMultiplier:1,reason:'sin benchmark adaptativo persistido',governanceMode,governanceReason:null};
-  const quality=await loadBudgetQualityPolicy(db,userId,category);
-  return applyBudgetQualityProtection(base,quality,governanceMode);
+  const [quality,containment]=await Promise.all([loadBudgetQualityPolicy(db,userId,category),loadDriftContainment(db,userId)]);
+  return applyDriftContainmentProtection(applyBudgetQualityProtection(base,quality,governanceMode),containment,governanceMode);
  }catch{return null;}
 }
 
