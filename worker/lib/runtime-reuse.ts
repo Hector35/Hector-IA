@@ -1,9 +1,11 @@
+import {retrieveHybridMemory,type HybridMemoryDb} from './hybrid-memory';
+
 export type ReuseRisk='low'|'medium'|'high';
 export type ReuseMode='deterministic'|'context';
 
 export type RuntimeReuseCandidate={
  id:string;
- source:'experience'|'skill'|'rule';
+ source:'experience'|'skill'|'rule'|'document'|'result';
  taskType:string;
  risk:ReuseRisk;
  confidence:number;
@@ -70,7 +72,7 @@ export function chooseRuntimeReuse(input:string,candidates:RuntimeReuseCandidate
  if(candidate.mode==='deterministic'&&candidate.deterministicOutput&&best.score>=.72&&candidate.confidence>=.8&&candidate.successRate>=.8&&candidate.estimatedCostUsd<=modelCost){
   return{kind:'deterministic',reason:`Procedimiento conocido y verificado (${best.score.toFixed(2)}).`,risk,candidate,output:candidate.deterministicOutput,reusedFraction:1};
  }
- return{kind:'assist',reason:`Se reutilizará contexto verificado (${best.score.toFixed(2)}) y el modelo resolverá solo lo nuevo.`,risk,candidate,context:`EXPERIENCIA REUTILIZABLE ${candidate.id}\nTipo: ${candidate.taskType}\nProcedimiento verificado:\n${candidate.procedure.slice(0,4000)}`,reusedFraction:Math.max(.15,Math.min(.85,best.score))};
+ return{kind:'assist',reason:`Se reutilizará contexto verificado (${best.score.toFixed(2)}) y el modelo resolverá solo lo nuevo.`,risk,candidate,context:`MEMORIA HÍBRIDA VERIFICADA ${candidate.id}\nTipo: ${candidate.taskType}\nProcedimiento:\n${candidate.procedure.slice(0,4000)}`,reusedFraction:Math.max(.15,Math.min(.85,best.score))};
 }
 
 export async function runWithRuntimeReuse<T>(input:{prompt:string;candidates:RuntimeReuseCandidate[];authorizedHighRisk?:boolean;modelCostUsd?:number;model:(context:string)=>Promise<T>;deterministic:(output:string,candidate:RuntimeReuseCandidate)=>T;record?:(event:RuntimeReuseRecord)=>Promise<void>|void}){
@@ -93,7 +95,7 @@ function reusableOutput(result:string){const match=result.match(/(?:^|\n)REUSABL
 function parseJson(value:string|null,fallback:unknown){try{return JSON.parse(value||'');}catch{return fallback;}}
 function hasVerifiedEvidence(value:string|null){const evidence=parseJson(value,[]);return Array.isArray(evidence)&&evidence.some(item=>item&&typeof item==='object'&&(item as {verified?:unknown}).verified===true);}
 
-export async function loadRuntimeReuseCandidates(db:{prepare:(sql:string)=>{bind:(...values:unknown[])=>{all:<T>()=>Promise<{results:T[]}>}}},userId:string):Promise<RuntimeReuseCandidate[]> {
+async function loadLegacyCandidates(db:HybridMemoryDb,userId:string):Promise<RuntimeReuseCandidate[]>{
  try{
   const rows=(await db.prepare("SELECT id,objective,objective_normalized,result,skills_json,attempts,created_at,estimated_cost_usd,evidence_json,verified FROM agent_experiences WHERE user_id=? AND status='completed' AND verified=1 AND result IS NOT NULL AND length(trim(result))>=20 ORDER BY created_at DESC LIMIT 120").bind(userId).all<{id:string;objective:string;objective_normalized:string;result:string;skills_json:string|null;attempts:number;created_at:string|null;estimated_cost_usd:number|null;evidence_json:string|null;verified:number}>()).results;
   return rows.filter(row=>row.verified===1&&hasVerifiedEvidence(row.evidence_json)).map(row=>{
@@ -102,4 +104,14 @@ export async function loadRuntimeReuseCandidates(db:{prepare:(sql:string)=>{bind
    return{id:row.id,source:'experience' as const,taskType:skills[0]||'general',risk:classifyReuseRisk(trigger),confidence,successRate:confidence,recencyScore:experienceRecencyScore(row.created_at),estimatedCostUsd:Math.max(0,Number(row.estimated_cost_usd)||0),trigger,procedure:row.result.replace(/(?:^|\n)REUSABLE_OUTPUT\s*:[\s\S]+$/i,'').trim().slice(0,4000),mode:output?'deterministic' as const:'context' as const,deterministicOutput:output};
   });
  }catch{return[];}
+}
+
+export async function loadRuntimeReuseCandidates(db:HybridMemoryDb,userId:string,query=''):Promise<RuntimeReuseCandidate[]> {
+ if(!query.trim())return loadLegacyCandidates(db,userId);
+ const hybrid=await retrieveHybridMemory(db,userId,query,{limit:12,maxContextChars:4200});
+ if(!hybrid.hits.length)return loadLegacyCandidates(db,userId);
+ return hybrid.hits.map(hit=>{
+  const output=reusableOutput(hit.content);
+  return{id:hit.id,source:hit.sourceType,taskType:hit.tags[0]||hit.sourceType,risk:classifyReuseRisk(`${hit.title} ${hit.normalizedText}`),confidence:hit.confidence,successRate:hit.successRate,recencyScore:hit.recencyScore,estimatedCostUsd:hit.estimatedCostUsd,trigger:hit.normalizedText||hit.title,procedure:hit.content.replace(/(?:^|\n)REUSABLE_OUTPUT\s*:[\s\S]+$/i,'').trim().slice(0,4000),mode:output?'deterministic':'context',deterministicOutput:output};
+ });
 }
