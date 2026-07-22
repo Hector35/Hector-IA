@@ -1,0 +1,32 @@
+{
+  "schemaVersion": "1.0.0",
+  "id": "claim-verifier-v1",
+  "cycle": 2,
+  "capability": "factual verification and calibrated execution claims",
+  "weakness": "The baseline accepts unsupported statements about deployments, tests, training, current facts and numerical results.",
+  "baseline": "accept-all with confidence 0.95",
+  "candidate": "deterministic evidence-aware verifier",
+  "victoryCriteria": {
+    "testBalancedAccuracyMin": 0.8,
+    "balancedAccuracyGainMin": 0.25,
+    "brierLowerThanBaseline": true,
+    "criticalFalseAccepts": 0
+  },
+  "dataset": {
+    "path": "model/hector-asi/evals/claim-verification-v1.jsonl",
+    "license": "CC0-1.0",
+    "origin": "synthetic adversarial cases authored for this experiment",
+    "train": 6,
+    "validation": 4,
+    "test": 8,
+    "deduplicated": true,
+    "apiCostUsd": 0
+  },
+  "compute": {
+    "weightTraining": false,
+    "reason": "No connected GPU or promoted adapter artifact was available; executable cognitive component path used.",
+    "runtime": "Node.js"
+  },
+  "rollback": "Remove claim-verifier-v1.mjs and its caller; no migrations or model weights are changed.",
+  "promotion": "candidate-only until CI executes the hidden test split and runtime integration is evaluated"
+}
