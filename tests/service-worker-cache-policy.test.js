@@ -9,7 +9,7 @@ function worker(responseHeaders={}){
  const cache={addAll:vi.fn(async()=>{}),put:vi.fn(async()=>{})};
  const caches={
   open:vi.fn(async()=>cache),
-  keys:vi.fn(async()=>['hector-os-transparent-model-v5','hector-os-static-shell-v6']),
+  keys:vi.fn(async()=>['hector-os-transparent-model-v5','hector-os-static-shell-v6','hector-asi-evolution-shell-v7']),
   delete:vi.fn(async()=>true),
   match:vi.fn(async()=>undefined)
  };
@@ -21,7 +21,7 @@ function worker(responseHeaders={}){
   addEventListener:(type,listener)=>{listeners[type]=listener;}
  };
  vm.runInNewContext(source,{self,caches,fetch,URL,Response,Promise,console});
- return{listeners,cache,caches,fetch};
+ return{listeners,cache,caches,fetch,self};
 }
 
 function dispatchFetch(listener,request){
@@ -70,11 +70,18 @@ describe('service worker private cache policy',()=>{
   expect(fetch).not.toHaveBeenCalled();
  });
 
- it('deletes the previous permissive cache during activation',async()=>{
+ it('deletes every stale shell and keeps only the current evolution shell',async()=>{
   const {listeners,caches}=worker();const waits=[];
   listeners.activate({waitUntil:value=>waits.push(Promise.resolve(value))});
   await Promise.all(waits);
   expect(caches.delete).toHaveBeenCalledWith('hector-os-transparent-model-v5');
-  expect(caches.delete).not.toHaveBeenCalledWith('hector-os-static-shell-v6');
+  expect(caches.delete).toHaveBeenCalledWith('hector-os-static-shell-v6');
+  expect(caches.delete).not.toHaveBeenCalledWith('hector-asi-evolution-shell-v7');
+ });
+
+ it('accepts an explicit skip-waiting request from the refreshed client',()=>{
+  const {listeners,self}=worker();
+  listeners.message({data:{type:'SKIP_WAITING'}});
+  expect(self.skipWaiting).toHaveBeenCalledOnce();
  });
 });
