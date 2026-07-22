@@ -4,6 +4,7 @@ import {CodexApp} from './CodexApp';
 import {installWorkModeEnhancer} from './work-mode-ui';
 import {installWorkEvidenceEnhancer} from './work-evidence-ui';
 import {installScheduledTasksEnhancer} from './scheduled-tasks-ui';
+import {installProgrammedResultsEnhancer} from './programmed-results-ui';
 import {installOneCommandEnhancer} from './one-command-ui';
 import {installComposerFileUpload} from './composer-file-upload';
 import {installFileSearchEnhancer} from './file-search-ui';
@@ -30,6 +31,7 @@ import './project-ui.css';
 import './work-mode-ui.css';
 import './work-evidence-ui.css';
 import './scheduled-tasks-ui.css';
+import './programmed-results-ui.css';
 import './one-command-ui.css';
 import './composer-file-upload.css';
 import './file-search-ui.css';
@@ -56,6 +58,7 @@ ReactDOM.createRoot(document.getElementById('root')!).render(
 
 installWorkModeEnhancer();
 installScheduledTasksEnhancer();
+installProgrammedResultsEnhancer();
 installOneCommandEnhancer();
 installComposerFileUpload();
 installFileSearchEnhancer();
