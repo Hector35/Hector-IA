@@ -1,9 +1,16 @@
 import {describe,expect,it,vi} from 'vitest';
-import {chooseRuntimeReuse,runWithRuntimeReuse,type RuntimeReuseCandidate} from './runtime-reuse';
+import {chooseRuntimeReuse,loadRuntimeReuseCandidates,runWithRuntimeReuse,type RuntimeReuseCandidate} from './runtime-reuse';
 
 const known:RuntimeReuseCandidate={id:'skill-known',source:'skill',taskType:'github-code',risk:'medium',confidence:.94,successRate:.92,estimatedCostUsd:0,trigger:'ejecuta typecheck pruebas y build del repositorio',procedure:'Ejecutar typecheck, pruebas y build; devolver evidencia.',mode:'deterministic',deterministicOutput:'Validación reutilizada y completada.'};
 
 const contextCandidate:RuntimeReuseCandidate={...known,id:'experience-context',mode:'context',deterministicOutput:undefined,confidence:.74,successRate:.8,trigger:'analiza error desconocido del repositorio',procedure:'Inspeccionar primero el error y los archivos relacionados.'};
+
+function dbWithRows(rows:unknown[]){
+ const all=vi.fn(async()=>({results:rows}));
+ const bind=vi.fn(()=>({all}));
+ const prepare=vi.fn(()=>({bind}));
+ return{db:{prepare},prepare,bind,all};
+}
 
 describe('runtime reuse engine',()=>{
  it('resuelve una tarea conocida sin llamar al modelo',async()=>{
@@ -41,5 +48,21 @@ describe('runtime reuse engine',()=>{
  it('permite evaluar alto riesgo cuando existe autorización explícita',()=>{
   const candidate={...known,risk:'high' as const,trigger:'elimina despliegue temporal verificado'};
   expect(chooseRuntimeReuse('Elimina el despliegue temporal verificado',[candidate],{authorizedHighRisk:true}).kind).not.toBe('blocked');
+ });
+
+ it('carga únicamente experiencias con evidencia objetivamente verificada',async()=>{
+  const verified={id:'verified',objective:'Ejecuta pruebas del repositorio',objective_normalized:'ejecuta pruebas del repositorio',result:'Procedimiento comprobado\nREUSABLE_OUTPUT: pruebas aprobadas',skills_json:'["github-code"]',attempts:1,evidence_json:'[{"kind":"test","verified":true}]',verified:1};
+  const unverified={...verified,id:'unverified',evidence_json:'[{"kind":"nota","verified":false}]'};
+  const legacy={...verified,id:'legacy',evidence_json:'[]'};
+  const {db,prepare}=dbWithRows([verified,unverified,legacy]);
+  const candidates=await loadRuntimeReuseCandidates(db,'user-1');
+  expect(candidates.map(item=>item.id)).toEqual(['verified']);
+  expect(candidates[0]).toMatchObject({mode:'deterministic',deterministicOutput:'pruebas aprobadas'});
+  expect(prepare.mock.calls[0][0]).toContain("verified=1");
+ });
+
+ it('mantiene fallback seguro si el esquema todavía no está disponible',async()=>{
+  const db={prepare:()=>({bind:()=>({all:async()=>{throw new Error('missing column');}})})};
+  await expect(loadRuntimeReuseCandidates(db,'user-1')).resolves.toEqual([]);
  });
 });
