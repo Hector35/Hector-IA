@@ -6,6 +6,7 @@ import './hector-asi.css';
 import './hector-asi-markdown.css';
 import './hector-asi-operations.css';
 import './hector-asi-evolution.css';
+import './hector-asi-evolution-compact.css';
 
 ReactDOM.createRoot(document.getElementById('root')!).render(
   <React.StrictMode><HectorASIEvolutionApp/></React.StrictMode>
