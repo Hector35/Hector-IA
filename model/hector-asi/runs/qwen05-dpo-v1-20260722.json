@@ -1,0 +1,15 @@
+{
+  "schemaVersion": "1.0.0",
+  "experimentId": "hector-asi-qwen05-dpo-v1",
+  "runId": "29945068498",
+  "completedAt": "2026-07-22T18:13:39Z",
+  "status": "experimental-weights-generated-reproducibly",
+  "championPromoted": false,
+  "baseModel": {"repository":"Qwen/Qwen2.5-0.5B-Instruct","revision":"a338b55dd21219a5f4da42bc11a9313d1a27d4cc","license":"Apache-2.0"},
+  "training": {"method":"LoRA DPO","hardware":"GitHub-hosted 4-vCPU Linux runner constrained to one CPU thread per replica","replicas":2,"epochsPerReplica":6,"stepsPerReplica":48,"seed":35,"beta":0.1,"learningRate":0.00012,"secondsFirstReplica":266.14589977264404,"trainableParameters":540672,"parameterDeltaL2":1.590130090713501},
+  "reproducibility": {"byteIdenticalAdapters":true,"adapterSha256":"d9031f4b4604fa01e4b0098406013aa1d49a57eb9ede666957e0bf074fafe1a7","scope":"Two replicas with pinned model, software, data, seed and CPU execution produced identical adapter bytes."},
+  "evaluation": {"basePreferenceAccuracy":0.0,"candidatePreferenceAccuracy":0.0,"baseMeanPreferenceMargin":-48.33542728424072,"candidateMeanPreferenceMargin":-33.81681823730469,"preferenceMarginDelta":14.518609046936035,"firstDpoLoss":0.6931471824645996,"finalDpoLoss":0.008361614309251308,"trainPairs":8,"hiddenValidationPairs":4,"criticalRegressionAssessment":"Preference margin improved substantially, but zero hidden pairs crossed into correct ranking; insufficient for promotion."},
+  "artifact": {"githubActionsArtifactId":"8540052857","name":"hector-asi-qwen05-dpo-29945068498","archiveBytes":5931118,"archiveSha256":"72d9ccf33b1f93f72fd3e944e0eb141437a9d9f79cb5ef798052cfa0e0c83c25","adapterPath":"adapter/adapter_model.safetensors","adapterBytes":2175168,"adapterSha256":"d9031f4b4604fa01e4b0098406013aa1d49a57eb9ede666957e0bf074fafe1a7","weightsCommittedToGit":false,"expiresAt":"2026-10-20T18:04:08Z"},
+  "datasets": {"trainSha256":"1930885295e05c656a9666b591b2603b4e5bbbb14b1ff9daf6840e67158483d3","validationSha256":"59270f3a11962762ad986e302899488a3e3ba35cf3fb959e81e95a17ba4b0691","privateUserData":false},
+  "promotionDecision": {"decision":"retain-as-experimental-preference-candidate","reason":"DPO produced reproducible real weights and a large positive hidden preference-margin shift, but hidden preference accuracy remained zero and the base is Qwen2.5 0.5B rather than Qwen3-4B.","rollback":"Stop loading or delete the LoRA adapter; frozen base weights remain unchanged."}
+}
