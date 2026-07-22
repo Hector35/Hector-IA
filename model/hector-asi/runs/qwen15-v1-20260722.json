@@ -1,0 +1,19 @@
+{
+  "schemaVersion": "1.1.0",
+  "experimentId": "hector-asi-qwen15-v1",
+  "runIds": ["29946227600", "29946560377"],
+  "completedAt": "2026-07-22T18:27:45Z",
+  "status": "experimental-weights-generated-reproducibly",
+  "championPromoted": false,
+  "baseModel": {"repository":"Qwen/Qwen2.5-1.5B-Instruct","revision":"989aa7980e4cf806f80c7fef2b1adb7bc71aa306","license":"Apache-2.0"},
+  "training": {"method":"LoRA SFT","hardware":"Two independent GitHub-hosted 4-vCPU Linux runs constrained to one CPU thread","independentRuns":2,"epochsPerRun":1,"stepsPerRun":12,"seed":35,"secondsFirstRun":119.42319345474243,"secondsSecondRun":118.78016901016235,"trainableParameters":544768,"parameterDeltaL2":1.0609352588653564},
+  "reproducibility": {"independentRuns":2,"byteIdenticalAdapters":true,"adapterSha256":"47b883a2fb61e1618eaa4d7011903db8b5fd6abb03283cd109a67395bcfa1e20","scope":"Exact byte identity was demonstrated across two independent GitHub Actions runs with pinned model revision, software, dataset, seed and single-thread deterministic CPU execution."},
+  "evaluation": {"baseValidationLoss":4.705404111317226,"candidateValidationLoss":4.282887424741473,"validationLossDelta":-0.4225166865757535,"relativeValidationImprovement":0.08979392132538316,"trainExamples":12,"validationExamples":7,"criticalRegressionAssessment":"not broad enough for champion eligibility"},
+  "artifacts": [
+    {"githubActionsArtifactId":"8540317926","name":"hector-asi-qwen15-29946227600","archiveBytes":5936240,"archiveSha256":"9f3d463481552975cd965f50b74a91e0224afc1b4846bc31b2073f31ece68c35","expiresAt":"2026-10-20T18:20:21Z"},
+    {"githubActionsArtifactId":"8540448183","name":"hector-asi-qwen15-29946560377","archiveBytes":5936238,"archiveSha256":"a5db52963781598039911a6f39222e6f357ece942fb4a2943a01bca1ea750716","expiresAt":"2026-10-20T18:25:05Z"}
+  ],
+  "adapter": {"path":"adapter/adapter_model.safetensors","bytes":2193720,"sha256":"47b883a2fb61e1618eaa4d7011903db8b5fd6abb03283cd109a67395bcfa1e20","weightsCommittedToGit":false},
+  "datasets": {"trainSha256":"87d3a9f2cb44d2579615398c2cff5985f456f12623026f238e829b12b1433b69","validationSha256":"13cea3640af10d94d22f33bc3cd53260c5f9454fc08ec325e6c13d8ee6e32852","privateUserData":false},
+  "promotionDecision": {"decision":"retain-as-experimental-qwen-specialist","reason":"The candidate generated reproducible real weights and improved hidden loss, but the base is Qwen2.5 1.5B rather than Qwen3 4B and seven hidden cases cannot establish broad safety, calibration, transfer or regression performance.","rollback":"Do not load or delete the adapter; the frozen base model remains unchanged."}
+}
