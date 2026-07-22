@@ -12,6 +12,7 @@
     "OPENAI_MODEL_REASONING": "gpt-5.6-sol",
     "CLOUDFLARE_MODEL_FAST": "@cf/meta/llama-3.1-8b-instruct-fast",
     "CLOUDFLARE_AI_ENABLED": "true",
+    "CLOUDFLARE_AI_TIMEOUT_MS": "12000",
     "APP_NAME": "Héctor OS"
   },
   "ai": { "binding": "AI" },
