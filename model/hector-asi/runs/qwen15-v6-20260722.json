@@ -1,0 +1,72 @@
+{
+  "schemaVersion": "1.0.0",
+  "experimentId": "hector-asi-qwen15-v6",
+  "status": "experimental-weights-generated-reproducibly",
+  "championPromoted": false,
+  "baseModel": {
+    "repository": "Qwen/Qwen2.5-1.5B-Instruct",
+    "revision": "989aa7980e4cf806f80c7fef2b1adb7bc71aa306",
+    "license": "Apache-2.0"
+  },
+  "training": {
+    "method": "LoRA SFT",
+    "hardware": "GitHub-hosted CPU runner",
+    "replicas": 2,
+    "epochsPerReplica": 2,
+    "stepsPerReplica": 48,
+    "seed": 35,
+    "secondsFirstReplica": 463.6855454444885,
+    "trainableParameters": 2179072,
+    "parameterDeltaL2": 3.2041807174682617,
+    "targetModules": ["q_proj", "k_proj", "v_proj", "o_proj"],
+    "loraRank": 8,
+    "loraAlpha": 16,
+    "learningRate": 0.0001,
+    "maxLength": 112
+  },
+  "datasets": {
+    "trainPath": "model/hector-asi/data/qwen15-sft-v5.jsonl",
+    "trainExamples": 24,
+    "trainSha256": "d508b6e89877a3fbbac5646fe730d405de239f9087549e9f43d8bcbebd3446c6",
+    "validationPath": "model/hector-asi/evals/qwen15-held-out-v5.jsonl",
+    "validationExamples": 12,
+    "validationSha256": "794eeb3c961b16f974a6241a38b62ef34c22b3482116406eff2f277528bb02c7",
+    "privateUserData": false,
+    "deduplicated": true,
+    "splitContaminationChecked": true
+  },
+  "evaluation": {
+    "baseValidationLoss": 4.1809311509132385,
+    "candidateValidationLoss": 2.492658148209254,
+    "validationLossDelta": -1.6882730027039844,
+    "relativeValidationImprovement": 0.40380311030360216,
+    "firstTrainLoss": 3.8503541946411133,
+    "finalTrainLoss": 2.3556535243988037,
+    "byteIdenticalReplicas": 2,
+    "controlledComparison": {
+      "referenceCandidate": "hector-asi-qwen15-v5",
+      "sameBaseAndSplits": true,
+      "referenceCandidateValidationLoss": 3.2841206666666667,
+      "candidateLossAdvantage": 0.7914625184574127,
+      "candidateRelativeLossAdvantage": 0.2409967960964604
+    },
+    "criticalRegressionAssessment": "Aggregate held-out loss improved materially, but the 12-case split is not sufficient to establish broad behavioral safety, calibration, latency, cost, or cross-domain regression absence."
+  },
+  "artifact": {
+    "githubActionsRunId": "29959492567",
+    "githubActionsArtifactId": "8545868261",
+    "name": "hector-asi-qwen15-v6-29959492567",
+    "adapterPath": "adapter/adapter_model.safetensors",
+    "adapterBytes": 8745704,
+    "adapterSha256": "9d6a00e55313808b9bc8fd7904473caefb352f38490e6f385c064de2f8011ba8",
+    "archiveBytes": 11979648,
+    "archiveSha256": "a329777d2145531536b398db9f9ab2efc47141410d2ee3a657a28a61c52f4a97",
+    "weightsCommittedToGit": false,
+    "expiresAt": "2026-10-20T21:30:58Z"
+  },
+  "promotionDecision": {
+    "decision": "retain-as-leading-qwen15-experimental-candidate",
+    "reason": "The expanded LoRA adapter directly outperformed Qwen15-v5 on the identical base and hidden split, but it is still Qwen2.5-1.5B rather than the registered Qwen3-4B target and evaluation breadth remains insufficient for champion promotion.",
+    "rollback": "Do not load or remove the LoRA adapter; the frozen base model and all prior candidates remain unchanged."
+  }
+}
