@@ -1,8 +1,12 @@
 import type {Bindings} from '../types';
+import {observeVerifiedLearning} from './learned-skills';
 
-export async function recordExperience(env:Bindings,input:{jobId:string;userId:string;objective:string;status:string;result?:string;skills:string[];attempts:number;durationMs:number}){
+export async function recordExperience(env:Bindings,input:{jobId:string;userId:string;objective:string;status:string;result?:string;skills:string[];attempts:number;durationMs:number;verified?:boolean;evidence?:Record<string,unknown>;procedure?:string}){
  const id=crypto.randomUUID();
  await env.DB.prepare('INSERT INTO agent_experiences(id,job_id,user_id,objective,status,result,skills_json,attempts,duration_ms) VALUES(?,?,?,?,?,?,?,?,?)').bind(id,input.jobId,input.userId,input.objective,input.status,input.result||null,JSON.stringify(input.skills),input.attempts,input.durationMs).run();
+ if(input.status==='completed'&&input.verified===true&&input.result){
+  await observeVerifiedLearning(env,{experienceId:id,userId:input.userId,objective:input.objective,procedure:(input.procedure||input.result).slice(0,6000),skills:input.skills,verified:true,evidence:input.evidence||{verified:true}});
+ }
  return id;
 }
 
