@@ -22,8 +22,12 @@ export function unwrapWorkObjective(value:string){
  return value.replace(WORK_MODE_PREFIX,'').replace(/^\s*OBJETIVO\s*/i,'').trim();
 }
 
+export function cleanWorkModeOutput(value:string|undefined|null){
+ return String(value||'').replace(/\n?WORK_STATE\s*:\s*(?:completed|continue|waiting)\s*$/im,'').replace(/\n?WORK_WAIT_MINUTES\s*:\s*\d+\s*$/im,'').trim();
+}
+
 export function workModeExecutionPrompt(storedPrompt:string,checkpoint:string|undefined|null,attempt:number){
- const objective=unwrapWorkObjective(storedPrompt),prior=String(checkpoint||'').trim().slice(0,10000);
+ const objective=unwrapWorkObjective(storedPrompt),prior=cleanWorkModeOutput(checkpoint).slice(0,10000);
  return [
   'MODO TRABAJO PERSISTENTE DE HÉCTOR OS',
   `Ciclo ${Math.max(1,Math.trunc(attempt)||1)}.`,
