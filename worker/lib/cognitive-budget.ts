@@ -1,9 +1,11 @@
 import {estimateModelCost} from './model-pricing';
+import {loadForecastAccuracy,type ForecastAccuracySummary} from './forecast-accuracy';
 
 export type CognitiveBudgetSettings={dailyLimitUsd:number;monthlyLimitUsd:number;warnPercent:number;enforcementMode:'observe'|'protect'};
 export type CognitiveBudgetUsage={todayUsd:number;monthUsd:number};
-export type CognitiveBudgetStatus=CognitiveBudgetSettings&CognitiveBudgetUsage&{dailyPercent:number;monthlyPercent:number;warning:boolean;exceeded:boolean;state:'ok'|'warning'|'exceeded';remainingTodayUsd:number;remainingMonthUsd:number};
-export type CognitiveCostProjection={model:string;tier:'fast'|'balanced'|'deep';passes:1|2|3;estimatedInputTokens:number;estimatedOutputTokens:number;estimatedCostUsd:number;remainingTodayAfterUsd:number;remainingMonthAfterUsd:number;fitsDaily:boolean;fitsMonthly:boolean;fitsBudget:boolean;pricingKnown:boolean};
+export type ForecastCalibration={multiplier:number;sampleCount:number;specificToModel:boolean;source:'model'|'global'|'none'};
+export type CognitiveBudgetStatus=CognitiveBudgetSettings&CognitiveBudgetUsage&{dailyPercent:number;monthlyPercent:number;warning:boolean;exceeded:boolean;state:'ok'|'warning'|'exceeded';remainingTodayUsd:number;remainingMonthUsd:number;forecastAccuracy?:ForecastAccuracySummary};
+export type CognitiveCostProjection={model:string;tier:'fast'|'balanced'|'deep';passes:1|2|3;estimatedInputTokens:number;estimatedOutputTokens:number;baseEstimatedCostUsd:number;estimatedCostUsd:number;remainingTodayAfterUsd:number;remainingMonthAfterUsd:number;fitsDaily:boolean;fitsMonthly:boolean;fitsBudget:boolean;pricingKnown:boolean;calibration:ForecastCalibration};
 export type BudgetAction={action:'allow'|'allow-protected'|'degrade';reason:string};
 
 export const DEFAULT_COGNITIVE_BUDGET:CognitiveBudgetSettings={dailyLimitUsd:1,monthlyLimitUsd:20,warnPercent:80,enforcementMode:'observe'};
@@ -27,27 +29,33 @@ export function evaluateCognitiveBudget(settings:CognitiveBudgetSettings,usage:C
  const safeSettings=normalizeCognitiveBudgetSettings(settings),safeUsage=normalizeCognitiveBudgetUsage(usage),dailyPercent=percent(safeUsage.todayUsd,safeSettings.dailyLimitUsd),monthlyPercent=percent(safeUsage.monthUsd,safeSettings.monthlyLimitUsd),peak=Math.max(dailyPercent,monthlyPercent),exceeded=dailyPercent>=100||monthlyPercent>=100,warning=!exceeded&&peak>=safeSettings.warnPercent;
  return{...safeSettings,...safeUsage,dailyPercent,monthlyPercent,warning,exceeded,state:exceeded?'exceeded':warning?'warning':'ok',remainingTodayUsd:Math.max(0,safeSettings.dailyLimitUsd-safeUsage.todayUsd),remainingMonthUsd:Math.max(0,safeSettings.monthlyLimitUsd-safeUsage.monthUsd)};
 }
+export function forecastCalibration(status:CognitiveBudgetStatus,model:string):ForecastCalibration{
+ const accuracy=status.forecastAccuracy,specific=accuracy?.byModel.find(item=>item.model===model&&item.sampleCount>=5);
+ if(specific)return{multiplier:clamp(specific.recommendedMultiplier,.5,2),sampleCount:specific.sampleCount,specificToModel:true,source:'model'};
+ if(accuracy?.calibrationReady)return{multiplier:clamp(accuracy.recommendedMultiplier,.5,2),sampleCount:accuracy.sampleCount,specificToModel:false,source:'global'};
+ return{multiplier:1,sampleCount:accuracy?.sampleCount||0,specificToModel:false,source:'none'};
+}
 export function projectCognitiveCost(status:CognitiveBudgetStatus,model:string,tier:'fast'|'balanced'|'deep',inputChars:number,contextChars=0,passes:1|2|3=1):CognitiveCostProjection{
  const safeInputChars=Math.max(0,Number.isFinite(inputChars)?inputChars:0),safeContextChars=Math.max(0,Number.isFinite(contextChars)?contextChars:0),baseInputTokens=Math.max(1,Math.ceil((safeInputChars+safeContextChars+6000)/4)),baseOutputTokens=OUTPUT_TOKENS_BY_TIER[tier];
  const estimatedInputTokens=passes===1?baseInputTokens:passes===2?baseInputTokens*2:baseInputTokens*2+Math.min(16_000,baseInputTokens+baseOutputTokens*2);
- const estimatedOutputTokens=baseOutputTokens*passes;
- const estimate=estimateModelCost({input_tokens:estimatedInputTokens,output_tokens:estimatedOutputTokens},model),remainingTodayAfterUsd=status.dailyLimitUsd-status.todayUsd-estimate.costUsd,remainingMonthAfterUsd=status.monthlyLimitUsd-status.monthUsd-estimate.costUsd,fitsDaily=remainingTodayAfterUsd>=0,fitsMonthly=remainingMonthAfterUsd>=0;
- return{model,tier,passes,estimatedInputTokens,estimatedOutputTokens,estimatedCostUsd:estimate.costUsd,remainingTodayAfterUsd:Math.max(0,remainingTodayAfterUsd),remainingMonthAfterUsd:Math.max(0,remainingMonthAfterUsd),fitsDaily,fitsMonthly,fitsBudget:fitsDaily&&fitsMonthly,pricingKnown:estimate.pricingKnown};
+ const estimatedOutputTokens=baseOutputTokens*passes,estimate=estimateModelCost({input_tokens:estimatedInputTokens,output_tokens:estimatedOutputTokens},model),calibration=forecastCalibration(status,model),estimatedCostUsd=estimate.costUsd*calibration.multiplier,remainingTodayAfterUsd=status.dailyLimitUsd-status.todayUsd-estimatedCostUsd,remainingMonthAfterUsd=status.monthlyLimitUsd-status.monthUsd-estimatedCostUsd,fitsDaily=remainingTodayAfterUsd>=0,fitsMonthly=remainingMonthAfterUsd>=0;
+ return{model,tier,passes,estimatedInputTokens,estimatedOutputTokens,baseEstimatedCostUsd:estimate.costUsd,estimatedCostUsd,remainingTodayAfterUsd:Math.max(0,remainingTodayAfterUsd),remainingMonthAfterUsd:Math.max(0,remainingMonthAfterUsd),fitsDaily,fitsMonthly,fitsBudget:fitsDaily&&fitsMonthly,pricingKnown:estimate.pricingKnown,calibration};
 }
 export function isBudgetProtectedTask(input:string,task:string){return sensitiveTaskSignals.test(`${task} ${input}`);}
 export function budgetAction(status:CognitiveBudgetStatus,sensitive=false,explicitHigh=false,projection?:CognitiveCostProjection|null):BudgetAction{
  if(status.enforcementMode!=='protect')return{action:'allow',reason:'presupuesto en observación; no modifica el router'};
  if(sensitive||explicitHigh)return{action:'allow-protected',reason:'tarea sensible o razonamiento alto explícito; no se degrada automáticamente'};
  if(status.exceeded)return{action:'degrade',reason:'presupuesto ya excedido en modo protección; usar ruta de menor costo'};
- if(projection&&!projection.fitsBudget)return{action:'degrade',reason:'el costo proyectado rebasaría el saldo diario o mensual disponible'};
- return{action:'allow',reason:projection?'la respuesta proyectada cabe dentro del presupuesto disponible':'presupuesto disponible'};
+ if(projection&&!projection.fitsBudget)return{action:'degrade',reason:'el costo proyectado calibrado rebasaría el saldo diario o mensual disponible'};
+ return{action:'allow',reason:projection?'la respuesta proyectada calibrada cabe dentro del presupuesto disponible':'presupuesto disponible'};
 }
-export function summarizeBudgetDecision(status:CognitiveBudgetStatus,action:BudgetAction,projection?:CognitiveCostProjection|null){return{state:status.state,enforcementMode:status.enforcementMode,dailyPercent:status.dailyPercent,monthlyPercent:status.monthlyPercent,action:action.action,reason:action.reason,projection:projection?{model:projection.model,tier:projection.tier,passes:projection.passes,estimatedInputTokens:projection.estimatedInputTokens,estimatedOutputTokens:projection.estimatedOutputTokens,estimatedCostUsd:projection.estimatedCostUsd,remainingTodayAfterUsd:projection.remainingTodayAfterUsd,remainingMonthAfterUsd:projection.remainingMonthAfterUsd,fitsBudget:projection.fitsBudget,pricingKnown:projection.pricingKnown}:null};}
+export function summarizeBudgetDecision(status:CognitiveBudgetStatus,action:BudgetAction,projection?:CognitiveCostProjection|null){return{state:status.state,enforcementMode:status.enforcementMode,dailyPercent:status.dailyPercent,monthlyPercent:status.monthlyPercent,action:action.action,reason:action.reason,projection:projection?{model:projection.model,tier:projection.tier,passes:projection.passes,estimatedInputTokens:projection.estimatedInputTokens,estimatedOutputTokens:projection.estimatedOutputTokens,baseEstimatedCostUsd:projection.baseEstimatedCostUsd,estimatedCostUsd:projection.estimatedCostUsd,remainingTodayAfterUsd:projection.remainingTodayAfterUsd,remainingMonthAfterUsd:projection.remainingMonthAfterUsd,fitsBudget:projection.fitsBudget,pricingKnown:projection.pricingKnown,calibration:projection.calibration}:null};}
 export async function loadCognitiveBudget(db:D1Database,userId:string){
- const [row,usage]=await Promise.all([
+ const [row,usage,forecastAccuracy]=await Promise.all([
   db.prepare('SELECT daily_limit_usd,monthly_limit_usd,warn_percent,enforcement_mode FROM cognitive_budgets WHERE user_id=?').bind(userId).first<any>(),
-  db.prepare("SELECT COALESCE(SUM(CASE WHEN created_at>=date('now') THEN estimated_cost_usd ELSE 0 END),0) today_usd,COALESCE(SUM(CASE WHEN created_at>=datetime('now','start of month') THEN estimated_cost_usd ELSE 0 END),0) month_usd FROM api_usage WHERE user_id=?").bind(userId).first<any>()
+  db.prepare("SELECT COALESCE(SUM(CASE WHEN created_at>=date('now') THEN estimated_cost_usd ELSE 0 END),0) today_usd,COALESCE(SUM(CASE WHEN created_at>=datetime('now','start of month') THEN estimated_cost_usd ELSE 0 END),0) month_usd FROM api_usage WHERE user_id=?").bind(userId).first<any>(),
+  loadForecastAccuracy(db,userId)
  ]);
  const settings=normalizeCognitiveBudgetSettings(row?{dailyLimitUsd:row.daily_limit_usd,monthlyLimitUsd:row.monthly_limit_usd,warnPercent:row.warn_percent,enforcementMode:row.enforcement_mode}:DEFAULT_COGNITIVE_BUDGET);
- return evaluateCognitiveBudget(settings,normalizeCognitiveBudgetUsage({todayUsd:usage?.today_usd,monthUsd:usage?.month_usd}));
+ return{...evaluateCognitiveBudget(settings,normalizeCognitiveBudgetUsage({todayUsd:usage?.today_usd,monthUsd:usage?.month_usd})),forecastAccuracy};
 }
