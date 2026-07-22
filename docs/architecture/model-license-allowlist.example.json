@@ -1,0 +1,12 @@
+{
+  "schemaVersion": 1,
+  "models": [],
+  "requiredFields": ["id", "revision", "sha256", "license", "tasks", "maxBytes", "source"],
+  "policy": {
+    "denyUnknownLicense": true,
+    "pinRevision": true,
+    "verifyChecksum": true,
+    "allowRemoteCode": false,
+    "requireBenchmark": true
+  }
+}

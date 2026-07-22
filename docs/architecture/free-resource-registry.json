@@ -1,0 +1,21 @@
+{
+  "reviewedAt": "2026-07-22",
+  "policy": "deterministic -> retrieval/cache -> browser-local -> Cloudflare free -> economical -> advanced",
+  "resources": [
+    {"id":"d1","status":"adopt","cost":"free-tier","purpose":["structured-memory","lexical-retrieval","metrics"],"required":true},
+    {"id":"r2-standard","status":"adopt","cost":"free-tier","purpose":["artifacts","documents","small-model-files"],"required":false},
+    {"id":"workers-ai","status":"pilot","cost":"10000-neurons-day-free","purpose":["embedding","classification","extraction","small-generation"],"required":false},
+    {"id":"transformers-js-v4","status":"pilot","cost":"zero-api","purpose":["browser-embedding","browser-classification"],"required":false},
+    {"id":"github-actions-public","status":"adopt","cost":"zero-standard-runner","purpose":["tests","build","audit"],"required":true},
+    {"id":"vectorize","status":"benchmark-first","cost":"free-allocation","purpose":["managed-vector-search"],"required":false}
+  ],
+  "guardrails": [
+    "model-license-allow-list",
+    "daily-budget",
+    "feature-detection",
+    "safe-fallback",
+    "verified-evidence-only",
+    "immutable-action-shas",
+    "benchmark-before-enable"
+  ]
+}
