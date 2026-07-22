@@ -3,6 +3,7 @@ import {z} from 'zod';
 import type {Bindings,Variables} from '../types';
 import {requireAuth} from '../lib/auth';
 import {latestActions,normalizeDriftIncident,restoreExecutionPlan,retryLocked} from '../lib/plan-drift-incidents';
+import {aggregateDriftContainment} from '../lib/plan-drift-containment';
 import {executePlannedContextual,estimatePlannedCost} from '../lib/planned-response';
 import {loadContextPack,renderContext} from '../lib/context';
 import {loadFeedbackRoutingProfile} from '../lib/feedback-routing';
@@ -25,8 +26,8 @@ planDriftIncidents.get('/',async c=>{
   c.env.DB.prepare("SELECT id,model,estimated_cost_usd,metadata_json,created_at FROM api_usage WHERE user_id=? AND service='policy-drift-blocked' ORDER BY created_at DESC LIMIT 100").bind(userId).all(),
   c.env.DB.prepare("SELECT metadata_json,created_at FROM api_usage WHERE user_id=? AND service='policy-drift-action' ORDER BY created_at DESC LIMIT 300").bind(userId).all()
  ]);
- const actionMap=latestActions((actions.results||[]) as any[]),items=(drifts.results||[]).map(row=>normalizeDriftIncident(row,actionMap)).filter(Boolean);
- return c.json({items,active:items.filter((item:any)=>item.status==='active'||item.status==='retry-failed').length});
+ const actionMap=latestActions((actions.results||[]) as any[]),items=(drifts.results||[]).map(row=>normalizeDriftIncident(row,actionMap)).filter((item):item is NonNullable<typeof item>=>!!item),containment=aggregateDriftContainment(items);
+ return c.json({items,active:items.filter(item=>item.status==='active'||item.status==='retry-failed').length,containment,containedCauses:containment.filter(group=>group.status==='contained').length});
 });
 
 planDriftIncidents.post('/:id/action',async c=>{
