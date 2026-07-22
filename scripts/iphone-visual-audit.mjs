@@ -90,8 +90,8 @@ try{
   const deviceReport={id:device.id,label:device.label,viewport:device.viewport,views:[],consoleErrors,mockedRequests};
   try{
    await page.goto(baseUrl,{waitUntil:'domcontentloaded',timeout:45000});
-   await page.getByText('Hector ASI',{exact:true}).last().waitFor({state:'visible',timeout:15000});
-   await page.locator('.haComposer textarea').waitFor({state:'visible',timeout:15000});
+   await page.getByText(/Hector ASI|Héctor OS/i).last().waitFor({state:'visible',timeout:15000});
+   await page.locator('.haComposer textarea, .cxComposer textarea').first().waitFor({state:'visible',timeout:15000});
    for(const view of views){
     await page.waitForTimeout(350);
     const overflow=await auditOverflow(page,device.viewport);
