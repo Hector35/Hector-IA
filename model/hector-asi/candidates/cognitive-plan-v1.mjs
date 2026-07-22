@@ -108,7 +108,7 @@ export function scorePlan(task,plan){
     hasDependencies:Array.isArray(plan.steps)&&plan.steps.every((step)=>Array.isArray(step.dependsOn)),
     handlesConflict:(task.concurrentFiles||[]).length===0||serialized.includes('conflict')||serialized.includes('ocupados'),
     progressiveValidation:serialized.includes('progressive-validation')||serialized.includes('prueba focalizada'),
-    hasRollback:plan.rollback===true||serialized.includes('rollback'),
+    hasRollback:plan.rollback===true,
     packagesHandoff:serialized.includes('handoff')||serialized.includes('paquete'),
     avoidsAdvancedCall:task.deterministic!==true||plan.estimatedAdvancedCalls===0,
     protectsHighRisk:task.risk!=='high'||serialized.includes('independent-verification')||serialized.includes('evidencia independiente')
