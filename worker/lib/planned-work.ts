@@ -8,6 +8,7 @@ import {chooseProvider} from './providers';
 import {chooseDeliberation} from './deliberation';
 import {createExecutionPlan,verifyExecutionPlan,type ExecutionPlan} from './execution-plan';
 import {loadRuntimeReuseCandidates,runWithRuntimeReuse,type RuntimeReuseCandidate} from './runtime-reuse';
+import {createCallGovernor,decideCallBudget,governExecutionPlan,type CallGovernorMetrics,type ReuseDisposition} from './call-governor';
 
 export type PlannedWorkInput={userId:string;prompt:string;allowWeb:boolean;reasoningLevel:'auto'|'high';context?:string;authorizedHighRisk?:boolean};
 
@@ -53,17 +54,33 @@ function deterministicWorkOutput(output:string,candidate:RuntimeReuseCandidate,p
  };
 }
 
+function zeroCallMetrics(plan:ExecutionPlan,prompt:string):CallGovernorMetrics{
+ const decision=decideCallBudget({prompt,reuse:'deterministic',requestedPasses:plan.cognition.passes,reasoningLevel:'high'});
+ return{advancedCalls:0,deduplicatedCalls:0,blockedCalls:0,requestedPasses:decision.requestedPasses,executedPasses:0,estimatedAdvancedCallsSaved:decision.estimatedAdvancedCallsSaved,justifications:[decision.justification]};
+}
+
 export async function executePlannedWork(env:Bindings,input:PlannedWorkInput){
  const prepared=await prepareWorkExecutionPlan(env,input);
  const candidates=await loadRuntimeReuseCandidates(env.DB,input.userId);
  const baseContext=input.context||'Trabajo persistente ejecutado fuera del chat.';
+ let activePlan=prepared.plan,governorMetrics:CallGovernorMetrics|undefined;
+ const executeModel=async(reuseContext:string,disposition:ReuseDisposition)=>{
+  const governed=await governExecutionPlan(prepared.plan,{prompt:input.prompt,reuse:disposition,reasoningLevel:input.reasoningLevel});
+  activePlan=governed.plan;
+  const governor=createCallGovernor(governed.decision);
+  const context=reuseContext?`${baseContext}\n\n${reuseContext}`:baseContext;
+  const value=await governor.advanced({key:`${input.userId}:${activePlan.hash}:${input.prompt}:${context}`,justification:`Ejecutar ${activePlan.route.model} para la parte no resuelta de ${activePlan.task}.`,execute:()=>executePlannedContextual(env,input.prompt,[],context,activePlan,{feedback:prepared.feedback,budgetDecision:prepared.budgetDecision})});
+  governorMetrics=governor.metrics;
+  return value;
+ };
  const executed=candidates.length?await runWithRuntimeReuse({
   prompt:input.prompt,candidates,authorizedHighRisk:input.authorizedHighRisk,modelCostUsd:.02,
-  model:async reuseContext=>executePlannedContextual(env,input.prompt,[],reuseContext?`${baseContext}\n\n${reuseContext}`:baseContext,prepared.plan,{feedback:prepared.feedback,budgetDecision:prepared.budgetDecision}),
+  model:reuseContext=>executeModel(reuseContext,reuseContext?'assist':'escalate'),
   deterministic:(output,candidate)=>deterministicWorkOutput(output,candidate,prepared)
- }):{value:await executePlannedContextual(env,input.prompt,[],baseContext,prepared.plan,{feedback:prepared.feedback,budgetDecision:prepared.budgetDecision}),decision:{kind:'escalate' as const,reason:'No había experiencias reutilizables.',risk:'low' as const,candidate:null,reusedFraction:0},modelCalls:1};
+ }):{value:await executeModel('','escalate'),decision:{kind:'escalate' as const,reason:'No había experiencias reutilizables.',risk:'low' as const,candidate:null,reusedFraction:0},modelCalls:1};
+ if(executed.decision.kind==='deterministic')governorMetrics=zeroCallMetrics(prepared.plan,input.prompt);
  const out=executed.value;
- const verification=verifyExecutionPlan(prepared.plan,{model:out.model,tier:out.modelTier,provider:out.provider,requestedProvider:out.requestedProvider,cognitiveMode:out.cognitiveMode,deliberationPasses:out.deliberationPasses,fallback:out.fallback});
+ const verification=verifyExecutionPlan(activePlan,{model:out.model,tier:out.modelTier,provider:out.provider,requestedProvider:out.requestedProvider,cognitiveMode:out.cognitiveMode,deliberationPasses:out.deliberationPasses,fallback:out.fallback});
  const usage=estimatePlannedCost(out.usage,out.model);if(out.searchedWeb)usage.costUsd+=.01;
- return{out,plan:prepared.plan,verification,usage,reuse:{kind:executed.decision.kind,candidateId:executed.decision.kind==='assist'||executed.decision.kind==='deterministic'?executed.decision.candidate.id:null,reusedFraction:executed.decision.reusedFraction,modelCalls:executed.modelCalls,reason:executed.decision.reason}};
+ return{out,plan:activePlan,verification,usage,reuse:{kind:executed.decision.kind,candidateId:executed.decision.kind==='assist'||executed.decision.kind==='deterministic'?executed.decision.candidate.id:null,reusedFraction:executed.decision.reusedFraction,modelCalls:executed.modelCalls,reason:executed.decision.reason},callGovernor:governorMetrics};
 }
