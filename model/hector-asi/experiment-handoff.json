@@ -1,0 +1,31 @@
+{
+  "schemaVersion": "1.0.0",
+  "cycle": 1,
+  "status": "foundation-complete-training-not-run",
+  "capability": "reproducible-open-weight-model-training",
+  "branch": "agent/hector-asi-model-foundation-cycle-1",
+  "reusableArtifacts": [
+    "model/hector-asi/model-registry.json",
+    "model/hector-asi/train_sft.py",
+    "model/hector-asi/validate.mjs",
+    "model/hector-asi/evaluate_outputs.mjs",
+    "model/hector-asi/data/sft-seed-v1.jsonl",
+    "model/hector-asi/evals/held-out-v1.jsonl"
+  ],
+  "failedApproaches": [
+    "Do not claim improvement from the six-example seed.",
+    "Do not commit checkpoints or adapters to Git.",
+    "Do not train without pinning the base revision and recording hashes."
+  ],
+  "validationCommands": [
+    "npm run model:validate",
+    "npm test -- --run src/hector-asi-model.test.js src/hector-asi-evaluator.test.js",
+    "npm run typecheck",
+    "npm run build"
+  ],
+  "nextPriorities": [
+    "Implement a base-versus-candidate inference harness and signed promotion report.",
+    "Curate a larger licensed reasoning and tool-use dataset with contamination checks.",
+    "Acquire permitted GPU compute and execute the first QLoRA run with immutable base hashes."
+  ]
+}
