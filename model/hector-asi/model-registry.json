@@ -1,5 +1,5 @@
 {
-  "schemaVersion": "1.3.0",
+  "schemaVersion": "1.4.0",
   "project": "Hector ASI",
   "champion": null,
   "candidates": [
@@ -44,6 +44,17 @@
       "artifacts": {"adapterPath":"GitHub Actions artifact 8538668082/adapter/adapter_model.safetensors","metricsPath":"model/hector-asi/runs/qwen05-v1-20260722.json","storage":"github-actions-artifact","committedToGit":false,"adapterSha256":"a45407c1abe3d411884f16f42324c1384b5d823e201b277315baac327940a867","archiveSha256":"38835811097a9dd5ca692c68166b0d6941f7c1333b6cb38998e81361b953eda1","adapterBytes":2175168,"expiresAt":"2026-10-20T17:23:15Z"},
       "evaluation": {"baseValidationLoss":4.585448066393535,"candidateValidationLoss":3.9348132610321045,"validationLossDelta":-0.6506348053614301,"relativeValidationImprovement":0.14189121672315785,"byteIdenticalReplicas":2},
       "promotionGate": {"minimumHeldOutImprovement":0.03,"maximumSecondaryRegression":0.01,"criticalRegressionsAllowed":0,"requiresReproducibleRun":true,"requiresRollbackArtifact":true,"blockedBy":"Base is Qwen2.5 0.5B rather than the planned Qwen3 4B champion and evaluation breadth remains insufficient."}
+    },
+    {
+      "id": "hector-asi-qwen05-dpo-v1",
+      "status": "experimental-weights-generated-reproducibly",
+      "eligibleForChampion": false,
+      "baseModel": {"repository":"Qwen/Qwen2.5-0.5B-Instruct","revision":"a338b55dd21219a5f4da42bc11a9313d1a27d4cc","license":"Apache-2.0","licenseUrl":"https://huggingface.co/Qwen/Qwen2.5-0.5B-Instruct","weightsHash":null,"rationale":"CPU-trainable Qwen base used to test preference optimization as a distinct second-stage training method."},
+      "method": {"stage":"dpo","adapter":"lora","precision":"float32-cpu","targetModules":["q_proj","v_proj"],"beta":0.1},
+      "dataset": {"path":"model/hector-asi/data/qwen05-dpo-v1.jsonl","validationPath":"model/hector-asi/evals/qwen05-dpo-held-out-v1.jsonl","containsPrivateUserData":false},
+      "artifacts": {"adapterPath":"GitHub Actions artifact 8540052857/adapter/adapter_model.safetensors","metricsPath":"model/hector-asi/runs/qwen05-dpo-v1-20260722.json","storage":"github-actions-artifact","committedToGit":false,"adapterSha256":"d9031f4b4604fa01e4b0098406013aa1d49a57eb9ede666957e0bf074fafe1a7","archiveSha256":"72d9ccf33b1f93f72fd3e944e0eb141437a9d9f79cb5ef798052cfa0e0c83c25","adapterBytes":2175168,"expiresAt":"2026-10-20T18:04:08Z"},
+      "evaluation": {"basePreferenceAccuracy":0.0,"candidatePreferenceAccuracy":0.0,"baseMeanPreferenceMargin":-48.33542728424072,"candidateMeanPreferenceMargin":-33.81681823730469,"preferenceMarginDelta":14.518609046936035,"firstDpoLoss":0.6931471824645996,"finalDpoLoss":0.008361614309251308,"byteIdenticalReplicas":2},
+      "promotionGate": {"minimumHeldOutImprovement":0.03,"maximumSecondaryRegression":0.01,"criticalRegressionsAllowed":0,"requiresReproducibleRun":true,"requiresRollbackArtifact":true,"blockedBy":"Hidden preference accuracy remained zero; base is Qwen2.5 0.5B rather than Qwen3 4B and evaluation breadth is insufficient."}
     }
   ]
 }
