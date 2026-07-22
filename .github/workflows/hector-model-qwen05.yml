@@ -28,11 +28,13 @@ jobs:
           python -m pip install --upgrade pip
           python -m pip install --index-url https://download.pytorch.org/whl/cpu 'torch==2.7.1'
           python -m pip install 'transformers==4.53.2' 'peft==0.16.0' 'accelerate==1.8.1' 'safetensors==0.5.3'
-      - name: Train real Qwen 0.5B LoRA adapter
+      - name: Train two real Qwen 0.5B LoRA replicas
         run: |
-          python model/hector-asi/train_qwen05.py \
-            --output-dir artifacts/hector-asi-qwen05-v1 \
-            --epochs 1 --max-length 80 --lr 2e-4 --seed 35
+          python model/hector-asi/train_qwen05.py --output-dir artifacts/hector-asi-qwen05-v1 --epochs 1 --max-length 80 --lr 2e-4 --seed 35
+          python model/hector-asi/train_qwen05.py --output-dir artifacts/hector-asi-qwen05-v1-replica --epochs 1 --max-length 80 --lr 2e-4 --seed 35
+      - name: Prove byte-identical reproducibility
+        run: |
+          test "$(sha256sum artifacts/hector-asi-qwen05-v1/adapter/adapter_model.safetensors | cut -d' ' -f1)" = "$(sha256sum artifacts/hector-asi-qwen05-v1-replica/adapter/adapter_model.safetensors | cut -d' ' -f1)"
       - name: Verify weights and evaluation
         run: |
           python - <<'PY'
@@ -44,6 +46,7 @@ jobs:
           assert results['weightsGenerated'] is True
           assert results['parameterDeltaL2'] > 0
           assert results['adapterBytes'] > 1000000
+          assert results['candidateValidationLoss'] < results['baseValidationLoss']
           assert (root/'adapter'/'adapter_model.safetensors').is_file()
           assert (root/'SHA256SUMS').is_file()
           print(json.dumps(results,indent=2))
