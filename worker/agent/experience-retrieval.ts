@@ -23,6 +23,7 @@ export type RankedExperience={
 };
 export type ExperienceRetrieval={items:RankedExperience[];context:string;traceIds:string[]};
 
+const EMPTY_RETRIEVAL:ExperienceRetrieval={items:[],context:'',traceIds:[]};
 const STOP_WORDS=new Set(['a','al','algo','como','con','de','del','el','en','es','esta','este','hacer','hasta','la','las','lo','los','mi','para','por','que','se','sin','su','un','una','y']);
 const HIGH_RISK=/\b(?:borrar|eliminar|destruir|transferir|pagar|comprar|publicar|desplegar|produccion|secreto|token|credencial|contrasena|autenticacion|permiso|admin)\b/;
 const MEDIUM_RISK=/\b(?:github|codigo|repositorio|migracion|base de datos|archivo|correo|calendario|api|worker)\b/;
@@ -89,4 +90,8 @@ export async function retrieveSimilarExperiences(env:Bindings,input:{userId:stri
  const rows=(await env.DB.prepare("SELECT id,objective,result,skills_json,attempts,duration_ms,created_at FROM agent_experiences WHERE user_id=? AND status='completed' AND result IS NOT NULL AND length(trim(result))>=20 ORDER BY created_at DESC LIMIT ?").bind(input.userId,candidateLimit).all<ExperienceRow>()).results||[];
  const items=rankExperiences(rows,{objective:input.objective,skills:input.skills,limit:input.limit});
  return{items,context:renderExperienceContext(items),traceIds:items.map(item=>item.id)};
+}
+
+export async function safeRetrieveSimilarExperiences(env:Bindings,input:{userId:string;objective:string;skills:string[];limit?:number;candidateLimit?:number}):Promise<ExperienceRetrieval>{
+ try{return await retrieveSimilarExperiences(env,input);}catch{return EMPTY_RETRIEVAL;}
 }
