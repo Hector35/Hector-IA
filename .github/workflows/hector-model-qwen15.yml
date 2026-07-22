@@ -1,0 +1,51 @@
+name: Hector model Qwen15 training
+on:
+  pull_request:
+    branches: [main]
+    paths:
+      - 'model/hector-asi/**'
+      - '.github/workflows/hector-model-qwen15.yml'
+  workflow_dispatch:
+permissions:
+  contents: read
+jobs:
+  train-qwen15-lora:
+    runs-on: ubuntu-latest
+    timeout-minutes: 120
+    env:
+      HF_HUB_DISABLE_TELEMETRY: '1'
+      TOKENIZERS_PARALLELISM: 'false'
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+      - name: Install pinned CPU stack
+        run: |
+          python -m pip install --upgrade pip
+          python -m pip install --index-url https://download.pytorch.org/whl/cpu 'torch==2.7.1'
+          python -m pip install 'transformers==4.53.2' 'peft==0.16.0' 'accelerate==1.8.1' 'safetensors==0.5.3'
+      - name: Train real Qwen 1.5B LoRA adapter
+        run: python model/hector-asi/train_qwen15.py --output-dir artifacts/hector-asi-qwen15-v1 --epochs 1 --max-length 64 --lr 2e-4 --seed 35
+      - name: Verify weights and evaluation
+        run: |
+          python - <<'PY'
+          import json
+          from pathlib import Path
+          root=Path('artifacts/hector-asi-qwen15-v1')
+          results=json.loads((root/'metrics.json').read_text())['results']
+          assert results['weightsGenerated'] is True
+          assert results['parameterDeltaL2'] > 0
+          assert results['adapterBytes'] > 1000000
+          assert results['candidateValidationLoss'] < results['baseValidationLoss']
+          assert (root/'adapter'/'adapter_model.safetensors').is_file()
+          assert (root/'SHA256SUMS').is_file()
+          print(json.dumps(results,indent=2))
+          PY
+      - name: Upload immutable adapter
+        uses: actions/upload-artifact@v4
+        with:
+          name: hector-asi-qwen15-${{ github.run_id }}
+          path: artifacts/hector-asi-qwen15-v1
+          if-no-files-found: error
+          retention-days: 90
