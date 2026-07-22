@@ -1,0 +1,59 @@
+{
+  "schemaVersion": "1.0.0",
+  "id": "hector-asi-qwen15-v5",
+  "status": "experimental-weights-generated-reproducibly",
+  "eligibleForChampion": false,
+  "role": "broader-curriculum-specialist",
+  "baseModel": {
+    "repository": "Qwen/Qwen2.5-1.5B-Instruct",
+    "revision": "989aa7980e4cf806f80c7fef2b1adb7bc71aa306",
+    "license": "Apache-2.0",
+    "licenseUrl": "https://huggingface.co/Qwen/Qwen2.5-1.5B-Instruct"
+  },
+  "method": {
+    "stage": "sft",
+    "adapter": "lora",
+    "precision": "float32-cpu",
+    "targetModules": ["q_proj", "v_proj"],
+    "rank": 4,
+    "alpha": 8,
+    "epochs": 2,
+    "learningRate": 0.00012,
+    "seed": 35
+  },
+  "dataset": {
+    "path": "model/hector-asi/data/qwen15-sft-v5.jsonl",
+    "validationPath": "model/hector-asi/evals/qwen15-held-out-v5.jsonl",
+    "trainExamples": 24,
+    "validationExamples": 12,
+    "containsPrivateUserData": false,
+    "deduplicated": true,
+    "splitContaminationChecked": true
+  },
+  "artifacts": {
+    "adapterPath": "GitHub Actions artifact 8544725572/adapter/adapter_model.safetensors",
+    "metricsPath": "model/hector-asi/runs/qwen15-v5-20260722.json",
+    "storage": "github-actions-artifact",
+    "committedToGit": false,
+    "adapterSha256": "985bcdad75074c1be10b907511240f17687438e54143b04f526700e255187d1c",
+    "archiveSha256": "dbba50fe68cf740352485d22d81d732e4f6fe800950fc89eafb61d1fd81d6d39",
+    "adapterBytes": 2193720,
+    "expiresAt": "2026-10-20T20:43:52Z"
+  },
+  "evaluation": {
+    "baseValidationLoss": 4.1809311509132385,
+    "candidateValidationLoss": 3.2841206192970276,
+    "validationLossDelta": -0.8968105316162109,
+    "relativeValidationImprovement": 0.2145001912840208,
+    "byteIdenticalReplicas": 2,
+    "parameterDeltaL2": 2.3860321044921875
+  },
+  "promotionGate": {
+    "minimumHeldOutImprovement": 0.03,
+    "maximumSecondaryRegression": 0.01,
+    "criticalRegressionsAllowed": 0,
+    "requiresReproducibleRun": true,
+    "requiresRollbackArtifact": true,
+    "blockedBy": "Base is Qwen2.5-1.5B rather than Qwen3-4B; twelve hidden loss cases do not establish behavioral accuracy, adversarial safety, calibration or broad cross-domain regressions."
+  }
+}
