@@ -1,0 +1,8 @@
+.hxFileSearch{display:grid;grid-template-columns:1fr auto;gap:6px 12px;align-items:end;margin:0 0 14px;padding:12px 14px;border:1px solid rgba(255,255,255,.08);border-radius:16px;background:rgba(255,255,255,.035)}
+.hxFileSearch>span{grid-column:1/-1;font-size:12px;font-weight:700;color:var(--cx-muted,#9ca3af)}
+.hxFileSearch input{min-width:0;height:44px;border:1px solid rgba(255,255,255,.1);border-radius:12px;background:rgba(7,10,18,.72);color:inherit;padding:0 13px;font:inherit}
+.hxFileSearch input:focus{outline:2px solid rgba(108,99,255,.7);outline-offset:2px}
+.hxFileSearch small{white-space:nowrap;color:var(--cx-muted,#9ca3af);font-size:12px;padding-bottom:13px}
+.hxFileSearchEmpty{padding:28px 16px;text-align:center;color:var(--cx-muted,#9ca3af)}
+.cxFileList>a[hidden]{display:none!important}
+@media(max-width:420px){.hxFileSearch{grid-template-columns:1fr}.hxFileSearch>span{grid-column:auto}.hxFileSearch small{padding:0}.hxFileSearch input{width:100%}}
