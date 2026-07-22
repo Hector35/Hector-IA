@@ -16,9 +16,9 @@ describe('call governor free-first',()=>{
   expect(plan.reuse.kind).toBe('assist');
   expect(plan.maxAdvancedCalls).toBe(1);
  });
- it('resuelve clasificación simple con reglas sin API',()=>{
+ it('reserva clasificación semántica al free tier cuando está permitido',()=>{
   const plan=governInference({prompt:'Clasifica esta solicitud por tipo',candidates:[],allowCloudflareAi:true});
-  expect(plan).toMatchObject({capability:'classification',inferenceTier:'none',maxAdvancedCalls:0});
+  expect(plan).toMatchObject({capability:'classification',inferenceTier:'cloudflare-free',maxAdvancedCalls:0});
  });
  it('bloquea alto riesgo sin gastar inferencia',()=>{
   const plan=governInference({prompt:'Elimina y despliega el proyecto',candidates:[known]});
