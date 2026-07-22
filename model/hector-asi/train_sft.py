@@ -4,9 +4,10 @@ import argparse
 import json
 from pathlib import Path
 
+import torch
 from datasets import load_dataset
 from peft import LoraConfig
-from transformers import BitsAndBytesConfig
+from transformers import AutoModelForCausalLM, AutoTokenizer, BitsAndBytesConfig
 from trl import SFTConfig, SFTTrainer
 
 DEFAULT_MODEL = "Qwen/Qwen3-4B-Instruct-2507"
@@ -43,9 +44,17 @@ def main() -> None:
     quantization = BitsAndBytesConfig(
         load_in_4bit=True,
         bnb_4bit_quant_type="nf4",
-        bnb_4bit_compute_dtype="bfloat16",
+        bnb_4bit_compute_dtype=torch.bfloat16,
         bnb_4bit_use_double_quant=True,
     )
+    model = AutoModelForCausalLM.from_pretrained(
+        args.model,
+        revision=args.revision,
+        quantization_config=quantization,
+        device_map="auto",
+        torch_dtype=torch.bfloat16,
+    )
+    tokenizer = AutoTokenizer.from_pretrained(args.model, revision=args.revision, use_fast=True)
     peft = LoraConfig(
         r=32,
         lora_alpha=64,
@@ -71,11 +80,11 @@ def main() -> None:
         report_to="none",
     )
     trainer = SFTTrainer(
-        model=args.model,
+        model=model,
         args=config,
         train_dataset=dataset,
+        processing_class=tokenizer,
         peft_config=peft,
-        model_init_kwargs={"revision": args.revision, "quantization_config": quantization, "device_map": "auto"},
     )
     trainer.train()
     trainer.save_model(args.output_dir)
