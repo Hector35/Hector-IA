@@ -42,6 +42,7 @@ describe('Hector ASI adversarial visible-growth contract',()=>{
     expect(compact).toContain('.eaOrganism{width:132px}');
     expect(compact).toContain('.eaVisibleGrowth{margin-top:7px;gap:5px}');
     expect(compact).toContain('.eaUnlockCard small,.eaNextUnlock small{display:none}');
+    expect(compact).not.toMatch(/\.eaHome\{[^}]*min-height:\s*(?:7\d\d|8\d\d|9\d\d|\d{4,})px/);
   });
 
   it('preserves accessible primary touch targets on the smallest supported view',()=>{
