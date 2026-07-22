@@ -2,7 +2,7 @@ import {describe,expect,it} from 'vitest';
 import {applyBudgetQualityProtection,summarizeBenchmarkPolicy,type BenchmarkAggregateRow} from './benchmark-promotion';
 import type {BudgetQualityPolicy} from './budget-quality-breaker';
 const row=(winner:'baseline'|'adaptive'|'tie',baseline=10,adaptive=14,baselineCost=.01,adaptiveCost=.03):BenchmarkAggregateRow=>({winner,baseline_score:baseline,adaptive_score:adaptive,baseline_cost_usd:baselineCost,adaptive_cost_usd:adaptiveCost});
-const quality=(state:BudgetQualityPolicy['state']):BudgetQualityPolicy=>({state,sampleCount:6,acceptedCount:3,negativeCount:3,correctionCount:1,acceptanceRate:.5,negativeRate:.5,correctionRate:1/6,lastDegradedAt:'2026-07-21T22:00:00.000Z',reason:'calidad fuera de umbral'});
+const quality=(state:BudgetQualityPolicy['state']):BudgetQualityPolicy=>({state,sampleCount:6,acceptedCount:3,negativeCount:3,correctionCount:1,acceptanceRate:.5,negativeRate:.5,correctionRate:1/6,lastDegradedAt:'2026-07-21T22:00:00.000Z',nextProbeAt:state==='suspended'?'2026-07-22T22:00:00.000Z':null,triggeredBy:['acceptance','negative'],reason:'calidad fuera de umbral'});
 
 describe('summarizeBenchmarkPolicy',()=>{
  it('permanece observando con muestras insuficientes',()=>{const policy=summarizeBenchmarkPolicy([row('adaptive'),row('adaptive')]);expect(policy.status).toBe('observing');expect(policy.strategy).toBe('baseline');});
