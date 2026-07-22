@@ -1,0 +1,39 @@
+{
+  "verifiedAt": "2026-07-22",
+  "policy": [
+    "deterministic",
+    "cache-and-d1",
+    "browser-local",
+    "workers-ai-free-tier",
+    "economic-external",
+    "advanced-external"
+  ],
+  "selectedModels": {
+    "generation": "@cf/zai-org/glm-4.7-flash",
+    "embedding": "@cf/google/embeddinggemma-300m",
+    "reranker": "@cf/baai/bge-reranker-base"
+  },
+  "activeBindings": ["DB", "FILES", "AI"],
+  "readyWithoutNewPaidService": [
+    "deterministic-rules",
+    "d1-hybrid-retrieval",
+    "workers-cache",
+    "workers-ai-embeddings",
+    "workers-ai-reranker",
+    "workers-ai-fast-generation",
+    "github-actions-public-runner",
+    "r2-object-storage"
+  ],
+  "requiresBindingOrClientWork": [
+    "vectorize-semantic-index",
+    "cloudflare-queues",
+    "cloudflare-browser-rendering",
+    "browser-wasm-inference",
+    "browser-webgpu-inference"
+  ],
+  "rejectedDefaults": [
+    "@cf/meta/llama-3.1-8b-instruct",
+    "@hf/meta-llama/meta-llama-3-8b-instruct",
+    "@cf/meta/llama-3-8b-instruct"
+  ]
+}
