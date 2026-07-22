@@ -18,6 +18,9 @@ jobs:
     env:
       HF_HUB_DISABLE_TELEMETRY: "1"
       TOKENIZERS_PARALLELISM: "false"
+      PYTHONHASHSEED: "35"
+      OMP_NUM_THREADS: "1"
+      MKL_NUM_THREADS: "1"
     steps:
       - name: Checkout candidate branch
         uses: actions/checkout@v4
@@ -33,18 +36,50 @@ jobs:
           python -m pip install --index-url https://download.pytorch.org/whl/cpu "torch==2.7.1"
           python -m pip install "transformers==4.53.2" "peft==0.16.0" "accelerate==1.8.1" "safetensors==0.5.3"
 
-      - name: Train real LoRA adapter
+      - name: Train two real LoRA replicas
         run: |
-          python model/hector-asi/train_cpu_smoke.py \
-            --model openai-community/gpt2 \
-            --revision 607a30d783dfa663caf39e06633721c8d4cfcd7e \
-            --train-file model/hector-asi/data/sft-seed-v1.jsonl \
-            --validation-file model/hector-asi/evals/cpu-smoke-held-out-v1.jsonl \
-            --output-dir artifacts/hector-asi-cpu-smoke-v1 \
-            --epochs 2 \
-            --max-length 128 \
-            --learning-rate 5e-4 \
-            --seed 35
+          for replica in a b; do
+            taskset -c 0 python model/hector-asi/train_cpu_smoke.py \
+              --model openai-community/gpt2 \
+              --revision 607a30d783dfa663caf39e06633721c8d4cfcd7e \
+              --train-file model/hector-asi/data/sft-seed-v1.jsonl \
+              --validation-file model/hector-asi/evals/cpu-smoke-held-out-v1.jsonl \
+              --output-dir "artifacts/hector-asi-cpu-smoke-v1-${replica}" \
+              --epochs 2 \
+              --max-length 128 \
+              --learning-rate 5e-4 \
+              --seed 35
+          done
+
+      - name: Prove same-run reproducibility
+        run: |
+          python - <<'PY'
+          import hashlib
+          import json
+          import shutil
+          from pathlib import Path
+
+          def digest(path: Path) -> str:
+              return hashlib.sha256(path.read_bytes()).hexdigest()
+
+          root = Path("artifacts")
+          a = root / "hector-asi-cpu-smoke-v1-a"
+          b = root / "hector-asi-cpu-smoke-v1-b"
+          a_hash = digest(a / "adapter" / "adapter_model.safetensors")
+          b_hash = digest(b / "adapter" / "adapter_model.safetensors")
+          if a_hash != b_hash:
+              raise SystemExit(f"Adapter reproduction mismatch: {a_hash} != {b_hash}")
+          final = root / "hector-asi-cpu-smoke-v1"
+          shutil.copytree(a, final)
+          (final / "reproduction.json").write_text(json.dumps({
+              "schemaVersion": "1.0.0",
+              "replicas": 2,
+              "sameRunner": True,
+              "adapterSha256": a_hash,
+              "identical": True
+          }, indent=2, sort_keys=True) + "\n")
+          print(a_hash)
+          PY
 
       - name: Verify generated weights and hashes
         run: |
@@ -54,12 +89,14 @@ jobs:
 
           root = Path("artifacts/hector-asi-cpu-smoke-v1")
           metrics = json.loads((root / "metrics.json").read_text())
+          reproduction = json.loads((root / "reproduction.json").read_text())
           assert metrics["results"]["weightsGenerated"] is True
           assert metrics["results"]["parameterDeltaL2"] > 0
+          assert reproduction["identical"] is True
           assert (root / "adapter" / "adapter_model.safetensors").is_file()
           assert (root / "SHA256SUMS").is_file()
           assert (root / "run-manifest.json").is_file()
-          print(json.dumps(metrics["results"], indent=2))
+          print(json.dumps({"results": metrics["results"], "reproduction": reproduction}, indent=2))
           PY
 
       - name: Upload immutable training artifact
