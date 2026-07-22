@@ -1,0 +1,50 @@
+/* Adversarial compact-viewport correction.
+   Keeps the organism, real unlock, current abilities and next evolution visible
+   without opening technical details on short iPhone viewports. */
+@media (max-width:420px) and (max-height:700px){
+  .eaHome{padding:8px 0 6px}
+  .eaCelebration{margin-bottom:7px;padding:7px 9px;border-radius:14px;gap:8px}
+  .eaCelebration>svg{width:17px;height:17px}
+  .eaCelebration small{font-size:7px}
+  .eaCelebration strong{font-size:11px}
+
+  .eaOrganism{width:132px}
+  .eaCore{width:48px;height:48px;border-radius:17px}
+  .eaCore span{font-size:23px}
+  .eaCore i{right:4px;bottom:4px;width:7px;height:7px}
+  .eaCore:before{inset:-9px}
+  .eaCore:after{inset:-17px}
+  .eaNode{width:34px;height:34px;border-radius:11px}
+  .eaNode svg{width:12px;height:12px}
+  .eaNode small{display:none}
+  .eaParticle{width:4px;height:4px}
+
+  .eaIdentity{margin-top:2px}
+  .eaIdentity>span{font-size:7px}
+  .eaIdentity h1{font-size:27px;margin-top:3px}
+  .eaIdentity p{font-size:9px;margin-top:3px}
+
+  .eaVisibleGrowth{margin-top:7px;gap:5px}
+  .eaUnlockCard,.eaNowCan,.eaNextUnlock{border-radius:14px;box-shadow:none}
+  .eaUnlockCard{grid-template-columns:30px minmax(0,1fr);gap:8px;padding:7px 9px}
+  .eaUnlockMark{width:30px;height:30px;border-radius:10px;box-shadow:none}
+  .eaUnlockMark svg{width:15px;height:15px}
+  .eaUnlockCard>div:last-child,.eaNextUnlock>div{gap:2px}
+  .eaUnlockCard span,.eaNextUnlock span,.eaNowCan header span{font-size:7px}
+  .eaUnlockCard strong,.eaNextUnlock strong{font-size:11px}
+  .eaUnlockCard small,.eaNextUnlock small{display:none}
+
+  .eaNowCan{padding:7px 9px}
+  .eaNowCan header{margin-bottom:5px}
+  .eaNowCan header strong{font-size:8px}
+  .eaAbilityChips{gap:4px}
+  .eaAbilityChip{min-height:24px;padding:0 7px;font-size:8px;gap:4px}
+  .eaAbilityChip svg{width:10px;height:10px}
+
+  .eaNextUnlock{grid-template-columns:24px minmax(0,1fr);gap:7px;padding:7px 9px}
+  .eaNextUnlock>svg{width:16px;height:16px}
+
+  .eaPrimaryActions{margin-top:7px;gap:6px}
+  .eaPrimaryActions button{min-height:44px;border-radius:14px;padding:0 9px;font-size:10px}
+  .eaPrimaryActions svg{width:16px;height:16px}
+}
