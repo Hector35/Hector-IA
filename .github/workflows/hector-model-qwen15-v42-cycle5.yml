@@ -1,0 +1,71 @@
+name: Hector model Qwen15 v42 cycle 5
+on:
+  pull_request:
+    branches: [main]
+    paths:
+      - '.github/workflows/hector-model-qwen15-v42-cycle5.yml'
+  workflow_dispatch:
+permissions:
+  contents: read
+jobs:
+  train-qwen15-v42:
+    runs-on: ubuntu-latest
+    timeout-minutes: 360
+    env:
+      HF_HUB_DISABLE_TELEMETRY: '1'
+      TOKENIZERS_PARALLELISM: 'false'
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+      - name: Install pinned CPU stack
+        run: |
+          python -m pip install --upgrade pip
+          python -m pip install --index-url https://download.pytorch.org/whl/cpu 'torch==2.7.1'
+          python -m pip install 'transformers==4.53.2' 'peft==0.16.0' 'accelerate==1.8.1' 'safetensors==0.5.3'
+      - name: Train real rank-32 LoRA candidate
+        run: |
+          python model/hector-asi/train_qwen15_v10.py \
+            --train-file model/hector-asi/data/qwen15-sft-v5.jsonl \
+            --validation-file model/hector-asi/evals/qwen15-held-out-v5.jsonl \
+            --experiment-id hector-asi-qwen15-v42-cycle5 \
+            --output-dir artifacts/hector-asi-qwen15-v42-cycle5 \
+            --epochs 2 --max-length 112 --lr 2e-5 --seed 505
+      - name: Verify weights and evaluate conservative gate
+        run: |
+          python - <<'PY'
+          import hashlib, json
+          from pathlib import Path
+          root=Path('artifacts/hector-asi-qwen15-v42-cycle5')
+          metrics=json.loads((root/'metrics.json').read_text())
+          weights=root/'adapter'/'adapter_model.safetensors'
+          digest=hashlib.sha256(weights.read_bytes()).hexdigest()
+          x=metrics['results']
+          evidence={
+            'experimentId':'hector-asi-qwen15-v42-cycle5',
+            'adapterSha256':digest,
+            'adapterBytes':weights.stat().st_size,
+            'weightsGenerated':x['weightsGenerated'],
+            'parameterDeltaL2':x['parameterDeltaL2'],
+            'baseValidationLoss':x['baseValidationLoss'],
+            'candidateValidationLoss':x['candidateValidationLoss'],
+            'relativeValidationImprovement':x['relativeValidationImprovement'],
+            'championHiddenTestLoss':1.028577556212743,
+            'eligibleForPromotion':x['candidateValidationLoss'] < 1.028577556212743,
+            'decision':'promote-only-after-separate-hidden-behavioral-safety-evaluation'
+          }
+          (root/'cycle5-gate.json').write_text(json.dumps(evidence,indent=2,sort_keys=True)+'\n')
+          print(json.dumps(evidence,indent=2,sort_keys=True))
+          assert x['weightsGenerated'] and x['parameterDeltaL2'] > 0
+          assert weights.stat().st_size > 30000000
+          assert x['candidateValidationLoss'] < x['baseValidationLoss']
+          PY
+      - name: Upload immutable adapter and evidence
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: hector-asi-qwen15-v42-cycle5-${{ github.run_id }}
+          path: artifacts/hector-asi-qwen15-v42-cycle5
+          if-no-files-found: error
+          retention-days: 90
