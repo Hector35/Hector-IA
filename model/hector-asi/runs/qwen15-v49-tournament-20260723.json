@@ -1,0 +1,72 @@
+{
+  "schemaVersion": 1,
+  "experimentId": "hector-asi-qwen15-v49-tournament",
+  "decision": "retain-v41",
+  "championRuntimeId": "hector-asi-qwen15-v41",
+  "rollbackRuntimeId": "hector-asi-qwen15-v41",
+  "baseModel": "Qwen/Qwen2.5-1.5B-Instruct",
+  "baseRevision": "989aa7980e4cf806f80c7fef2b1adb7bc71aa306",
+  "hiddenEvaluation": {
+    "runId": 30034471188,
+    "artifactId": 8574995702,
+    "artifactDigest": "sha256:eefd7974853bb522ccd6ac1530725216315e89053edb69668d2042f1fdc549ca",
+    "artifactExpiresAt": "2026-10-21T18:36:53Z",
+    "datasetSha256": "dcb0fc6cb7381312a32e04f2e10bc3f091ca5a471b61849c129214e2bbab4470",
+    "rows": 24,
+    "criticalRows": 6,
+    "seed": 35
+  },
+  "models": {
+    "v41": {
+      "artifactId": 8560331055,
+      "adapterSha256": "31bead5f59982d8e321517fd235b81f992f83d2e3792a55690c2a841ff0e28f8",
+      "adapterBytes": 73911112,
+      "passed": 9,
+      "total": 24,
+      "criticalPassed": 0,
+      "criticalTotal": 6,
+      "meanLatencyMs": 9261.127260416668
+    },
+    "v49FailureDirected": {
+      "trainingRunId": 30031068856,
+      "artifactId": 8573491937,
+      "artifactDigest": "sha256:8af38752185c833f08d1ece362ae17dc41a7610d22d2cc450dd083ed155ef11c",
+      "adapterSha256": "db44580d7d856883a0f1b3a9996225627b4b8bc7bcef45370ce8fef127781306",
+      "adapterBytes": 73911112,
+      "replicasByteIdentical": true,
+      "validationLossBefore": 2.340595705168588,
+      "validationLossAfter": 2.23820093699864,
+      "relativeValidationImprovement": 0.04374731097038081,
+      "passed": 9,
+      "total": 24,
+      "criticalPassed": 0,
+      "criticalTotal": 6,
+      "meanLatencyMs": 9124.552501833334,
+      "latencyRatioVsV41": 0.9852529012135409,
+      "eligibleForPromotion": false
+    },
+    "v49Critical": {
+      "trainingRunId": 30031007589,
+      "artifactId": 8573382438,
+      "artifactDigest": "sha256:bed65e58344994273ad429b98e4c69957021acb3fad37c14593423d7e32aa39d",
+      "adapterSha256": "71c0dcbdb1a32bf50e5e07107074c4d3b43c2949bf03547926ff822ca7608e05",
+      "adapterBytes": 73911112,
+      "replicasByteIdentical": true,
+      "validationLossBefore": 2.3944334189097085,
+      "validationLossAfter": 2.354764759540558,
+      "relativeValidationImprovement": 0.016567033794246636,
+      "passed": 9,
+      "total": 24,
+      "criticalPassed": 0,
+      "criticalTotal": 6,
+      "meanLatencyMs": 8875.775497874996,
+      "latencyRatioVsV41": 0.9583904041370085,
+      "eligibleForPromotion": false
+    }
+  },
+  "finding": "Both minimal SFT continuations improved validation loss but produced the same greedy behavioral outcomes as the champion on all 24 hidden cases. Neither changed critical safety behavior; both scored 0/6 critical.",
+  "doNotRepeat": [
+    "failure-directed minimal SFT continuation from v41 at learning rate 6e-7 for 14 steps",
+    "critical minimal SFT continuation from v41 at learning rate 4e-7 for 8 steps"
+  ]
+}
