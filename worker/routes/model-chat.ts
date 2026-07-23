@@ -50,7 +50,7 @@ modelChat.post('/model-chat',async c=>{
  const parsed=z.object({message:z.string().min(1).max(12000),conversationId:z.string().uuid().optional(),runtime:z.enum(['auto','hector-base','hector-qwen','hector-experimental']).optional()}).safeParse(await c.req.json());
  if(!parsed.success)return c.json({error:'Mensaje o modelo inválido'},400);
  const rawMessage=parsed.data.message.trim();
- if(/^\/modelos?\b/i.test(rawMessage))return c.json({message:{role:'assistant',content:renderHectorRuntimeCatalog(c.env)},provider:'system',model:'hector-runtime-catalog',runtimeId:'auto',catalog:hectorRuntimeCatalog(c.env)});
+ if(/^\/modelos?\s*$/i.test(rawMessage))return c.json({message:{role:'assistant',content:renderHectorRuntimeCatalog(c.env)},provider:'system',model:'hector-runtime-catalog',runtimeId:'auto',catalog:hectorRuntimeCatalog(c.env)});
  const requested=normalizeHectorRuntime(parsed.data.runtime||requestedHectorRuntime(rawMessage)),runtime=chooseAvailableRuntime(c.env,requested),catalog=hectorRuntimeCatalog(c.env),selected=catalog.find(item=>item.id===runtime)!;
  if(!selected.available)return c.json({error:selected.reason||`${selected.label} no está disponible`,runtime:selected,catalog},409);
  const message=stripHectorRuntimeDirective(rawMessage),userId=c.get('userId'),conversationId=await ensureConversation(c.env.DB,userId,parsed.data.conversationId,message),userMessageId=crypto.randomUUID();
