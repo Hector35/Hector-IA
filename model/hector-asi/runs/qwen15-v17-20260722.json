@@ -1,0 +1,82 @@
+{
+  "schemaVersion": "1.0.0",
+  "experimentId": "hector-asi-qwen15-v17",
+  "status": "experimental-weights-generated-reproducibly-rejected",
+  "decision": "retain-negative-evidence",
+  "eligibleForChampion": false,
+  "baseModel": {
+    "repository": "Qwen/Qwen2.5-1.5B-Instruct",
+    "revision": "989aa7980e4cf806f80c7fef2b1adb7bc71aa306",
+    "license": "Apache-2.0"
+  },
+  "method": {
+    "stage": "sft",
+    "adapter": "dora",
+    "epochs": 2,
+    "learningRate": 0.00004,
+    "weightDecay": 0.01,
+    "rank": 16,
+    "alpha": 32,
+    "dropout": 0.05,
+    "targetModules": ["q_proj", "k_proj", "v_proj", "o_proj"],
+    "seed": 35
+  },
+  "dataset": {
+    "trainExamples": 40,
+    "validationExamples": 20,
+    "containsPrivateUserData": false,
+    "trainPaths": [
+      "model/hector-asi/data/qwen15-sft-v5.jsonl",
+      "model/hector-asi/data/qwen15-sft-v6-supplement.jsonl"
+    ],
+    "validationPaths": [
+      "model/hector-asi/evals/qwen15-held-out-v5.jsonl",
+      "model/hector-asi/evals/qwen15-held-out-v6-supplement.jsonl"
+    ]
+  },
+  "training": {
+    "weightsGenerated": true,
+    "byteIdenticalReplicas": 2,
+    "runtimeSeconds": 1092.2932963371277,
+    "hardware": "GitHub Actions ubuntu-latest CPU",
+    "python": "3.11.15",
+    "torch": "2.7.1+cpu",
+    "steps": 80,
+    "trainableParameters": 4458496,
+    "parameterDeltaL2": 3.050063133239746
+  },
+  "evaluation": {
+    "baseValidationLoss": 4.092009758949279,
+    "candidateValidationLoss": 2.3736926674842835,
+    "relativeValidationImprovement": 0.41992008638469486,
+    "comparableLeader": {
+      "experimentId": "hector-asi-qwen15-v15",
+      "candidateValidationLoss": 2.113117218017578
+    },
+    "lossRegressionVsLeader": 0.2605754494667053,
+    "verdict": "DoRA improved strongly over the frozen base but regressed against the comparable all-linear LoRA leader; do not promote."
+  },
+  "artifact": {
+    "provider": "github-actions",
+    "runId": 29975265796,
+    "artifactId": 8551741336,
+    "name": "hector-asi-qwen15-v17-29975265796",
+    "adapterPath": "adapter/adapter_model.safetensors",
+    "adapterBytes": 17879296,
+    "adapterSha256": "824503912d627d51ca7825af0cfc6f2582f0cbbbfd68655328a75eb80cd80f5f",
+    "archiveDigest": "sha256:1dd7648738b4b6ffe0f458aa0ae95f16d79a95a23c9f8c0ab8fe1cb7413d9c84",
+    "expiresAt": "2026-10-21T02:46:44Z",
+    "committedToGit": false
+  },
+  "failureAnalysis": {
+    "workflowTrainingStep": "success",
+    "reproducibility": "success",
+    "gateFailure": "adapter-size assertion expected >30000000 bytes, but DoRA rank-16 adapter was 17879296 bytes",
+    "technicalConclusion": "The size threshold was inappropriate for a rank-16 DoRA adapter; however, removing it would not change the rejection because held-out loss remained worse than v15."
+  },
+  "rollback": {
+    "action": "keep-current-leader",
+    "baseRevisionPinned": true,
+    "weightsStoredOutsideGit": true
+  }
+}
