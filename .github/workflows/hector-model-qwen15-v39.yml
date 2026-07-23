@@ -25,6 +25,24 @@ jobs:
       - uses: actions/setup-python@v5
         with:
           python-version: '3.11'
+      - name: Compile trainer and validate JSONL structure
+        run: |
+          python -m py_compile model/hector-asi/train_qwen15_v39.py
+          python - <<'PY'
+          import json
+          from pathlib import Path
+          paths=[
+            'model/hector-asi/data/qwen15-sft-v5.jsonl',
+            'model/hector-asi/data/qwen15-sft-v6-supplement.jsonl',
+            'model/hector-asi/evals/qwen15-validation-v39.jsonl',
+            'model/hector-asi/evals/qwen15-held-out-v5.jsonl',
+            'model/hector-asi/evals/qwen15-held-out-v6-supplement.jsonl',
+          ]
+          for path in paths:
+            rows=[json.loads(line) for line in Path(path).read_text().splitlines() if line.strip()]
+            assert rows and all(row.get('verification',{}).get('verified') is True for row in rows)
+          print('trainer and data structure: OK')
+          PY
       - name: Install pinned CPU stack
         run: |
           python -m pip install --upgrade pip
