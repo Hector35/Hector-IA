@@ -10,10 +10,7 @@ import torch
 from peft import PeftModel
 from transformers import AutoModelForCausalLM, AutoTokenizer
 
-BASE_MODEL = "Qwen/Qwen2.5-1.5B-Instruct"
-BASE_REVISION = "989aa7980e4cf806f80c7fef2b1adb7bc71aa306"
-RUNTIME_ID = "hector-asi-qwen15-v10"
-ADAPTER_SHA256 = "e1170e7a2a4e2fb19ce66744720e178955ce02fea07531f1b187366c7fa8c502"
+MANIFEST_PATH = Path(os.getenv("CHAT_CHAMPION_MANIFEST", "model/hector-asi/registry/chat-champion.json"))
 
 
 def sha256(path: Path) -> str:
@@ -24,21 +21,31 @@ def sha256(path: Path) -> str:
     return digest.hexdigest()
 
 
+def load_manifest() -> dict:
+    manifest = json.loads(MANIFEST_PATH.read_text(encoding="utf-8"))
+    if manifest.get("schemaVersion") != 1 or manifest.get("promotionState") != "active":
+        raise RuntimeError("El manifiesto del campeón no está activo")
+    return manifest
+
+
 def main() -> None:
+    manifest = load_manifest()
     adapter_dir = Path(os.getenv("ADAPTER_DIR", "/tmp/hector-adapter/adapter"))
     output_path = Path(os.getenv("SMOKE_OUTPUT", "/tmp/hector-custom-model-smoke.json"))
     adapter_file = adapter_dir / "adapter_model.safetensors"
     actual_hash = sha256(adapter_file)
-    if actual_hash != ADAPTER_SHA256:
+    if actual_hash != manifest["adapterSha256"]:
         raise RuntimeError(f"Hash del adaptador inválido: {actual_hash}")
+    if adapter_file.stat().st_size != int(manifest["adapterBytes"]):
+        raise RuntimeError("Tamaño del adaptador inválido")
 
     torch.set_num_threads(max(1, min(4, os.cpu_count() or 1)))
     started = time.time()
-    tokenizer = AutoTokenizer.from_pretrained(BASE_MODEL, revision=BASE_REVISION, use_fast=True)
+    tokenizer = AutoTokenizer.from_pretrained(manifest["baseModel"], revision=manifest["baseRevision"], use_fast=True)
     tokenizer.pad_token = tokenizer.pad_token or tokenizer.eos_token
     base = AutoModelForCausalLM.from_pretrained(
-        BASE_MODEL,
-        revision=BASE_REVISION,
+        manifest["baseModel"],
+        revision=manifest["baseRevision"],
         torch_dtype=torch.float32,
         low_cpu_mem_usage=True,
         attn_implementation="eager",
@@ -75,11 +82,13 @@ def main() -> None:
 
     evidence = {
         "ok": True,
-        "runtimeId": RUNTIME_ID,
-        "baseModel": BASE_MODEL,
-        "baseRevision": BASE_REVISION,
+        "runtimeId": manifest["runtimeId"],
+        "baseModel": manifest["baseModel"],
+        "baseRevision": manifest["baseRevision"],
+        "artifactId": int(manifest["artifactId"]),
         "adapterSha256": actual_hash,
         "adapterBytes": adapter_file.stat().st_size,
+        "sourceRunId": int(manifest["sourceRunId"]),
         "inputTokens": int(encoded["input_ids"].numel()),
         "outputTokens": int(generated.numel()),
         "latencyMs": round((time.time() - started) * 1000),
