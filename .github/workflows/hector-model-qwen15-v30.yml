@@ -24,13 +24,21 @@ jobs:
       - uses: actions/setup-python@v5
         with:
           python-version: '3.11'
-      - name: Provision bounded swap for CPU training
+      - name: Attempt bounded swap when runner permits it
+        shell: bash
         run: |
+          set +e
           sudo fallocate -l 8G /swapfile
           sudo chmod 600 /swapfile
           sudo mkswap /swapfile
           sudo swapon /swapfile
+          SWAP_STATUS=$?
+          if [ "$SWAP_STATUS" -ne 0 ]; then
+            echo "Hosted runner does not permit swapon; continuing with the memory-safe trainer."
+            sudo rm -f /swapfile
+          fi
           free -h
+          exit 0
       - name: Install pinned CPU stack
         run: |
           python -m pip install --upgrade pip
