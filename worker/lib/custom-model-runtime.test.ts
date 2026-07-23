@@ -33,16 +33,16 @@ describe('Hector model runtime selection',()=>{
   expect(stripHectorRuntimeDirective('Usa Héctor Base: responde breve')).toBe('responde breve');
  });
 
- it('reports trained custom weights honestly when no runtime exists',()=>{
+ it('keeps custom weights available through the scheduled free queue without secrets',()=>{
   const custom=hectorRuntimeCatalog(env()).find(item=>item.id==='hector-experimental');
-  expect(custom).toMatchObject({available:false,customWeights:true,status:'trained-offline',model:'hector-asi-qwen15-v10'});
-  expect(custom?.reason).toContain('falta un runtime');
+  expect(custom).toMatchObject({available:true,customWeights:true,status:'queued',model:'hector-asi-qwen15-v10'});
+  expect(custom?.reason).toContain('cada cinco minutos');
  });
 
- it('enables queued custom inference with an authorized GitHub runner token',()=>{
+ it('uses immediate dispatch when an authorized GitHub runner token exists',()=>{
   const custom=hectorRuntimeCatalog(env({GITHUB_RUNNER_TOKEN:'github-token'})).find(item=>item.id==='hector-experimental');
   expect(custom).toMatchObject({available:true,customWeights:true,status:'queued'});
-  expect(custom?.reason).toContain('GitHub Actions');
+  expect(custom?.reason).toContain('despacho inmediato');
  });
 
  it('prefers a dedicated endpoint when endpoint and token are configured',()=>{
