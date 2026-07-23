@@ -1,0 +1,22 @@
+{
+  "schemaVersion": "1.0.0",
+  "updatedAt": "2026-07-23T00:09:00Z",
+  "globalChampion": null,
+  "experimentalLeader": {
+    "id": "hector-asi-qwen15-v10",
+    "baseModel": "Qwen/Qwen2.5-1.5B-Instruct",
+    "stage": "sft",
+    "adapter": "lora",
+    "artifactId": "8548489661",
+    "adapterSha256": "e1170e7a2a4e2fb19ce66744720e178955ce02fea07531f1b187366c7fa8c502",
+    "candidateValidationLoss": 2.2110140224297843,
+    "relativeValidationImprovement": 0.4711694990979053,
+    "comparisonScope": "same frozen base and identical 24-train/12-held-out split as Qwen15-v8",
+    "eligibleForGlobalChampion": false,
+    "blockedBy": [
+      "planned champion base is Qwen3-4B",
+      "only twelve held-out examples",
+      "no broad sealed behavioral, safety, calibration, latency or cost evaluation"
+    ]
+  }
+}
