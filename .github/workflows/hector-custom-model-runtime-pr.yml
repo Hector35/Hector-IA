@@ -41,9 +41,12 @@ jobs:
           workflow=Path('.github/workflows/hector-custom-model-chat.yml').read_text()
           route=Path('worker/routes/model-chat.ts').read_text()
           oidc=Path('worker/lib/github-actions-oidc.ts').read_text()
-          for source in (app, action, route):
+          for source in (app, route):
               assert 'Qwen/Qwen2.5-1.5B-Instruct' in source
               assert '989aa7980e4cf806f80c7fef2b1adb7bc71aa306' in source
+          assert 'job["baseModel"]' in action
+          assert 'job["baseRevision"]' in action
+          assert 'job["adapterSha256"]' in action
           assert '/v1/chat/completions' in app
           assert 'PeftModel.from_pretrained' in app and 'PeftModel.from_pretrained' in action
           assert 'torch==2.7.1' in docker and 'torch==2.7.1' in workflow
@@ -51,8 +54,10 @@ jobs:
           for source in (deploy, workflow, route):
               assert 'e1170e7a2a4e2fb19ce66744720e178955ce02fea07531f1b187366c7fa8c502' in source
           assert 'id-token: write' in workflow
+          assert "cron: '*/5 * * * *'" in workflow
+          assert '/model-jobs/pending' in route
           assert 'hector-asi-model-inference' in oidc
-          assert 'workflow_dispatch' in oidc
+          assert 'workflow_dispatch' in oidc and 'schedule' in oidc
           assert 'GITHUB_RUNNER_TOKEN' in route
           print('runtime bundle and queued inference contract: OK')
           PY
