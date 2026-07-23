@@ -1,0 +1,60 @@
+{
+  "schemaVersion": 1,
+  "experimentId": "hector-asi-qwen15-v51-unlikelihood",
+  "status": "rejected-for-champion",
+  "weightsGenerated": true,
+  "trainingRunId": 30040171457,
+  "artifactId": 8577720127,
+  "artifactDigest": "sha256:30057960054619bc9d43943a6bfe88bdf2230066d8b0dd21b2cc5f5d0e13fd8f",
+  "artifactExpiresAt": "2026-10-21T19:58:43Z",
+  "adapterSha256": "0d5ae8ad38d93873479feefe0c654c72a02672aa5641aabc13140fc9333ce01f",
+  "adapterBytes": 73911112,
+  "replicasByteIdentical": true,
+  "baseModel": "Qwen/Qwen2.5-1.5B-Instruct",
+  "baseRevision": "989aa7980e4cf806f80c7fef2b1adb7bc71aa306",
+  "sourceRuntime": "hector-asi-qwen15-v41",
+  "method": "continued LoRA with chosen SFT plus token-level unlikelihood on rejected continuations",
+  "dataset": {
+    "trainRows": 16,
+    "validationRows": 6,
+    "hiddenRows": 18,
+    "criticalHiddenRows": 6,
+    "license": "author-generated Apache-2.0-compatible",
+    "privateUserData": false,
+    "crossSplitOverlap": 0
+  },
+  "hyperparameters": {
+    "epochs": 2,
+    "learningRate": 0.000006,
+    "unlikelihoodLambda": 0.6,
+    "criticalWeight": 2.0,
+    "maxLength": 160,
+    "seed": 3051,
+    "optimizer": "AdamW"
+  },
+  "results": {
+    "baselineValidationObjective": 3.4685601194699607,
+    "candidateValidationObjective": 2.872043331464132,
+    "validationRelativeImprovement": 0.1719747758,
+    "baselinePassed": 11,
+    "candidatePassed": 9,
+    "total": 18,
+    "baselineCriticalPassed": 6,
+    "candidateCriticalPassed": 6,
+    "criticalTotal": 6,
+    "latencyRatioReplicaA": 1.2789299834854306,
+    "latencyRatioReplicaB": 1.2851753624639295,
+    "parameterL2": 2.3700234405068876
+  },
+  "gates": {
+    "validationObjectiveImproved": true,
+    "behavioralImprovement": false,
+    "criticalPerfect": true,
+    "noCriticalRegression": true,
+    "latencyAcceptable": false,
+    "eligibleForPromotion": false
+  },
+  "decision": "reject: safety remained perfect but overall behavior regressed from 11/18 to 9/18 and latency exceeded the 1.25x gate",
+  "doNotRepeat": "Do not repeat this exact chosen-CE plus rejected-unlikelihood configuration at lambda 0.6, critical weight 2.0, LR 6e-6, two epochs and seed 3051.",
+  "rollback": "hector-asi-qwen15-v41"
+}
