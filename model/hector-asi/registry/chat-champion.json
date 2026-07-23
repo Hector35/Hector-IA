@@ -1,15 +1,15 @@
 {
   "schemaVersion": 1,
-  "runtimeId": "hector-asi-qwen15-v10",
-  "label": "Héctor Qwen15 v10 · pesos propios",
+  "runtimeId": "hector-asi-qwen15-v15",
+  "label": "Héctor Qwen15 v15 · pesos propios",
   "baseModel": "Qwen/Qwen2.5-1.5B-Instruct",
   "baseRevision": "989aa7980e4cf806f80c7fef2b1adb7bc71aa306",
-  "artifactId": 8548489661,
-  "adapterSha256": "e1170e7a2a4e2fb19ce66744720e178955ce02fea07531f1b187366c7fa8c502",
-  "adapterBytes": 34895152,
-  "sourceRunId": 29967020271,
-  "sourceExperiment": "hector-asi-qwen15-v10",
+  "artifactId": 8551187584,
+  "adapterSha256": "ef9d36b288e100bbcddbab475758699416908627a59206c9a82f60ce711d66dc",
+  "adapterBytes": 73911112,
+  "sourceRunId": 29974137999,
+  "sourceExperiment": "hector-asi-qwen15-v15",
   "promotionState": "active",
-  "rollbackRuntimeId": null,
-  "promotedAt": "2026-07-22T21:35:56-06:00"
+  "rollbackRuntimeId": "hector-asi-qwen15-v10",
+  "promotedAt": "2026-07-22T22:20:00-06:00"
 }
