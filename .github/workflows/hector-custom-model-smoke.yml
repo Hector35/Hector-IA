@@ -7,6 +7,9 @@ on:
     paths:
       - '.github/workflows/hector-custom-model-smoke.yml'
       - 'model/hector-asi/inference/smoke_custom_model.py'
+      - 'model/hector-asi/registry/chat-champion.json'
+      - 'worker/lib/chat-champion.ts'
+      - 'worker/routes/model-chat.ts'
 
 permissions:
   contents: read
@@ -22,8 +25,7 @@ jobs:
     runs-on: ubuntu-latest
     timeout-minutes: 45
     env:
-      ADAPTER_ARTIFACT_ID: '8548489661'
-      ADAPTER_SHA256: 'e1170e7a2a4e2fb19ce66744720e178955ce02fea07531f1b187366c7fa8c502'
+      CHAT_CHAMPION_MANIFEST: model/hector-asi/registry/chat-champion.json
       ADAPTER_DIR: /tmp/hector-adapter/adapter
       SMOKE_OUTPUT: /tmp/hector-custom-model-smoke.json
       HF_HOME: /home/runner/.cache/huggingface
@@ -32,20 +34,37 @@ jobs:
     steps:
       - uses: actions/checkout@v4
 
+      - name: Load promoted chat champion
+        id: champion
+        shell: bash
+        run: |
+          set -euo pipefail
+          jq -e '.schemaVersion == 1 and .promotionState == "active" and (.runtimeId | length > 0) and (.artifactId > 0) and (.adapterSha256 | test("^[a-f0-9]{64}$")) and (.adapterBytes > 30000000)' "$CHAT_CHAMPION_MANIFEST" >/dev/null
+          echo "runtime_id=$(jq -r '.runtimeId' "$CHAT_CHAMPION_MANIFEST")" >> "$GITHUB_OUTPUT"
+          echo "base_model=$(jq -r '.baseModel' "$CHAT_CHAMPION_MANIFEST")" >> "$GITHUB_OUTPUT"
+          echo "base_revision=$(jq -r '.baseRevision' "$CHAT_CHAMPION_MANIFEST")" >> "$GITHUB_OUTPUT"
+          echo "artifact_id=$(jq -r '.artifactId' "$CHAT_CHAMPION_MANIFEST")" >> "$GITHUB_OUTPUT"
+          echo "adapter_sha256=$(jq -r '.adapterSha256' "$CHAT_CHAMPION_MANIFEST")" >> "$GITHUB_OUTPUT"
+          echo "adapter_bytes=$(jq -r '.adapterBytes' "$CHAT_CHAMPION_MANIFEST")" >> "$GITHUB_OUTPUT"
+          echo "source_run_id=$(jq -r '.sourceRunId' "$CHAT_CHAMPION_MANIFEST")" >> "$GITHUB_OUTPUT"
+
       - name: Wait for Hector ASI custom queue deployment
         shell: bash
+        env:
+          RUNTIME_ID: ${{ steps.champion.outputs.runtime_id }}
+          ADAPTER_SHA256: ${{ steps.champion.outputs.adapter_sha256 }}
         run: |
           set -euo pipefail
           for attempt in $(seq 1 60); do
             if curl -fsS https://hector-os.hectorhdzr035.workers.dev/health > /tmp/hector-health.json; then
               cat /tmp/hector-health.json
-              if jq -e '.ok == true and .customModel.runtime == "hector-asi-qwen15-v10" and .customModel.mode == "github-actions"' /tmp/hector-health.json >/dev/null; then
+              if jq -e --arg runtime "$RUNTIME_ID" --arg sha "$ADAPTER_SHA256" '.ok == true and .customModel.runtime == $runtime and .customModel.adapterSha256 == $sha and .customModel.mode == "github-actions"' /tmp/hector-health.json >/dev/null; then
                 exit 0
               fi
             fi
             sleep 10
           done
-          echo 'Producción no reportó la cola del modelo propio' >&2
+          echo 'Producción no reportó el campeón neuronal esperado' >&2
           exit 1
 
       - uses: actions/setup-python@v5
@@ -58,7 +77,7 @@ jobs:
         uses: actions/cache@v4
         with:
           path: /home/runner/.cache/huggingface
-          key: qwen25-15b-989aa7980e4cf806f80c7fef2b1adb7bc71aa306-v1
+          key: qwen-chat-${{ steps.champion.outputs.base_revision }}-v1
 
       - name: Install CPU inference stack
         run: |
@@ -73,6 +92,9 @@ jobs:
       - name: Download and verify immutable Hector adapter
         env:
           GH_TOKEN: ${{ github.token }}
+          ADAPTER_ARTIFACT_ID: ${{ steps.champion.outputs.artifact_id }}
+          ADAPTER_SHA256: ${{ steps.champion.outputs.adapter_sha256 }}
+          ADAPTER_BYTES: ${{ steps.champion.outputs.adapter_bytes }}
         shell: bash
         run: |
           set -euo pipefail
@@ -87,14 +109,23 @@ jobs:
           test -n "$ADAPTER_FILE"
           test "$(sha256sum "$ADAPTER_FILE" | awk '{print $1}')" = "$ADAPTER_SHA256"
           cp -a "$(dirname "$ADAPTER_FILE")" /tmp/hector-adapter/adapter
-          test "$(stat -c%s "$ADAPTER_DIR/adapter_model.safetensors")" -eq 34895152
+          test "$(stat -c%s "$ADAPTER_DIR/adapter_model.safetensors")" -eq "$ADAPTER_BYTES"
 
       - name: Generate real neural response
         run: python model/hector-asi/inference/smoke_custom_model.py
 
       - name: Validate evidence
         run: |
-          jq -e '.ok == true and .runtimeId == "hector-asi-qwen15-v10" and .baseRevision == "989aa7980e4cf806f80c7fef2b1adb7bc71aa306" and .adapterSha256 == "e1170e7a2a4e2fb19ce66744720e178955ce02fea07531f1b187366c7fa8c502" and .adapterBytes == 34895152 and (.response | length > 0)' "$SMOKE_OUTPUT"
+          python - <<'PY'
+          import json, os
+          manifest=json.load(open(os.environ['CHAT_CHAMPION_MANIFEST']))
+          evidence=json.load(open(os.environ['SMOKE_OUTPUT']))
+          assert evidence['ok'] is True
+          for key in ('runtimeId','baseModel','baseRevision','artifactId','adapterSha256','adapterBytes','sourceRunId'):
+              assert evidence[key] == manifest[key], (key,evidence[key],manifest[key])
+          assert evidence['response'].strip()
+          print('chat champion smoke evidence: OK')
+          PY
 
       - uses: actions/upload-artifact@v4
         with:
@@ -102,6 +133,7 @@ jobs:
           path: |
             /tmp/hector-custom-model-smoke.json
             /tmp/hector-health.json
+            model/hector-asi/registry/chat-champion.json
           retention-days: 30
 
       - name: Publish success receipt
@@ -110,10 +142,15 @@ jobs:
           GH_TOKEN: ${{ github.token }}
         shell: bash
         run: |
+          RUNTIME="$(jq -r '.runtimeId' "$SMOKE_OUTPUT")"
+          BASE="$(jq -r '.baseModel+"@"+.baseRevision' "$SMOKE_OUTPUT")"
+          SHA="$(jq -r '.adapterSha256' "$SMOKE_OUTPUT")"
+          BYTES="$(jq -r '.adapterBytes' "$SMOKE_OUTPUT")"
           TOKENS="$(jq -r '.outputTokens' "$SMOKE_OUTPUT")"
           LATENCY="$(jq -r '.latencyMs' "$SMOKE_OUTPUT")"
-          BODY="✅ Inferencia neuronal real verificada.\n\n- runtime: hector-asi-qwen15-v10\n- base: Qwen/Qwen2.5-1.5B-Instruct@989aa7980e4cf806f80c7fef2b1adb7bc71aa306\n- adapter SHA-256: $ADAPTER_SHA256\n- adapter bytes: 34895152\n- output tokens: ${TOKENS}\n- latency ms: ${LATENCY}\n- producción: customModel.mode=github-actions\n- evidencia: ${GITHUB_SERVER_URL}/${GITHUB_REPOSITORY}/actions/runs/${GITHUB_RUN_ID}"
-          gh issue create --title "[custom-model-smoke] OK ${GITHUB_SHA::7}" --body "$BODY"
+          SOURCE_RUN="$(jq -r '.sourceRunId' "$SMOKE_OUTPUT")"
+          BODY="✅ Inferencia neuronal real verificada.\n\n- runtime: ${RUNTIME}\n- base: ${BASE}\n- adapter SHA-256: ${SHA}\n- adapter bytes: ${BYTES}\n- source run: ${SOURCE_RUN}\n- output tokens: ${TOKENS}\n- latency ms: ${LATENCY}\n- producción: customModel.mode=github-actions\n- evidencia: ${GITHUB_SERVER_URL}/${GITHUB_REPOSITORY}/actions/runs/${GITHUB_RUN_ID}"
+          gh issue create --title "[custom-model-smoke] OK ${RUNTIME} ${GITHUB_SHA::7}" --body "$BODY"
 
       - name: Publish failure receipt
         if: failure()
@@ -121,5 +158,6 @@ jobs:
           GH_TOKEN: ${{ github.token }}
         shell: bash
         run: |
-          BODY="❌ La inferencia de humo del modelo propio falló. No se declaró el runtime como verificado.\n\nRun: ${GITHUB_SERVER_URL}/${GITHUB_REPOSITORY}/actions/runs/${GITHUB_RUN_ID}"
-          gh issue create --title "[custom-model-smoke] FALLO ${GITHUB_SHA::7}" --body "$BODY"
+          RUNTIME="$(jq -r '.runtimeId // "desconocido"' "$CHAT_CHAMPION_MANIFEST" 2>/dev/null || echo desconocido)"
+          BODY="❌ La inferencia de humo del campeón ${RUNTIME} falló. No se declaró el runtime como verificado.\n\nRun: ${GITHUB_SERVER_URL}/${GITHUB_REPOSITORY}/actions/runs/${GITHUB_RUN_ID}"
+          gh issue create --title "[custom-model-smoke] FALLO ${RUNTIME} ${GITHUB_SHA::7}" --body "$BODY"
