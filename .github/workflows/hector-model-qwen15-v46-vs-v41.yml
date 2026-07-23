@@ -1,0 +1,69 @@
+name: Hector model Qwen15 v46 versus v41 behavioral evaluation
+on:
+  pull_request:
+    branches: [main]
+    paths:
+      - 'model/hector-asi/evals/qwen15-behavioral-v46.jsonl'
+      - 'model/hector-asi/training/evaluate_qwen15_v46_vs_v41.py'
+      - 'model/hector-asi/registry/candidates/hector-asi-qwen15-v46.json'
+      - '.github/workflows/hector-model-qwen15-v46-vs-v41.yml'
+  workflow_dispatch:
+permissions:
+  contents: read
+  actions: read
+jobs:
+  evaluate-qwen15-v46-vs-v41:
+    runs-on: ubuntu-latest
+    timeout-minutes: 60
+    env:
+      V41_ARTIFACT_ID: '8560331055'
+      V46_ARTIFACT_ID: '8563103414'
+      V41_SHA: '31bead5f59982d8e321517fd235b81f992f83d2e3792a55690c2a841ff0e28f8'
+      V46_SHA: '57e1348a675130d9e0c184d031e02043657f051cd7ab63cca51acaba2b4e94b3'
+      V41_DIR: /tmp/hector-v41/adapter
+      V46_DIR: /tmp/hector-v46/adapter
+      EVAL_OUTPUT: qwen15-v46-vs-v41.json
+      HF_HOME: /home/runner/.cache/huggingface
+      TOKENIZERS_PARALLELISM: 'false'
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+      - name: Validate sealed evaluation and candidate evidence
+        run: |
+          python -m py_compile model/hector-asi/training/evaluate_qwen15_v46_vs_v41.py
+          test "$(wc -l < model/hector-asi/evals/qwen15-behavioral-v46.jsonl)" -eq 18
+          python -m json.tool model/hector-asi/registry/candidates/hector-asi-qwen15-v46.json >/dev/null
+      - name: Install pinned CPU stack
+        run: |
+          python -m pip install --disable-pip-version-check --index-url https://download.pytorch.org/whl/cpu torch==2.7.1
+          python -m pip install --disable-pip-version-check accelerate==1.8.1 huggingface_hub==0.34.4 peft==0.16.0 safetensors==0.5.3 transformers==4.53.2
+      - name: Download and verify immutable adapters
+        env:
+          GH_TOKEN: ${{ github.token }}
+        shell: bash
+        run: |
+          set -euo pipefail
+          for spec in "v41:$V41_ARTIFACT_ID:$V41_SHA:$V41_DIR" "v46:$V46_ARTIFACT_ID:$V46_SHA:$V46_DIR"; do
+            IFS=: read -r name id expected dest <<< "$spec"
+            mkdir -p "/tmp/$name-artifact" "$(dirname "$dest")"
+            curl --fail --location --retry 4 -H "Authorization: Bearer $GH_TOKEN" -H "Accept: application/vnd.github+json" "https://api.github.com/repos/${GITHUB_REPOSITORY}/actions/artifacts/${id}/zip" -o "/tmp/$name.zip"
+            unzip -q "/tmp/$name.zip" -d "/tmp/$name-artifact"
+            file="$(find "/tmp/$name-artifact" -type f -path '*/adapter/adapter_model.safetensors' -print -quit)"
+            test -n "$file"; test "$(sha256sum "$file" | awk '{print $1}')" = "$expected"
+            cp -a "$(dirname "$file")" "$dest"
+            test "$(stat -c%s "$dest/adapter_model.safetensors")" -eq 73911112
+          done
+      - name: Compare champion v41 versus candidate v46
+        run: python model/hector-asi/training/evaluate_qwen15_v46_vs_v41.py
+      - name: Upload complete evidence
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: hector-asi-qwen15-v46-vs-v41-${{ github.run_id }}
+          path: qwen15-v46-vs-v41.json
+          if-no-files-found: error
+          retention-days: 90
+      - name: Enforce promotion gate
+        run: jq -e '.gates.eligibleForPromotion == true' "$EVAL_OUTPUT"
