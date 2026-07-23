@@ -1,0 +1,85 @@
+name: Hector model Qwen15 v56 direct champion evaluation
+on:
+  pull_request:
+    branches: [main]
+    paths:
+      - '.github/workflows/hector-model-qwen15-v56-direct-champion.yml'
+      - 'model/hector-asi/training/evaluate_qwen15_v56_vs_champion.py'
+  workflow_dispatch:
+permissions:
+  contents: read
+  actions: read
+jobs:
+  evaluate-qwen15-v56-direct:
+    runs-on: ubuntu-latest
+    timeout-minutes: 90
+    env:
+      V41_ARTIFACT_ID: '8560331055'
+      V41_SHA: '31bead5f59982d8e321517fd235b81f992f83d2e3792a55690c2a841ff0e28f8'
+      V41_DIR: /tmp/hector-v41/adapter
+      V54_ARTIFACT_ID: '8579920006'
+      V54_SHA: '86cac6f1e80e23dec0941159c6d5e1250b238385e5c88cc647152848b42123df'
+      V54_DIR: /tmp/hector-v54/adapter
+      V56_ARTIFACT_ID: '8580900380'
+      V56_SHA: '6cf3ccda4956d99074f44ad6e35e9274581198c89dff7f84d54a5d8b47636ead'
+      V56_DIR: /tmp/hector-v56/adapter
+      EVAL_OUTPUT: /tmp/qwen15-v56-direct.json
+      HF_HOME: /home/runner/.cache/huggingface
+      TOKENIZERS_PARALLELISM: 'false'
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+          cache: pip
+      - name: Validate sealed evaluation and evaluator
+        run: |
+          set -euo pipefail
+          python -m py_compile model/hector-asi/training/evaluate_qwen15_v56_vs_champion.py
+          test "$(wc -l < model/hector-asi/evals/qwen15-v51-hidden.jsonl)" -eq 18
+          test "$(grep -c '"'"'critical"'"':true' model/hector-asi/evals/qwen15-v51-hidden.jsonl)" -eq 6
+      - name: Download and verify immutable adapters
+        env:
+          GH_TOKEN: ${{ github.token }}
+        shell: bash
+        run: |
+          set -euo pipefail
+          for spec in \
+            "v41:$V41_ARTIFACT_ID:$V41_SHA:$V41_DIR" \
+            "v54:$V54_ARTIFACT_ID:$V54_SHA:$V54_DIR" \
+            "v56:$V56_ARTIFACT_ID:$V56_SHA:$V56_DIR"; do
+            IFS=: read -r name artifact_id expected_sha destination <<< "$spec"
+            archive="/tmp/${name}.zip"; extract="/tmp/${name}-artifact"
+            mkdir -p "$extract" "$(dirname "$destination")"
+            curl --fail --location --retry 4 \
+              -H "Authorization: Bearer $GH_TOKEN" \
+              -H "Accept: application/vnd.github+json" \
+              "https://api.github.com/repos/${GITHUB_REPOSITORY}/actions/artifacts/${artifact_id}/zip" \
+              -o "$archive"
+            unzip -q "$archive" -d "$extract"
+            adapter_file="$(find "$extract" -type f -path '*/adapter/adapter_model.safetensors' -print -quit)"
+            test -n "$adapter_file"
+            test "$(sha256sum "$adapter_file" | awk '{print $1}')" = "$expected_sha"
+            test "$(stat -c%s "$adapter_file")" -eq 73911112
+            cp -a "$(dirname "$adapter_file")" "$destination"
+          done
+      - name: Install pinned CPU stack
+        run: |
+          python -m pip install --disable-pip-version-check --index-url https://download.pytorch.org/whl/cpu torch==2.7.1
+          python -m pip install --disable-pip-version-check accelerate==1.8.1 huggingface_hub==0.34.4 peft==0.16.0 safetensors==0.5.3 transformers==4.53.2
+      - name: Compare V41 champion, V54 source and V56 candidate
+        run: |
+          set -o pipefail
+          /usr/bin/time -v python model/hector-asi/training/evaluate_qwen15_v56_vs_champion.py 2>&1 | tee /tmp/qwen15-v56-direct.log
+      - name: Upload complete direct evidence
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: hector-asi-qwen15-v56-direct-${{ github.run_id }}
+          path: |
+            /tmp/qwen15-v56-direct.json
+            /tmp/qwen15-v56-direct.log
+          if-no-files-found: warn
+          retention-days: 90
+      - name: Enforce promotion gate
+        run: jq -e '.v56VsV41.gates.eligibleForPromotion == true' "$EVAL_OUTPUT"
