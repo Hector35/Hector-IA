@@ -1,0 +1,67 @@
+name: Hector model Qwen15 rank32 hidden evaluation
+on:
+  pull_request:
+    branches: [main]
+    paths:
+      - '.github/workflows/hector-model-qwen15-r32-eval.yml'
+      - 'model/hector-asi/evals/qwen15-r32-hidden-v1.jsonl'
+      - 'model/hector-asi/training/evaluate_qwen15_r32_vs_v41.py'
+  workflow_dispatch:
+permissions:
+  contents: read
+  actions: read
+jobs:
+  evaluate-qwen15-r32:
+    runs-on: ubuntu-latest
+    timeout-minutes: 90
+    env:
+      V41_ARTIFACT_ID: '8560331055'
+      R32_ARTIFACT_ID: '8573494507'
+      V41_SHA: '31bead5f59982d8e321517fd235b81f992f83d2e3792a55690c2a841ff0e28f8'
+      R32_SHA: 'dc8dfdd1b5060fd1fef55abb859eaf1cadb095704899b530b99d65a3ef15421e'
+      V41_DIR: /tmp/hector-v41/adapter
+      R32_DIR: /tmp/hector-r32/adapter
+      EVAL_OUTPUT: /tmp/qwen15-r32-hidden-eval.json
+      TOKENIZERS_PARALLELISM: 'false'
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+      - name: Validate sealed evaluation
+        run: |
+          python -m py_compile model/hector-asi/training/evaluate_qwen15_r32_vs_v41.py
+          test "$(wc -l < model/hector-asi/evals/qwen15-r32-hidden-v1.jsonl)" -eq 18
+      - name: Download and verify immutable adapters
+        env:
+          GH_TOKEN: ${{ github.token }}
+        shell: bash
+        run: |
+          set -euo pipefail
+          for spec in "v41:$V41_ARTIFACT_ID:$V41_SHA:73911112:$V41_DIR" "r32:$R32_ARTIFACT_ID:$R32_SHA:34895152:$R32_DIR"; do
+            IFS=: read -r name id expected bytes dest <<< "$spec"
+            mkdir -p "/tmp/$name-artifact" "$(dirname "$dest")"
+            curl --fail --location --retry 4 -H "Authorization: Bearer $GH_TOKEN" -H "Accept: application/vnd.github+json" "https://api.github.com/repos/${GITHUB_REPOSITORY}/actions/artifacts/${id}/zip" -o "/tmp/$name.zip"
+            unzip -q "/tmp/$name.zip" -d "/tmp/$name-artifact"
+            file="$(find "/tmp/$name-artifact" -type f -path '*/adapter/adapter_model.safetensors' -print -quit)"
+            test -n "$file"; test "$(sha256sum "$file" | awk '{print $1}')" = "$expected"; test "$(stat -c%s "$file")" = "$bytes"
+            cp -a "$(dirname "$file")" "$dest"
+          done
+      - name: Install pinned CPU stack
+        run: |
+          python -m pip install --disable-pip-version-check --index-url https://download.pytorch.org/whl/cpu torch==2.7.1
+          python -m pip install --disable-pip-version-check accelerate==1.8.1 huggingface_hub==0.34.4 peft==0.16.0 safetensors==0.5.3 transformers==4.53.2
+      - name: Compare rank32 candidate against champion v41
+        run: python model/hector-asi/training/evaluate_qwen15_r32_vs_v41.py
+      - name: Upload complete evidence
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: hector-asi-qwen15-r32-hidden-${{ github.run_id }}
+          path: /tmp/qwen15-r32-hidden-eval.json
+          retention-days: 90
+          if-no-files-found: error
+      - name: Record promotion decision
+        run: |
+          jq '{decision,gates,v41:{passed:.v41.passed,criticalPassed:.v41.criticalPassed,meanLatencyMs:.v41.meanLatencyMs},candidate:{passed:.candidate.passed,criticalPassed:.candidate.criticalPassed,meanLatencyMs:.candidate.meanLatencyMs},latencyRatio}' "$EVAL_OUTPUT" | tee -a "$GITHUB_STEP_SUMMARY"
+          test "$(jq -r '.decision' "$EVAL_OUTPUT")" = "promote" && echo "candidate eligible" || echo "candidate rejected; evidence preserved"
