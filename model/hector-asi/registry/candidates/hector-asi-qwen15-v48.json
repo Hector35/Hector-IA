@@ -1,0 +1,44 @@
+{
+  "schemaVersion": "1.0.0",
+  "id": "hector-asi-qwen15-v48",
+  "status": "behavioral-evaluation-pending",
+  "baseModel": {
+    "repository": "Qwen/Qwen2.5-1.5B-Instruct",
+    "revision": "989aa7980e4cf806f80c7fef2b1adb7bc71aa306"
+  },
+  "sourceAdapter": {
+    "id": "hector-asi-qwen15-v41",
+    "artifactId": 8560331055,
+    "sha256": "31bead5f59982d8e321517fd235b81f992f83d2e3792a55690c2a841ff0e28f8"
+  },
+  "training": {
+    "method": "minimal SFT replay continuation from champion",
+    "runId": 30026593268,
+    "artifactId": 8571765920,
+    "artifactName": "hector-asi-qwen15-v48-30026593268",
+    "artifactDigest": "sha256:3cbf67ebe7c1962ce7f6aba42bd90ccd6b1f4a73e691138b97b25b4a780a9aad",
+    "adapterSha256": "ac85f81ede2f326b3c5e6865d7e6018551a3aa31429eb751295e5e7bc5a2e208",
+    "adapterBytes": 73911112,
+    "replicasByteIdentical": true,
+    "expiresAt": "2026-10-21T16:46:53Z",
+    "trainRows": 16,
+    "validationRows": 8,
+    "epochs": 1,
+    "steps": 16,
+    "learningRate": 0.0000008,
+    "seed": 35,
+    "beforeValidationLoss": 2.160177603363991,
+    "afterValidationLoss": 1.9820953607559204,
+    "relativeValidationImprovement": 0.08243870426706922,
+    "trainSha256": "d6e2e5f233aceb9936161dfe63858acd20e7a7c76d6f2d51d72de5db56f3796a",
+    "validationSha256": "58e971bdbdd6cfb8ee4bfacf11bc84c52060f49e4b62f2fdb4a75bcf14ab4f80",
+    "hardware": "GitHub hosted Ubuntu 24.04 CPU; peak RSS 9.50 GiB",
+    "durationSecondsPerReplica": [239.99225282669067, 222.70790791511536]
+  },
+  "promotion": {
+    "currentChampion": "hector-asi-qwen15-v41",
+    "eligible": false,
+    "blockedBy": "Pending sealed generative comparison against champion v41",
+    "rollback": "hector-asi-qwen15-v41"
+  }
+}
