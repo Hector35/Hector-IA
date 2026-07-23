@@ -12,6 +12,9 @@ on:
   workflow_dispatch:
 permissions:
   contents: read
+concurrency:
+  group: hector-qwen15-v36-${{ github.event.pull_request.number || github.run_id }}
+  cancel-in-progress: false
 jobs:
   train-qwen15-v36:
     runs-on: ubuntu-latest
