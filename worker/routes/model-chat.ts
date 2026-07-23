@@ -6,13 +6,10 @@ import {loadContextPack,renderContext} from '../lib/context';
 import {renderBootstrap} from '../intelligence/bootstrap';
 import {callCloudflare,callHuggingFaceQwen} from '../lib/providers';
 import {callHectorExperimental,hasCustomModelEndpoint,hasQueuedCustomInference,hectorRuntimeCatalog,normalizeHectorRuntime,renderHectorRuntimeCatalog,requestedHectorRuntime,stripHectorRuntimeDirective,type HectorRuntimeId} from '../lib/custom-model-runtime';
+import {CHAT_CHAMPION,chatChampionEvidence} from '../lib/chat-champion';
 import {enforceResponseContract} from '../lib/response-contract';
 import {verifyGitHubActionsOidc} from '../lib/github-actions-oidc';
 
-const CUSTOM_RUNTIME='hector-asi-qwen15-v10';
-const BASE_MODEL='Qwen/Qwen2.5-1.5B-Instruct';
-const BASE_REVISION='989aa7980e4cf806f80c7fef2b1adb7bc71aa306';
-const ADAPTER_SHA256='e1170e7a2a4e2fb19ce66744720e178955ce02fea07531f1b187366c7fa8c502';
 const WORKFLOW='hector-custom-model-chat.yml';
 
 type PendingMetadata={
@@ -21,7 +18,10 @@ type PendingMetadata={
  userMessageId:string;
  assistantMessageId:string;
  runtimeId:string;
+ artifactId:number;
  adapterSha256:string;
+ adapterBytes:number;
+ sourceRunId:number;
  dispatchMode?:'immediate'|'scheduled';
  dispatchedAt?:string;
  startedAt?:string;
@@ -62,6 +62,7 @@ function instructions(runtime:HectorRuntimeId,context:string){return `${renderBo
 
 RUNTIME SELECCIONADO
 - ${runtime}
+- Campeón neuronal registrado: ${CHAT_CHAMPION.runtimeId}
 - Responde como Hector ASI.
 - Responde en español salvo petición contraria.
 - Distingue hechos, inferencias y límites.
@@ -95,26 +96,26 @@ async function dispatchInference(env:Bindings,jobId:string){
 
 async function queueCustomInference(env:Bindings,userId:string,conversationId:string,userMessageId:string,selected:ReturnType<typeof hectorRuntimeCatalog>[number]){
  const assistantMessageId=crypto.randomUUID(),jobId=crypto.randomUUID();
- const placeholder='Tu modelo propio está cargando **Qwen 1.5B + los pesos LoRA de Héctor** en cómputo gratuito. La respuesta aparecerá aquí automáticamente cuando termine.';
- const pending:PendingMetadata={status:'pending',conversationId,userMessageId,assistantMessageId,runtimeId:CUSTOM_RUNTIME,adapterSha256:ADAPTER_SHA256};
+ const placeholder=`Tu modelo propio está cargando **${CHAT_CHAMPION.label}** sobre Qwen 1.5B en cómputo gratuito. La respuesta aparecerá aquí automáticamente cuando termine.`;
+ const pending:PendingMetadata={status:'pending',conversationId,userMessageId,assistantMessageId,runtimeId:CHAT_CHAMPION.runtimeId,artifactId:CHAT_CHAMPION.artifactId,adapterSha256:CHAT_CHAMPION.adapterSha256,adapterBytes:CHAT_CHAMPION.adapterBytes,sourceRunId:CHAT_CHAMPION.sourceRunId};
  await env.DB.batch([
   env.DB.prepare('INSERT INTO messages(id,conversation_id,role,content) VALUES(?,?,?,?)').bind(assistantMessageId,conversationId,'assistant',placeholder),
-  env.DB.prepare('INSERT INTO api_usage(id,user_id,provider,service,model,input_units,cached_input_units,output_units,estimated_cost_usd,metadata_json) VALUES(?,?,?,?,?,?,?,?,?,?)').bind(jobId,userId,'GitHub Actions','custom-model-inference-pending',CUSTOM_RUNTIME,0,0,0,0,JSON.stringify(pending))
+  env.DB.prepare('INSERT INTO api_usage(id,user_id,provider,service,model,input_units,cached_input_units,output_units,estimated_cost_usd,metadata_json) VALUES(?,?,?,?,?,?,?,?,?,?)').bind(jobId,userId,'GitHub Actions','custom-model-inference-pending',CHAT_CHAMPION.runtimeId,0,0,0,0,JSON.stringify(pending))
  ]);
  const dispatched=await dispatchInference(env,jobId);
  pending.dispatchMode=dispatched?'immediate':'scheduled';
  if(dispatched)pending.dispatchedAt=new Date().toISOString();
  await env.DB.prepare('UPDATE api_usage SET metadata_json=? WHERE id=?').bind(JSON.stringify(pending),jobId).run();
  await saveRollingSummary(env.DB,userId,conversationId);
- return{conversationId,message:{id:assistantMessageId,role:'assistant',content:placeholder},provider:'github-actions',model:CUSTOM_RUNTIME,runtimeId:'hector-experimental',runtime:selected,fallback:false,modelTier:'custom-queued',pending:true,jobId,dispatchMode:pending.dispatchMode};
+ return{conversationId,message:{id:assistantMessageId,role:'assistant',content:placeholder},provider:'github-actions',model:CHAT_CHAMPION.runtimeId,runtimeId:'hector-experimental',runtime:selected,champion:chatChampionEvidence(),fallback:false,modelTier:'custom-queued',pending:true,jobId,dispatchMode:pending.dispatchMode};
 }
 
-modelChat.get('/models',c=>c.json({items:hectorRuntimeCatalog(c.env),commands:{list:'/modelos',base:'/modelo base <mensaje>',qwen:'/modelo qwen <mensaje>',own:'/modelo propio <mensaje>'}}));
+modelChat.get('/models',c=>c.json({items:hectorRuntimeCatalog(c.env),champion:chatChampionEvidence(),commands:{list:'/modelos',base:'/modelo base <mensaje>',qwen:'/modelo qwen <mensaje>',own:'/modelo propio <mensaje>'}}));
 
 modelChat.get('/model-jobs/pending',async c=>{
  if(!await authorizeWorkflow(c.req.header('Authorization')))return c.json({error:'No autorizado'},401);
  const row=await c.env.DB.prepare("SELECT id FROM api_usage WHERE service='custom-model-inference-pending' AND created_at>=datetime('now','-1 hour') ORDER BY created_at LIMIT 1").first<{id:string}>();
- return c.json({jobId:row?.id||null});
+ return c.json({jobId:row?.id||null,champion:chatChampionEvidence()});
 });
 
 modelChat.get('/model-jobs/:id/input',async c=>{
@@ -123,6 +124,7 @@ modelChat.get('/model-jobs/:id/input',async c=>{
  if(!row||!freshEnough(row.created_at))return c.json({error:'Trabajo inexistente o vencido'},404);
  const state=metadata(row);
  if(!['pending','running'].includes(state.status))return c.json({error:'Trabajo no disponible'},409);
+ if(state.runtimeId!==CHAT_CHAMPION.runtimeId||state.artifactId!==CHAT_CHAMPION.artifactId||state.adapterSha256!==CHAT_CHAMPION.adapterSha256)return c.json({error:'El trabajo pertenece a un campeón anterior; vuelve a enviar el mensaje'},409);
  const userMessage=await c.env.DB.prepare('SELECT content FROM messages WHERE id=? AND conversation_id=?').bind(state.userMessageId,state.conversationId).first<{content:string}>();
  if(!userMessage)return c.json({error:'Mensaje de origen no encontrado'},404);
  const pack=await loadContextPack(c.env,row.user_id,state.conversationId,userMessage.content),context=renderContext(pack);
@@ -130,12 +132,12 @@ modelChat.get('/model-jobs/:id/input',async c=>{
  const history=rows.filter((item:any)=>item.id!==state.assistantMessageId&&(item.role==='user'||item.role==='assistant')).map((item:any)=>({role:item.role,content:item.content}));
  state.status='running';state.startedAt=state.startedAt||new Date().toISOString();
  await c.env.DB.prepare("UPDATE api_usage SET service='custom-model-inference-running',metadata_json=? WHERE id=?").bind(JSON.stringify(state),row.id).run();
- return c.json({jobId:row.id,runtimeId:CUSTOM_RUNTIME,baseModel:BASE_MODEL,baseRevision:BASE_REVISION,adapterSha256:ADAPTER_SHA256,maxNewTokens:256,messages:[{role:'system',content:instructions('hector-experimental',context)},...history]});
+ return c.json({jobId:row.id,...chatChampionEvidence(),maxNewTokens:256,messages:[{role:'system',content:instructions('hector-experimental',context)},...history]});
 });
 
 modelChat.post('/model-jobs/:id/result',async c=>{
  if(!await authorizeWorkflow(c.req.header('Authorization')))return c.json({error:'No autorizado'},401);
- const parsed=z.object({text:z.string().min(1).max(20000).optional(),error:z.string().min(1).max(2000).optional(),usage:z.object({inputTokens:z.number().int().nonnegative(),outputTokens:z.number().int().nonnegative()}).optional(),runtime:z.object({model:z.string(),baseModel:z.string(),baseRevision:z.string(),adapterSha256:z.string(),latencyMs:z.number().nonnegative(),hardware:z.string()}).optional()}).refine(value=>Boolean(value.text)!==Boolean(value.error),{message:'Se requiere texto o error'}).safeParse(await c.req.json());
+ const parsed=z.object({text:z.string().min(1).max(20000).optional(),error:z.string().min(1).max(2000).optional(),usage:z.object({inputTokens:z.number().int().nonnegative(),outputTokens:z.number().int().nonnegative()}).optional(),runtime:z.object({model:z.string(),baseModel:z.string(),baseRevision:z.string(),artifactId:z.number().int().positive(),adapterSha256:z.string(),adapterBytes:z.number().int().positive(),sourceRunId:z.number().int().positive(),latencyMs:z.number().nonnegative(),hardware:z.string()}).optional()}).refine(value=>Boolean(value.text)!==Boolean(value.error),{message:'Se requiere texto o error'}).safeParse(await c.req.json());
  if(!parsed.success)return c.json({error:'Resultado inválido'},400);
  const row=await pendingRow(c.env.DB,c.req.param('id'));
  if(!row||!freshEnough(row.created_at))return c.json({error:'Trabajo inexistente o vencido'},404);
@@ -147,24 +149,25 @@ modelChat.post('/model-jobs/:id/result',async c=>{
  let visible:string,contractApplied=false,contractReasons:string[]=[];
  if(parsed.data.error){visible=`El modelo propio no pudo completar esta respuesta: ${parsed.data.error}`;state.status='failed';state.error=parsed.data.error;}
  else{
-  if(parsed.data.runtime?.adapterSha256!==ADAPTER_SHA256||parsed.data.runtime.baseRevision!==BASE_REVISION||parsed.data.runtime.model!==CUSTOM_RUNTIME)return c.json({error:'La evidencia neuronal no coincide con el modelo autorizado'},409);
-  const contract=enforceResponseContract(userMessage.content,parsed.data.text!);visible=contract.text;contractApplied=contract.applied;contractReasons=contract.reasons;state.status='completed';state.runtime=parsed.data.runtime;state.contractApplied=contractApplied;state.contractReasons=contractReasons;
+  const runtime=parsed.data.runtime;
+  if(!runtime||runtime.adapterSha256!==CHAT_CHAMPION.adapterSha256||runtime.adapterBytes!==CHAT_CHAMPION.adapterBytes||runtime.artifactId!==CHAT_CHAMPION.artifactId||runtime.sourceRunId!==CHAT_CHAMPION.sourceRunId||runtime.baseModel!==CHAT_CHAMPION.baseModel||runtime.baseRevision!==CHAT_CHAMPION.baseRevision||runtime.model!==CHAT_CHAMPION.runtimeId)return c.json({error:'La evidencia neuronal no coincide con el campeón autorizado'},409);
+  const contract=enforceResponseContract(userMessage.content,parsed.data.text!);visible=contract.text;contractApplied=contract.applied;contractReasons=contract.reasons;state.status='completed';state.runtime=runtime;state.contractApplied=contractApplied;state.contractReasons=contractReasons;
  }
  state.completedAt=new Date().toISOString();
  const usage=parsed.data.usage||{inputTokens:0,outputTokens:0};
  await c.env.DB.batch([
   c.env.DB.prepare('UPDATE messages SET content=? WHERE id=? AND conversation_id=?').bind(visible,state.assistantMessageId,state.conversationId),
-  c.env.DB.prepare("UPDATE api_usage SET provider='GitHub Actions',service=?,model=?,input_units=?,output_units=?,metadata_json=? WHERE id=?").bind(state.status==='completed'?'selected-model-chat':'custom-model-inference-failed',CUSTOM_RUNTIME,usage.inputTokens,usage.outputTokens,JSON.stringify(state),row.id)
+  c.env.DB.prepare("UPDATE api_usage SET provider='GitHub Actions',service=?,model=?,input_units=?,output_units=?,metadata_json=? WHERE id=?").bind(state.status==='completed'?'selected-model-chat':'custom-model-inference-failed',CHAT_CHAMPION.runtimeId,usage.inputTokens,usage.outputTokens,JSON.stringify(state),row.id)
  ]);
  await saveRollingSummary(c.env.DB,row.user_id,state.conversationId);
- return c.json({ok:true,status:state.status,conversationId:state.conversationId,messageId:state.assistantMessageId});
+ return c.json({ok:true,status:state.status,conversationId:state.conversationId,messageId:state.assistantMessageId,champion:chatChampionEvidence()});
 });
 
 modelChat.post('/model-chat',async c=>{
  const parsed=z.object({message:z.string().min(1).max(12000),conversationId:z.string().uuid().optional(),runtime:z.enum(['auto','hector-base','hector-qwen','hector-experimental']).optional()}).safeParse(await c.req.json());
  if(!parsed.success)return c.json({error:'Mensaje o modelo inválido'},400);
  const rawMessage=parsed.data.message.trim();
- if(/^\/modelos?\s*$/i.test(rawMessage))return c.json({message:{role:'assistant',content:renderHectorRuntimeCatalog(c.env)},provider:'system',model:'hector-runtime-catalog',runtimeId:'auto',catalog:hectorRuntimeCatalog(c.env)});
+ if(/^\/modelos?\s*$/i.test(rawMessage))return c.json({message:{role:'assistant',content:renderHectorRuntimeCatalog(c.env)},provider:'system',model:'hector-runtime-catalog',runtimeId:'auto',catalog:hectorRuntimeCatalog(c.env),champion:chatChampionEvidence()});
  const requested=normalizeHectorRuntime(parsed.data.runtime||requestedHectorRuntime(rawMessage)),runtime=chooseAvailableRuntime(c.env,requested),catalog=hectorRuntimeCatalog(c.env),selected=catalog.find(item=>item.id===runtime)!;
  if(!selected.available)return c.json({error:selected.reason||`${selected.label} no está disponible`,runtime:selected,catalog},409);
  const message=stripHectorRuntimeDirective(rawMessage),userId=c.get('userId'),conversationId=await ensureConversation(c.env.DB,userId,parsed.data.conversationId,message),userMessageId=crypto.randomUUID();
@@ -179,9 +182,9 @@ modelChat.post('/model-chat',async c=>{
   const contract=enforceResponseContract(message,out.text),assistantMessageId=crypto.randomUUID();
   await c.env.DB.batch([
    c.env.DB.prepare('INSERT INTO messages(id,conversation_id,role,content) VALUES(?,?,?,?)').bind(assistantMessageId,conversationId,'assistant',contract.text),
-   c.env.DB.prepare('INSERT INTO api_usage(id,user_id,provider,service,model,input_units,cached_input_units,output_units,estimated_cost_usd,metadata_json) VALUES(?,?,?,?,?,?,?,?,?,?)').bind(crypto.randomUUID(),userId,provider,'selected-model-chat',out.model,Number(out.usage?.input_tokens||0),0,Number(out.usage?.output_tokens||0),0,JSON.stringify({runtimeId:runtime,customWeights:selected.customWeights,contractApplied:contract.applied,contractReasons:contract.reasons}))
+   c.env.DB.prepare('INSERT INTO api_usage(id,user_id,provider,service,model,input_units,cached_input_units,output_units,estimated_cost_usd,metadata_json) VALUES(?,?,?,?,?,?,?,?,?,?)').bind(crypto.randomUUID(),userId,provider,'selected-model-chat',out.model,Number(out.usage?.input_tokens||0),0,Number(out.usage?.output_tokens||0),0,JSON.stringify({runtimeId:runtime,customWeights:selected.customWeights,champion:runtime==='hector-experimental'?chatChampionEvidence():undefined,contractApplied:contract.applied,contractReasons:contract.reasons}))
   ]);
   await saveRollingSummary(c.env.DB,userId,conversationId);
-  return c.json({conversationId,message:{id:assistantMessageId,role:'assistant',content:contract.text},provider,model:out.model,runtimeId:runtime,runtime:selected,fallback:false,modelTier:'selected',usage:out.usage,contract:{applied:contract.applied,reasons:contract.reasons}});
+  return c.json({conversationId,message:{id:assistantMessageId,role:'assistant',content:contract.text},provider,model:out.model,runtimeId:runtime,runtime:selected,champion:runtime==='hector-experimental'?chatChampionEvidence():undefined,fallback:false,modelTier:'selected',usage:out.usage,contract:{applied:contract.applied,reasons:contract.reasons}});
  }catch(error){return c.json({error:error instanceof Error?error.message:'El modelo seleccionado no respondió',runtime:selected},502);}
 });

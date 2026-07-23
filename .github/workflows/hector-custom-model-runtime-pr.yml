@@ -5,12 +5,17 @@ on:
     branches: [main]
     paths:
       - 'model/hector-asi/inference/**'
+      - 'model/hector-asi/registry/chat-champion.json'
       - 'worker/lib/custom-model-runtime*'
+      - 'worker/lib/chat-champion*'
       - 'worker/lib/github-actions-oidc*'
       - 'worker/routes/model-chat.ts'
+      - 'worker/index.ts'
+      - 'tests/chat-champion-contract.test.mjs'
       - '.github/workflows/hector-custom-model-runtime-pr.yml'
       - '.github/workflows/deploy-hector-custom-model.yml'
       - '.github/workflows/hector-custom-model-chat.yml'
+      - '.github/workflows/hector-custom-model-smoke.yml'
 
 permissions:
   contents: read
@@ -29,35 +34,51 @@ jobs:
           python -m py_compile \
             model/hector-asi/inference/space/app.py \
             model/hector-asi/inference/deploy_hf_space.py \
-            model/hector-asi/inference/run_action_chat.py
-      - name: Validate immutable runtime contract
+            model/hector-asi/inference/run_action_chat.py \
+            model/hector-asi/inference/smoke_custom_model.py
+      - name: Validate promoted chat champion contract
         run: |
           python - <<'PY'
+          import json,re
           from pathlib import Path
+          manifest=json.loads(Path('model/hector-asi/registry/chat-champion.json').read_text())
           app=Path('model/hector-asi/inference/space/app.py').read_text()
           docker=Path('model/hector-asi/inference/space/Dockerfile').read_text()
           deploy=Path('model/hector-asi/inference/deploy_hf_space.py').read_text()
           action=Path('model/hector-asi/inference/run_action_chat.py').read_text()
+          smoke=Path('model/hector-asi/inference/smoke_custom_model.py').read_text()
           workflow=Path('.github/workflows/hector-custom-model-chat.yml').read_text()
+          smoke_workflow=Path('.github/workflows/hector-custom-model-smoke.yml').read_text()
           route=Path('worker/routes/model-chat.ts').read_text()
+          runtime=Path('worker/lib/custom-model-runtime.ts').read_text()
+          champion=Path('worker/lib/chat-champion.ts').read_text()
+          index=Path('worker/index.ts').read_text()
           oidc=Path('worker/lib/github-actions-oidc.ts').read_text()
-          for source in (app, route):
-              assert 'Qwen/Qwen2.5-1.5B-Instruct' in source
-              assert '989aa7980e4cf806f80c7fef2b1adb7bc71aa306' in source
-          assert 'job["baseModel"]' in action
-          assert 'job["baseRevision"]' in action
-          assert 'job["adapterSha256"]' in action
+          assert manifest['schemaVersion']==1 and manifest['promotionState']=='active'
+          assert re.fullmatch(r'hector-asi-qwen15-v\d+',manifest['runtimeId'])
+          assert manifest['baseModel']=='Qwen/Qwen2.5-1.5B-Instruct'
+          assert re.fullmatch(r'[a-f0-9]{40}',manifest['baseRevision'])
+          assert isinstance(manifest['artifactId'],int) and manifest['artifactId']>0
+          assert re.fullmatch(r'[a-f0-9]{64}',manifest['adapterSha256'])
+          assert manifest['adapterBytes']>30_000_000
+          assert isinstance(manifest['sourceRunId'],int) and manifest['sourceRunId']>0
           assert '/v1/chat/completions' in app
-          assert 'PeftModel.from_pretrained' in app and 'PeftModel.from_pretrained' in action
-          assert 'torch==2.7.1' in docker and 'torch==2.7.1' in workflow
+          assert 'PeftModel.from_pretrained' in app and 'PeftModel.from_pretrained' in action and 'PeftModel.from_pretrained' in smoke
+          assert 'torch==2.7.1' in docker and 'torch==2.7.1' in workflow and 'torch==2.7.1' in smoke_workflow
           assert 'private=True' in deploy
-          for source in (deploy, workflow, route):
-              assert 'e1170e7a2a4e2fb19ce66744720e178955ce02fea07531f1b187366c7fa8c502' in source
+          for source in (action,smoke,workflow,smoke_workflow):
+              assert 'chat-champion.json' in source
+          for source in (route,runtime,index):
+              assert 'CHAT_CHAMPION' in source
+          for field in ('runtimeId','baseModel','baseRevision','artifactId','adapterSha256','adapterBytes','sourceRunId'):
+              assert field in action and field in route
           assert 'id-token: write' in workflow
           assert "cron: '*/5 * * * *'" in workflow
           assert '/model-jobs/pending' in route
           assert 'hector-asi-model-inference' in oidc
           assert 'workflow_dispatch' in oidc and 'schedule' in oidc
           assert 'GITHUB_RUNNER_TOKEN' in route
-          print('runtime bundle and queued inference contract: OK')
+          assert 'parseChampion' in champion
+          print(json.dumps({'runtimeId':manifest['runtimeId'],'artifactId':manifest['artifactId'],'adapterSha256':manifest['adapterSha256']},indent=2))
+          print('promoted chat champion contract: OK')
           PY

@@ -24,8 +24,7 @@ jobs:
     runs-on: ubuntu-latest
     timeout-minutes: 45
     env:
-      ADAPTER_ARTIFACT_ID: '8548489661'
-      ADAPTER_SHA256: 'e1170e7a2a4e2fb19ce66744720e178955ce02fea07531f1b187366c7fa8c502'
+      CHAT_CHAMPION_MANIFEST: model/hector-asi/registry/chat-champion.json
       ADAPTER_DIR: /tmp/hector-adapter/adapter
       HF_HOME: /home/runner/.cache/huggingface
       TRANSFORMERS_CACHE: /home/runner/.cache/huggingface
@@ -33,6 +32,20 @@ jobs:
       HECTOR_WORKER_ORIGIN: https://hector-os.hectorhdzr035.workers.dev
     steps:
       - uses: actions/checkout@v4
+
+      - name: Load promoted chat champion
+        id: champion
+        shell: bash
+        run: |
+          set -euo pipefail
+          jq -e '.schemaVersion == 1 and .promotionState == "active" and (.runtimeId | length > 0) and (.artifactId > 0) and (.adapterSha256 | test("^[a-f0-9]{64}$")) and (.adapterBytes > 30000000)' "$CHAT_CHAMPION_MANIFEST" >/dev/null
+          echo "runtime_id=$(jq -r '.runtimeId' "$CHAT_CHAMPION_MANIFEST")" >> "$GITHUB_OUTPUT"
+          echo "base_model=$(jq -r '.baseModel' "$CHAT_CHAMPION_MANIFEST")" >> "$GITHUB_OUTPUT"
+          echo "base_revision=$(jq -r '.baseRevision' "$CHAT_CHAMPION_MANIFEST")" >> "$GITHUB_OUTPUT"
+          echo "artifact_id=$(jq -r '.artifactId' "$CHAT_CHAMPION_MANIFEST")" >> "$GITHUB_OUTPUT"
+          echo "adapter_sha256=$(jq -r '.adapterSha256' "$CHAT_CHAMPION_MANIFEST")" >> "$GITHUB_OUTPUT"
+          echo "adapter_bytes=$(jq -r '.adapterBytes' "$CHAT_CHAMPION_MANIFEST")" >> "$GITHUB_OUTPUT"
+          echo "source_run_id=$(jq -r '.sourceRunId' "$CHAT_CHAMPION_MANIFEST")" >> "$GITHUB_OUTPUT"
 
       - name: Resolve one authorized pending inference job
         id: resolve
@@ -61,7 +74,7 @@ jobs:
         uses: actions/cache@v4
         with:
           path: /home/runner/.cache/huggingface
-          key: qwen25-15b-989aa7980e4cf806f80c7fef2b1adb7bc71aa306-v1
+          key: qwen-chat-${{ steps.champion.outputs.base_revision }}-v1
 
       - name: Install CPU inference stack
         if: steps.resolve.outputs.job_id != ''
@@ -79,6 +92,9 @@ jobs:
         if: steps.resolve.outputs.job_id != ''
         env:
           GH_TOKEN: ${{ github.token }}
+          ADAPTER_ARTIFACT_ID: ${{ steps.champion.outputs.artifact_id }}
+          ADAPTER_SHA256: ${{ steps.champion.outputs.adapter_sha256 }}
+          ADAPTER_BYTES: ${{ steps.champion.outputs.adapter_bytes }}
         shell: bash
         run: |
           set -euo pipefail
@@ -93,9 +109,9 @@ jobs:
           test -n "$ADAPTER_FILE"
           test "$(sha256sum "$ADAPTER_FILE" | awk '{print $1}')" = "$ADAPTER_SHA256"
           cp -a "$(dirname "$ADAPTER_FILE")" /tmp/hector-adapter/adapter
-          test "$(stat -c%s "$ADAPTER_DIR/adapter_model.safetensors")" -eq 34895152
+          test "$(stat -c%s "$ADAPTER_DIR/adapter_model.safetensors")" -eq "$ADAPTER_BYTES"
 
-      - name: Generate response with base plus personalized LoRA weights
+      - name: Generate response with promoted personalized weights
         if: steps.resolve.outputs.job_id != ''
         env:
           MODEL_JOB_ID: ${{ steps.resolve.outputs.job_id }}
