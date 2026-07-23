@@ -1,0 +1,235 @@
+name: Deploy Hector custom model
+
+on:
+  workflow_dispatch:
+  push:
+    branches: [main]
+    paths:
+      - 'model/hector-asi/inference/**'
+      - '.github/workflows/deploy-hector-custom-model.yml'
+
+permissions:
+  contents: read
+  actions: read
+  issues: write
+
+concurrency:
+  group: hector-custom-model-production
+  cancel-in-progress: false
+
+jobs:
+  deploy-custom-model:
+    runs-on: ubuntu-latest
+    timeout-minutes: 120
+    env:
+      HF_TOKEN_RAW: ${{ secrets.HUGGINGFACE_TOKEN || secrets.HF_TOKEN }}
+      CLOUDFLARE_API_TOKEN_RAW: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+      CLOUDFLARE_ACCOUNT_ID: ${{ vars.CLOUDFLARE_ACCOUNT_ID }}
+      ADAPTER_ARTIFACT_ID: '8548489661'
+      ADAPTER_SHA256: 'e1170e7a2a4e2fb19ce66744720e178955ce02fea07531f1b187366c7fa8c502'
+      MODEL_RUNTIME_ID: 'hector-asi-qwen15-v10'
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+
+      - name: Prepare protected credentials
+        id: credentials
+        shell: bash
+        run: |
+          set -euo pipefail
+          HF_TOKEN="$(printf %s "$HF_TOKEN_RAW" | tr -d '[:space:]')"
+          CF_TOKEN="$(printf %s "$CLOUDFLARE_API_TOKEN_RAW" | tr -d '[:space:]')"
+          test -n "$HF_TOKEN"
+          test -n "$CF_TOKEN"
+          test -n "$CLOUDFLARE_ACCOUNT_ID"
+          echo "::add-mask::$HF_TOKEN"
+          echo "::add-mask::$CF_TOKEN"
+          echo "HF_TOKEN=$HF_TOKEN" >> "$GITHUB_ENV"
+          echo "CLOUDFLARE_API_TOKEN=$CF_TOKEN" >> "$GITHUB_ENV"
+
+      - name: Download immutable trained adapter
+        id: adapter
+        env:
+          GH_TOKEN: ${{ github.token }}
+        shell: bash
+        run: |
+          set -euo pipefail
+          mkdir -p /tmp/hector-artifact /tmp/hector-space/adapter
+          curl --fail --location --retry 4 \
+            -H "Authorization: Bearer $GH_TOKEN" \
+            -H "Accept: application/vnd.github+json" \
+            "https://api.github.com/repos/${GITHUB_REPOSITORY}/actions/artifacts/${ADAPTER_ARTIFACT_ID}/zip" \
+            -o /tmp/hector-adapter.zip
+          unzip -q /tmp/hector-adapter.zip -d /tmp/hector-artifact
+          ADAPTER_FILE="$(find /tmp/hector-artifact -type f -path '*/adapter/adapter_model.safetensors' -print -quit)"
+          test -n "$ADAPTER_FILE"
+          ACTUAL_SHA="$(sha256sum "$ADAPTER_FILE" | awk '{print $1}')"
+          test "$ACTUAL_SHA" = "$ADAPTER_SHA256"
+          ADAPTER_DIR="$(dirname "$ADAPTER_FILE")"
+          cp -a "$ADAPTER_DIR"/. /tmp/hector-space/adapter/
+          test "$(stat -c%s /tmp/hector-space/adapter/adapter_model.safetensors)" -gt 30000000
+          printf '{"artifactId":"%s","adapterSha256":"%s","sourceRunId":"29967020271"}\n' \
+            "$ADAPTER_ARTIFACT_ID" "$ACTUAL_SHA" > /tmp/hector-space/deployment-evidence.json
+
+      - name: Prepare private Space bundle
+        shell: bash
+        run: |
+          set -euo pipefail
+          cp -a model/hector-asi/inference/space/. /tmp/hector-space/
+          python -m py_compile /tmp/hector-space/app.py model/hector-asi/inference/deploy_hf_space.py
+          test -f /tmp/hector-space/Dockerfile
+          test -f /tmp/hector-space/adapter/adapter_config.json
+
+      - name: Install deployment client
+        run: python -m pip install --disable-pip-version-check 'huggingface_hub==0.34.4' 'requests==2.32.4'
+
+      - name: Create or update private inference Space
+        id: space
+        shell: bash
+        run: |
+          set -euo pipefail
+          python model/hector-asi/inference/deploy_hf_space.py \
+            --folder /tmp/hector-space \
+            --repo-name hector-asi-qwen15-v10-runtime \
+            --output /tmp/hector-space-deploy.json \
+            --commit-message "Deploy ${MODEL_RUNTIME_ID} from GitHub artifact ${ADAPTER_ARTIFACT_ID}"
+          SPACE_URL="$(python -c "import json; print(json.load(open('/tmp/hector-space-deploy.json'))['spaceUrl'])")"
+          SPACE_REPO="$(python -c "import json; print(json.load(open('/tmp/hector-space-deploy.json'))['repoId'])")"
+          echo "space_url=$SPACE_URL" >> "$GITHUB_OUTPUT"
+          echo "space_repo=$SPACE_REPO" >> "$GITHUB_OUTPUT"
+
+      - name: Wait for model weights to load
+        id: ready
+        env:
+          SPACE_URL: ${{ steps.space.outputs.space_url }}
+        shell: bash
+        run: |
+          python - <<'PY'
+          import json, os, sys, time
+          import requests
+          url=os.environ['SPACE_URL'].rstrip('/')+'/health'
+          headers={'Authorization':f"Bearer {os.environ['HF_TOKEN']}"}
+          last='no response'
+          for attempt in range(150):
+              try:
+                  response=requests.get(url,headers=headers,timeout=30)
+                  last=f"HTTP {response.status_code}: {response.text[:500]}"
+                  if response.status_code==200:
+                      data=response.json()
+                      print(json.dumps(data,ensure_ascii=False),flush=True)
+                      if data.get('ok') is True and data.get('adapterSha256')==os.environ['ADAPTER_SHA256']:
+                          sys.exit(0)
+                      if data.get('status')=='error':
+                          raise RuntimeError(data.get('error') or 'Space model load failed')
+              except Exception as exc:
+                  last=repr(exc)
+                  print(f'attempt {attempt+1}: {last}',flush=True)
+              time.sleep(20)
+          raise RuntimeError(f'El Space no quedó listo: {last}')
+          PY
+
+      - name: Verify direct inference with personalized weights
+        id: inference
+        env:
+          SPACE_URL: ${{ steps.space.outputs.space_url }}
+        shell: bash
+        run: |
+          python - <<'PY'
+          import json, os
+          import requests
+          url=os.environ['SPACE_URL'].rstrip('/')+'/v1/chat/completions'
+          payload={
+            'model':'hector-asi-qwen15-v10',
+            'messages':[{'role':'user','content':'Responde en una sola línea: modelo neuronal de Héctor operativo.'}],
+            'max_tokens':48,
+            'temperature':0.0
+          }
+          response=requests.post(url,headers={'Authorization':f"Bearer {os.environ['HF_TOKEN']}",'Content-Type':'application/json'},json=payload,timeout=180)
+          print(response.status_code,response.text[:3000])
+          response.raise_for_status()
+          data=response.json()
+          text=data.get('choices',[{}])[0].get('message',{}).get('content','').strip()
+          runtime=data.get('runtime',{})
+          assert text
+          assert data.get('model')=='hector-asi-qwen15-v10'
+          assert runtime.get('adapterSha256')==os.environ['ADAPTER_SHA256']
+          open('/tmp/direct-inference.json','w').write(json.dumps(data,indent=2,ensure_ascii=False)+'\n')
+          PY
+
+      - name: Install and validate Hector OS
+        id: validate
+        run: |
+          npm ci
+          npm run typecheck
+          npm test -- --passWithNoTests
+          npm run build
+
+      - name: Connect private Space to Hector ASI
+        id: configure
+        env:
+          SPACE_URL: ${{ steps.space.outputs.space_url }}
+        shell: bash
+        run: |
+          set -euo pipefail
+          printf '%s' 'true' | npx wrangler secret put HECTOR_CUSTOM_MODEL_ENABLED
+          printf '%s' "${SPACE_URL%/}/v1" | npx wrangler secret put HECTOR_CUSTOM_MODEL_BASE_URL
+          printf '%s' "$HF_TOKEN" | npx wrangler secret put HECTOR_CUSTOM_MODEL_TOKEN
+          printf '%s' "$MODEL_RUNTIME_ID" | npx wrangler secret put HECTOR_CUSTOM_MODEL_ID
+          printf '%s' "$MODEL_RUNTIME_ID" | npx wrangler secret put HECTOR_CUSTOM_MODEL_NAME
+          printf '%s' 'Héctor Qwen15 v10 · pesos propios' | npx wrangler secret put HECTOR_CUSTOM_MODEL_LABEL
+          printf '%s' '120000' | npx wrangler secret put HECTOR_CUSTOM_MODEL_TIMEOUT_MS
+
+      - name: Deploy Hector ASI with custom runtime enabled
+        id: worker
+        run: npx wrangler deploy
+
+      - name: Verify production health
+        id: health
+        run: curl -fsS https://hector-os.hectorhdzr035.workers.dev/health | tee /tmp/hector-production-health.json | jq -e '.ok == true'
+
+      - name: Publish deployment evidence
+        if: success()
+        env:
+          SPACE_REPO: ${{ steps.space.outputs.space_repo }}
+          SPACE_URL: ${{ steps.space.outputs.space_url }}
+        shell: bash
+        run: |
+          {
+            echo '## Hector custom model deployed'
+            echo
+            echo "- Runtime: \`$MODEL_RUNTIME_ID\`"
+            echo "- Base: \`Qwen/Qwen2.5-1.5B-Instruct@989aa7980e4cf806f80c7fef2b1adb7bc71aa306\`"
+            echo "- Adapter artifact: \`$ADAPTER_ARTIFACT_ID\`"
+            echo "- Adapter SHA-256: \`$ADAPTER_SHA256\`"
+            echo "- Private Space: \`$SPACE_REPO\`"
+            echo "- Private endpoint: \`${SPACE_URL%/}/v1/chat/completions\`"
+            echo '- Direct inference: success'
+            echo '- Hector ASI deploy and /health: success'
+            echo '- Chat command: `/modelo propio <mensaje>`'
+          } >> "$GITHUB_STEP_SUMMARY"
+
+      - name: Publish sanitized failure
+        if: failure()
+        env:
+          GH_TOKEN: ${{ github.token }}
+          CREDENTIALS_OUTCOME: ${{ steps.credentials.outcome }}
+          ADAPTER_OUTCOME: ${{ steps.adapter.outcome }}
+          SPACE_OUTCOME: ${{ steps.space.outcome }}
+          READY_OUTCOME: ${{ steps.ready.outcome }}
+          INFERENCE_OUTCOME: ${{ steps.inference.outcome }}
+          VALIDATE_OUTCOME: ${{ steps.validate.outcome }}
+          CONFIGURE_OUTCOME: ${{ steps.configure.outcome }}
+          WORKER_OUTCOME: ${{ steps.worker.outcome }}
+          HEALTH_OUTCOME: ${{ steps.health.outcome }}
+        shell: bash
+        run: |
+          BODY="El despliegue del modelo propio falló sin exponer secretos.\n\n- credenciales: ${CREDENTIALS_OUTCOME}\n- artefacto: ${ADAPTER_OUTCOME}\n- Space: ${SPACE_OUTCOME}\n- carga de pesos: ${READY_OUTCOME}\n- inferencia directa: ${INFERENCE_OUTCOME}\n- validación Héctor OS: ${VALIDATE_OUTCOME}\n- configuración: ${CONFIGURE_OUTCOME}\n- Worker: ${WORKER_OUTCOME}\n- salud: ${HEALTH_OUTCOME}\n\nRun: ${GITHUB_SERVER_URL}/${GITHUB_REPOSITORY}/actions/runs/${GITHUB_RUN_ID}"
+          gh issue create --title "[custom-model-deploy] FALLO ${GITHUB_SHA::7}" --body "$BODY"
