@@ -1,0 +1,44 @@
+{
+  "schemaVersion": "1.0.0",
+  "experimentId": "hector-asi-qwen15-v16",
+  "status": "training",
+  "hypothesis": "Con el mismo currículo ampliado 40/20 y LoRA atención-only rango 32, tres épocas con LR 3e-5 pueden superar el control v13 de dos épocas sin introducir la máscara assistant-only ni módulos MLP.",
+  "baseModel": {
+    "repository": "Qwen/Qwen2.5-1.5B-Instruct",
+    "revision": "989aa7980e4cf806f80c7fef2b1adb7bc71aa306",
+    "license": "Apache-2.0"
+  },
+  "data": {
+    "trainExamples": 40,
+    "heldOutExamples": 20,
+    "privateUserData": false,
+    "source": "author-generated Apache-2.0-compatible",
+    "deduplication": "unique id and normalized user prompt",
+    "contaminationGate": "disjoint ids between train and held-out"
+  },
+  "method": {
+    "stage": "SFT",
+    "adapter": "LoRA",
+    "rank": 32,
+    "alpha": 64,
+    "dropout": 0.05,
+    "targetModules": ["q_proj", "k_proj", "v_proj", "o_proj"],
+    "epochs": 3,
+    "learningRate": 0.00003,
+    "weightDecay": 0.01,
+    "seed": 35,
+    "replicas": 2
+  },
+  "promotion": {
+    "eligibleForChampion": false,
+    "requiresByteIdenticalReplicas": true,
+    "minimumRelativeHeldOutImprovement": 0.03,
+    "requiresComparisonAgainstV13V14V15": true,
+    "rollback": "Do not load adapter; frozen base remains unchanged."
+  },
+  "artifact": {
+    "storage": "GitHub Actions artifact, outside Git",
+    "retentionDays": 90,
+    "expectedPath": "adapter/adapter_model.safetensors"
+  }
+}
