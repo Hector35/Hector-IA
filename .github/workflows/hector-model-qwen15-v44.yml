@@ -1,0 +1,120 @@
+name: Hector model Qwen15 v44 preference continuation
+
+on:
+  pull_request:
+    branches: [main]
+    paths:
+      - '.github/workflows/hector-model-qwen15-v44.yml'
+      - 'model/hector-asi/training/train_qwen15_v44_pairwise_from_v15.py'
+      - 'model/hector-asi/data/qwen15-v44-preferences-*.jsonl'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  actions: read
+
+concurrency:
+  group: hector-qwen15-v44-${{ github.ref }}
+  cancel-in-progress: false
+
+jobs:
+  train-qwen15-v44:
+    runs-on: ubuntu-latest
+    timeout-minutes: 120
+    env:
+      SOURCE_ARTIFACT_ID: '8551187584'
+      SOURCE_ADAPTER_SHA256: 'ef9d36b288e100bbcddbab475758699416908627a59206c9a82f60ce711d66dc'
+      SOURCE_ADAPTER_BYTES: '73911112'
+      TRAIN: model/hector-asi/data/qwen15-v44-preferences-train.jsonl
+      TEST: model/hector-asi/data/qwen15-v44-preferences-test.jsonl
+      SOURCE_DIR: /tmp/hector-v15/adapter
+      OUT_A: artifacts/hector-asi-qwen15-v44-a
+      OUT_B: artifacts/hector-asi-qwen15-v44-b
+      HF_HOME: /home/runner/.cache/huggingface
+      TOKENIZERS_PARALLELISM: 'false'
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+          cache: pip
+
+      - name: Validate sources and trainer
+        run: |
+          python -m py_compile model/hector-asi/training/train_qwen15_v44_pairwise_from_v15.py
+          python - <<'PY'
+          import json
+          from pathlib import Path
+          train=[json.loads(x) for x in Path('${{ env.TRAIN }}').read_text().splitlines() if x.strip()]
+          test=[json.loads(x) for x in Path('${{ env.TEST }}').read_text().splitlines() if x.strip()]
+          norm=lambda s:' '.join(s.lower().split())
+          assert len(train)==12 and len(test)==6
+          assert not ({x['id'] for x in train}&{x['id'] for x in test})
+          assert not ({norm(x['prompt']) for x in train}&{norm(x['prompt']) for x in test})
+          assert all({'id','prompt','chosen','rejected','domain'}<=set(x) for x in train+test)
+          PY
+
+      - name: Download and verify active v15 adapter
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          set -euo pipefail
+          mkdir -p /tmp/hector-v15-zip /tmp/hector-v15
+          curl --fail --location --retry 4 \
+            -H "Authorization: Bearer $GH_TOKEN" \
+            -H "Accept: application/vnd.github+json" \
+            "https://api.github.com/repos/${GITHUB_REPOSITORY}/actions/artifacts/${SOURCE_ARTIFACT_ID}/zip" \
+            -o /tmp/hector-v15.zip
+          unzip -q /tmp/hector-v15.zip -d /tmp/hector-v15-zip
+          ADAPTER_FILE="$(find /tmp/hector-v15-zip -type f -path '*/adapter/adapter_model.safetensors' -print -quit)"
+          test -n "$ADAPTER_FILE"
+          test "$(sha256sum "$ADAPTER_FILE" | awk '{print $1}')" = "$SOURCE_ADAPTER_SHA256"
+          test "$(stat -c%s "$ADAPTER_FILE")" -eq "$SOURCE_ADAPTER_BYTES"
+          cp -a "$(dirname "$ADAPTER_FILE")" "$SOURCE_DIR"
+
+      - name: Install pinned CPU stack
+        run: |
+          python -m pip install --disable-pip-version-check --index-url https://download.pytorch.org/whl/cpu torch==2.7.1
+          python -m pip install --disable-pip-version-check accelerate==1.8.1 huggingface_hub==0.34.4 peft==0.16.0 safetensors==0.5.3 transformers==4.53.2
+
+      - name: Train two real preference continuations
+        run: |
+          set -euo pipefail
+          python model/hector-asi/training/train_qwen15_v44_pairwise_from_v15.py --train "$TRAIN" --test "$TEST" --source-adapter "$SOURCE_DIR" --out "$OUT_A" --seed 35 | tee /tmp/v44-a.log
+          python model/hector-asi/training/train_qwen15_v44_pairwise_from_v15.py --train "$TRAIN" --test "$TEST" --source-adapter "$SOURCE_DIR" --out "$OUT_B" --seed 35 | tee /tmp/v44-b.log
+
+      - name: Verify reproducibility and promotion gates
+        run: |
+          set -euo pipefail
+          A="$OUT_A/adapter/adapter_model.safetensors"
+          B="$OUT_B/adapter/adapter_model.safetensors"
+          test -f "$A" -a -f "$B"
+          cmp "$A" "$B"
+          test "$(sha256sum "$A" | awk '{print $1}')" = "$(sha256sum "$B" | awk '{print $1}')"
+          test "$(stat -c%s "$A")" -gt 50000000
+          python - <<'PY'
+          import json
+          from pathlib import Path
+          a=json.loads(Path('artifacts/hector-asi-qwen15-v44-a/manifest.json').read_text())
+          b=json.loads(Path('artifacts/hector-asi-qwen15-v44-b/manifest.json').read_text())
+          assert a['adapterSha256']==b['adapterSha256']
+          assert a['adapterBytes']==b['adapterBytes']
+          assert a['sourceRuntime']=='hector-asi-qwen15-v15'
+          assert a['sourceAdapterSha256']=='ef9d36b288e100bbcddbab475758699416908627a59206c9a82f60ce711d66dc'
+          assert a['trainRows']==12 and a['testRows']==6 and a['steps']==12
+          assert a['after']['accuracy']>=a['before']['accuracy']
+          assert a['after']['mean_margin']>a['before']['mean_margin']
+          PY
+
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: hector-asi-qwen15-v44-${{ github.run_id }}
+          path: |
+            artifacts/hector-asi-qwen15-v44-a
+            artifacts/hector-asi-qwen15-v44-b
+            /tmp/v44-a.log
+            /tmp/v44-b.log
+          retention-days: 90
+          if-no-files-found: warn
