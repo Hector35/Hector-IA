@@ -13,6 +13,10 @@ permissions:
   contents: read
   actions: read
 
+concurrency:
+  group: qwen15-v24-behavioral-${{ github.event.pull_request.number || github.run_id }}
+  cancel-in-progress: false
+
 jobs:
   evaluate-qwen15-v24:
     runs-on: ubuntu-latest
