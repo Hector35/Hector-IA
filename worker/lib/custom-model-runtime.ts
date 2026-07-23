@@ -9,7 +9,7 @@ export type HectorRuntimeCatalogItem={
  description:string;
  available:boolean;
  customWeights:boolean;
- status:'active'|'configured'|'trained-offline'|'disabled';
+ status:'active'|'configured'|'queued'|'trained-offline'|'disabled';
  model?:string;
  reason?:string;
 };
@@ -45,19 +45,27 @@ export function stripHectorRuntimeDirective(message:string){
  return stripped||message.trim();
 }
 
-export function hectorRuntimeCatalog(env:Bindings):HectorRuntimeCatalogItem[]{
+export function hasCustomModelEndpoint(env:Bindings){
  const custom=env as CustomBindings;
- const customConfigured=custom.HECTOR_CUSTOM_MODEL_ENABLED!=='false'&&Boolean(custom.HECTOR_CUSTOM_MODEL_BASE_URL?.trim())&&Boolean((custom.HECTOR_CUSTOM_MODEL_TOKEN||env.HUGGINGFACE_TOKEN)?.trim());
+ return custom.HECTOR_CUSTOM_MODEL_ENABLED!=='false'&&Boolean(custom.HECTOR_CUSTOM_MODEL_BASE_URL?.trim())&&Boolean((custom.HECTOR_CUSTOM_MODEL_TOKEN||env.HUGGINGFACE_TOKEN)?.trim());
+}
+
+export function hasQueuedCustomInference(env:Bindings){return Boolean(env.GITHUB_RUNNER_TOKEN?.trim());}
+
+export function hectorRuntimeCatalog(env:Bindings):HectorRuntimeCatalogItem[]{
+ const custom=env as CustomBindings,endpointConfigured=hasCustomModelEndpoint(env),queued=hasQueuedCustomInference(env),available=endpointConfigured||queued;
+ const status:HectorRuntimeCatalogItem['status']=endpointConfigured?'configured':queued?'queued':'trained-offline';
+ const reason=endpointConfigured?'Endpoint neuronal personalizado configurado':queued?'Los pesos se ejecutan bajo demanda en GitHub Actions; la respuesta puede tardar varios minutos':'Pesos entrenados y registrados, pero falta un runtime autorizado';
  return[
   {id:'auto',label:'Automático',description:'Héctor elige el runtime disponible más adecuado.',available:true,customWeights:false,status:'active'},
   {id:'hector-base',label:'Héctor Base',description:'Workers AI y reglas locales.',available:env.CLOUDFLARE_AI_ENABLED!=='false'&&Boolean(env.AI),customWeights:false,status:env.CLOUDFLARE_AI_ENABLED!=='false'&&Boolean(env.AI)?'active':'disabled',model:env.CLOUDFLARE_MODEL_FAST},
   {id:'hector-qwen',label:'Héctor Qwen',description:'Qwen abierto mediante Hugging Face.',available:env.HECTOR_QWEN_ENABLED!=='false'&&Boolean(env.HUGGINGFACE_TOKEN?.trim()),customWeights:false,status:env.HECTOR_QWEN_ENABLED!=='false'&&Boolean(env.HUGGINGFACE_TOKEN?.trim())?'active':'disabled',model:env.HECTOR_QWEN_MODEL},
-  {id:'hector-experimental',label:custom.HECTOR_CUSTOM_MODEL_LABEL||'Héctor experimental',description:'Adaptador neuronal propio líder. Requiere un endpoint de inferencia que cargue la base y sus pesos LoRA.',available:customConfigured,customWeights:true,status:customConfigured?'configured':'trained-offline',model:custom.HECTOR_CUSTOM_MODEL_ID||'hector-asi-qwen15-v10',reason:customConfigured?'Endpoint personalizado configurado':'Pesos entrenados y registrados, pero todavía no desplegados en un servidor de inferencia'}
+  {id:'hector-experimental',label:custom.HECTOR_CUSTOM_MODEL_LABEL||'Héctor Qwen15 v10 · pesos propios',description:endpointConfigured?'Adaptador neuronal propio servido por un endpoint dedicado.':'Adaptador neuronal propio cargado bajo demanda en cómputo gratuito reproducible.',available,customWeights:true,status,model:custom.HECTOR_CUSTOM_MODEL_ID||'hector-asi-qwen15-v10',reason}
  ];
 }
 
 export function renderHectorRuntimeCatalog(env:Bindings){
- const lines=hectorRuntimeCatalog(env).map(item=>`- **${item.label}** (${item.id}): ${item.available?'disponible':item.status==='trained-offline'?'entrenado, falta desplegar':'no disponible'}${item.model?` · ${item.model}`:''}${item.reason?` · ${item.reason}`:''}`);
+ const lines=hectorRuntimeCatalog(env).map(item=>`- **${item.label}** (${item.id}): ${item.available?item.status==='queued'?'disponible bajo demanda':'disponible':item.status==='trained-offline'?'entrenado, falta runtime':'no disponible'}${item.model?` · ${item.model}`:''}${item.reason?` · ${item.reason}`:''}`);
  return `## Modelos de Héctor ASI\n${lines.join('\n')}\n\nComandos: \`/modelo base <mensaje>\`, \`/modelo qwen <mensaje>\` o \`/modelo propio <mensaje>\`.`;
 }
 
@@ -67,8 +75,7 @@ type CustomChatResponse={id?:string;choices?:Array<{message?:{content?:string}}>
 
 export async function callHectorExperimental(env:Bindings,instructions:string,messages:Array<{role:'user'|'assistant';content:string}>){
  const custom=env as CustomBindings;
- const item=hectorRuntimeCatalog(env).find(entry=>entry.id==='hector-experimental')!;
- if(!item.available)throw new Error(item.reason||'El modelo experimental no está desplegado');
+ if(!hasCustomModelEndpoint(env))throw new Error('El endpoint dedicado del modelo propio no está configurado');
  const token=(custom.HECTOR_CUSTOM_MODEL_TOKEN||env.HUGGINGFACE_TOKEN||'').trim();
  const timeout=Number(custom.HECTOR_CUSTOM_MODEL_TIMEOUT_MS),timeoutMs=Number.isFinite(timeout)&&timeout>=1000?Math.min(120_000,timeout):60_000;
  const controller=new AbortController(),timer=setTimeout(()=>controller.abort(),timeoutMs);
