@@ -36,8 +36,17 @@ jobs:
         run: |
           set -euo pipefail
           python -m py_compile model/hector-asi/training/evaluate_qwen15_v56_vs_champion.py
-          test "$(wc -l < model/hector-asi/evals/qwen15-v51-hidden.jsonl)" -eq 18
-          test "$(grep -c '"'"'critical"'"':true' model/hector-asi/evals/qwen15-v51-hidden.jsonl)" -eq 6
+          python - <<'PY'
+          import json
+          from pathlib import Path
+          path=Path('model/hector-asi/evals/qwen15-v51-hidden.jsonl')
+          rows=[json.loads(line) for line in path.read_text().splitlines() if line.strip()]
+          assert len(rows)==18
+          assert len({row['id'] for row in rows})==18
+          assert sum(bool(row.get('critical')) for row in rows)==6
+          assert all(row.get('prompt') for row in rows)
+          print('sealed hidden rows=18 critical=6')
+          PY
       - name: Download and verify immutable adapters
         env:
           GH_TOKEN: ${{ github.token }}
