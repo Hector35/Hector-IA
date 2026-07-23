@@ -5,8 +5,12 @@ on:
     branches: [main]
     paths:
       - 'model/hector-asi/inference/**'
+      - 'worker/lib/custom-model-runtime*'
+      - 'worker/lib/github-actions-oidc*'
+      - 'worker/routes/model-chat.ts'
       - '.github/workflows/hector-custom-model-runtime-pr.yml'
       - '.github/workflows/deploy-hector-custom-model.yml'
+      - '.github/workflows/hector-custom-model-chat.yml'
 
 permissions:
   contents: read
@@ -24,7 +28,8 @@ jobs:
         run: |
           python -m py_compile \
             model/hector-asi/inference/space/app.py \
-            model/hector-asi/inference/deploy_hf_space.py
+            model/hector-asi/inference/deploy_hf_space.py \
+            model/hector-asi/inference/run_action_chat.py
       - name: Validate immutable runtime contract
         run: |
           python - <<'PY'
@@ -32,12 +37,22 @@ jobs:
           app=Path('model/hector-asi/inference/space/app.py').read_text()
           docker=Path('model/hector-asi/inference/space/Dockerfile').read_text()
           deploy=Path('model/hector-asi/inference/deploy_hf_space.py').read_text()
-          assert 'Qwen/Qwen2.5-1.5B-Instruct' in app
-          assert '989aa7980e4cf806f80c7fef2b1adb7bc71aa306' in app
+          action=Path('model/hector-asi/inference/run_action_chat.py').read_text()
+          workflow=Path('.github/workflows/hector-custom-model-chat.yml').read_text()
+          route=Path('worker/routes/model-chat.ts').read_text()
+          oidc=Path('worker/lib/github-actions-oidc.ts').read_text()
+          for source in (app, action, route):
+              assert 'Qwen/Qwen2.5-1.5B-Instruct' in source
+              assert '989aa7980e4cf806f80c7fef2b1adb7bc71aa306' in source
           assert '/v1/chat/completions' in app
-          assert 'PeftModel.from_pretrained' in app
-          assert 'torch==2.7.1' in docker
+          assert 'PeftModel.from_pretrained' in app and 'PeftModel.from_pretrained' in action
+          assert 'torch==2.7.1' in docker and 'torch==2.7.1' in workflow
           assert 'private=True' in deploy
-          assert 'e1170e7a2a4e2fb19ce66744720e178955ce02fea07531f1b187366c7fa8c502' in deploy
-          print('runtime bundle contract: OK')
+          for source in (deploy, workflow, route):
+              assert 'e1170e7a2a4e2fb19ce66744720e178955ce02fea07531f1b187366c7fa8c502' in source
+          assert 'id-token: write' in workflow
+          assert 'hector-asi-model-inference' in oidc
+          assert 'workflow_dispatch' in oidc
+          assert 'GITHUB_RUNNER_TOKEN' in route
+          print('runtime bundle and queued inference contract: OK')
           PY
