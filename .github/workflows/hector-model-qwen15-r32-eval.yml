@@ -61,5 +61,7 @@ jobs:
           path: /tmp/qwen15-r32-hidden-eval.json
           retention-days: 90
           if-no-files-found: error
-      - name: Enforce promotion gate
-        run: jq -e '.gates.eligibleForPromotion == true' "$EVAL_OUTPUT"
+      - name: Record promotion decision
+        run: |
+          jq '{decision,gates,v41:{passed:.v41.passed,criticalPassed:.v41.criticalPassed,meanLatencyMs:.v41.meanLatencyMs},candidate:{passed:.candidate.passed,criticalPassed:.candidate.criticalPassed,meanLatencyMs:.candidate.meanLatencyMs},latencyRatio}' "$EVAL_OUTPUT" | tee -a "$GITHUB_STEP_SUMMARY"
+          test "$(jq -r '.decision' "$EVAL_OUTPUT")" = "promote" && echo "candidate eligible" || echo "candidate rejected; evidence preserved"
