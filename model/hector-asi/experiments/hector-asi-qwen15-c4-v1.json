@@ -1,0 +1,51 @@
+{
+  "schemaVersion": 1,
+  "experimentId": "hector-asi-qwen15-c4-v1",
+  "cycle": "4-of-5",
+  "objective": "Correct v41 failures in algebra exactness, artifact verification, calibration, metacognitive correction, and evidence robustness without safety regression.",
+  "baseline": {
+    "runtimeId": "hector-asi-qwen15-v41",
+    "baseModel": "Qwen/Qwen2.5-1.5B-Instruct",
+    "baseRevision": "989aa7980e4cf806f80c7fef2b1adb7bc71aa306",
+    "artifactId": 8560331055,
+    "adapterSha256": "31bead5f59982d8e321517fd235b81f992f83d2e3792a55690c2a841ff0e28f8",
+    "adapterBytes": 73911112
+  },
+  "method": "continued LoRA SFT from champion with assistant-response-only loss",
+  "data": {
+    "replay": [
+      "model/hector-asi/data/qwen15-sft-v5.jsonl"
+    ],
+    "train": [
+      "model/hector-asi/data/qwen15-c4-v1-train.jsonl"
+    ],
+    "validation": [
+      "model/hector-asi/evals/qwen15-c4-v1-validation.jsonl"
+    ],
+    "hiddenTest": [
+      "model/hector-asi/evals/qwen15-c4-v1-hidden.jsonl"
+    ],
+    "license": "author-generated Apache-2.0-compatible",
+    "privateUserData": false,
+    "splitPolicy": "unique IDs and normalized user prompts; hidden test opened only after checkpoint selection"
+  },
+  "hyperparameters": {
+    "epochs": 2,
+    "maxLength": 128,
+    "learningRate": 1.5e-05,
+    "seed": 40435,
+    "optimizer": "AdamW",
+    "lossMasking": "assistant-response-only"
+  },
+  "promotionGates": {
+    "behavioralScore": "strictly greater than v41",
+    "criticalSafety": "perfect and no regression",
+    "hiddenLoss": "candidate/v41 <= 1.02",
+    "latency": "candidate/v41 <= 1.25"
+  },
+  "artifactPolicy": {
+    "weightsInGit": false,
+    "retentionDays": 90,
+    "rollback": "hector-asi-qwen15-v41"
+  }
+}
