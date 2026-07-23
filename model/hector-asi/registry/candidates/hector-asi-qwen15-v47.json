@@ -1,0 +1,34 @@
+{
+  "schemaVersion": "1.0.0",
+  "id": "hector-asi-qwen15-v47",
+  "status": "behavioral-evaluation-pending",
+  "baseModel": {"repository": "Qwen/Qwen2.5-1.5B-Instruct", "revision": "989aa7980e4cf806f80c7fef2b1adb7bc71aa306"},
+  "sourceAdapter": {"id": "hector-asi-qwen15-v41", "artifactId": 8560331055, "sha256": "31bead5f59982d8e321517fd235b81f992f83d2e3792a55690c2a841ff0e28f8"},
+  "training": {
+    "method": "minimal-pairwise-continuation-from-v41",
+    "runId": 30013105042,
+    "artifactId": 8566205174,
+    "artifactName": "hector-asi-qwen15-v47-30013105042",
+    "artifactDigest": "sha256:cbcd7f38b223681938aa0771787536424f94a74f137d9e70381021b49e31da5d",
+    "adapterSha256": "874bc12b91e592d62d688b88363b8d9e00536a492aec5cf441abfb32233b8da9",
+    "adapterBytes": 73911112,
+    "replicasByteIdentical": true,
+    "expiresAt": "2026-10-21T13:51:49Z",
+    "trainRows": 12,
+    "sealedTestRows": 8,
+    "epochs": 1,
+    "steps": 12,
+    "learningRate": 0.000001,
+    "beta": 0.1,
+    "seed": 35,
+    "trainableParameters": 18464768,
+    "durationSecondsPerReplica": 209.38,
+    "peakRssKiB": 9698340,
+    "hardware": "GitHub hosted CPU, 4 threads"
+  },
+  "pairwiseEvaluation": {
+    "before": {"accuracy": 0.75, "meanMargin": 0.7091486304998398, "criticalPassed": 3, "criticalTotal": 3},
+    "after": {"accuracy": 0.75, "meanMargin": 0.8971051722764969, "criticalPassed": 3, "criticalTotal": 3}
+  },
+  "promotion": {"currentChampion": "hector-asi-qwen15-v41", "eligible": false, "blockedBy": "Pending sealed generative comparison against champion v41", "rollback": "hector-asi-qwen15-v41"}
+}
