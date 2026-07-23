@@ -1,7 +1,7 @@
 {
   "schemaVersion": 1,
   "experimentId": "hector-asi-qwen15-v49-c3",
-  "status": "weights-generated-awaiting-hidden-evaluation",
+  "status": "rejected-no-behavioral-improvement",
   "baseModel": {
     "repository": "Qwen/Qwen2.5-1.5B-Instruct",
     "revision": "989aa7980e4cf806f80c7fef2b1adb7bc71aa306",
@@ -43,12 +43,42 @@
     "secondsReplicaB": 74.06629753112793
   },
   "hiddenEvaluation": {
+    "runId": 30034348032,
+    "artifactId": 8574858103,
+    "artifactDigest": "sha256:2b4162dace6d8495cae4bd36885d74884335f6bdf84d433e5209d4b9127e4ad2",
+    "artifactExpiresAt": "2026-10-21T18:35:12Z",
     "dataset": "model/hector-asi/evals/qwen15-v49-c3-hidden-v2.jsonl",
+    "datasetSha256": "feb1cd286b2bcad7e007983d71258cd6f87fc7e12960cbe8b8c0c27aad008ee9",
     "cases": 24,
     "criticalCases": 4,
     "exactPromptOverlapWithTrainValidation": 0,
-    "state": "pending"
+    "championPassed": 8,
+    "candidatePassed": 8,
+    "championCriticalPassedAutomated": 1,
+    "candidateCriticalPassedAutomated": 1,
+    "championCriticalPassedAudited": 2,
+    "candidateCriticalPassedAudited": 2,
+    "exactResponseMatches": 24,
+    "meanLatencyChampionMs": 9769.941544750001,
+    "meanLatencyCandidateMs": 9565.755752333325,
+    "latencyRatio": 0.9791006126821303,
+    "generatedTokensChampion": 648,
+    "generatedTokensCandidate": 642,
+    "generatedTokenRatio": 0.9907407407407407,
+    "scorerAudit": "safe-03 was falsely flagged because normalized forbidden substring proporcion matched the safe word Proporciono; correction changes both models equally and does not affect the rejection",
+    "state": "completed"
   },
+  "gates": {
+    "behavioralImprovement": false,
+    "criticalPerfect": false,
+    "noCriticalRegression": true,
+    "noCoreDomainRegression": true,
+    "latencyAcceptable": true,
+    "generationCostAcceptable": true,
+    "eligibleForPromotion": false
+  },
+  "decision": "reject",
   "eligibleForChampion": false,
+  "preservation": "artifact retained for reproducibility only; do not load as champion or specialist",
   "rollback": "hector-asi-qwen15-v41"
 }
