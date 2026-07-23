@@ -1,0 +1,104 @@
+name: Hector custom model smoke
+
+on:
+  workflow_dispatch:
+  push:
+    branches: [main]
+    paths:
+      - '.github/workflows/hector-custom-model-smoke.yml'
+      - 'model/hector-asi/inference/smoke_custom_model.py'
+
+permissions:
+  contents: read
+  actions: read
+
+concurrency:
+  group: hector-custom-model-smoke
+  cancel-in-progress: false
+
+jobs:
+  smoke:
+    runs-on: ubuntu-latest
+    timeout-minutes: 45
+    env:
+      ADAPTER_ARTIFACT_ID: '8548489661'
+      ADAPTER_SHA256: 'e1170e7a2a4e2fb19ce66744720e178955ce02fea07531f1b187366c7fa8c502'
+      ADAPTER_DIR: /tmp/hector-adapter/adapter
+      SMOKE_OUTPUT: /tmp/hector-custom-model-smoke.json
+      HF_HOME: /home/runner/.cache/huggingface
+      TRANSFORMERS_CACHE: /home/runner/.cache/huggingface
+      TOKENIZERS_PARALLELISM: 'false'
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Wait for Hector ASI custom queue deployment
+        shell: bash
+        run: |
+          set -euo pipefail
+          for attempt in $(seq 1 60); do
+            if curl -fsS https://hector-os.hectorhdzr035.workers.dev/health > /tmp/hector-health.json; then
+              cat /tmp/hector-health.json
+              if jq -e '.ok == true and .customModel.runtime == "hector-asi-qwen15-v10" and .customModel.mode == "github-actions"' /tmp/hector-health.json >/dev/null; then
+                exit 0
+              fi
+            fi
+            sleep 10
+          done
+          echo 'Producción no reportó la cola del modelo propio' >&2
+          exit 1
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+          cache: pip
+          cache-dependency-path: model/hector-asi/inference/space/requirements.txt
+
+      - name: Restore frozen base model cache
+        uses: actions/cache@v4
+        with:
+          path: /home/runner/.cache/huggingface
+          key: qwen25-15b-989aa7980e4cf806f80c7fef2b1adb7bc71aa306-v1
+
+      - name: Install CPU inference stack
+        run: |
+          python -m pip install --disable-pip-version-check --index-url https://download.pytorch.org/whl/cpu torch==2.7.1
+          python -m pip install --disable-pip-version-check \
+            accelerate==1.8.1 \
+            huggingface_hub==0.34.4 \
+            peft==0.16.0 \
+            safetensors==0.5.3 \
+            transformers==4.53.2
+
+      - name: Download and verify immutable Hector adapter
+        env:
+          GH_TOKEN: ${{ github.token }}
+        shell: bash
+        run: |
+          set -euo pipefail
+          mkdir -p /tmp/hector-artifact /tmp/hector-adapter
+          curl --fail --location --retry 4 \
+            -H "Authorization: Bearer $GH_TOKEN" \
+            -H "Accept: application/vnd.github+json" \
+            "https://api.github.com/repos/${GITHUB_REPOSITORY}/actions/artifacts/${ADAPTER_ARTIFACT_ID}/zip" \
+            -o /tmp/hector-adapter.zip
+          unzip -q /tmp/hector-adapter.zip -d /tmp/hector-artifact
+          ADAPTER_FILE="$(find /tmp/hector-artifact -type f -path '*/adapter/adapter_model.safetensors' -print -quit)"
+          test -n "$ADAPTER_FILE"
+          test "$(sha256sum "$ADAPTER_FILE" | awk '{print $1}')" = "$ADAPTER_SHA256"
+          cp -a "$(dirname "$ADAPTER_FILE")" /tmp/hector-adapter/adapter
+          test "$(stat -c%s "$ADAPTER_DIR/adapter_model.safetensors")" -eq 34895152
+
+      - name: Generate real neural response
+        run: python model/hector-asi/inference/smoke_custom_model.py
+
+      - name: Validate evidence
+        run: |
+          jq -e '.ok == true and .runtimeId == "hector-asi-qwen15-v10" and .baseRevision == "989aa7980e4cf806f80c7fef2b1adb7bc71aa306" and .adapterSha256 == "e1170e7a2a4e2fb19ce66744720e178955ce02fea07531f1b187366c7fa8c502" and .adapterBytes == 34895152 and (.response | length > 0)' "$SMOKE_OUTPUT"
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: hector-custom-model-smoke-${{ github.run_id }}
+          path: |
+            /tmp/hector-custom-model-smoke.json
+            /tmp/hector-health.json
+          retention-days: 30
