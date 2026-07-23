@@ -18,8 +18,8 @@ def sha(p):
  return h.hexdigest()
 def norm(s):return ' '.join(unicodedata.normalize('NFKD',s).encode('ascii','ignore').decode().lower().split())
 def rows(p):return [json.loads(x) for x in Path(p).read_text().splitlines() if x.strip()]
-def read_pairs(p):
- r=rows(p);assert len(r)==8 and len({x['id'] for x in r})==8 and len({norm(x['prompt']) for x in r})==8
+def read_pairs(p,expected):
+ r=rows(p);assert len(r)==expected and len({x['id'] for x in r})==expected and len({norm(x['prompt']) for x in r})==expected
  assert all(x.get('verified') is True and x.get('provenance')=='author-generated' and x.get('license')=='Apache-2.0-compatible' for x in r);return r
 def read_replay(p):
  r=rows(p);assert len(r)==24 and len({x['id'] for x in r})==24
@@ -59,7 +59,7 @@ def behavior(model,tok,cases):
 def rss():return resource.getrusage(resource.RUSAGE_SELF).ru_maxrss/1024
 def main():
  a=cli();set_seed(a.seed);torch.use_deterministic_algorithms(True);torch.set_num_threads(1);torch.set_num_interop_threads(1);started=time.time();src=Path(a.source_adapter);wf=src/'adapter_model.safetensors';assert sha(wf)==BASE_SHA and wf.stat().st_size==BASE_BYTES
- tr,rep,va,hi=read_pairs(a.pairs),read_replay(a.replay),read_pairs(a.validation),read_hidden(a.hidden);sig=lambda rs:{norm(x.get('prompt') or next(m['content'] for m in x['messages'] if m['role']=='user')) for x in rs};assert not sig(tr)&sig(va) and not sig(tr)&sig(hi) and not sig(va)&sig(hi)
+ tr,rep,va,hi=read_pairs(a.pairs,8),read_replay(a.replay),read_pairs(a.validation,4),read_hidden(a.hidden);sig=lambda rs:{norm(x.get('prompt') or next(m['content'] for m in x['messages'] if m['role']=='user')) for x in rs};assert not sig(tr)&sig(va) and not sig(tr)&sig(hi) and not sig(va)&sig(hi)
  tok=AutoTokenizer.from_pretrained(src,use_fast=True);tok.pad_token=tok.pad_token or tok.eos_token;tb,vb=pair_batches(tok,tr,a.max_length),pair_batches(tok,va,a.max_length);rb=[encode_replay(tok,x,a.max_length) for x in rep]
  b=base();champ=PeftModel.from_pretrained(b,src,is_trainable=False);tr_ref=margins(champ,tb);va_ref=margins(champ,vb);before_val=objective(champ,vb,va_ref,a.beta);before_beh=behavior(champ,tok,hi);del champ,b;gc.collect()
  b=base();m=PeftModel.from_pretrained(b,src,is_trainable=True);pars=[p for p in m.parameters() if p.requires_grad];initial=[p.detach().clone() for p in pars];opt=AdamW(pars,lr=a.lr,betas=(.9,.999),weight_decay=.01,foreach=False);root=Path(a.out);bestdir=root/'best-adapter';final=root/'adapter';root.mkdir(parents=True,exist_ok=True);best=float('inf');hist=[]
