@@ -1,0 +1,91 @@
+{
+  "schemaVersion": "1.0.0",
+  "experimentFamily": "hector-asi-qwen15-v12",
+  "status": "reproducible-candidates-rejected",
+  "championPromoted": false,
+  "baseline": {
+    "id": "hector-asi-qwen15-v10",
+    "baseModel": "Qwen/Qwen2.5-1.5B-Instruct",
+    "candidateValidationLoss": 2.2110140224297843
+  },
+  "sharedDataset": {
+    "trainPath": "model/hector-asi/data/qwen15-sft-v5.jsonl",
+    "trainSha256": "d508b6e89877a3fbbac5646fe730d405de239f9087549e9f43d8bcbebd3446c6",
+    "trainExamples": 24,
+    "validationPath": "model/hector-asi/evals/qwen15-held-out-v5.jsonl",
+    "validationSha256": "794eeb3c961b16f974a6241a38b62ef34c22b3482116406eff2f277528bb02c7",
+    "validationExamples": 12,
+    "privateUserData": false
+  },
+  "candidates": [
+    {
+      "variant": "warmup-cosine-weight-decay",
+      "sourcePullRequest": 646,
+      "githubActionsRunId": "29969911516",
+      "githubActionsArtifactId": "8549749677",
+      "artifactName": "hector-asi-qwen15-v12-29969911516",
+      "archiveSha256": "d4a3729e5b0780fd8ec053868462d15492a672c0e229ce2271da65ea900389ed",
+      "adapterSha256": "8ec65fbc910956be554c717c5f9fa3ed2341895c9f55ae12d39b8a9e2002cad7",
+      "adapterBytes": 34895152,
+      "expiresAt": "2026-10-21T00:44:18Z",
+      "training": {
+        "method": "LoRA SFT",
+        "epochs": 4,
+        "steps": 96,
+        "learningRate": 0.00004,
+        "warmupRatio": 0.1,
+        "scheduler": "cosine",
+        "weightDecay": 0.01,
+        "loraRank": 32,
+        "loraAlpha": 64,
+        "loraDropout": 0.05,
+        "trainableParameters": 8716288,
+        "parameterDeltaL2": 2.755697250366211,
+        "runtimeSecondsFirstReplica": 863.2532970905304,
+        "byteIdenticalReplicas": true
+      },
+      "evaluation": {
+        "baseValidationLoss": 4.1809311509132385,
+        "candidateValidationLoss": 2.500642071167628,
+        "relativeValidationImprovement": 0.4018935062775636,
+        "lossRegressionVsLeader": 0.2896280487378436
+      },
+      "decision": "reject"
+    },
+    {
+      "variant": "cosine-decay-with-floor",
+      "sourcePullRequest": 647,
+      "githubActionsRunId": "29970522317",
+      "githubActionsArtifactId": "8549853249",
+      "artifactName": "hector-asi-qwen15-v12-29970522317",
+      "archiveSha256": "440278e191fe4c8385fcca366da38e9a36edc3e89644d41fb62c63e0c4fa1ba4",
+      "adapterSha256": "9b572c702ef32db1f7b3f002cd8ffc48d368a86089e650cd67dbcc95700d4bc2",
+      "adapterBytes": 34895152,
+      "expiresAt": "2026-10-21T00:57:44Z",
+      "training": {
+        "method": "LoRA SFT",
+        "epochs": 3,
+        "steps": 72,
+        "learningRate": 0.00004,
+        "minimumLearningRate": 0.00001,
+        "scheduler": "cosine",
+        "loraRank": 32,
+        "loraAlpha": 64,
+        "loraDropout": 0.05,
+        "trainableParameters": 8716288,
+        "parameterDeltaL2": 2.4707136154174805,
+        "runtimeSecondsFirstReplica": 668.8239142894745,
+        "byteIdenticalReplicas": true
+      },
+      "evaluation": {
+        "baseValidationLoss": 4.1809311509132385,
+        "candidateValidationLoss": 2.609256863594055,
+        "relativeValidationImprovement": 0.37591489325909694,
+        "lossRegressionVsLeader": 0.3982428411642708
+      },
+      "decision": "reject"
+    }
+  ],
+  "conclusion": "Both schedulers generated real reproducible adapters but underperformed the constant-learning-rate Qwen15-v10 leader on the identical frozen base and hidden split. Do not repeat either configuration without changing the dataset, objective, or evaluation design.",
+  "rollback": "Do not load either adapter. Keep Qwen15-v10 as the experimental leader; frozen base weights remain unchanged."
+}
