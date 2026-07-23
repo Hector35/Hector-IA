@@ -1,0 +1,153 @@
+name: Hector model Qwen15 v50 risk-weighted training
+on:
+  pull_request:
+    branches: [main]
+    paths:
+      - '.github/workflows/hector-model-qwen15-v50-risk-weighted.yml'
+      - 'model/hector-asi/training/train_qwen15_v50_risk_weighted.py'
+      - 'model/hector-asi/data/qwen15-v50-risk-weighted-train.jsonl'
+      - 'model/hector-asi/evals/qwen15-v50-risk-weighted-validation.jsonl'
+      - 'model/hector-asi/evals/qwen15-v50-risk-weighted-hidden.jsonl'
+  workflow_dispatch:
+permissions:
+  contents: read
+  actions: read
+concurrency:
+  group: hector-qwen15-v50-risk-${{ github.ref }}
+  cancel-in-progress: false
+jobs:
+  train-qwen15-v50:
+    runs-on: ubuntu-latest
+    timeout-minutes: 120
+    env:
+      SOURCE_ARTIFACT_ID: '8560331055'
+      SOURCE_ADAPTER_SHA256: '31bead5f59982d8e321517fd235b81f992f83d2e3792a55690c2a841ff0e28f8'
+      SOURCE_ADAPTER_BYTES: '73911112'
+      SOURCE_DIR: /tmp/hector-v41/adapter
+      TRAIN_BASE: model/hector-asi/data/qwen15-sft-v5.jsonl
+      TRAIN_RISK: model/hector-asi/data/qwen15-v50-risk-weighted-train.jsonl
+      VALIDATION: model/hector-asi/evals/qwen15-v50-risk-weighted-validation.jsonl
+      HIDDEN: model/hector-asi/evals/qwen15-v50-risk-weighted-hidden.jsonl
+      OUT_A: artifacts/hector-asi-qwen15-v50-a
+      OUT_B: artifacts/hector-asi-qwen15-v50-b
+      TOKENIZERS_PARALLELISM: 'false'
+      HF_HOME: /home/runner/.cache/huggingface
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+          cache: pip
+      - name: Validate licensed data, splits and trainer
+        run: |
+          set -euo pipefail
+          python -m py_compile model/hector-asi/training/train_qwen15_v50_risk_weighted.py
+          python - <<'PY'
+          import json,unicodedata
+          from pathlib import Path
+          files={
+            'base':('model/hector-asi/data/qwen15-sft-v5.jsonl',24),
+            'risk':('model/hector-asi/data/qwen15-v50-risk-weighted-train.jsonl',24),
+            'validation':('model/hector-asi/evals/qwen15-v50-risk-weighted-validation.jsonl',10),
+            'hidden':('model/hector-asi/evals/qwen15-v50-risk-weighted-hidden.jsonl',18),
+          }
+          rows={name:[json.loads(line) for line in Path(path).read_text().splitlines() if line.strip()] for name,(path,_) in files.items()}
+          for name,(_,expected) in files.items(): assert len(rows[name])==expected,(name,len(rows[name]))
+          norm=lambda value:' '.join(''.join(c for c in unicodedata.normalize('NFKD',value.lower()) if not unicodedata.combining(c)).split())
+          groups=[rows['base']+rows['risk'],rows['validation'],rows['hidden']]
+          signatures=[]
+          for group in groups:
+            ids={row['id'] for row in group}; prompts={norm(next(message['content'] for message in row['messages'] if message['role']=='user')) for row in group}
+            assert len(ids)==len(group) and len(prompts)==len(group)
+            signatures.append((ids,prompts))
+          for left in range(3):
+            for right in range(left+1,3): assert not signatures[left][0]&signatures[right][0] and not signatures[left][1]&signatures[right][1]
+          risk=rows['risk']; assert sum(float(row.get('trainingWeight',1))==3 for row in risk)==12
+          assert all(row['verification']['source']=='author-generated' and row['verification']['license']=='Apache-2.0-compatible' for row in risk+rows['validation']+rows['hidden'])
+          assert sum(bool(row.get('evaluation',{}).get('critical')) for row in rows['hidden'])==6
+          print('train=48 validation=10 hidden=18 criticalTrain=12 criticalHidden=6 contamination=0 privateData=false')
+          PY
+      - name: Download and verify immutable champion v41
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          set -euo pipefail
+          mkdir -p /tmp/hector-v41-zip /tmp/hector-v41
+          curl --fail --location --retry 4 \
+            -H "Authorization: Bearer $GH_TOKEN" \
+            -H "Accept: application/vnd.github+json" \
+            "https://api.github.com/repos/${GITHUB_REPOSITORY}/actions/artifacts/${SOURCE_ARTIFACT_ID}/zip" \
+            -o /tmp/hector-v41.zip
+          unzip -q /tmp/hector-v41.zip -d /tmp/hector-v41-zip
+          ADAPTER_FILE="$(find /tmp/hector-v41-zip -type f -path '*/adapter/adapter_model.safetensors' -print -quit)"
+          test -n "$ADAPTER_FILE"
+          test "$(sha256sum "$ADAPTER_FILE" | awk '{print $1}')" = "$SOURCE_ADAPTER_SHA256"
+          test "$(stat -c%s "$ADAPTER_FILE")" -eq "$SOURCE_ADAPTER_BYTES"
+          cp -a "$(dirname "$ADAPTER_FILE")" "$SOURCE_DIR"
+      - name: Install pinned CPU stack
+        run: |
+          python -m pip install --disable-pip-version-check --index-url https://download.pytorch.org/whl/cpu torch==2.7.1
+          python -m pip install --disable-pip-version-check accelerate==1.8.1 huggingface_hub==0.34.4 peft==0.16.0 safetensors==0.5.3 transformers==4.53.2
+      - name: Train two deterministic risk-weighted continuations
+        run: |
+          set -o pipefail
+          mkdir -p artifacts/logs
+          /usr/bin/time -v python model/hector-asi/training/train_qwen15_v50_risk_weighted.py \
+            --source-adapter "$SOURCE_DIR" \
+            --train-files "$TRAIN_BASE" "$TRAIN_RISK" \
+            --validation-files "$VALIDATION" \
+            --test-files "$HIDDEN" \
+            --output-dir "$OUT_A" --experiment-id hector-asi-qwen15-v50-risk-weighted \
+            --epochs 2 --max-length 160 --max-new-tokens 96 --lr 8e-6 --seed 40450 \
+            2>&1 | tee artifacts/logs/v50-a.log
+          /usr/bin/time -v python model/hector-asi/training/train_qwen15_v50_risk_weighted.py \
+            --source-adapter "$SOURCE_DIR" \
+            --train-files "$TRAIN_BASE" "$TRAIN_RISK" \
+            --validation-files "$VALIDATION" \
+            --test-files "$HIDDEN" \
+            --output-dir "$OUT_B" --experiment-id hector-asi-qwen15-v50-risk-weighted \
+            --epochs 2 --max-length 160 --max-new-tokens 96 --lr 8e-6 --seed 40450 \
+            2>&1 | tee artifacts/logs/v50-b.log
+      - name: Verify real weights and reproducibility
+        run: |
+          set -euo pipefail
+          A="$OUT_A/adapter/adapter_model.safetensors"
+          B="$OUT_B/adapter/adapter_model.safetensors"
+          test -f "$A" -a -f "$B"
+          cmp "$A" "$B"
+          test "$(stat -c%s "$A")" -gt 50000000
+          python - <<'PY'
+          import json
+          from pathlib import Path
+          a=json.loads(Path('artifacts/hector-asi-qwen15-v50-a/metrics.json').read_text())
+          b=json.loads(Path('artifacts/hector-asi-qwen15-v50-b/metrics.json').read_text())
+          assert a['candidate']['adapterSha256']==b['candidate']['adapterSha256']
+          assert a['candidate']['adapterBytes']==b['candidate']['adapterBytes']
+          assert a['candidate']['parameterDeltaL2']>0 and b['candidate']['parameterDeltaL2']>0
+          assert a['dataset']['trainExamples']==48 and a['dataset']['validationExamples']==10 and a['dataset']['testExamples']==18
+          assert a['dataset']['criticalTrainExamples']==12 and a['dataset']['criticalTestExamples']==6
+          print(json.dumps({
+            'sha256':a['candidate']['adapterSha256'],
+            'bytes':a['candidate']['adapterBytes'],
+            'validationBefore':a['baseline']['validationLoss'],
+            'validationAfter':a['candidate']['bestValidationLoss'],
+            'hiddenBefore':a['baseline']['hiddenTestLoss'],
+            'hiddenAfter':a['candidate']['hiddenTestLoss'],
+            'behaviorBefore':a['baseline']['behavioral']['passed'],
+            'behaviorAfter':a['candidate']['behavioral']['passed'],
+            'criticalBefore':a['baseline']['behavioral']['criticalPassed'],
+            'criticalAfter':a['candidate']['behavioral']['criticalPassed'],
+            'eligible':a['eligibleForChampion'],
+          },sort_keys=True))
+          PY
+      - name: Upload weights, manifests, metrics and logs
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: hector-asi-qwen15-v50-risk-weighted-${{ github.run_id }}
+          path: |
+            artifacts/hector-asi-qwen15-v50-a
+            artifacts/hector-asi-qwen15-v50-b
+            artifacts/logs
+          if-no-files-found: warn
+          retention-days: 90
