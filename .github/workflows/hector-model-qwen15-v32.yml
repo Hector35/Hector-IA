@@ -1,0 +1,63 @@
+name: Hector model Qwen15 v32 training
+on:
+  pull_request:
+    branches: [main]
+    paths:
+      - 'model/hector-asi/data/qwen15-sft-v5.jsonl'
+      - 'model/hector-asi/data/qwen15-sft-v6-supplement.jsonl'
+      - 'model/hector-asi/evals/qwen15-held-out-v5.jsonl'
+      - 'model/hector-asi/evals/qwen15-held-out-v6-supplement.jsonl'
+      - 'model/hector-asi/train_qwen15_v32.py'
+      - '.github/workflows/hector-model-qwen15-v32.yml'
+  workflow_dispatch:
+permissions:
+  contents: read
+jobs:
+  train-qwen15-v32:
+    runs-on: ubuntu-latest
+    timeout-minutes: 360
+    env:
+      HF_HUB_DISABLE_TELEMETRY: '1'
+      TOKENIZERS_PARALLELISM: 'false'
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+      - name: Install pinned CPU stack
+        run: |
+          python -m pip install --upgrade pip
+          python -m pip install --index-url https://download.pytorch.org/whl/cpu 'torch==2.7.1'
+          python -m pip install 'transformers==4.53.2' 'peft==0.16.0' 'accelerate==1.8.1' 'safetensors==0.5.3'
+      - name: Train two AdamW epsilon replicas
+        run: |
+          for replica in a b; do
+            python model/hector-asi/train_qwen15_v32.py \
+              --train-files model/hector-asi/data/qwen15-sft-v5.jsonl model/hector-asi/data/qwen15-sft-v6-supplement.jsonl \
+              --validation-files model/hector-asi/evals/qwen15-held-out-v5.jsonl model/hector-asi/evals/qwen15-held-out-v6-supplement.jsonl \
+              --experiment-id hector-asi-qwen15-v32 \
+              --output-dir artifacts/hector-asi-qwen15-v32-$replica \
+              --epochs 2 --max-length 112 --lr 3e-5 --seed 35
+          done
+      - name: Verify reproducibility and leader gate
+        run: |
+          python - <<'PY'
+          import hashlib,json
+          from pathlib import Path
+          roots=[Path('artifacts/hector-asi-qwen15-v32-a'),Path('artifacts/hector-asi-qwen15-v32-b')]
+          def sha(p):return hashlib.sha256(p.read_bytes()).hexdigest()
+          metrics=[json.loads((r/'metrics.json').read_text()) for r in roots];hashes=[sha(r/'adapter'/'adapter_model.safetensors') for r in roots]
+          x=metrics[0]['results'];summary={'adapterSha256':hashes[0],'byteIdenticalReplicas':int(hashes[0]==hashes[1]),**{k:x[k] for k in ['baseValidationLoss','candidateValidationLoss','relativeValidationImprovement','parameterDeltaL2','trainableParameters','adapterBytes']},'trainExamples':metrics[0]['dataset']['trainExamples'],'validationExamples':metrics[0]['dataset']['validationExamples'],'controlledComparison':'v32 AdamW eps 1e-6 versus active v15 default eps 1e-8; all other train settings identical','leaderLoss':2.1131172180,'rollback':'hector-asi-qwen15-v15'}
+          (roots[0]/'reproducibility.json').write_text(json.dumps(summary,indent=2)+'\n');print(json.dumps(summary,indent=2))
+          assert hashes[0]==hashes[1]
+          for m,r in zip(metrics,roots):
+            y=m['results'];assert y['weightsGenerated'] and y['parameterDeltaL2']>0;assert y['candidateValidationLoss']<y['baseValidationLoss'];assert y['relativeValidationImprovement']>=.03;assert y['adapterBytes']>30000000;assert (r/'SHA256SUMS').is_file();assert m['dataset']['trainExamples']==40;assert m['dataset']['validationExamples']==20;assert m['dataset']['crossSplitPromptOverlap']==0;assert m['hyperparameters']['adamEpsilon']==1e-6
+          PY
+      - name: Upload immutable adapter and evidence
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: hector-asi-qwen15-v32-${{ github.run_id }}
+          path: artifacts/hector-asi-qwen15-v32-a
+          if-no-files-found: error
+          retention-days: 90
