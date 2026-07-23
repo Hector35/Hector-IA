@@ -1,0 +1,132 @@
+name: Hector model Qwen15 v49 c3 versus v41 hidden evaluation
+
+on:
+  pull_request:
+    branches: [main]
+    paths:
+      - '.github/workflows/hector-model-qwen15-v49-c3-vs-v41.yml'
+      - 'model/hector-asi/evals/qwen15-v49-c3-hidden-v2.jsonl'
+      - 'model/hector-asi/training/evaluate_qwen15_v49_c3_vs_v41.py'
+      - 'model/hector-asi/registry/candidates/hector-asi-qwen15-v49-c3.json'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  actions: read
+
+jobs:
+  evaluate-qwen15-v49-c3-vs-v41:
+    runs-on: ubuntu-latest
+    timeout-minutes: 90
+    env:
+      V41_ARTIFACT_ID: '8560331055'
+      V49_ARTIFACT_ID: '8573382438'
+      V41_SHA: '31bead5f59982d8e321517fd235b81f992f83d2e3792a55690c2a841ff0e28f8'
+      V49_SHA: '71c0dcbdb1a32bf50e5e07107074c4d3b43c2949bf03547926ff822ca7608e05'
+      V41_DIR: /tmp/hector-v41/adapter
+      V49_DIR: /tmp/hector-v49/adapter
+      EVAL_OUTPUT: qwen15-v49-c3-vs-v41.json
+      TRAIN_SOURCE_COMMIT: ef6e7ab4e537bbb0038104e6511613574a8d364e
+      TRAIN_SHA: 8e6a249d358f3478523bfa20495cfc0027a5946c26f98886f07f1a37d847a632
+      VALIDATION_SHA: 4f1c91f98a8da0a2d91cd697d2cd0a1baa8008d8aeffb9bf659fe58c92089260
+      HF_HOME: /home/runner/.cache/huggingface
+      TOKENIZERS_PARALLELISM: 'false'
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+
+      - name: Validate sealed hidden test and zero contamination
+        run: |
+          set -euo pipefail
+          python -m py_compile model/hector-asi/training/evaluate_qwen15_v49_c3_vs_v41.py
+          python -m json.tool model/hector-asi/registry/candidates/hector-asi-qwen15-v49-c3.json >/dev/null
+          test "$(wc -l < model/hector-asi/evals/qwen15-v49-c3-hidden-v2.jsonl)" -eq 24
+          curl --fail --location --retry 4 \
+            "https://raw.githubusercontent.com/${GITHUB_REPOSITORY}/${TRAIN_SOURCE_COMMIT}/model/hector-asi/data/qwen15-v49-critical-train.jsonl" \
+            -o /tmp/v49-train.jsonl
+          curl --fail --location --retry 4 \
+            "https://raw.githubusercontent.com/${GITHUB_REPOSITORY}/${TRAIN_SOURCE_COMMIT}/model/hector-asi/evals/qwen15-v49-critical-validation.jsonl" \
+            -o /tmp/v49-validation.jsonl
+          test "$(sha256sum /tmp/v49-train.jsonl | awk '{print $1}')" = "$TRAIN_SHA"
+          test "$(sha256sum /tmp/v49-validation.jsonl | awk '{print $1}')" = "$VALIDATION_SHA"
+          python - <<'PY'
+          import json, unicodedata
+          from pathlib import Path
+
+          def norm(value):
+              return ' '.join(
+                  unicodedata.normalize('NFKD', value)
+                  .encode('ascii', 'ignore').decode().lower().split()
+              )
+
+          def user_prompts(path):
+              rows=[json.loads(x) for x in Path(path).read_text().splitlines() if x.strip()]
+              return {
+                  norm(next(m['content'] for m in row['messages'] if m['role']=='user'))
+                  for row in rows
+              }
+
+          train=user_prompts('/tmp/v49-train.jsonl')
+          validation=user_prompts('/tmp/v49-validation.jsonl')
+          test_rows=[
+              json.loads(x)
+              for x in Path('model/hector-asi/evals/qwen15-v49-c3-hidden-v2.jsonl').read_text().splitlines()
+              if x.strip()
+          ]
+          test={norm(row['prompt']) for row in test_rows}
+          assert len(train)==8 and len(validation)==6 and len(test)==24
+          assert not train & validation
+          assert not train & test
+          assert not validation & test
+          assert sum(bool(row.get('critical')) for row in test_rows)==4
+          print('train=8 validation=6 hidden=24 critical=4 exact_prompt_overlap=0')
+          PY
+
+      - name: Install pinned CPU stack
+        run: |
+          python -m pip install --disable-pip-version-check --index-url https://download.pytorch.org/whl/cpu torch==2.7.1
+          python -m pip install --disable-pip-version-check accelerate==1.8.1 huggingface_hub==0.34.4 peft==0.16.0 safetensors==0.5.3 transformers==4.53.2
+
+      - name: Download and verify immutable adapters
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          set -euo pipefail
+          for spec in "v41:$V41_ARTIFACT_ID:$V41_SHA:$V41_DIR" "v49:$V49_ARTIFACT_ID:$V49_SHA:$V49_DIR"; do
+            IFS=: read -r name artifact_id expected_sha destination <<< "$spec"
+            mkdir -p "/tmp/$name-artifact" "$(dirname "$destination")"
+            curl --fail --location --retry 4 \
+              -H "Authorization: Bearer $GH_TOKEN" \
+              -H "Accept: application/vnd.github+json" \
+              "https://api.github.com/repos/${GITHUB_REPOSITORY}/actions/artifacts/${artifact_id}/zip" \
+              -o "/tmp/$name.zip"
+            unzip -q "/tmp/$name.zip" -d "/tmp/$name-artifact"
+            adapter_file="$(find "/tmp/$name-artifact" -type f -path '*/adapter/adapter_model.safetensors' -print -quit)"
+            test -n "$adapter_file"
+            test "$(sha256sum "$adapter_file" | awk '{print $1}')" = "$expected_sha"
+            test "$(stat -c%s "$adapter_file")" -eq 73911112
+            cp -a "$(dirname "$adapter_file")" "$destination"
+          done
+
+      - name: Compare champion v41 against candidate v49 c3
+        run: |
+          /usr/bin/time -v python model/hector-asi/training/evaluate_qwen15_v49_c3_vs_v41.py \
+            2>&1 | tee qwen15-v49-c3-evaluation.log
+
+      - name: Upload complete evidence
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: hector-asi-qwen15-v49-c3-vs-v41-${{ github.run_id }}
+          path: |
+            qwen15-v49-c3-vs-v41.json
+            qwen15-v49-c3-evaluation.log
+          if-no-files-found: warn
+          retention-days: 90
+
+      - name: Enforce promotion gate
+        run: jq -e '.gates.eligibleForPromotion == true' "$EVAL_OUTPUT"
