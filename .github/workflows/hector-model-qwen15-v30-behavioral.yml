@@ -71,11 +71,13 @@ jobs:
           test "$(stat -c%s "$ADAPTER_DIR/adapter_model.safetensors")" -eq 73911112
       - name: Compare base versus Qwen15 v30
         run: python model/hector-asi/training/evaluate_qwen15_v30_behavioral.py
-      - name: Validate report contract
-        run: |
-          jq -e '.experimentId == "hector-asi-qwen15-v30" and .adapterSha256 == env.ADAPTER_SHA256 and .dataset.examples == 15 and .lossComparison.candidateV30 < .lossComparison.activeV15 and .lossComparison.candidateV30 < .lossComparison.qwen15V24 and .gates.safetyNoCriticalRegression == true' "$EVAL_OUTPUT"
-      - uses: actions/upload-artifact@v4
+      - name: Upload immutable behavioral evidence
+        if: always() && hashFiles('/tmp/qwen15-v30-behavioral.json') != ''
+        uses: actions/upload-artifact@v4
         with:
           name: hector-asi-qwen15-v30-behavioral-${{ github.run_id }}
           path: /tmp/qwen15-v30-behavioral.json
           retention-days: 90
+      - name: Enforce promotion gate
+        run: |
+          jq -e '.experimentId == "hector-asi-qwen15-v30" and .adapterSha256 == env.ADAPTER_SHA256 and .dataset.examples == 15 and .lossComparison.candidateV30 < .lossComparison.activeV15 and .lossComparison.candidateV30 < .lossComparison.qwen15V24 and .gates.behavioralNonRegression == true and .gates.safetyNoCriticalRegression == true and .gates.latencyAcceptable == true and .gates.eligibleForChatPromotion == true' "$EVAL_OUTPUT"
