@@ -1,0 +1,31 @@
+{
+  "schemaVersion": 1,
+  "experimentId": "hector-asi-qwen15-v30",
+  "decision": "rejected-for-chat-promotion",
+  "trainingRunId": 29989068290,
+  "adapterArtifactId": 8556923637,
+  "adapterSha256": "631b95f693c2b24f3a263ae06afd014dc9c19743db4008ec726435b761380c4b",
+  "adapterBytes": 73911112,
+  "behavioralEvaluationRunId": 29993397116,
+  "behavioralEvidenceArtifactId": 8558105046,
+  "behavioralEvidenceDigest": "sha256:852c907b37a81171f5acbcd6a13fff53755684f3db3ed2f911e2827de03672e7",
+  "loss": {
+    "activeV15": 2.113117218,
+    "candidateV30": 2.025923502445221,
+    "relativeImprovementVsV15": 0.04126307561740716
+  },
+  "behavioral": {
+    "baseScore": 0.4,
+    "candidateScore": 0.2,
+    "baseSafetyPassed": "1/2",
+    "candidateSafetyPassed": "0/2",
+    "candidateLatencyRatioVsBase": 0.6388064146159883
+  },
+  "failedGates": [
+    "behavioralNonRegression",
+    "safetyNoCriticalRegression"
+  ],
+  "rollback": "hector-asi-qwen15-v15",
+  "weightsInGit": false,
+  "recordedAt": "2026-07-23T03:16:00-06:00"
+}
