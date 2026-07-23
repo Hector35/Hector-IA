@@ -1,0 +1,76 @@
+{
+  "schemaVersion": 1,
+  "experimentId": "hector-asi-qwen15-v55-ipo",
+  "status": "rejected-for-champion",
+  "decision": "retain-v41",
+  "baseModel": "Qwen/Qwen2.5-1.5B-Instruct",
+  "baseRevision": "989aa7980e4cf806f80c7fef2b1adb7bc71aa306",
+  "sourceChampion": {
+    "runtimeId": "hector-asi-qwen15-v41",
+    "artifactId": 8560331055,
+    "adapterSha256": "31bead5f59982d8e321517fd235b81f992f83d2e3792a55690c2a841ff0e28f8"
+  },
+  "training": {
+    "runId": 30048194310,
+    "artifactId": 8580959604,
+    "artifactDigest": "sha256:1b87f2368cef4943de902173a402d34bce6a9f9c68d5f523a4b65bfb262ca59e",
+    "artifactExpiresAt": "2026-10-21T21:58:12Z",
+    "adapterSha256": "189d8b22c3cc1c560edeb925b4edd1c1bad5532a26654e2e9ab9fa304b000c2f",
+    "adapterBytes": 73911112,
+    "replicasByteIdentical": true,
+    "method": "Identity Preference Optimization with frozen V41 reference and LoRA trust-region anchor",
+    "hyperparameters": {
+      "beta": 0.2,
+      "ipoTarget": 2.5,
+      "anchorLambda": 0.03,
+      "learningRate": 0.000002,
+      "epochs": 2,
+      "clipNorm": 0.5,
+      "maxLength": 160,
+      "seed": 3055
+    },
+    "runtime": {
+      "secondsPerReplica": 1354.2214806079865,
+      "peakRssMb": 12011.59375,
+      "python": "3.11.15",
+      "torch": "2.7.1+cpu",
+      "hardware": "Linux-6.17.0-1020-azure-x86_64-with-glibc2.39"
+    }
+  },
+  "comparison": {
+    "validationObjective": {"v41": 10.15625, "v55": 3.421648547053337},
+    "behavior": {
+      "v41Passed": 11,
+      "v55Passed": 11,
+      "total": 18,
+      "v41CriticalPassed": 6,
+      "v55CriticalPassed": 6,
+      "criticalTotal": 6,
+      "v41MeanTokens": 20.88888888888889,
+      "v55MeanTokens": 34.05555555555556,
+      "tokenRatio": 1.6303191489361704,
+      "v41MeanLatencyMs": 8239.117608055556,
+      "v55MeanLatencyMs": 11369.116305499978,
+      "latencyRatio": 1.379894307304862
+    },
+    "behavioralChanges": {
+      "gained": ["v51-h-14 calibration"],
+      "regressed": ["v51-h-07 math"],
+      "netPassedChange": 0,
+      "netCriticalChange": 0
+    }
+  },
+  "gates": {
+    "validationImproved": true,
+    "behavioralImprovement": false,
+    "criticalPerfect": true,
+    "noCriticalRegression": true,
+    "latencyAcceptable": false,
+    "tokenLengthAcceptable": false,
+    "eligibleForChampion": false
+  },
+  "doNotRepeat": [
+    "IPO from V41 with beta 0.20, target 2.5, anchor 0.03, LR 2e-6, two epochs and seed 3055 on the V55 24/4/18 split"
+  ],
+  "rollback": "hector-asi-qwen15-v41"
+}

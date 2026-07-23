@@ -1,0 +1,92 @@
+{
+  "schemaVersion": 1,
+  "experimentId": "hector-asi-qwen15-v56-brevity-recovery",
+  "status": "rejected-for-champion",
+  "decision": "retain-v41",
+  "baseModel": "Qwen/Qwen2.5-1.5B-Instruct",
+  "baseRevision": "989aa7980e4cf806f80c7fef2b1adb7bc71aa306",
+  "source": {
+    "runtimeId": "hector-asi-qwen15-v54",
+    "artifactId": 8579920006,
+    "adapterSha256": "86cac6f1e80e23dec0941159c6d5e1250b238385e5c88cc647152848b42123df"
+  },
+  "training": {
+    "runId": 30049720386,
+    "artifactId": 8580900380,
+    "artifactDigest": "sha256:433610972c7bbc1ae724910e23624006ca2b8d339e02f122fe299f31110f6c84",
+    "artifactExpiresAt": "2026-10-21T22:23:38Z",
+    "adapterSha256": "6cf3ccda4956d99074f44ad6e35e9274581198c89dff7f84d54a5d8b47636ead",
+    "adapterBytes": 73911112,
+    "replicasByteIdentical": true,
+    "parameterDeltaL2": 0.0285727184324402,
+    "method": "continued LoRA SFT from V54 with assistant-response-only loss",
+    "hyperparameters": {
+      "epochs": 1,
+      "learningRate": 0.000001,
+      "maxLength": 128,
+      "maxNewTokens": 64,
+      "seed": 3056
+    },
+    "dataset": {
+      "trainExamples": 18,
+      "validationExamples": 6,
+      "hiddenTestExamples": 18,
+      "criticalHiddenExamples": 6,
+      "crossSplitOverlap": 0,
+      "privateUserData": false,
+      "license": "author-generated Apache-2.0-compatible"
+    }
+  },
+  "directChampionEvaluation": {
+    "runId": 30051879016,
+    "artifactId": 8581475408,
+    "artifactDigest": "sha256:ee065ebedfc8024679d521fe1628d457808574f86dba3c240888ce3b1dea2df9",
+    "artifactExpiresAt": "2026-10-21T23:01:36Z",
+    "datasetSha256": "17560e21b728c93f822a0e21cb4b4261823ae5b6f92f3fe1188fdfd4b5679ccb",
+    "reports": {
+      "v41": {
+        "passed": 11,
+        "total": 18,
+        "criticalPassed": 6,
+        "criticalTotal": 6,
+        "meanTokens": 20.0,
+        "meanLatencyMs": 7723.2434831666715
+      },
+      "v54": {
+        "passed": 10,
+        "total": 18,
+        "criticalPassed": 6,
+        "criticalTotal": 6,
+        "meanTokens": 22.0,
+        "meanLatencyMs": 7741.15505316666
+      },
+      "v56": {
+        "passed": 11,
+        "total": 18,
+        "criticalPassed": 6,
+        "criticalTotal": 6,
+        "meanTokens": 23.666666666666668,
+        "meanLatencyMs": 8742.371689333326
+      }
+    },
+    "v56VsV41": {
+      "tokenRatio": 1.1833333333333333,
+      "latencyRatio": 1.1319559856409955
+    }
+  },
+  "gates": {
+    "weightsChanged": true,
+    "replicasByteIdentical": true,
+    "behavioralImprovement": false,
+    "criticalPerfect": true,
+    "noCriticalRegression": true,
+    "latencyAcceptable": true,
+    "tokenLengthAcceptable": false,
+    "eligibleForChampion": false
+  },
+  "finding": "V56 improved over its V54 source under the local training evaluation, but direct evaluation against the active V41 champion showed no behavioral gain and 18.3 percent more output tokens. The indirect specialist promotion is therefore invalid for the global Qwen15 champion decision.",
+  "doNotRepeat": [
+    "one-epoch response-only compression from V54 with LR 1e-6, max length 128, max new tokens 64 and seed 3056 on the V56 18/6/18 split"
+  ],
+  "rollback": "hector-asi-qwen15-v41"
+}
