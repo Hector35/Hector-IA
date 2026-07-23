@@ -4,9 +4,11 @@ on:
   workflow_dispatch:
     inputs:
       job_id:
-        description: Identificador opaco del trabajo de inferencia
-        required: true
+        description: Identificador opaco opcional del trabajo de inferencia
+        required: false
         type: string
+  schedule:
+    - cron: '*/5 * * * *'
 
 permissions:
   contents: read
@@ -14,7 +16,7 @@ permissions:
   id-token: write
 
 concurrency:
-  group: hector-custom-model-chat-${{ inputs.job_id }}
+  group: hector-custom-model-chat-${{ inputs.job_id || github.run_id }}
   cancel-in-progress: false
 
 jobs:
