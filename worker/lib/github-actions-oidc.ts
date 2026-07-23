@@ -36,7 +36,7 @@ export function assertGitHubActionsClaims(claims:Claims,nowSeconds=Math.floor(Da
  if(claims.repository!==REPOSITORY)throw new Error('Repositorio OIDC no autorizado');
  if(claims.ref!=='refs/heads/main')throw new Error('Ref OIDC no autorizada');
  if(claims.workflow_ref!==WORKFLOW_REF)throw new Error('Workflow OIDC no autorizado');
- if(claims.event_name!=='workflow_dispatch')throw new Error('Evento OIDC no autorizado');
+ if(!['workflow_dispatch','schedule'].includes(String(claims.event_name||'')))throw new Error('Evento OIDC no autorizado');
  return claims;
 }
 
