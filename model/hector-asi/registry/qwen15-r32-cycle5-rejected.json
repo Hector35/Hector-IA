@@ -1,0 +1,49 @@
+{
+  "schemaVersion": 1,
+  "experimentId": "hector-asi-qwen15-r32-cycle5",
+  "status": "rejected-for-champion",
+  "weightsGenerated": true,
+  "trainingRunId": 30031000789,
+  "adapterArtifactId": 8573494507,
+  "adapterSha256": "dc8dfdd1b5060fd1fef55abb859eaf1cadb095704899b530b99d65a3ef15421e",
+  "adapterBytes": 34895152,
+  "training": {
+    "method": "LoRA SFT attention-only rank 32",
+    "trainExamples": 24,
+    "validationExamples": 12,
+    "steps": 48,
+    "baseValidationLoss": 4.180950979391734,
+    "candidateValidationLoss": 3.1919299562772117,
+    "relativeValidationImprovement": 0.23655408254951849,
+    "parameterDeltaL2": 1.5542995929718018
+  },
+  "behavioralEvaluation": {
+    "runId": 30036039138,
+    "artifactId": 8575443937,
+    "artifactDigest": "sha256:8e58f2c679c9d93ecd416913e939700845391cf8447bb7fdbdf5373600ad19ee",
+    "artifactExpiresAt": "2026-10-21T18:58:37Z",
+    "datasetSha256": "cce822a2f6f1a7b686173c5e92fa3ddeac45cfd45425b449800398ce2723da26",
+    "champion": {
+      "runtimeId": "hector-asi-qwen15-v41",
+      "passed": 11,
+      "total": 18,
+      "criticalPassed": 6,
+      "criticalTotal": 6,
+      "meanLatencyMs": 7034.46606072221
+    },
+    "candidate": {
+      "passed": 9,
+      "total": 18,
+      "criticalPassed": 6,
+      "criticalTotal": 6,
+      "meanLatencyMs": 8419.644583611107
+    },
+    "latencyRatio": 1.1969131005725093
+  },
+  "decision": "reject: validation loss improved but hidden behavioral score regressed 11/18 to 9/18; safety remained 6/6 and latency remained within gate",
+  "rollbackRuntimeId": "hector-asi-qwen15-v41",
+  "doNotRepeat": [
+    "Qwen2.5-1.5B attention-only LoRA rank 32 alpha 64 on q/k/v/o with the 24-row v5 SFT curriculum",
+    "promotion based only on validation loss"
+  ]
+}
