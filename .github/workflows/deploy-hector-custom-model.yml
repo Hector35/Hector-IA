@@ -2,11 +2,6 @@ name: Deploy Hector custom model
 
 on:
   workflow_dispatch:
-  push:
-    branches: [main]
-    paths:
-      - 'model/hector-asi/inference/**'
-      - '.github/workflows/deploy-hector-custom-model.yml'
 
 permissions:
   contents: read
