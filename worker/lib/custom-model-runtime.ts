@@ -40,8 +40,8 @@ export function requestedHectorRuntime(message:string):HectorRuntimeId{
 
 export function stripHectorRuntimeDirective(message:string){
  const stripped=message
-  .replace(/^\s*\/modelo\s+(?:h[eé]ctor\s+)?(?:base|qwen|propio|experimental|qwen15(?:-v\d+)?)\s*[:\-–—]?\s*/i,'')
-  .replace(/^\s*(?:usa|habla con|responde con)\s+(?:(?:mi|tu|el)\s+modelo(?:\s+propio|\s+experimental)?|(?:h[eé]ctor\s+)?(?:base|qwen)|hector-asi-qwen15-v\d+)\s*[:\-–—]?\s*/i,'')
+  .replace(/^\s*\/modelo\s+(?:h[eé]ctor\s+)?(?:qwen15(?:-v\d+)?|experimental|propio|base|qwen)\b\s*[:\-–—]?\s*/i,'')
+  .replace(/^\s*(?:usa|habla con|responde con)\s+(?:hector-asi-qwen15-v\d+|(?:mi|tu|el)\s+modelo(?:\s+propio|\s+experimental)?|(?:h[eé]ctor\s+)?(?:base|qwen))\b\s*[:\-–—]?\s*/i,'')
   .trim();
  return stripped||message.trim();
 }
