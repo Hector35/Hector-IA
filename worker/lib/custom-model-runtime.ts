@@ -30,7 +30,7 @@ export function normalizeHectorRuntime(value:unknown):HectorRuntimeId{
 
 export function requestedHectorRuntime(message:string):HectorRuntimeId{
  const text=message.trim();
- if(/^\/modelos?\b/i.test(text))return'auto';
+ if(/^\/modelos?\s*$/i.test(text))return'auto';
  if(/^(?:\/modelo\s+)?(?:h[eé]ctor\s+)?base\b|\b(?:usa|habla con|responde con)\s+(?:h[eé]ctor\s+)?base\b/i.test(text))return'hector-base';
  if(/^(?:\/modelo\s+)?(?:h[eé]ctor\s+)?qwen\b|\b(?:usa|habla con|responde con)\s+(?:h[eé]ctor\s+)?qwen\b/i.test(text))return'hector-qwen';
  if(/^(?:\/modelo\s+)?(?:propio|experimental|qwen15(?:-v10)?)\b|\b(?:usa|habla con|responde con)\s+(?:mi|tu|el)\s+modelo(?:\s+propio|\s+experimental)?\b|\bhector-asi-qwen15-v10\b/i.test(text))return'hector-experimental';
