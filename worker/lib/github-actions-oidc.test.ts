@@ -14,8 +14,12 @@ const valid={
 };
 
 describe('GitHub Actions OIDC model inference',()=>{
- it('accepts only the authorized main workflow',()=>{
+ it('accepts the authorized main workflow when dispatched',()=>{
   expect(assertGitHubActionsClaims(valid,now)).toEqual(valid);
+ });
+ it('accepts the same authorized workflow on its schedule',()=>{
+  const scheduled={...valid,event_name:'schedule'};
+  expect(assertGitHubActionsClaims(scheduled,now)).toEqual(scheduled);
  });
  it.each([
   ['repository','otro/repo'],
