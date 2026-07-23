@@ -28,6 +28,23 @@ export function normalizeHectorRuntime(value:unknown):HectorRuntimeId{
  return HECTOR_RUNTIME_IDS.includes(value as HectorRuntimeId)?value as HectorRuntimeId:'auto';
 }
 
+export function requestedHectorRuntime(message:string):HectorRuntimeId{
+ const text=message.trim();
+ if(/^\/modelos?\s*$/i.test(text))return'auto';
+ if(/^(?:\/modelo\s+)?(?:h[eé]ctor\s+)?base\b|\b(?:usa|habla con|responde con)\s+(?:h[eé]ctor\s+)?base\b/i.test(text))return'hector-base';
+ if(/^(?:\/modelo\s+)?(?:h[eé]ctor\s+)?qwen\b|\b(?:usa|habla con|responde con)\s+(?:h[eé]ctor\s+)?qwen\b/i.test(text))return'hector-qwen';
+ if(/^(?:\/modelo\s+)?(?:propio|experimental|qwen15(?:-v10)?)\b|\b(?:usa|habla con|responde con)\s+(?:mi|tu|el)\s+modelo(?:\s+propio|\s+experimental)?\b|\bhector-asi-qwen15-v10\b/i.test(text))return'hector-experimental';
+ return'auto';
+}
+
+export function stripHectorRuntimeDirective(message:string){
+ const stripped=message
+  .replace(/^\s*\/modelo\s+(?:h[eé]ctor\s+)?(?:base|qwen|propio|experimental|qwen15(?:-v10)?)\s*[:\-–—]?\s*/i,'')
+  .replace(/^\s*(?:usa|habla con|responde con)\s+(?:(?:mi|tu|el)\s+modelo(?:\s+propio|\s+experimental)?|(?:h[eé]ctor\s+)?(?:base|qwen)|hector-asi-qwen15-v10)\s*[:\-–—]?\s*/i,'')
+  .trim();
+ return stripped||message.trim();
+}
+
 export function hectorRuntimeCatalog(env:Bindings):HectorRuntimeCatalogItem[]{
  const custom=env as CustomBindings;
  const customConfigured=custom.HECTOR_CUSTOM_MODEL_ENABLED!=='false'&&Boolean(custom.HECTOR_CUSTOM_MODEL_BASE_URL?.trim())&&Boolean((custom.HECTOR_CUSTOM_MODEL_TOKEN||env.HUGGINGFACE_TOKEN)?.trim());
@@ -37,6 +54,11 @@ export function hectorRuntimeCatalog(env:Bindings):HectorRuntimeCatalogItem[]{
   {id:'hector-qwen',label:'Héctor Qwen',description:'Qwen abierto mediante Hugging Face.',available:env.HECTOR_QWEN_ENABLED!=='false'&&Boolean(env.HUGGINGFACE_TOKEN?.trim()),customWeights:false,status:env.HECTOR_QWEN_ENABLED!=='false'&&Boolean(env.HUGGINGFACE_TOKEN?.trim())?'active':'disabled',model:env.HECTOR_QWEN_MODEL},
   {id:'hector-experimental',label:custom.HECTOR_CUSTOM_MODEL_LABEL||'Héctor experimental',description:'Adaptador neuronal propio líder. Requiere un endpoint de inferencia que cargue la base y sus pesos LoRA.',available:customConfigured,customWeights:true,status:customConfigured?'configured':'trained-offline',model:custom.HECTOR_CUSTOM_MODEL_ID||'hector-asi-qwen15-v10',reason:customConfigured?'Endpoint personalizado configurado':'Pesos entrenados y registrados, pero todavía no desplegados en un servidor de inferencia'}
  ];
+}
+
+export function renderHectorRuntimeCatalog(env:Bindings){
+ const lines=hectorRuntimeCatalog(env).map(item=>`- **${item.label}** (${item.id}): ${item.available?'disponible':item.status==='trained-offline'?'entrenado, falta desplegar':'no disponible'}${item.model?` · ${item.model}`:''}${item.reason?` · ${item.reason}`:''}`);
+ return `## Modelos de Héctor ASI\n${lines.join('\n')}\n\nComandos: \`/modelo base <mensaje>\`, \`/modelo qwen <mensaje>\` o \`/modelo propio <mensaje>\`.`;
 }
 
 function endpoint(baseUrl:string){const normalized=baseUrl.replace(/\/$/,'');return normalized.endsWith('/chat/completions')?normalized:`${normalized}/chat/completions`;}

@@ -1,6 +1,7 @@
 import type {Bindings} from '../types';
 import {renderBootstrap} from '../intelligence/bootstrap';
 import {callCloudflare,callHuggingFaceQwen,type ProviderName} from './providers';
+import {callHectorExperimental,type HectorRuntimeId} from './custom-model-runtime';
 import {assessProviderResponse,recordProviderQuality,type ProviderQualityAssessment} from './provider-quality';
 import {aggregateUsage,candidateInstructions,judgeInput,judgeInstructions,type CandidateRole} from './deliberation';
 import {estimateModelCost} from './model-pricing';
@@ -9,8 +10,9 @@ import type {FeedbackRoutingProfile} from './feedback-routing';
 
 export type PlannedAIUsage={input_tokens?:number;output_tokens?:number;input_tokens_details?:{cached_tokens?:number;cache_write_tokens?:number}};
 export type PlannedChatTurn={role:'user'|'assistant';content:string};
-export type PlannedExecutionMetadata={feedback:FeedbackRoutingProfile;budgetDecision:unknown};
+export type PlannedExecutionMetadata={feedback:FeedbackRoutingProfile;budgetDecision:unknown;runtimeId?:HectorRuntimeId};
 type CoreResult={id:string;text:string;usage?:PlannedAIUsage;searchedWeb:boolean;model:string;provider:ProviderName;requestedProvider:ProviderName;providerReason:string;fallback:boolean;qualityScore:number;qualityAccepted:boolean;cognitiveMode:'single'|'ensemble'|'ensemble-degraded';deliberationPasses:number;deliberationReason:string};
+type DecoratedResult=CoreResult&{modelTier:ExecutionPlan['route']['tier'];modelReason:string;task:string;feedbackAdaptation:{sampleCount:number;preferDeep:boolean;avoidCloudflare:boolean;guidanceApplied:number;reason:string};budgetDecision:unknown;runtimeId?:HectorRuntimeId};
 type OpenCandidate={role:CandidateRole;out:Awaited<ReturnType<typeof callCloudflare>>};
 
 function sensitive(task:string){return /salud|riesgo|finanzas|legal|seguridad/i.test(task);}
@@ -18,7 +20,7 @@ function instructions(plan:ExecutionPlan,renderedContext:string,guidance:string[
 
 RUNTIME CONVERSACIONAL AUTORIZADO
 - Identidad: Hector ASI / Héctor Base
-- Proveedores permitidos: Héctor Qwen mediante Hugging Face, Cloudflare Workers AI y reglas locales
+- Proveedores permitidos: modelos propios mediante endpoint configurado, Héctor Qwen mediante Hugging Face, Cloudflare Workers AI y reglas locales
 - OpenAI: prohibido para responder el chat; reservado para generar datos, crítica y evaluación del entrenamiento
 - Plan: ${plan.hash.slice(0,12)}
 - Tarea: ${plan.task}
@@ -41,8 +43,9 @@ ${guidance.map(item=>`- ${item}`).join('\n')}
 CONTEXTO DINÁMICO
 ${renderedContext}`;}
 function conversation(history:PlannedChatTurn[],input:string){const recent=history.slice(-16),last=recent[recent.length-1],items=last?.role==='user'&&last.content===input?recent:[...recent,{role:'user' as const,content:input}];return items.map(item=>`${item.role==='user'?'Usuario':'Héctor'}: ${item.content}`).join('\n');}
+function turns(history:PlannedChatTurn[],input:string){const recent=history.slice(-16),last=recent[recent.length-1];return last?.role==='user'&&last.content===input?recent:[...recent,{role:'user' as const,content:input}];}
 async function quality(env:Bindings,plan:ExecutionPlan,started:number,requested:ProviderName,actual:ProviderName,model:string,fallback:boolean,assessment:ProviderQualityAssessment,reasons:string[]=[]){try{await recordProviderQuality(env.DB,{requestedProvider:requested,actualProvider:actual,model,routeTier:plan.route.tier,task:plan.task,accepted:assessment.accepted,score:assessment.score,fallback,latencyMs:Date.now()-started,reasons:[plan.hash.slice(0,12),'chat-open-model-only',...reasons,...assessment.reasons]});}catch{}}
-function decorate(result:CoreResult,plan:ExecutionPlan,metadata:PlannedExecutionMetadata){return{...result,modelTier:plan.route.tier,modelReason:`${plan.policySummary} Chat abierto únicamente; OpenAI reservado para entrenamiento y evaluación.`,task:plan.task,feedbackAdaptation:{sampleCount:metadata.feedback.sampleCount,preferDeep:metadata.feedback.preferDeep,avoidCloudflare:metadata.feedback.avoidCloudflare,guidanceApplied:metadata.feedback.guidance.length,reason:metadata.feedback.reason},budgetDecision:metadata.budgetDecision};}
+function decorate(result:CoreResult,plan:ExecutionPlan,metadata:PlannedExecutionMetadata):DecoratedResult{return{...result,modelTier:plan.route.tier,modelReason:`${plan.policySummary} Runtime: ${metadata.runtimeId||'auto'}. Chat abierto únicamente; OpenAI reservado para entrenamiento y evaluación.`,task:plan.task,feedbackAdaptation:{sampleCount:metadata.feedback.sampleCount,preferDeep:metadata.feedback.preferDeep,avoidCloudflare:metadata.feedback.avoidCloudflare,guidanceApplied:metadata.feedback.guidance.length,reason:metadata.feedback.reason},budgetDecision:metadata.budgetDecision,runtimeId:metadata.runtimeId||'auto'};}
 function best(input:string,candidates:OpenCandidate[]){return candidates.map(candidate=>({candidate,assessment:assessProviderResponse(input,candidate.out.text)})).sort((a,b)=>b.assessment.score-a.assessment.score)[0];}
 function requestedFallback(plan:ExecutionPlan,actual:ProviderName){return plan.provider.requested!==actual;}
 
@@ -64,10 +67,14 @@ async function cloudflareEnsemble(env:Bindings,input:string,system:string,plan:E
  }catch(error){await quality(env,plan,started,plan.provider.requested,'cloudflare',fallbackCandidate.candidate.out.model,true,fallbackCandidate.assessment,[`juez abierto no disponible: ${error instanceof Error?error.message:'error'}`]);return{id:fallbackCandidate.candidate.out.id,text:fallbackCandidate.candidate.out.text,usage:aggregateUsage(candidateUsage) as PlannedAIUsage,searchedWeb:false,model:fallbackCandidate.candidate.out.model,provider:'cloudflare',requestedProvider:plan.provider.requested,providerReason:`${plan.provider.reason}; juez abierto no disponible`,fallback:true,qualityScore:fallbackCandidate.assessment.score,qualityAccepted:fallbackCandidate.assessment.accepted,cognitiveMode:'ensemble-degraded',deliberationPasses:2,deliberationReason:plan.cognition.reason};}
 }
 
-export async function executePlannedContextual(env:Bindings,input:string,history:PlannedChatTurn[],renderedContext:string,plan:ExecutionPlan,metadata:PlannedExecutionMetadata){
+export async function executePlannedContextual(env:Bindings,input:string,history:PlannedChatTurn[],renderedContext:string,plan:ExecutionPlan,metadata:PlannedExecutionMetadata):Promise<DecoratedResult>{
  const started=Date.now(),historyText=conversation(history,input),system=`${instructions(plan,renderedContext,metadata.feedback.guidance)}\n\nHISTORIAL RECIENTE\n${historyText}`;
  let result:CoreResult;
- if(plan.provider.requested==='huggingface'){
+ if(metadata.runtimeId==='hector-experimental'){
+  const out=await callHectorExperimental(env,system,turns(history,input)),assessment=assessProviderResponse(input,out.text);
+  await quality(env,plan,started,'huggingface','huggingface',out.model,false,assessment,['adaptador propio ejecutado mediante endpoint configurado']);
+  result={id:out.id,text:out.text,usage:out.usage,searchedWeb:false,model:out.model,provider:'huggingface',requestedProvider:'huggingface',providerReason:'el usuario seleccionó el modelo neuronal propio de Héctor',fallback:false,qualityScore:assessment.score,qualityAccepted:assessment.accepted,cognitiveMode:'single',deliberationPasses:1,deliberationReason:'selección explícita de runtime'};
+ }else if(plan.provider.requested==='huggingface'){
   try{
    const out=await callHuggingFaceQwen(env,system,history),assessment=assessProviderResponse(input,out.text);
    await quality(env,plan,started,'huggingface','huggingface',out.model,false,assessment,['Héctor Qwen ejecutado']);
