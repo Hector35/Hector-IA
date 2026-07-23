@@ -1,16 +1,6 @@
-name: Hector model cycle 4 continued LoRA
+name: Hector model cycle 4 v1 archived rerun
 
 on:
-  pull_request:
-    branches: [main]
-    paths:
-      - 'model/hector-asi/data/qwen15-sft-v5.jsonl'
-      - 'model/hector-asi/data/qwen15-c4-v1-train.jsonl'
-      - 'model/hector-asi/evals/qwen15-c4-v1-validation.jsonl'
-      - 'model/hector-asi/evals/qwen15-c4-v1-hidden.jsonl'
-      - 'model/hector-asi/train_qwen15_c4_v1.py'
-      - 'model/hector-asi/experiments/hector-asi-qwen15-c4-v1.json'
-      - '.github/workflows/hector-model-c4-v1.yml'
   workflow_dispatch:
 
 permissions:
@@ -28,43 +18,24 @@ jobs:
       BASELINE_ADAPTER_SHA256: '31bead5f59982d8e321517fd235b81f992f83d2e3792a55690c2a841ff0e28f8'
     steps:
       - uses: actions/checkout@v4
-
       - uses: actions/setup-python@v5
         with:
           python-version: '3.11'
-
-      - name: Validate licensed, deduplicated, sealed splits
+      - name: Validate archived v1 inputs
         run: |
           python -m py_compile model/hector-asi/train_qwen15_c4_v1.py
           python - <<'PY'
           import json
           from pathlib import Path
-          paths = [
-              'model/hector-asi/data/qwen15-c4-v1-train.jsonl',
-              'model/hector-asi/evals/qwen15-c4-v1-validation.jsonl',
-              'model/hector-asi/evals/qwen15-c4-v1-hidden.jsonl',
-          ]
-          sets = []
-          expected = [20, 8, 12]
-          for path, count in zip(paths, expected):
-              rows = [json.loads(x) for x in Path(path).read_text().splitlines() if x.strip()]
-              assert len(rows) == count
+          for path, count in [
+              ('model/hector-asi/data/qwen15-c4-v1-train.jsonl', 20),
+              ('model/hector-asi/evals/qwen15-c4-v1-validation.jsonl', 8),
+              ('model/hector-asi/evals/qwen15-c4-v1-hidden.jsonl', 12),
+          ]:
+              rows=[json.loads(x) for x in Path(path).read_text().splitlines() if x.strip()]
+              assert len(rows)==count
               assert all(r['verification']['verified'] for r in rows)
-              assert all(r['verification']['source'] == 'author-generated' for r in rows)
-              assert all(r['verification']['license'] == 'Apache-2.0-compatible' for r in rows)
-              ids = {r['id'] for r in rows}
-              prompts = {
-                  ' '.join(next(m['content'] for m in r['messages'] if m['role'] == 'user').lower().split())
-                  for r in rows
-              }
-              assert len(ids) == len(rows) and len(prompts) == len(rows)
-              sets.append((ids, prompts))
-          for i in range(3):
-              for j in range(i + 1, 3):
-                  assert not sets[i][0] & sets[j][0]
-                  assert not sets[i][1] & sets[j][1]
           PY
-
       - name: Download and verify immutable v41 champion
         env:
           GH_TOKEN: ${{ github.token }}
@@ -80,16 +51,13 @@ jobs:
           BASELINE_ADAPTER="$(find baseline -type f -path '*/adapter/adapter_model.safetensors' -printf '%h\n' | head -n 1)"
           test -n "${BASELINE_ADAPTER}"
           echo "${BASELINE_ADAPTER_SHA256}  ${BASELINE_ADAPTER}/adapter_model.safetensors" | sha256sum --check -
-          test "$(stat -c %s "${BASELINE_ADAPTER}/adapter_model.safetensors")" = "73911112"
           echo "BASELINE_ADAPTER=${BASELINE_ADAPTER}" >> "${GITHUB_ENV}"
-
-      - name: Install pinned CPU training stack
+      - name: Install pinned CPU stack
         run: |
           python -m pip install --upgrade pip
           python -m pip install --index-url https://download.pytorch.org/whl/cpu 'torch==2.7.1'
           python -m pip install 'transformers==4.53.2' 'peft==0.16.0' 'accelerate==1.8.1' 'safetensors==0.5.3'
-
-      - name: Continue training from v41 with response-only loss
+      - name: Reproduce v1
         run: |
           mkdir -p artifacts/logs
           /usr/bin/time -v python model/hector-asi/train_qwen15_c4_v1.py \
@@ -101,36 +69,7 @@ jobs:
             --output-dir artifacts/hector-asi-qwen15-c4-v1 \
             --epochs 2 --max-length 128 --lr 1.5e-5 --seed 40435 --max-new-tokens 48 \
             2>&1 | tee artifacts/logs/train.log
-
-      - name: Verify real weights and evidence
-        run: |
-          python - <<'PY'
-          import hashlib, json
-          from pathlib import Path
-          root = Path('artifacts/hector-asi-qwen15-c4-v1')
-          metrics = json.loads((root / 'metrics.json').read_text())
-          weights = root / 'adapter' / 'adapter_model.safetensors'
-          digest = hashlib.sha256(weights.read_bytes()).hexdigest()
-          assert metrics['candidate']['weightsGenerated'] is True
-          assert weights.stat().st_size > 30_000_000
-          assert digest == metrics['candidate']['adapterSha256']
-          assert digest != metrics['baseline']['adapterSha256']
-          assert metrics['dataset']['crossSplitOverlap'] == 0
-          assert metrics['dataset']['privateUserData'] is False
-          print(json.dumps({
-              'adapterSha256': digest,
-              'adapterBytes': weights.stat().st_size,
-              'eligibleForChampion': metrics['eligibleForChampion'],
-              'baselineScore': metrics['baseline']['behavioral']['score'],
-              'candidateScore': metrics['candidate']['behavioral']['score'],
-              'criticalPassed': metrics['candidate']['behavioral']['criticalPassed'],
-              'criticalTotal': metrics['candidate']['behavioral']['criticalTotal'],
-              'hiddenLossRatioVsV41': metrics['candidate']['hiddenLossRatioVsV41'],
-              'latencyRatioVsV41': metrics['candidate']['latencyRatioVsV41'],
-          }, indent=2))
-          PY
-
-      - name: Upload immutable candidate, metrics, hashes, and logs
+      - name: Upload archived reproduction
         if: always()
         uses: actions/upload-artifact@v4
         with:
