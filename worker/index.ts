@@ -36,11 +36,12 @@ import {parseWorkModeResult,renderWorkModePrompt,workModeFailureTransition} from
 import {buildPlan} from './agent/planner';
 import {recordExperience} from './agent/learning';
 import {canRetry,JOB_LEASE_SECONDS,retryDelaySeconds} from './lib/job-reliability';
+import {hasCustomModelEndpoint,hasQueuedCustomInference} from './lib/custom-model-runtime';
 
 const app=new Hono<{Bindings:Bindings;Variables:Variables}>();
 app.use('*',secureHeaders({contentSecurityPolicy:{defaultSrc:["'self'"],connectSrc:["'self'"],imgSrc:["'self'",'data:'],styleSrc:["'self'","'unsafe-inline'"]}}));
 app.route('/control/v1',control);app.route('/generated',generated);app.route('/self-improve/v1',selfImprove);app.route('/runner/v1',runner);app.route('/runner/v1',pwaRunnerStatus);app.route('/evidence/v1',evidence);app.route('/api/auth',auth);app.route('/api/agent',agent);app.route('/api/intelligence',selfModel);app.route('/api/intelligence/budget',cognitiveBudget);app.route('/api/intelligence/benchmark',intelligenceBenchmark);app.route('/api/intelligence/plan-incidents',planDriftIncidents);app.route('/api/intelligence',modelChat);app.route('/api/intelligence',intelligence);app.route('/api/notifications',operationalNotifications);app.route('/api/work-mode',workMode);app.route('/api/system',systemInfo);app.route('/api/delegations',delegations);app.route('/api/projects',projectGovernance);app.route('/api/projects',projects);app.route('/api/pwa-factory',pwaFactory);app.route('/api/conversations',conversations);app.route('/api/chat-agents',chatAgents);app.route('/api/work-evidence',workEvidence);app.route('/api/memory',memoryStatus);app.route('/api/provider-health',providerHealth);app.route('/api/response-traces',responseTraces);app.route('/api/schedules',schedules);app.route('/api',intelligence);app.route('/api',openInteraction);app.route('/api',api);
-app.get('/health',c=>c.json({ok:true,service:c.env.APP_NAME}));app.all('*',c=>c.env.ASSETS.fetch(c.req.raw));
+app.get('/health',c=>c.json({ok:true,service:c.env.APP_NAME,customModel:{runtime:'hector-asi-qwen15-v10',mode:hasCustomModelEndpoint(c.env)?'endpoint':hasQueuedCustomInference(c.env)?'github-actions':'unavailable'}}));app.all('*',c=>c.env.ASSETS.fetch(c.req.raw));
 
 async function event(env:Bindings,jobId:string,message:string,progress:number){await env.DB.prepare('INSERT INTO work_events(id,job_id,message,progress) VALUES(?,?,?,?)').bind(crypto.randomUUID(),jobId,message,progress).run();}
 async function recoverExpiredLeases(env:Bindings){await env.DB.prepare(`UPDATE work_jobs SET status='queued',lease_token=NULL,lease_expires_at=NULL,next_retry_at=CURRENT_TIMESTAMP,updated_at=CURRENT_TIMESTAMP WHERE status='working' AND kind!='programming' AND (lease_expires_at IS NULL OR lease_expires_at<=CURRENT_TIMESTAMP)`).run();}
@@ -79,7 +80,7 @@ async function processNext(env:Bindings){
   }
   await event(env,job.id,'Resultado obtenido; verificando criterios y limitaciones',80);
   const completed=await env.DB.prepare("UPDATE work_jobs SET status='completed',progress=100,result=?,last_error=NULL,lease_token=NULL,lease_expires_at=NULL,next_retry_at=NULL,heartbeat_at=CURRENT_TIMESTAMP,updated_at=CURRENT_TIMESTAMP WHERE id=? AND lease_token=?").bind(out.text,job.id,leaseToken).run();if(!completed.meta.changes)return;
-  await env.DB.batch([env.DB.prepare("INSERT INTO work_events(id,job_id,message,progress) VALUES(?,?,?,100)").bind(crypto.randomUUID(),job.id,continuous?'Modo Trabajo completó y verificó el objetivo':'Resultado guardado bajo plan cognitivo verificado')]);
+  await env.DB.batch([env.DB.prepare("INSERT INTO work_events(id,job_id,message,progress) VALUES(?,?, 'Resultado guardado bajo plan cognitivo verificado',100)").bind(crypto.randomUUID(),job.id)]);
   await recordUsage(env,job,out,u,executionPlan,verification,continuous?'work-mode-completed':job.schedule_id?'scheduled-work-planned':'background-work-planned');
   await recordExperience(env,{jobId:job.id,userId:job.user_id,objective:job.prompt,status:'completed',result:out.text,skills:plan.skills,attempts:job.attempt_count,durationMs:Date.now()-started});
  }catch(e){
@@ -92,6 +93,5 @@ async function processNext(env:Bindings){
   const retry=canRetry(job.attempt_count,job.max_attempts),delay=retryDelaySeconds(job.attempt_count),status=retry?'queued':'blocked',nextRetry=retry?`datetime('now','+${delay} seconds')`:'NULL';const failed=await env.DB.prepare(`UPDATE work_jobs SET status=?,result=?,last_error=?,next_retry_at=${nextRetry},lease_token=NULL,lease_expires_at=NULL,heartbeat_at=CURRENT_TIMESTAMP,updated_at=CURRENT_TIMESTAMP WHERE id=? AND lease_token=?`).bind(status,message,message,job.id,leaseToken).run();if(failed.meta.changes){await event(env,job.id,retry?`Error detectado; se intentará una alternativa en ${delay}s`:'Límite de intentos alcanzado; trabajo bloqueado',25);await recordExperience(env,{jobId:job.id,userId:job.user_id,objective:job.prompt,status,result:message,skills:plan.skills,attempts:job.attempt_count,durationMs:Date.now()-started});}
  }
 }
-
 async function processScheduledWork(env:Bindings){await processDueSchedules(env);await processNext(env);}
 export default {fetch:app.fetch,scheduled:(_controller:ScheduledController,env:Bindings,ctx:ExecutionContext)=>{ctx.waitUntil(processScheduledWork(env));ctx.waitUntil(processNextDelegation(env));ctx.waitUntil(processProjectQueue(env));ctx.waitUntil(processChatAgentRuns(env));}};
