@@ -16,12 +16,13 @@ const ADAPTER_SHA256='e1170e7a2a4e2fb19ce66744720e178955ce02fea07531f1b187366c7f
 const WORKFLOW='hector-custom-model-chat.yml';
 
 type PendingMetadata={
- status:'pending'|'running'|'completed'|'failed'|'dispatch-failed';
+ status:'pending'|'running'|'completed'|'failed';
  conversationId:string;
  userMessageId:string;
  assistantMessageId:string;
  runtimeId:string;
  adapterSha256:string;
+ dispatchMode?:'immediate'|'scheduled';
  dispatchedAt?:string;
  startedAt?:string;
  completedAt?:string;
@@ -81,16 +82,18 @@ async function authorizeWorkflow(header:string|undefined){
 
 async function dispatchInference(env:Bindings,jobId:string){
  const token=env.GITHUB_RUNNER_TOKEN?.trim();
- if(!token)throw new Error('El token del runner neuronal no está configurado en Cloudflare');
- const response=await fetch(`https://api.github.com/repos/Hector35/Hector-IA/actions/workflows/${WORKFLOW}/dispatches`,{
-  method:'POST',
-  headers:{Authorization:`Bearer ${token}`,Accept:'application/vnd.github+json','Content-Type':'application/json','User-Agent':'Hector-ASI'},
-  body:JSON.stringify({ref:'main',inputs:{job_id:jobId}})
- });
- if(response.status!==204)throw new Error(`GitHub rechazó la inferencia con HTTP ${response.status}`);
+ if(!token)return false;
+ try{
+  const response=await fetch(`https://api.github.com/repos/Hector35/Hector-IA/actions/workflows/${WORKFLOW}/dispatches`,{
+   method:'POST',
+   headers:{Authorization:`Bearer ${token}`,Accept:'application/vnd.github+json','Content-Type':'application/json','User-Agent':'Hector-ASI'},
+   body:JSON.stringify({ref:'main',inputs:{job_id:jobId}})
+  });
+  return response.status===204;
+ }catch{return false;}
 }
 
-async function queueCustomInference(env:Bindings,userId:string,conversationId:string,userMessageId:string,message:string,selected:ReturnType<typeof hectorRuntimeCatalog>[number]){
+async function queueCustomInference(env:Bindings,userId:string,conversationId:string,userMessageId:string,selected:ReturnType<typeof hectorRuntimeCatalog>[number]){
  const assistantMessageId=crypto.randomUUID(),jobId=crypto.randomUUID();
  const placeholder='Tu modelo propio está cargando **Qwen 1.5B + los pesos LoRA de Héctor** en cómputo gratuito. La respuesta aparecerá aquí automáticamente cuando termine.';
  const pending:PendingMetadata={status:'pending',conversationId,userMessageId,assistantMessageId,runtimeId:CUSTOM_RUNTIME,adapterSha256:ADAPTER_SHA256};
@@ -98,25 +101,21 @@ async function queueCustomInference(env:Bindings,userId:string,conversationId:st
   env.DB.prepare('INSERT INTO messages(id,conversation_id,role,content) VALUES(?,?,?,?)').bind(assistantMessageId,conversationId,'assistant',placeholder),
   env.DB.prepare('INSERT INTO api_usage(id,user_id,provider,service,model,input_units,cached_input_units,output_units,estimated_cost_usd,metadata_json) VALUES(?,?,?,?,?,?,?,?,?,?)').bind(jobId,userId,'GitHub Actions','custom-model-inference-pending',CUSTOM_RUNTIME,0,0,0,0,JSON.stringify(pending))
  ]);
- try{
-  await dispatchInference(env,jobId);
-  pending.dispatchedAt=new Date().toISOString();
-  await env.DB.prepare("UPDATE api_usage SET metadata_json=? WHERE id=?").bind(JSON.stringify(pending),jobId).run();
-  await saveRollingSummary(env.DB,userId,conversationId);
-  return{conversationId,message:{id:assistantMessageId,role:'assistant',content:placeholder},provider:'github-actions',model:CUSTOM_RUNTIME,runtimeId:'hector-experimental',runtime:selected,fallback:false,modelTier:'custom-queued',pending:true,jobId};
- }catch(error){
-  const detail=error instanceof Error?error.message:'No se pudo iniciar la inferencia';
-  const visible=`No pude iniciar los pesos propios: ${detail}`;
-  pending.status='dispatch-failed';pending.error=detail;pending.completedAt=new Date().toISOString();
-  await env.DB.batch([
-   env.DB.prepare('UPDATE messages SET content=? WHERE id=? AND conversation_id=?').bind(visible,assistantMessageId,conversationId),
-   env.DB.prepare("UPDATE api_usage SET service='custom-model-inference-failed',metadata_json=? WHERE id=?").bind(JSON.stringify(pending),jobId)
-  ]);
-  return{conversationId,message:{id:assistantMessageId,role:'assistant',content:visible},provider:'system',model:CUSTOM_RUNTIME,runtimeId:'hector-experimental',runtime:selected,fallback:false,modelTier:'custom-blocked',pending:false,jobId};
- }
+ const dispatched=await dispatchInference(env,jobId);
+ pending.dispatchMode=dispatched?'immediate':'scheduled';
+ if(dispatched)pending.dispatchedAt=new Date().toISOString();
+ await env.DB.prepare('UPDATE api_usage SET metadata_json=? WHERE id=?').bind(JSON.stringify(pending),jobId).run();
+ await saveRollingSummary(env.DB,userId,conversationId);
+ return{conversationId,message:{id:assistantMessageId,role:'assistant',content:placeholder},provider:'github-actions',model:CUSTOM_RUNTIME,runtimeId:'hector-experimental',runtime:selected,fallback:false,modelTier:'custom-queued',pending:true,jobId,dispatchMode:pending.dispatchMode};
 }
 
 modelChat.get('/models',c=>c.json({items:hectorRuntimeCatalog(c.env),commands:{list:'/modelos',base:'/modelo base <mensaje>',qwen:'/modelo qwen <mensaje>',own:'/modelo propio <mensaje>'}}));
+
+modelChat.get('/model-jobs/pending',async c=>{
+ if(!await authorizeWorkflow(c.req.header('Authorization')))return c.json({error:'No autorizado'},401);
+ const row=await c.env.DB.prepare("SELECT id FROM api_usage WHERE service='custom-model-inference-pending' AND created_at>=datetime('now','-1 hour') ORDER BY created_at LIMIT 1").first<{id:string}>();
+ return c.json({jobId:row?.id||null});
+});
 
 modelChat.get('/model-jobs/:id/input',async c=>{
  if(!await authorizeWorkflow(c.req.header('Authorization')))return c.json({error:'No autorizado'},401);
@@ -170,7 +169,7 @@ modelChat.post('/model-chat',async c=>{
  if(!selected.available)return c.json({error:selected.reason||`${selected.label} no está disponible`,runtime:selected,catalog},409);
  const message=stripHectorRuntimeDirective(rawMessage),userId=c.get('userId'),conversationId=await ensureConversation(c.env.DB,userId,parsed.data.conversationId,message),userMessageId=crypto.randomUUID();
  await c.env.DB.prepare('INSERT INTO messages(id,conversation_id,role,content) VALUES(?,?,?,?)').bind(userMessageId,conversationId,'user',message).run();
- if(runtime==='hector-experimental'&&!hasCustomModelEndpoint(c.env)&&hasQueuedCustomInference(c.env))return c.json(await queueCustomInference(c.env,userId,conversationId,userMessageId,message,selected),202);
+ if(runtime==='hector-experimental'&&!hasCustomModelEndpoint(c.env)&&hasQueuedCustomInference(c.env))return c.json(await queueCustomInference(c.env,userId,conversationId,userMessageId,selected),202);
  const pack=await loadContextPack(c.env,userId,conversationId,message),context=renderContext(pack),system=instructions(runtime,context),history=pack.recentMessages.filter(item=>item.role==='user'||item.role==='assistant').map(item=>({role:item.role as 'user'|'assistant',content:item.content}));
  try{
   let out:{text:string;id:string;model:string;usage?:{input_tokens?:number;output_tokens?:number}},provider:string;
