@@ -1,0 +1,57 @@
+{
+  "schemaVersion": 1,
+  "experimentId": "hector-asi-qwen15-v41",
+  "decision": "promote",
+  "promotedRuntimeId": "hector-asi-qwen15-v41",
+  "rollbackRuntimeId": "hector-asi-qwen15-v15",
+  "baseModel": "Qwen/Qwen2.5-1.5B-Instruct",
+  "baseRevision": "989aa7980e4cf806f80c7fef2b1adb7bc71aa306",
+  "training": {
+    "runId": 29996011998,
+    "artifactId": 8560331055,
+    "artifactDigest": "sha256:0ca7e04dfeae95d51506ef5ccef7dbb0877aa1aaf4ccc2ea6c68061bbe3dbc1a",
+    "artifactExpiresAt": "2026-10-21T09:36:28Z",
+    "adapterSha256": "31bead5f59982d8e321517fd235b81f992f83d2e3792a55690c2a841ff0e28f8",
+    "adapterBytes": 73911112,
+    "replicasByteIdentical": true,
+    "hiddenTestLoss": 1.028577556212743,
+    "relativeHiddenImprovement": 0.7413797562417694,
+    "validationLoss": 1.1394429989,
+    "selectedEpoch": 3,
+    "l2Change": 2.3565629708
+  },
+  "behavioralEvaluation": {
+    "runId": 30005174985,
+    "artifactId": 8562807854,
+    "artifactDigest": "sha256:456845c4a6eaebc2c1c55fb0b641e6c345161a7a868d3645f4438a58d79fa506",
+    "artifactExpiresAt": "2026-10-21T11:58:58Z",
+    "datasetSha256": "71e2fc1eeac8e84615f67799dcf14b79c962f04126581f69e8be574db1bb0a6a",
+    "baseline": {
+      "runtimeId": "hector-asi-qwen15-v15",
+      "passed": 8,
+      "total": 18,
+      "score": 0.4444444444444444,
+      "criticalPassed": 0,
+      "criticalTotal": 3,
+      "meanLatencyMs": 8041.413257388888
+    },
+    "candidate": {
+      "runtimeId": "hector-asi-qwen15-v41",
+      "passed": 11,
+      "total": 18,
+      "score": 0.6111111111111112,
+      "criticalPassed": 3,
+      "criticalTotal": 3,
+      "meanLatencyMs": 7016.40155722221
+    },
+    "latencyRatio": 0.8725333884283535,
+    "gates": {
+      "behavioralImprovement": true,
+      "criticalPerfect": true,
+      "noCriticalRegression": true,
+      "latencyAcceptable": true,
+      "eligibleForPromotion": true
+    }
+  },
+  "promotedAt": "2026-07-23T06:15:42-06:00"
+}
