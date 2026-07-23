@@ -1,0 +1,137 @@
+{
+  "schemaVersion": "1.0.0",
+  "experimentId": "hector-asi-qwen15-c4-v2",
+  "cycle": "4-of-5",
+  "status": "experimental-weights-generated-rejected",
+  "decision": "retain-negative-evidence-do-not-promote",
+  "eligibleForChampion": false,
+  "baseModel": {
+    "repository": "Qwen/Qwen2.5-1.5B-Instruct",
+    "revision": "989aa7980e4cf806f80c7fef2b1adb7bc71aa306",
+    "license": "Apache-2.0"
+  },
+  "baseline": {
+    "runtimeId": "hector-asi-qwen15-v41",
+    "artifactId": 8560331055,
+    "adapterSha256": "31bead5f59982d8e321517fd235b81f992f83d2e3792a55690c2a841ff0e28f8",
+    "adapterBytes": 73911112
+  },
+  "method": {
+    "stage": "continued-lora-sft",
+    "initialization": "fresh from hector-asi-qwen15-v41",
+    "lossMasking": "assistant-response-only",
+    "checkpointSelection": "lowest independent validation loss",
+    "epochs": 1,
+    "bestEpoch": 1,
+    "learningRate": 0.000007,
+    "maxLength": 144,
+    "maxNewTokens": 56,
+    "optimizer": "AdamW",
+    "seed": 40436
+  },
+  "dataset": {
+    "trainExamples": 68,
+    "validationExamples": 10,
+    "hiddenTestExamples": 15,
+    "criticalSafetyExamples": 3,
+    "crossSplitOverlap": 0,
+    "containsPrivateUserData": false,
+    "source": "author-generated",
+    "license": "Apache-2.0-compatible",
+    "trainPaths": [
+      "model/hector-asi/data/qwen15-sft-v5.jsonl",
+      "model/hector-asi/data/qwen15-c4-v1-train.jsonl",
+      "model/hector-asi/data/qwen15-c4-v2-train.jsonl"
+    ],
+    "validationPath": "model/hector-asi/evals/qwen15-c4-v2-validation.jsonl",
+    "hiddenTestPath": "model/hector-asi/evals/qwen15-c4-v2-hidden.jsonl",
+    "v1HiddenReused": false
+  },
+  "training": {
+    "weightsGenerated": true,
+    "adapterSha256": "4b3e46a8f62663189cd0ac737d1bb3f27689618fb9ab807895a91a687c784aa0",
+    "adapterBytes": 73911112,
+    "hashDiffersFromChampion": true,
+    "runtimeSeconds": 1097.5791997909546,
+    "peakRssMb": 11215.87109375,
+    "hardware": "GitHub Actions ubuntu-latest CPU; Linux-6.17.0-1020-azure-x86_64",
+    "python": "3.11.15",
+    "torch": "2.7.1+cpu",
+    "transformers": "4.53.2",
+    "peft": "0.16.0",
+    "accelerate": "1.8.1",
+    "safetensors": "0.5.3",
+    "githubRunId": 30033474329,
+    "githubHeadSha": "2fe55f7e456918c3d6969c519545fd8c86979107",
+    "replicas": 1,
+    "secondReplicaSkipped": "candidate failed behavioral and critical-safety promotion gates"
+  },
+  "evaluation": {
+    "validation": {
+      "baselineLoss": 1.9551663249731064,
+      "candidateLoss": 1.822293645143509,
+      "relativeImprovement": 0.06796085871386028
+    },
+    "hiddenTest": {
+      "baselineLoss": 1.751031639178594,
+      "candidateLoss": 1.6760513603687286,
+      "candidateToBaselineRatio": 0.9571793695029757,
+      "relativeImprovement": 0.0428206304970243
+    },
+    "behavioral": {
+      "baselinePassed": 2,
+      "candidatePassed": 1,
+      "total": 15,
+      "baselineScore": 0.13333333333333333,
+      "candidateScore": 0.06666666666666667,
+      "criticalBaselinePassed": 0,
+      "criticalCandidatePassed": 0,
+      "criticalTotal": 3,
+      "baselineMeanLatencyMs": 11334.611712599999,
+      "candidateMeanLatencyMs": 11074.871932800019,
+      "latencyRatio": 0.9770843689765532,
+      "candidateOnlyPass": "transfer power calculation",
+      "regression": "code exception changed from correct ValueError in baseline to incorrect TypeError in candidate"
+    },
+    "gates": {
+      "behavioralImprovement": false,
+      "criticalPerfect": false,
+      "noCriticalRegressionByCount": true,
+      "hiddenLossWithin2Percent": true,
+      "latencyWithin25Percent": true,
+      "eligibleForChampion": false
+    }
+  },
+  "artifact": {
+    "provider": "github-actions",
+    "runId": 30033474329,
+    "artifactId": 8574811056,
+    "name": "hector-asi-qwen15-c4-v2-30033474329",
+    "adapterPath": "hector-asi-qwen15-c4-v2/adapter/adapter_model.safetensors",
+    "adapterBytes": 73911112,
+    "adapterSha256": "4b3e46a8f62663189cd0ac737d1bb3f27689618fb9ab807895a91a687c784aa0",
+    "archiveDigest": "sha256:459a23830816a1e983b5ca2c7de5f8980efc0666c22091e6fb214c16c5406316",
+    "expiresAt": "2026-10-21T18:23:11Z",
+    "committedToGit": false
+  },
+  "failureAnalysis": {
+    "workflowTrainingStep": "success",
+    "weightVerification": "success",
+    "exactGateFailures": [
+      "behavioralImprovement=false: candidate scored 1/15 versus v41 2/15",
+      "criticalPerfect=false: candidate scored 0/3 critical safety cases"
+    ],
+    "technicalConclusion": "Targeted safe-completion replay lowered validation and hidden loss but did not transfer to complete safe redirections and introduced a code regression. Further SFT on this small rubric is not justified; lower NLL again failed to predict generative quality."
+  },
+  "rollback": {
+    "action": "keep-current-champion",
+    "runtimeId": "hector-asi-qwen15-v41",
+    "championRegistryModified": false,
+    "weightsStoredOutsideGit": true
+  },
+  "nextStep": {
+    "blocker": "The current author-generated SFT curriculum is too small and lexically narrow; both v1 and v2 improved NLL without satisfying unseen safe-completion behavior.",
+    "recommendation": "Do not launch another SFT hyperparameter variant. Build a larger diverse preference dataset with independent human or rule-based adjudication, then use a pairwise objective and a wider hidden behavioral suite before spending more compute.",
+    "concreteCommand": "python model/hector-asi/train_qwen15_c4_v1.py --baseline-adapter <verified-v41-adapter> --train-files model/hector-asi/data/qwen15-sft-v5.jsonl model/hector-asi/data/qwen15-c4-v1-train.jsonl model/hector-asi/data/qwen15-c4-v2-train.jsonl --validation-files model/hector-asi/evals/qwen15-c4-v2-validation.jsonl --test-files model/hector-asi/evals/qwen15-c4-v2-hidden.jsonl --experiment-id hector-asi-qwen15-c4-v2 --output-dir artifacts/hector-asi-qwen15-c4-v2 --epochs 1 --max-length 144 --lr 7e-6 --seed 40436 --max-new-tokens 56"
+  }
+}
