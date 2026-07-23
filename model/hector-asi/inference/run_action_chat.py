@@ -14,6 +14,7 @@ from transformers import AutoModelForCausalLM, AutoTokenizer
 
 WORKER_ORIGIN = os.getenv("HECTOR_WORKER_ORIGIN", "https://hector-os.hectorhdzr035.workers.dev").rstrip("/")
 AUDIENCE = "hector-asi-model-inference"
+MANIFEST_PATH = Path(os.getenv("CHAT_CHAMPION_MANIFEST", "model/hector-asi/registry/chat-champion.json"))
 
 
 def oidc_token() -> str:
@@ -50,6 +51,46 @@ def sha256(path: Path) -> str:
     return digest.hexdigest()
 
 
+def load_manifest() -> dict:
+    manifest = json.loads(MANIFEST_PATH.read_text(encoding="utf-8"))
+    required = (
+        "runtimeId",
+        "baseModel",
+        "baseRevision",
+        "artifactId",
+        "adapterSha256",
+        "adapterBytes",
+        "sourceRunId",
+    )
+    missing = [name for name in required if name not in manifest]
+    if missing:
+        raise RuntimeError(f"Manifiesto incompleto: {', '.join(missing)}")
+    if manifest.get("promotionState") != "active":
+        raise RuntimeError("El modelo del chat no está promovido")
+    return manifest
+
+
+def assert_contract(job: dict, manifest: dict, adapter_file: Path) -> str:
+    contract_fields = (
+        "runtimeId",
+        "baseModel",
+        "baseRevision",
+        "artifactId",
+        "adapterSha256",
+        "adapterBytes",
+        "sourceRunId",
+    )
+    differences = [name for name in contract_fields if job.get(name) != manifest.get(name)]
+    if differences:
+        raise RuntimeError(f"El trabajo no coincide con el campeón promovido: {', '.join(differences)}")
+    actual_hash = sha256(adapter_file)
+    if actual_hash != manifest["adapterSha256"]:
+        raise RuntimeError("El hash del adaptador no coincide con el campeón promovido")
+    if adapter_file.stat().st_size != int(manifest["adapterBytes"]):
+        raise RuntimeError("El tamaño del adaptador no coincide con el campeón promovido")
+    return actual_hash
+
+
 def main() -> None:
     job_id = os.environ["MODEL_JOB_ID"]
     token = oidc_token()
@@ -60,20 +101,19 @@ def main() -> None:
     )
     response.raise_for_status()
     job = response.json()
+    manifest = load_manifest()
 
     adapter_dir = Path(os.environ.get("ADAPTER_DIR", "/tmp/hector-adapter/adapter"))
     adapter_file = adapter_dir / "adapter_model.safetensors"
-    actual_hash = sha256(adapter_file)
-    if actual_hash != job["adapterSha256"]:
-        raise RuntimeError("El hash del adaptador no coincide con el trabajo autorizado")
+    actual_hash = assert_contract(job, manifest, adapter_file)
 
     torch.set_num_threads(max(1, min(4, os.cpu_count() or 1)))
     started = time.time()
-    tokenizer = AutoTokenizer.from_pretrained(job["baseModel"], revision=job["baseRevision"], use_fast=True)
+    tokenizer = AutoTokenizer.from_pretrained(manifest["baseModel"], revision=manifest["baseRevision"], use_fast=True)
     tokenizer.pad_token = tokenizer.pad_token or tokenizer.eos_token
     base = AutoModelForCausalLM.from_pretrained(
-        job["baseModel"],
-        revision=job["baseRevision"],
+        manifest["baseModel"],
+        revision=manifest["baseRevision"],
         torch_dtype=torch.float32,
         low_cpu_mem_usage=True,
         attn_implementation="eager",
@@ -101,6 +141,17 @@ def main() -> None:
     if not text:
         raise RuntimeError("El modelo propio produjo una respuesta vacía")
 
+    runtime = {
+        "model": manifest["runtimeId"],
+        "baseModel": manifest["baseModel"],
+        "baseRevision": manifest["baseRevision"],
+        "artifactId": int(manifest["artifactId"]),
+        "adapterSha256": actual_hash,
+        "adapterBytes": adapter_file.stat().st_size,
+        "sourceRunId": int(manifest["sourceRunId"]),
+        "latencyMs": round((time.time() - started) * 1000),
+        "hardware": "GitHub Actions ubuntu-latest CPU",
+    }
     post_result(
         job_id,
         {
@@ -109,17 +160,10 @@ def main() -> None:
                 "inputTokens": int(encoded["input_ids"].numel()),
                 "outputTokens": int(generated.numel()),
             },
-            "runtime": {
-                "model": job["runtimeId"],
-                "baseModel": job["baseModel"],
-                "baseRevision": job["baseRevision"],
-                "adapterSha256": actual_hash,
-                "latencyMs": round((time.time() - started) * 1000),
-                "hardware": "GitHub Actions ubuntu-latest CPU",
-            },
+            "runtime": runtime,
         },
     )
-    print(json.dumps({"ok": True, "jobId": job_id, "adapterSha256": actual_hash, "outputTokens": int(generated.numel())}))
+    print(json.dumps({"ok": True, "jobId": job_id, **runtime, "outputTokens": int(generated.numel())}))
 
 
 if __name__ == "__main__":
