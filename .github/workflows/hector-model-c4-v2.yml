@@ -1,0 +1,140 @@
+name: Hector model cycle 4 v2 safety restoration
+
+on:
+  pull_request:
+    branches: [main]
+    paths:
+      - 'model/hector-asi/data/qwen15-c4-v2-train.jsonl'
+      - 'model/hector-asi/evals/qwen15-c4-v2-validation.jsonl'
+      - 'model/hector-asi/evals/qwen15-c4-v2-hidden.jsonl'
+      - 'model/hector-asi/experiments/hector-asi-qwen15-c4-v2.json'
+      - '.github/workflows/hector-model-c4-v2.yml'
+  workflow_dispatch:
+
+permissions:
+  actions: read
+  contents: read
+
+jobs:
+  train-qwen15-c4-v2:
+    runs-on: ubuntu-latest
+    timeout-minutes: 90
+    env:
+      HF_HUB_DISABLE_TELEMETRY: '1'
+      TOKENIZERS_PARALLELISM: 'false'
+      BASELINE_ARTIFACT_ID: '8560331055'
+      BASELINE_ADAPTER_SHA256: '31bead5f59982d8e321517fd235b81f992f83d2e3792a55690c2a841ff0e28f8'
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+
+      - name: Validate fresh licensed and sealed v2 splits
+        run: |
+          python -m py_compile model/hector-asi/train_qwen15_c4_v1.py
+          python - <<'PY'
+          import json
+          from pathlib import Path
+          paths=[
+            ('model/hector-asi/data/qwen15-c4-v2-train.jsonl',24),
+            ('model/hector-asi/evals/qwen15-c4-v2-validation.jsonl',10),
+            ('model/hector-asi/evals/qwen15-c4-v2-hidden.jsonl',15),
+          ]
+          sets=[]
+          for path,count in paths:
+            rows=[json.loads(x) for x in Path(path).read_text().splitlines() if x.strip()]
+            assert len(rows)==count,(path,len(rows))
+            assert all(r['verification']['verified'] for r in rows)
+            assert all(r['verification']['source']=='author-generated' for r in rows)
+            assert all(r['verification']['license']=='Apache-2.0-compatible' for r in rows)
+            ids={r['id'] for r in rows}
+            prompts={' '.join(next(m['content'] for m in r['messages'] if m['role']=='user').lower().split()) for r in rows}
+            assert len(ids)==len(rows) and len(prompts)==len(rows)
+            sets.append((ids,prompts))
+          for i in range(3):
+            for j in range(i+1,3):
+              assert not sets[i][0]&sets[j][0]
+              assert not sets[i][1]&sets[j][1]
+          old=Path('model/hector-asi/evals/qwen15-c4-v1-hidden.jsonl')
+          old_prompts={' '.join(next(m['content'] for m in json.loads(x)['messages'] if m['role']=='user').lower().split()) for x in old.read_text().splitlines() if x.strip()}
+          assert not old_prompts & sets[2][1]
+          PY
+
+      - name: Download and verify immutable v41 champion
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          mkdir -p baseline
+          curl --fail --location --retry 3 \
+            -H "Authorization: Bearer ${GH_TOKEN}" \
+            -H "Accept: application/vnd.github+json" \
+            -H "X-GitHub-Api-Version: 2022-11-28" \
+            "https://api.github.com/repos/${GITHUB_REPOSITORY}/actions/artifacts/${BASELINE_ARTIFACT_ID}/zip" \
+            -o baseline-v41.zip
+          unzip -q baseline-v41.zip -d baseline
+          BASELINE_ADAPTER="$(find baseline -type f -path '*/adapter/adapter_model.safetensors' -printf '%h\n' | head -n 1)"
+          test -n "${BASELINE_ADAPTER}"
+          echo "${BASELINE_ADAPTER_SHA256}  ${BASELINE_ADAPTER}/adapter_model.safetensors" | sha256sum --check -
+          test "$(stat -c %s "${BASELINE_ADAPTER}/adapter_model.safetensors")" = "73911112"
+          echo "BASELINE_ADAPTER=${BASELINE_ADAPTER}" >> "${GITHUB_ENV}"
+
+      - name: Install pinned CPU training stack
+        run: |
+          python -m pip install --upgrade pip
+          python -m pip install --index-url https://download.pytorch.org/whl/cpu 'torch==2.7.1'
+          python -m pip install 'transformers==4.53.2' 'peft==0.16.0' 'accelerate==1.8.1' 'safetensors==0.5.3'
+
+      - name: Train real v2 adapter from v41
+        run: |
+          mkdir -p artifacts/logs
+          /usr/bin/time -v python model/hector-asi/train_qwen15_c4_v1.py \
+            --baseline-adapter "${BASELINE_ADAPTER}" \
+            --train-files model/hector-asi/data/qwen15-sft-v5.jsonl model/hector-asi/data/qwen15-c4-v1-train.jsonl model/hector-asi/data/qwen15-c4-v2-train.jsonl \
+            --validation-files model/hector-asi/evals/qwen15-c4-v2-validation.jsonl \
+            --test-files model/hector-asi/evals/qwen15-c4-v2-hidden.jsonl \
+            --experiment-id hector-asi-qwen15-c4-v2 \
+            --output-dir artifacts/hector-asi-qwen15-c4-v2 \
+            --epochs 1 --max-length 144 --lr 7e-6 --seed 40436 --max-new-tokens 56 \
+            2>&1 | tee artifacts/logs/train-v2.log
+
+      - name: Verify real weights and promotion gates
+        run: |
+          python - <<'PY'
+          import hashlib,json
+          from pathlib import Path
+          root=Path('artifacts/hector-asi-qwen15-c4-v2')
+          m=json.loads((root/'metrics.json').read_text())
+          w=root/'adapter'/'adapter_model.safetensors'
+          digest=hashlib.sha256(w.read_bytes()).hexdigest()
+          assert m['candidate']['weightsGenerated']
+          assert w.stat().st_size>30_000_000
+          assert digest==m['candidate']['adapterSha256']
+          assert digest!=m['baseline']['adapterSha256']
+          assert m['dataset']['trainExamples']==68
+          assert m['dataset']['validationExamples']==10
+          assert m['dataset']['testExamples']==15
+          assert m['dataset']['crossSplitOverlap']==0
+          print(json.dumps({
+            'adapterSha256':digest,
+            'adapterBytes':w.stat().st_size,
+            'eligibleForChampion':m['eligibleForChampion'],
+            'baselineScore':m['baseline']['behavioral']['score'],
+            'candidateScore':m['candidate']['behavioral']['score'],
+            'criticalPassed':m['candidate']['behavioral']['criticalPassed'],
+            'criticalTotal':m['candidate']['behavioral']['criticalTotal'],
+            'hiddenLossRatioVsV41':m['candidate']['hiddenLossRatioVsV41'],
+            'latencyRatioVsV41':m['candidate']['latencyRatioVsV41'],
+          },indent=2))
+          PY
+
+      - name: Upload immutable v2 adapter and evidence
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: hector-asi-qwen15-c4-v2-${{ github.run_id }}
+          path: |
+            artifacts/hector-asi-qwen15-c4-v2
+            artifacts/logs
+          if-no-files-found: warn
+          retention-days: 90
