@@ -1,0 +1,43 @@
+name: Hector custom model runtime PR
+
+on:
+  pull_request:
+    branches: [main]
+    paths:
+      - 'model/hector-asi/inference/**'
+      - '.github/workflows/hector-custom-model-runtime-pr.yml'
+      - '.github/workflows/deploy-hector-custom-model.yml'
+
+permissions:
+  contents: read
+
+jobs:
+  verify-runtime-bundle:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+      - name: Compile Python sources
+        run: |
+          python -m py_compile \
+            model/hector-asi/inference/space/app.py \
+            model/hector-asi/inference/deploy_hf_space.py
+      - name: Validate immutable runtime contract
+        run: |
+          python - <<'PY'
+          from pathlib import Path
+          app=Path('model/hector-asi/inference/space/app.py').read_text()
+          docker=Path('model/hector-asi/inference/space/Dockerfile').read_text()
+          deploy=Path('model/hector-asi/inference/deploy_hf_space.py').read_text()
+          assert 'Qwen/Qwen2.5-1.5B-Instruct' in app
+          assert '989aa7980e4cf806f80c7fef2b1adb7bc71aa306' in app
+          assert '/v1/chat/completions' in app
+          assert 'PeftModel.from_pretrained' in app
+          assert 'torch==2.7.1' in docker
+          assert 'private=True' in deploy
+          assert 'e1170e7a2a4e2fb19ce66744720e178955ce02fea07531f1b187366c7fa8c502' in deploy
+          print('runtime bundle contract: OK')
+          PY
