@@ -42,9 +42,9 @@ jobs:
           set -euo pipefail
           python -m py_compile model/hector-asi/training/train_qwen15_v53_anchor_dpo.py
           python - <<'PY'
-          import json,unicodedata
+          import json,os,unicodedata
           from pathlib import Path
-          files=[('$TRAIN_BASE',16),('$TRAIN_NEW',8),('$VALIDATION',4),('$HIDDEN',18)]
+          files=[(os.environ['TRAIN_BASE'],16),(os.environ['TRAIN_NEW'],8),(os.environ['VALIDATION'],4),(os.environ['HIDDEN'],18)]
           groups=[]
           norm=lambda s:' '.join(''.join(c for c in unicodedata.normalize('NFKD',s.lower()) if not unicodedata.combining(c)).split())
           for path,count in files:
