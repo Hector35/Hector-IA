@@ -1,0 +1,81 @@
+name: Hector model cycle 4 v1 archived rerun
+
+on:
+  workflow_dispatch:
+
+permissions:
+  actions: read
+  contents: read
+
+jobs:
+  train-qwen15-c4-v1:
+    runs-on: ubuntu-latest
+    timeout-minutes: 90
+    env:
+      HF_HUB_DISABLE_TELEMETRY: '1'
+      TOKENIZERS_PARALLELISM: 'false'
+      BASELINE_ARTIFACT_ID: '8560331055'
+      BASELINE_ADAPTER_SHA256: '31bead5f59982d8e321517fd235b81f992f83d2e3792a55690c2a841ff0e28f8'
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+      - name: Validate archived v1 inputs
+        run: |
+          python -m py_compile model/hector-asi/train_qwen15_c4_v1.py
+          python - <<'PY'
+          import json
+          from pathlib import Path
+          for path, count in [
+              ('model/hector-asi/data/qwen15-c4-v1-train.jsonl', 20),
+              ('model/hector-asi/evals/qwen15-c4-v1-validation.jsonl', 8),
+              ('model/hector-asi/evals/qwen15-c4-v1-hidden.jsonl', 12),
+          ]:
+              rows=[json.loads(x) for x in Path(path).read_text().splitlines() if x.strip()]
+              assert len(rows)==count
+              assert all(r['verification']['verified'] for r in rows)
+          PY
+      - name: Download and verify immutable v41 champion
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          mkdir -p baseline
+          curl --fail --location --retry 3 \
+            -H "Authorization: Bearer ${GH_TOKEN}" \
+            -H "Accept: application/vnd.github+json" \
+            -H "X-GitHub-Api-Version: 2022-11-28" \
+            "https://api.github.com/repos/${GITHUB_REPOSITORY}/actions/artifacts/${BASELINE_ARTIFACT_ID}/zip" \
+            -o baseline-v41.zip
+          unzip -q baseline-v41.zip -d baseline
+          BASELINE_ADAPTER="$(find baseline -type f -path '*/adapter/adapter_model.safetensors' -printf '%h\n' | head -n 1)"
+          test -n "${BASELINE_ADAPTER}"
+          echo "${BASELINE_ADAPTER_SHA256}  ${BASELINE_ADAPTER}/adapter_model.safetensors" | sha256sum --check -
+          echo "BASELINE_ADAPTER=${BASELINE_ADAPTER}" >> "${GITHUB_ENV}"
+      - name: Install pinned CPU stack
+        run: |
+          python -m pip install --upgrade pip
+          python -m pip install --index-url https://download.pytorch.org/whl/cpu 'torch==2.7.1'
+          python -m pip install 'transformers==4.53.2' 'peft==0.16.0' 'accelerate==1.8.1' 'safetensors==0.5.3'
+      - name: Reproduce v1
+        run: |
+          mkdir -p artifacts/logs
+          /usr/bin/time -v python model/hector-asi/train_qwen15_c4_v1.py \
+            --baseline-adapter "${BASELINE_ADAPTER}" \
+            --train-files model/hector-asi/data/qwen15-sft-v5.jsonl model/hector-asi/data/qwen15-c4-v1-train.jsonl \
+            --validation-files model/hector-asi/evals/qwen15-c4-v1-validation.jsonl \
+            --test-files model/hector-asi/evals/qwen15-c4-v1-hidden.jsonl \
+            --experiment-id hector-asi-qwen15-c4-v1 \
+            --output-dir artifacts/hector-asi-qwen15-c4-v1 \
+            --epochs 2 --max-length 128 --lr 1.5e-5 --seed 40435 --max-new-tokens 48 \
+            2>&1 | tee artifacts/logs/train.log
+      - name: Upload archived reproduction
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: hector-asi-qwen15-c4-v1-${{ github.run_id }}
+          path: |
+            artifacts/hector-asi-qwen15-c4-v1
+            artifacts/logs
+          if-no-files-found: warn
+          retention-days: 90
