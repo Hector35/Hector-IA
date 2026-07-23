@@ -1,0 +1,73 @@
+{
+  "schemaVersion": "1.0.0",
+  "experimentId": "hector-asi-qwen15-v57-simpo-length",
+  "status": "rejected",
+  "baseModel": {
+    "repository": "Qwen/Qwen2.5-1.5B-Instruct",
+    "revision": "989aa7980e4cf806f80c7fef2b1adb7bc71aa306",
+    "license": "Apache-2.0"
+  },
+  "sourceCandidate": {
+    "id": "hector-asi-qwen15-v41",
+    "artifactId": 8560331055,
+    "adapterSha256": "31bead5f59982d8e321517fd235b81f992f83d2e3792a55690c2a841ff0e28f8"
+  },
+  "training": {
+    "method": "SimPO length-normalized preference continuation with LoRA anchor",
+    "trainPairs": 8,
+    "validationPairs": 4,
+    "hiddenExamples": 18,
+    "criticalHiddenExamples": 6,
+    "epochs": 2,
+    "learningRate": 0.000002,
+    "beta": 2.0,
+    "gamma": 0.5,
+    "anchor": 0.03,
+    "seed": 3057,
+    "replicas": 2,
+    "runtimeSecondsPerReplica": 573.3195276260376,
+    "peakRssMb": 11682.5,
+    "hardware": "GitHub-hosted Linux CPU runner"
+  },
+  "artifact": {
+    "runId": 30053080614,
+    "artifactId": 8582099005,
+    "name": "hector-asi-qwen15-v57-simpo-30053080614",
+    "digest": "sha256:8734a6cb80d2cb5ec639320c11a105db82dbdab1ed433642af1f5b8d03447d89",
+    "adapterBytes": 73911112,
+    "adapterSha256": "6dd6c074724ce43ba1e5f6ec7829a746f94c42b7c6400588aee7bce658b43eac",
+    "byteIdenticalReplicas": 2,
+    "expiresAt": "2026-10-21T23:24:04Z",
+    "committedToGit": false
+  },
+  "comparison": {
+    "baselineValidationObjective": 0.34090280160307884,
+    "validationImproved": true,
+    "baselineBehavioralPassed": 11,
+    "candidateBehavioralPassed": 11,
+    "behavioralTotal": 18,
+    "baselineCriticalPassed": 6,
+    "candidateCriticalPassed": 6,
+    "criticalTotal": 6,
+    "baselineMeanTokens": 20.88888888888889,
+    "candidateMeanTokens": 20.61111111111111,
+    "baselineMeanLatencyMs": 7451.977030777778,
+    "candidateMeanLatencyMs": 7366.220821333325
+  },
+  "gates": {
+    "realWeights": true,
+    "byteIdenticalReplicas": true,
+    "validationImproved": true,
+    "behavioralImprovement": false,
+    "criticalPerfect": true,
+    "noCriticalRegression": true,
+    "latencyAcceptable": true,
+    "tokenLengthAcceptable": true,
+    "eligibleForPromotion": false
+  },
+  "decision": {
+    "result": "Reject V57 SimPO as champion candidate because it tied V41 at 11/18 despite preserving 6/6 safety and slightly reducing tokens and latency.",
+    "rollback": "hector-asi-qwen15-v41 artifact 8560331055",
+    "doNotRepeat": true
+  }
+}
