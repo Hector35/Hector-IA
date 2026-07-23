@@ -1,0 +1,81 @@
+{
+  "schemaVersion": "1.0.0",
+  "experimentId": "hector-asi-qwen15-v56-brevity-recovery",
+  "status": "promotion-gates-passed-qwen15-line",
+  "globalChampionEligible": false,
+  "globalChampionBlockedBy": "The project-wide target remains Qwen/Qwen3-4B-Instruct-2507; V56 is a Qwen2.5-1.5B specialist candidate.",
+  "baseModel": {
+    "repository": "Qwen/Qwen2.5-1.5B-Instruct",
+    "revision": "989aa7980e4cf806f80c7fef2b1adb7bc71aa306",
+    "license": "Apache-2.0"
+  },
+  "sourceCandidate": {
+    "id": "hector-asi-qwen15-v54",
+    "artifactId": 8579920006,
+    "adapterSha256": "86cac6f1e80e23dec0941159c6d5e1250b238385e5c88cc647152848b42123df"
+  },
+  "training": {
+    "method": "continued LoRA SFT with assistant-response-only CE and per-example risk weighting",
+    "trainExamples": 18,
+    "validationExamples": 6,
+    "hiddenExamples": 18,
+    "criticalHiddenExamples": 6,
+    "epochs": 1,
+    "learningRate": 0.000001,
+    "maxLength": 128,
+    "maxNewTokens": 64,
+    "seed": 3056,
+    "replicas": 2,
+    "runtimeSecondsPerReplica": 486.6125018596649,
+    "peakRssMb": 10164.6953125,
+    "hardware": "GitHub-hosted Linux CPU runner"
+  },
+  "artifact": {
+    "runId": 30049720386,
+    "artifactId": 8580900380,
+    "name": "hector-asi-qwen15-v56-brevity-recovery-30049720386",
+    "digest": "sha256:433610972c7bbc1ae724910e23624006ca2b8d339e02f122fe299f31110f6c84",
+    "adapterPath": "hector-asi-qwen15-v56-a/adapter/adapter_model.safetensors",
+    "adapterBytes": 73911112,
+    "adapterSha256": "6cf3ccda4956d99074f44ad6e35e9274581198c89dff7f84d54a5d8b47636ead",
+    "byteIdenticalReplicas": 2,
+    "expiresAt": "2026-10-21T22:23:38Z",
+    "committedToGit": false
+  },
+  "comparison": {
+    "baselineId": "hector-asi-qwen15-v54",
+    "baselineValidationLoss": 1.8870498140652974,
+    "candidateValidationLoss": 1.8101685345172882,
+    "baselineHiddenLoss": 2.1507151193088956,
+    "candidateHiddenLoss": 2.0833414726787143,
+    "baselineBehavioralPassed": 8,
+    "candidateBehavioralPassed": 9,
+    "behavioralTotal": 18,
+    "baselineCriticalPassed": 6,
+    "candidateCriticalPassed": 6,
+    "criticalTotal": 6,
+    "baselineOutputTokens": 291,
+    "candidateOutputTokens": 328,
+    "baselineMeanLatencyMs": 6033.168746388891,
+    "candidateMeanLatencyMs": 6554.807578499992,
+    "latencyRatio": 1.0864618335801273,
+    "parameterDeltaL2": 0.0285727184324402
+  },
+  "gates": {
+    "weightsChanged": true,
+    "validationImproved": true,
+    "hiddenLossWithinFivePercent": true,
+    "behavioralImprovement": true,
+    "criticalPerfect": true,
+    "noCriticalRegression": true,
+    "latencyWithinTwentyFivePercent": true,
+    "qwen15LinePromotion": true,
+    "projectWidePromotion": false
+  },
+  "decision": {
+    "qwen15Line": "Promote V56 over V54 as the leading Qwen2.5-1.5B specialist candidate.",
+    "projectWide": "Do not set model-registry champion; the official target is still Qwen3-4B and champion remains null.",
+    "rollback": "hector-asi-qwen15-v54 artifact 8579920006"
+  },
+  "doNotRepeat": false
+}
