@@ -1,0 +1,72 @@
+name: Hector model Qwen15 v42 preference training
+on:
+  pull_request:
+    branches: [main]
+    paths:
+      - 'model/hector-asi/data/qwen15-v42-preferences-*.jsonl'
+      - 'model/hector-asi/training/train_qwen15_v42_pairwise.py'
+      - '.github/workflows/hector-model-qwen15-v42.yml'
+  workflow_dispatch:
+permissions:
+  contents: read
+  actions: write
+concurrency:
+  group: hector-qwen15-v42-${{ github.ref }}
+  cancel-in-progress: false
+jobs:
+  train-qwen15-v42:
+    runs-on: ubuntu-latest
+    timeout-minutes: 90
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+      - name: Validate preference splits
+        run: |
+          python -m py_compile model/hector-asi/training/train_qwen15_v42_pairwise.py
+          python - <<'PY'
+          import json
+          from pathlib import Path
+          files=['model/hector-asi/data/qwen15-v42-preferences-train.jsonl','model/hector-asi/data/qwen15-v42-preferences-test.jsonl']
+          rows=[[json.loads(x) for x in Path(f).read_text().splitlines() if x.strip()] for f in files]
+          assert list(map(len,rows))==[12,6]
+          assert not ({r['id'] for r in rows[0]} & {r['id'] for r in rows[1]})
+          assert all(r['chosen']!=r['rejected'] and r['prompt'] for part in rows for r in part)
+          PY
+      - name: Install pinned CPU stack
+        run: |
+          python -m pip install --disable-pip-version-check --index-url https://download.pytorch.org/whl/cpu torch==2.7.1
+          python -m pip install --disable-pip-version-check accelerate==1.8.1 huggingface_hub==0.34.4 peft==0.16.0 safetensors==0.5.3 transformers==4.53.2
+      - name: Train two real pairwise replicas
+        env:
+          HF_HOME: /home/runner/.cache/huggingface
+          TOKENIZERS_PARALLELISM: 'false'
+        run: |
+          set -euo pipefail
+          for replica in a b; do
+            python model/hector-asi/training/train_qwen15_v42_pairwise.py \
+              --train model/hector-asi/data/qwen15-v42-preferences-train.jsonl \
+              --test model/hector-asi/data/qwen15-v42-preferences-test.jsonl \
+              --out artifacts/hector-asi-qwen15-v42-${replica} --seed 35 | tee artifacts/v42-${replica}.log
+          done
+      - name: Verify reproducibility and preference gain
+        run: |
+          python - <<'PY'
+          import hashlib,json
+          from pathlib import Path
+          a=Path('artifacts/hector-asi-qwen15-v42-a'); b=Path('artifacts/hector-asi-qwen15-v42-b')
+          ma=json.loads((a/'manifest.json').read_text()); mb=json.loads((b/'manifest.json').read_text())
+          fa=a/'adapter/adapter_model.safetensors'; fb=b/'adapter/adapter_model.safetensors'
+          h=lambda p:hashlib.sha256(p.read_bytes()).hexdigest()
+          assert h(fa)==h(fb)==ma['adapterSha256']==mb['adapterSha256']
+          assert fa.stat().st_size>5_000_000
+          assert ma['after']['accuracy']>=ma['before']['accuracy']
+          assert ma['after']['mean_margin']>ma['before']['mean_margin']
+          print(json.dumps(ma,indent=2,sort_keys=True))
+          PY
+      - uses: actions/upload-artifact@v4
+        with:
+          name: hector-asi-qwen15-v42-${{ github.run_id }}
+          path: artifacts/
+          retention-days: 90
