@@ -1,0 +1,26 @@
+{
+  "schemaVersion": "1.0.0",
+  "datasetId": "qwen15-v13-expanded-curriculum",
+  "license": "Apache-2.0-compatible author-generated data",
+  "privateUserData": false,
+  "train": {
+    "files": [
+      "model/hector-asi/data/qwen15-sft-v5.jsonl",
+      "model/hector-asi/data/qwen15-sft-v6-supplement.jsonl"
+    ],
+    "examples": 40
+  },
+  "heldOut": {
+    "files": [
+      "model/hector-asi/evals/qwen15-held-out-v5.jsonl",
+      "model/hector-asi/evals/qwen15-held-out-v6-supplement.jsonl"
+    ],
+    "examples": 20,
+    "sealedFromTraining": true
+  },
+  "quality": {
+    "deduplicatedBy": ["id", "normalized user prompt"],
+    "requiredVerification": true,
+    "domains": ["planning", "code", "math", "tool-use", "verification", "metacognition", "safety", "transfer", "calibration", "robustness", "early-stopping"]
+  }
+}
