@@ -11,6 +11,7 @@ on:
 permissions:
   contents: read
   actions: read
+  issues: write
 
 concurrency:
   group: hector-custom-model-smoke
@@ -102,3 +103,23 @@ jobs:
             /tmp/hector-custom-model-smoke.json
             /tmp/hector-health.json
           retention-days: 30
+
+      - name: Publish success receipt
+        if: success()
+        env:
+          GH_TOKEN: ${{ github.token }}
+        shell: bash
+        run: |
+          TOKENS="$(jq -r '.outputTokens' "$SMOKE_OUTPUT")"
+          LATENCY="$(jq -r '.latencyMs' "$SMOKE_OUTPUT")"
+          BODY="✅ Inferencia neuronal real verificada.\n\n- runtime: hector-asi-qwen15-v10\n- base: Qwen/Qwen2.5-1.5B-Instruct@989aa7980e4cf806f80c7fef2b1adb7bc71aa306\n- adapter SHA-256: $ADAPTER_SHA256\n- adapter bytes: 34895152\n- output tokens: ${TOKENS}\n- latency ms: ${LATENCY}\n- producción: customModel.mode=github-actions\n- evidencia: ${GITHUB_SERVER_URL}/${GITHUB_REPOSITORY}/actions/runs/${GITHUB_RUN_ID}"
+          gh issue create --title "[custom-model-smoke] OK ${GITHUB_SHA::7}" --body "$BODY"
+
+      - name: Publish failure receipt
+        if: failure()
+        env:
+          GH_TOKEN: ${{ github.token }}
+        shell: bash
+        run: |
+          BODY="❌ La inferencia de humo del modelo propio falló. No se declaró el runtime como verificado.\n\nRun: ${GITHUB_SERVER_URL}/${GITHUB_REPOSITORY}/actions/runs/${GITHUB_RUN_ID}"
+          gh issue create --title "[custom-model-smoke] FALLO ${GITHUB_SHA::7}" --body "$BODY"
