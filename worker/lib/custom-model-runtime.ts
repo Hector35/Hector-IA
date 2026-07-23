@@ -50,17 +50,16 @@ export function hasCustomModelEndpoint(env:Bindings){
  return custom.HECTOR_CUSTOM_MODEL_ENABLED!=='false'&&Boolean(custom.HECTOR_CUSTOM_MODEL_BASE_URL?.trim())&&Boolean((custom.HECTOR_CUSTOM_MODEL_TOKEN||env.HUGGINGFACE_TOKEN)?.trim());
 }
 
-export function hasQueuedCustomInference(env:Bindings){return Boolean(env.GITHUB_RUNNER_TOKEN?.trim());}
+export function hasQueuedCustomInference(_env:Bindings){return true;}
 
 export function hectorRuntimeCatalog(env:Bindings):HectorRuntimeCatalogItem[]{
- const custom=env as CustomBindings,endpointConfigured=hasCustomModelEndpoint(env),queued=hasQueuedCustomInference(env),available=endpointConfigured||queued;
- const status:HectorRuntimeCatalogItem['status']=endpointConfigured?'configured':queued?'queued':'trained-offline';
- const reason=endpointConfigured?'Endpoint neuronal personalizado configurado':queued?'Los pesos se ejecutan bajo demanda en GitHub Actions; la respuesta puede tardar varios minutos':'Pesos entrenados y registrados, pero falta un runtime autorizado';
+ const custom=env as CustomBindings,endpointConfigured=hasCustomModelEndpoint(env),immediate=Boolean(env.GITHUB_RUNNER_TOKEN?.trim());
+ const reason=endpointConfigured?'Endpoint neuronal personalizado configurado':immediate?'Los pesos se ejecutan bajo demanda en GitHub Actions mediante despacho inmediato':'Los pesos se ejecutan en GitHub Actions; la cola programada se revisa automáticamente cada cinco minutos';
  return[
   {id:'auto',label:'Automático',description:'Héctor elige el runtime disponible más adecuado.',available:true,customWeights:false,status:'active'},
   {id:'hector-base',label:'Héctor Base',description:'Workers AI y reglas locales.',available:env.CLOUDFLARE_AI_ENABLED!=='false'&&Boolean(env.AI),customWeights:false,status:env.CLOUDFLARE_AI_ENABLED!=='false'&&Boolean(env.AI)?'active':'disabled',model:env.CLOUDFLARE_MODEL_FAST},
   {id:'hector-qwen',label:'Héctor Qwen',description:'Qwen abierto mediante Hugging Face.',available:env.HECTOR_QWEN_ENABLED!=='false'&&Boolean(env.HUGGINGFACE_TOKEN?.trim()),customWeights:false,status:env.HECTOR_QWEN_ENABLED!=='false'&&Boolean(env.HUGGINGFACE_TOKEN?.trim())?'active':'disabled',model:env.HECTOR_QWEN_MODEL},
-  {id:'hector-experimental',label:custom.HECTOR_CUSTOM_MODEL_LABEL||'Héctor Qwen15 v10 · pesos propios',description:endpointConfigured?'Adaptador neuronal propio servido por un endpoint dedicado.':'Adaptador neuronal propio cargado bajo demanda en cómputo gratuito reproducible.',available,customWeights:true,status,model:custom.HECTOR_CUSTOM_MODEL_ID||'hector-asi-qwen15-v10',reason}
+  {id:'hector-experimental',label:custom.HECTOR_CUSTOM_MODEL_LABEL||'Héctor Qwen15 v10 · pesos propios',description:endpointConfigured?'Adaptador neuronal propio servido por un endpoint dedicado.':'Adaptador neuronal propio cargado bajo demanda en cómputo gratuito reproducible.',available:true,customWeights:true,status:endpointConfigured?'configured':'queued',model:custom.HECTOR_CUSTOM_MODEL_ID||'hector-asi-qwen15-v10',reason}
  ];
 }
 
