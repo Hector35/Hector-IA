@@ -1,0 +1,105 @@
+name: Hector model Qwen15 v68 interpolation training
+on:
+  pull_request:
+    branches: [main]
+    paths:
+      - '.github/workflows/hector-model-qwen15-v68-interpolate.yml'
+      - 'model/hector-asi/training/train_qwen15_v68_interpolate.py'
+      - 'model/hector-asi/data/qwen15-v68-interpolate-train.jsonl'
+      - 'model/hector-asi/evals/qwen15-v68-interpolate-validation.jsonl'
+  workflow_dispatch:
+permissions:
+  contents: read
+  actions: read
+concurrency:
+  group: hector-qwen15-v68-interpolate-${{ github.ref }}
+  cancel-in-progress: false
+jobs:
+  train-qwen15-v68:
+    runs-on: ubuntu-latest
+    timeout-minutes: 180
+    env:
+      SOURCE_ARTIFACT_ID: '8560331055'
+      SOURCE_SHA: '31bead5f59982d8e321517fd235b81f992f83d2e3792a55690c2a841ff0e28f8'
+      SOURCE_BYTES: '73911112'
+      TRAIN: model/hector-asi/data/qwen15-v68-interpolate-train.jsonl
+      VALIDATION: model/hector-asi/evals/qwen15-v68-interpolate-validation.jsonl
+      HIDDEN: model/hector-asi/evals/qwen15-v51-hidden.jsonl
+      SRC: /tmp/hector-v41/adapter
+      OUT_A: artifacts/hector-asi-qwen15-v68-a
+      OUT_B: artifacts/hector-asi-qwen15-v68-b
+      TOKENIZERS_PARALLELISM: 'false'
+      HF_HOME: /home/runner/.cache/huggingface
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+          cache: pip
+      - name: Validate trainer, provenance and splits
+        run: |
+          set -euo pipefail
+          python -m py_compile model/hector-asi/training/train_qwen15_v68_interpolate.py
+          python - <<'PY'
+          import json,os,unicodedata
+          from pathlib import Path
+          rows=lambda p:[json.loads(x) for x in Path(p).read_text().splitlines() if x.strip()]
+          tr,va,hi=rows(os.environ['TRAIN']),rows(os.environ['VALIDATION']),rows(os.environ['HIDDEN'])
+          assert (len(tr),len(va),len(hi))==(24,10,18)
+          assert sum(x['group']=='focal' for x in tr)==8 and sum(x['group']=='replay' for x in tr)==16
+          norm=lambda s:' '.join(''.join(c for c in unicodedata.normalize('NFKD',s.lower()) if not unicodedata.combining(c)).split())
+          sig=[]
+          for g in (tr,va,hi):
+            ids={x['id'] for x in g};prompts={norm(x['prompt']) for x in g};assert len(ids)==len(g) and len(prompts)==len(g);sig.append((ids,prompts))
+          for i in range(3):
+            for j in range(i+1,3):assert not sig[i][0]&sig[j][0] and not sig[i][1]&sig[j][1]
+          assert all(x.get('verified') is True and x.get('provenance')=='author-generated' and x.get('license')=='Apache-2.0-compatible' and x.get('rejected') for x in tr+va)
+          assert sum(bool(x.get('critical')) for x in hi)==6
+          print('train=24 focal=8 replay=16 validation=10 hidden=18 critical=6 contamination=0 privateData=false')
+          PY
+      - name: Download and verify immutable V41
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          set -euo pipefail
+          mkdir -p /tmp/v41zip /tmp/hector-v41
+          curl --fail --location --retry 4 -H "Authorization: Bearer $GH_TOKEN" -H "Accept: application/vnd.github+json" "https://api.github.com/repos/${GITHUB_REPOSITORY}/actions/artifacts/${SOURCE_ARTIFACT_ID}/zip" -o /tmp/v41.zip
+          unzip -q /tmp/v41.zip -d /tmp/v41zip
+          F="$(find /tmp/v41zip -type f -path '*/adapter/adapter_model.safetensors' -print -quit)"
+          test -n "$F"; test "$(sha256sum "$F"|awk '{print $1}')" = "$SOURCE_SHA"; test "$(stat -c%s "$F")" -eq "$SOURCE_BYTES"
+          cp -a "$(dirname "$F")" "$SRC"
+      - name: Install pinned CPU stack
+        run: |
+          python -m pip install --disable-pip-version-check --index-url https://download.pytorch.org/whl/cpu torch==2.7.1
+          python -m pip install --disable-pip-version-check accelerate==1.8.1 huggingface_hub==0.34.4 peft==0.16.0 safetensors==0.5.3 transformers==4.53.2
+      - name: Train two deterministic interpolated continuations
+        run: |
+          set -o pipefail
+          mkdir -p artifacts/logs
+          for spec in "$OUT_A:a" "$OUT_B:b"; do
+            IFS=: read -r out tag <<< "$spec"
+            /usr/bin/time -v python model/hector-asi/training/train_qwen15_v68_interpolate.py --source-adapter "$SRC" --train "$TRAIN" --validation "$VALIDATION" --hidden "$HIDDEN" --out "$out" --epochs 2 --lr 1.2e-6 --eos-lambda .08 --seed 3068 2>&1 | tee "artifacts/logs/v68-${tag}.log"
+          done
+      - name: Verify real reproducible weights
+        run: |
+          set -euo pipefail
+          A="$OUT_A/adapter/adapter_model.safetensors"; B="$OUT_B/adapter/adapter_model.safetensors"
+          test -f "$A" -a -f "$B"; cmp "$A" "$B"; test "$(stat -c%s "$A")" -gt 50000000
+          python - <<'PY'
+          import json
+          from pathlib import Path
+          a=json.loads(Path('artifacts/hector-asi-qwen15-v68-a/metrics.json').read_text());b=json.loads(Path('artifacts/hector-asi-qwen15-v68-b/metrics.json').read_text())
+          assert a['candidate']['adapterSha256']==b['candidate']['adapterSha256'];assert a['candidate']['adapterBytes']==b['candidate']['adapterBytes'];assert a['hyperparameters']['selectedAlpha']==b['hyperparameters']['selectedAlpha']
+          print(json.dumps({'sha256':a['candidate']['adapterSha256'],'bytes':a['candidate']['adapterBytes'],'selectedAlpha':a['hyperparameters']['selectedAlpha'],'baselineBehavior':a['baseline']['behavioral']['passed'],'candidateBehavior':a['candidate']['behavioral']['passed'],'baselineCritical':a['baseline']['behavioral']['criticalPassed'],'candidateCritical':a['candidate']['behavioral']['criticalPassed'],'eligible':a['gates']['eligibleForPromotion']},sort_keys=True))
+          PY
+      - name: Upload weights, metrics and logs
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: hector-asi-qwen15-v68-interpolate-${{ github.run_id }}
+          path: |
+            artifacts/hector-asi-qwen15-v68-a
+            artifacts/hector-asi-qwen15-v68-b
+            artifacts/logs
+          if-no-files-found: warn
+          retention-days: 90
