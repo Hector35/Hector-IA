@@ -1,0 +1,60 @@
+name: Hector Stage 6 canonical corpus v1
+on:
+  pull_request:
+    paths:
+      - 'model/hector-asi/data/**'
+      - '.github/workflows/hector-stage6-corpus-v1.yml'
+  workflow_dispatch:
+permissions:
+  contents: read
+jobs:
+  build-verify-corpus:
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - name: Compile builders
+        run: python -m py_compile model/hector-asi/data/build_stage6_corpus_v1.py model/hector-asi/data/validate_stage6_corpus.py
+      - name: Generate two deterministic replicas
+        run: |
+          python model/hector-asi/data/build_stage6_corpus_v1.py --output artifacts/a/corpus.jsonl --manifest artifacts/a/manifest.json
+          python model/hector-asi/data/build_stage6_corpus_v1.py --output artifacts/b/corpus.jsonl --manifest artifacts/b/manifest.json
+          cmp artifacts/a/corpus.jsonl artifacts/b/corpus.jsonl
+          cmp artifacts/a/manifest.json artifacts/b/manifest.json
+      - name: Materialize Benchmark V2 candidate for contamination check
+        run: |
+          git fetch --depth=1 origin model-eval-2/20260724-1142
+          git show FETCH_HEAD:model/hector-asi/evals/benchmark_v2/build_benchmark_v2.py > /tmp/build_benchmark_v2.py
+          python /tmp/build_benchmark_v2.py --out artifacts/benchmark-v2
+      - name: Validate schema, balance, hashes and contamination
+        run: |
+          python model/hector-asi/data/validate_stage6_corpus.py \
+            --corpus artifacts/a/corpus.jsonl \
+            --manifest artifacts/a/manifest.json \
+            --benchmark artifacts/benchmark-v2/hidden.jsonl \
+            --output artifacts/a/quality-report.json
+      - name: Enforce expected immutable identity
+        run: |
+          test "$(wc -l < artifacts/a/corpus.jsonl)" -eq 2048
+          test "$(sha256sum artifacts/a/corpus.jsonl | cut -d' ' -f1)" = "9012302d2ffce271ec28a2b760cfb12d42f1641c7abe863054a6366a981933d4"
+          python - <<'PY'
+          import json
+          q=json.load(open('artifacts/a/quality-report.json'))
+          assert q['accepted'] is True
+          assert q['rejected']==0
+          assert q['benchmarkChecked'] is True
+          assert not q['benchmarkOverlap']
+          assert q['splits']=={'train':1792,'validation':256}
+          PY
+      - name: Publish verified corpus
+        uses: actions/upload-artifact@v4
+        with:
+          name: stage6-canonical-corpus-v1-${{ github.run_id }}
+          path: |
+            artifacts/a/corpus.jsonl
+            artifacts/a/manifest.json
+            artifacts/a/quality-report.json
+          retention-days: 90
+          if-no-files-found: error
