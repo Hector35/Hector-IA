@@ -1,0 +1,23 @@
+{
+  "schemaVersion": 1,
+  "batchId": "stage6-canonical-20260724",
+  "status": "generator-committed-awaiting-ci",
+  "targetModel": "Qwen/Qwen3.5-397B-A17B",
+  "totalExamples": 0,
+  "plannedExamples": 640,
+  "sftExamples": 0,
+  "preferenceExamples": 0,
+  "multimodalExamples": 0,
+  "integratedExamples": 0,
+  "license": "CC0-1.0",
+  "containsPrivateUserData": false,
+  "benchmarkExcluded": true,
+  "verification": {
+    "structural": false,
+    "exactDedup": false,
+    "semanticKeyDedup": false,
+    "benchmarkExactPromptCheck": false,
+    "pythonTests": false
+  },
+  "note": "El generador y el verificador existen en una rama real. El conteo permanece en cero hasta que CI materialice y valide los archivos JSONL."
+}
