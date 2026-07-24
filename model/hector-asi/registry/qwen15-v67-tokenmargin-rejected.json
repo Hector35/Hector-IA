@@ -1,0 +1,102 @@
+{
+  "schemaVersion": 1,
+  "experimentId": "hector-asi-qwen15-v67-tokenmargin",
+  "status": "rejected-for-champion",
+  "decision": "retain-v41",
+  "baseModel": "Qwen/Qwen2.5-1.5B-Instruct",
+  "baseRevision": "989aa7980e4cf806f80c7fef2b1adb7bc71aa306",
+  "sourceChampion": {
+    "runtimeId": "hector-asi-qwen15-v41",
+    "artifactId": 8560331055,
+    "adapterSha256": "31bead5f59982d8e321517fd235b81f992f83d2e3792a55690c2a841ff0e28f8",
+    "adapterBytes": 73911112
+  },
+  "training": {
+    "runId": 30085466846,
+    "artifactId": 8594458978,
+    "artifactName": "hector-asi-qwen15-v67-tokenmargin-30085466846",
+    "artifactDigest": "sha256:52383171947b17a3d7847f9978c48334858b7d8f923b71a5e1cdb0e1b9c28f50",
+    "artifactExpiresAt": "2026-10-22T10:14:23Z",
+    "adapterSha256": "c9fcfd6ea4b6bf884d1bf15319dcb0c374ae9ac81821458a0de6c22d8df1ba59",
+    "adapterBytes": 73911112,
+    "replicasByteIdentical": true,
+    "method": "first-divergent-token margin training with replay logit distillation",
+    "hyperparameters": {
+      "epochs": 2,
+      "learningRate": 0.0000008,
+      "maxLength": 144,
+      "margin": 0.35,
+      "marginLambda": 0.65,
+      "distillLambda": 0.55,
+      "eosLambda": 0.06,
+      "seed": 3067
+    },
+    "runtime": {
+      "secondsReplicaA": 1228.9909608364105,
+      "secondsReplicaB": 1212.4349513053894,
+      "peakRssMbReplicaA": 14705.1796875,
+      "peakRssMbReplicaB": 15013.609375,
+      "python": "3.11.15",
+      "torch": "2.7.1+cpu",
+      "hardware": "GitHub-hosted Ubuntu 24.04 Azure x86_64 CPU"
+    }
+  },
+  "dataset": {
+    "trainExamples": 24,
+    "focalExamples": 8,
+    "replayExamples": 16,
+    "validationExamples": 10,
+    "hiddenTestExamples": 18,
+    "criticalHiddenExamples": 6,
+    "crossSplitOverlap": 0,
+    "privateUserData": false,
+    "license": "author-generated Apache-2.0-compatible",
+    "trainSha256": "e085e2134e4aa9462138b07a8958c5a1338ff34c0a88569f6f9ee7d1b772d934",
+    "validationSha256": "4ce61ee6259ebc3885e65a1cafdda0e2496209b56b4ccefdcb5405cd019cb126",
+    "hiddenTestSha256": "17560e21b728c93f822a0e21cb4b4261823ae5b6f92f3fe1188fdfd4b5679ccb"
+  },
+  "comparison": {
+    "validationObjective": {
+      "v41": 1.8912361115217209,
+      "v67": 1.8054673999547959,
+      "relativeImprovement": 0.045350610135037044
+    },
+    "behavior": {
+      "v41Passed": 10,
+      "v67Passed": 8,
+      "total": 18,
+      "v41CriticalPassed": 6,
+      "v67CriticalPassed": 6,
+      "criticalTotal": 6,
+      "v41MeanTokens": 18.88888888888889,
+      "v67MeanTokens": 18.5,
+      "tokenRatio": 0.9794117647058823,
+      "v41MeanLatencyMsReplicaA": 6678.186760222223,
+      "v67MeanLatencyMsReplicaA": 6720.100591611108,
+      "v41MeanLatencyMsReplicaB": 6580.763844722216,
+      "v67MeanLatencyMsReplicaB": 6725.180878222269,
+      "latencyRatioReplicaA": 1.0062762292960328,
+      "latencyRatioReplicaB": 1.0219453298899148,
+      "newRegressions": [
+        "v51-h-09 code",
+        "v51-h-14 calibration"
+      ]
+    }
+  },
+  "gates": {
+    "weightsChanged": true,
+    "replicasByteIdentical": true,
+    "validationImproved": true,
+    "behavioralImprovement": false,
+    "criticalPerfect": true,
+    "noCriticalRegression": true,
+    "latencyAcceptable": true,
+    "tokenLengthAcceptable": true,
+    "eligibleForChampion": false
+  },
+  "finding": "First-divergent-token margin training materially improved the validation objective and slightly shortened outputs while preserving all six critical safety cases and acceptable latency. However, hidden behavioral accuracy fell from 10/18 to 8/18 because code and calibration cases regressed. Directly increasing the first divergent token margin therefore changed greedy behavior, but in the wrong directions for two protected capabilities, so V67 cannot replace V41.",
+  "doNotRepeat": [
+    "First-divergent-token margin continuation from V41 with 8 focal plus 16 replay pairs, margin 0.35, margin lambda 0.65, replay distillation 0.55, EOS 0.06, LR 8e-7, 2 epochs, seed 3067 and this 24/10/18 split"
+  ],
+  "rollback": "hector-asi-qwen15-v41"
+}
