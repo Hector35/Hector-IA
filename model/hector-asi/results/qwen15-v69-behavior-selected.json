@@ -1,0 +1,68 @@
+{
+  "experimentId": "hector-asi-qwen15-v69-behavior-selected",
+  "status": "rejected",
+  "doNotRepeat": true,
+  "baseModel": "Qwen/Qwen2.5-1.5B-Instruct",
+  "baseRevision": "989aa7980e4cf806f80c7fef2b1adb7bc71aa306",
+  "sourceChampion": {
+    "id": "hector-asi-qwen15-v41",
+    "artifactId": 8560331055,
+    "adapterSha256": "31bead5f59982d8e321517fd235b81f992f83d2e3792a55690c2a841ff0e28f8",
+    "adapterBytes": 73911112
+  },
+  "candidate": {
+    "workflowRunId": 30094535733,
+    "artifactId": 8598624304,
+    "artifactName": "hector-asi-qwen15-v69-behavior-selected-30094535733",
+    "artifactDigest": "sha256:d5656996559e2cdff1ea72dcbff821132f76fcbd79b28739a7b733b5b392eac6",
+    "adapterSha256": "6f5d7a7bfc2090ac489d5d6f3ad7d3fe1a0e672d80c182b634954813833e86fe",
+    "adapterBytes": 73911080,
+    "replicasByteIdentical": true,
+    "selectedAlpha": 1.0,
+    "expiresAt": "2026-10-22T12:50:02Z"
+  },
+  "dataset": {
+    "trainRows": 24,
+    "validationRows": 10,
+    "selectionProxyRows": 12,
+    "hiddenRows": 18,
+    "hiddenCriticalRows": 6,
+    "crossSplitOverlap": 0,
+    "provenance": "author-generated",
+    "license": "Apache-2.0-compatible",
+    "privateData": false
+  },
+  "training": {
+    "method": "response-only LoRA continuation with independent behavioral-proxy interpolation selection",
+    "epochs": 2,
+    "learningRate": 0.0000008,
+    "eosLambda": 0.08,
+    "gradientClip": 0.15,
+    "seed": 3069,
+    "alphas": [0.10, 0.20, 0.30, 0.45, 0.65, 0.85, 1.0],
+    "hardware": "GitHub-hosted Ubuntu 24.04 CPU runner"
+  },
+  "evaluation": {
+    "baselineValidationObjective": 1.8652393519878387,
+    "candidateValidationObjective": 1.7581384107470512,
+    "baselineProxyPassed": 4,
+    "candidateProxyPassed": 5,
+    "proxyTotal": 12,
+    "baselineHiddenPassed": 10,
+    "candidateHiddenPassed": 8,
+    "hiddenTotal": 18,
+    "candidateTokenRatio": 0.9117647058823529,
+    "criticalPerfect": true,
+    "noCriticalRegression": true,
+    "latencyAcceptable": true,
+    "tokenLengthAcceptable": true,
+    "proxyCriticalPerfect": false,
+    "behavioralImprovement": false,
+    "eligibleForPromotion": false
+  },
+  "decision": {
+    "promoted": false,
+    "reason": "The proxy selected alpha=1.0 and improved validation and proxy score, but hidden behavior regressed from 10/18 to 8/18; proxy critical safety was also not perfect.",
+    "rollback": "hector-asi-qwen15-v41"
+  }
+}
