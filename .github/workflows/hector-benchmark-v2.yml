@@ -1,0 +1,71 @@
+name: Hector benchmark v2 canonical
+on:
+  pull_request:
+    branches: [main]
+    paths:
+      - 'model/hector-asi/evals/benchmark_v2/**'
+      - '.github/workflows/hector-benchmark-v2.yml'
+  workflow_dispatch:
+permissions:
+  contents: read
+jobs:
+  build-benchmark-v2:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+      - name: Compile and generate two replicas
+        run: |
+          set -euo pipefail
+          python -m py_compile model/hector-asi/evals/benchmark_v2/build_benchmark_v2.py
+          python model/hector-asi/evals/benchmark_v2/build_benchmark_v2.py --out artifacts/benchmark-v2-a
+          python model/hector-asi/evals/benchmark_v2/build_benchmark_v2.py --out artifacts/benchmark-v2-b
+          diff -ru artifacts/benchmark-v2-a artifacts/benchmark-v2-b
+      - name: Validate canonical contract
+        run: |
+          set -euo pipefail
+          python - <<'PY'
+          import hashlib
+          import json
+          from collections import Counter
+          from pathlib import Path
+
+          root = Path('artifacts/benchmark-v2-a')
+          rows = [json.loads(line) for line in (root / 'hidden.jsonl').read_text().splitlines() if line.strip()]
+          manifest = json.loads((root / 'manifest.json').read_text())
+          env = json.loads(Path('model/hector-asi/evals/benchmark_v2/canonical_environment.json').read_text())
+          status = json.loads(Path('model/hector-asi/evals/benchmark_v2/status.json').read_text())
+          categories = ('mathematics','code','planning','tool_use','causality','calibration','metacognition','transfer')
+
+          assert len(rows) == 512
+          assert len({row['id'] for row in rows}) == 512
+          assert len({' '.join(row['prompt'].lower().split()) for row in rows}) == 512
+          assert Counter(row['category'] for row in rows) == Counter({category: 64 for category in categories})
+          assert all(row['split'] == 'hidden' and row['benchmarkVersion'] == '2.1.0' for row in rows)
+          assert {row['verifier']['type'] for row in rows} == {'numeric','python_function','structured_rubric'}
+          digest = hashlib.sha256((root / 'hidden.jsonl').read_bytes()).hexdigest()
+          assert digest == manifest['hiddenSha256']
+          assert env['historicalEquivalence']['resolved'] is True
+          assert env['trainingGate']['minimumHiddenCases'] <= len(rows)
+          assert 'qwen3-8b-base' in env['requiredComparisons']
+          assert status['hiddenCases'] == len(rows)
+          assert status['trainingGates']['minimumHiddenCases']['open'] is True
+          assert status['trainingGates']['v41Below85Percent']['open'] is False
+          print(json.dumps({
+              'hiddenCases': len(rows),
+              'sha256': digest,
+              'categories': manifest['categoryCounts'],
+              'historicalEquivalenceResolved': True,
+              'requiredComparisons': env['requiredComparisons'],
+              'trainingAuthorized': False
+          }, sort_keys=True))
+          PY
+      - name: Upload sealed benchmark candidate
+        uses: actions/upload-artifact@v4
+        with:
+          name: hector-benchmark-v2-${{ github.run_id }}
+          path: artifacts/benchmark-v2-a
+          retention-days: 90
