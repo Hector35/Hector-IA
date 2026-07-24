@@ -1,0 +1,22 @@
+{
+  "schemaVersion": 1,
+  "status": "unresolved-evidence-mismatch",
+  "subject": "hector-asi-qwen15-v41",
+  "historicalClaims": [
+    {"score": 10, "total": 18, "evidenceArtifact": null, "canonical": false},
+    {"score": 11, "total": 18, "evidenceArtifact": null, "canonical": false}
+  ],
+  "decision": "Neither historical number is canonical because the repository state inspected for this benchmark does not expose a sealed case list, effective-model trace, environment lock, per-case outputs and verifier version sufficient to reproduce either score.",
+  "reproducibilityRequirements": [
+    "immutable 18-case input hash",
+    "model and adapter hashes",
+    "tokenizer revision",
+    "inference parameters and random seed",
+    "effective model identifier for every response",
+    "per-case output and verifier result",
+    "runtime and dependency lock"
+  ],
+  "canonicalV41Score": null,
+  "trainingGateOpen": false,
+  "nextAction": "Re-run V41 and V15 through the same Benchmark V2 harness. Historical 10/18 and 11/18 may be reported only as unverified legacy claims, never as promotion evidence."
+}
