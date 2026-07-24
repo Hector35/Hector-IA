@@ -1,0 +1,91 @@
+{
+  "schemaVersion": 1,
+  "experimentId": "hector-asi-qwen15-v62-pcgrad",
+  "status": "rejected-for-champion",
+  "decision": "retain-v41",
+  "baseModel": "Qwen/Qwen2.5-1.5B-Instruct",
+  "baseRevision": "989aa7980e4cf806f80c7fef2b1adb7bc71aa306",
+  "sourceChampion": {
+    "runtimeId": "hector-asi-qwen15-v41",
+    "artifactId": 8560331055,
+    "adapterSha256": "31bead5f59982d8e321517fd235b81f992f83d2e3792a55690c2a841ff0e28f8",
+    "adapterBytes": 73911112
+  },
+  "training": {
+    "runId": 30066563073,
+    "artifactId": 8586708121,
+    "artifactName": "hector-asi-qwen15-v62-pcgrad-30066563073",
+    "artifactDigest": "sha256:68b74ef101829e64a31dc36f11440b80835c7b7f4a31e3ce80c574a207e0711f",
+    "artifactExpiresAt": "2026-10-22T04:21:00Z",
+    "adapterSha256": "ab18d9d7c751623d242428c0817cb68ac270318c9e04c24b2f3d8565b5f462fc",
+    "adapterBytes": 73911112,
+    "replicasByteIdentical": true,
+    "method": "PCGrad continual LoRA: response-only CE and EOS loss with focal gradients projected against replay gradients on conflict",
+    "hyperparameters": {
+      "epochs": 2,
+      "learningRate": 0.0000015,
+      "maxLength": 160,
+      "replayScale": 0.65,
+      "seed": 3062
+    },
+    "gradientConflicts": 5,
+    "runtime": {
+      "peakRssMbReplicaA": 9594.02734375,
+      "peakRssMbReplicaB": 9835.1953125,
+      "python": "3.11.15",
+      "torch": "2.7.1+cpu",
+      "hardware": "GitHub-hosted Ubuntu 24.04 Azure x86_64 CPU"
+    }
+  },
+  "dataset": {
+    "trainExamples": 16,
+    "focalExamples": 8,
+    "replayExamples": 8,
+    "validationExamples": 6,
+    "hiddenTestExamples": 18,
+    "criticalHiddenExamples": 6,
+    "crossSplitOverlap": 0,
+    "privateUserData": false,
+    "license": "author-generated Apache-2.0-compatible",
+    "trainSha256": "0c515f58eb4bd278d3a9109af0b52ebc4784e7d8237b9be42aefb5b6f1559c22",
+    "validationSha256": "f6b77b226ac8eff7b25169834e915c10ba817f90501625b19037b991de66da25",
+    "hiddenTestSha256": "17560e21b728c93f822a0e21cb4b4261823ae5b6f92f3fe1188fdfd4b5679ccb"
+  },
+  "comparison": {
+    "validationObjective": {
+      "v41": 1.783548538883527,
+      "v62": 1.7363785356283188,
+      "relativeImprovement": 0.02644727966915192
+    },
+    "behavior": {
+      "v41Passed": 10,
+      "v62Passed": 8,
+      "total": 18,
+      "v41CriticalPassed": 6,
+      "v62CriticalPassed": 6,
+      "criticalTotal": 6,
+      "v41MeanTokens": 18.88888888888889,
+      "v62MeanTokens": 17.5,
+      "tokenRatio": 0.926470588235294,
+      "v41MeanLatencyMs": 6426.523776833339,
+      "v62MeanLatencyMs": 6164.569738277754,
+      "latencyRatio": 0.9592386105378011
+    }
+  },
+  "gates": {
+    "weightsChanged": true,
+    "replicasByteIdentical": true,
+    "validationImproved": true,
+    "behavioralImprovement": false,
+    "criticalPerfect": true,
+    "noCriticalRegression": true,
+    "latencyAcceptable": true,
+    "tokenLengthAcceptable": true,
+    "eligibleForChampion": false
+  },
+  "finding": "PCGrad detected five focal/replay gradient conflicts and reduced validation objective, mean tokens and latency, but hidden behavioral accuracy regressed from 10/18 to 8/18. The projection strategy preserved all six critical safety cases yet over-protected or distorted general capability gradients; it is not globally better than V41.",
+  "doNotRepeat": [
+    "PCGrad continual from V41 with 8 focal plus 8 replay examples, replay scale 0.65, response-only CE plus EOS loss, LR 1.5e-6, 2 epochs, seed 3062 and this 16/6/18 split"
+  ],
+  "rollback": "hector-asi-qwen15-v41"
+}
