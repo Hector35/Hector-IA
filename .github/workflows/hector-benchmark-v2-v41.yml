@@ -1,0 +1,99 @@
+name: Hector V41 Benchmark V2 evaluation
+
+on:
+  push:
+    branches:
+      - stage6-benchmark/20260724-v41-v2
+    paths:
+      - 'model/hector-asi/evals/benchmark_v2/run_v41_predictions.py'
+      - '.github/workflows/hector-benchmark-v2-v41.yml'
+  workflow_dispatch:
+
+permissions:
+  actions: read
+  contents: read
+
+concurrency:
+  group: hector-v41-benchmark-v2
+  cancel-in-progress: false
+
+jobs:
+  evaluate-v41:
+    runs-on: ubuntu-latest
+    timeout-minutes: 360
+    env:
+      V41_ARTIFACT_ID: '8560331055'
+      V41_ADAPTER_SHA256: '31bead5f59982d8e321517fd235b81f992f83d2e3792a55690c2a841ff0e28f8'
+      HF_HOME: ${{ github.workspace }}/.hf-cache
+      TOKENIZERS_PARALLELISM: 'false'
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+      - name: Install pinned evaluation runtime
+        run: |
+          python -m pip install --upgrade pip
+          pip install 'torch==2.7.1' 'transformers==4.53.2' 'peft==0.16.0' 'accelerate==1.9.0' 'safetensors==0.5.3'
+      - name: Build sealed Benchmark V2
+        run: |
+          mkdir -p artifacts/benchmark-v2 artifacts/v41
+          python model/hector-asi/evals/benchmark_v2/build_benchmark_v2.py --out artifacts/benchmark-v2
+          test "$(wc -l < artifacts/benchmark-v2/hidden.jsonl)" -eq 512
+      - name: Download immutable V41 adapter artifact
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          curl --fail --location --retry 4 \
+            -H "Authorization: Bearer $GH_TOKEN" \
+            -H 'Accept: application/vnd.github+json' \
+            -H 'X-GitHub-Api-Version: 2022-11-28' \
+            "${{ github.api_url }}/repos/${{ github.repository }}/actions/artifacts/$V41_ARTIFACT_ID/zip" \
+            --output artifacts/v41.zip
+          unzip -q artifacts/v41.zip -d artifacts/v41
+          ADAPTER=artifacts/v41/hector-asi-qwen15-v41-a/adapter/adapter_model.safetensors
+          test -f "$ADAPTER"
+          echo "$V41_ADAPTER_SHA256  $ADAPTER" | sha256sum --check --strict
+      - name: Generate all 512 attributed V41 predictions
+        run: |
+          python model/hector-asi/evals/benchmark_v2/run_v41_predictions.py \
+            --hidden artifacts/benchmark-v2/hidden.jsonl \
+            --adapter artifacts/v41/hector-asi-qwen15-v41-a/adapter \
+            --output artifacts/v41-predictions.jsonl \
+            --manifest artifacts/v41-run-manifest.json \
+            --batch-size 4 \
+            --max-new-tokens 96
+      - name: Score V41 with the canonical scorer
+        run: |
+          python model/hector-asi/evals/benchmark_v2/score_predictions.py \
+            --hidden artifacts/benchmark-v2/hidden.jsonl \
+            --predictions artifacts/v41-predictions.jsonl \
+            --expected-model hector-asi-qwen15-v41 \
+            --output artifacts/v41-benchmark-v2-report.json
+      - name: Publish fail-closed training gates
+        run: |
+          python - <<'PY'
+          import json
+          from pathlib import Path
+          report=json.loads(Path('artifacts/v41-benchmark-v2-report.json').read_text())
+          gates={
+            'benchmarkCases': {'required':500,'observed':report['hiddenCases'],'open':report['hiddenCases']>=500},
+            'v41Below85Percent': {'required':True,'observed':report['scorePercent']<85,'open':report['scorePercent']<85},
+            'trainableFailures': {'required':100,'observed':report['trainableFailureCount'],'open':report['trainableFailureCount']>=100},
+            'modelAttribution': {'required':True,'observed':report['effectiveModelAttributionPassed'],'open':report['effectiveModelAttributionPassed']},
+          }
+          payload={'schemaVersion':1,'model':'hector-asi-qwen15-v41','scorePercent':report['scorePercent'],'byCapability':report['byCapability'],'failureCount':report['failureCount'],'trainableFailureCount':report['trainableFailureCount'],'gates':gates,'trainingAuthorizedByBenchmark':all(v['open'] for v in gates.values())}
+          Path('artifacts/v41-training-gates.json').write_text(json.dumps(payload,indent=2,sort_keys=True)+'\n')
+          print(json.dumps(payload,indent=2,sort_keys=True))
+          PY
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: hector-v41-benchmark-v2-${{ github.run_id }}
+          path: |
+            artifacts/v41-run-manifest.json
+            artifacts/v41-predictions.jsonl
+            artifacts/v41-benchmark-v2-report.json
+            artifacts/v41-training-gates.json
+          if-no-files-found: error
+          retention-days: 90
