@@ -1,0 +1,45 @@
+{
+  "schemaVersion": 2,
+  "stage": 6,
+  "component": "benchmark-v2",
+  "status": "generator-ready-validation-pending",
+  "targetHiddenCases": 500,
+  "stretchHiddenCases": 1000,
+  "generatedCases": 0,
+  "validatedCases": 0,
+  "integratedCases": 0,
+  "categories": {
+    "mathematics": 0,
+    "code": 0,
+    "planning": 0,
+    "tools": 0,
+    "causality": 0,
+    "calibration": 0,
+    "metacognition": 0,
+    "comprehension": 0,
+    "multimodal": 0,
+    "transfer": 0
+  },
+  "historicalV41": {
+    "claim10of18": "unverified",
+    "claim11of18": "unverified",
+    "canonicalScore": null,
+    "reconciliation": "model/hector-asi/evals/benchmark-v2/v41-history-reconciliation.json"
+  },
+  "results": {
+    "v15": null,
+    "v41": null,
+    "qwen3_8b": null,
+    "qwen3_5_397b": null,
+    "kimi_k2_5": null
+  },
+  "trainingGates": {
+    "hiddenCasesAtLeast500": false,
+    "v41Below85Percent": false,
+    "v41FailuresAtLeast100": false,
+    "effectiveModelVerified": false,
+    "open": false
+  },
+  "attributionPolicy": "Requested model and effective model must match. Any fallback is recorded under the effective model and never credited to Qwen 397B or Kimi.",
+  "nextWorkflow": ".github/workflows/stage6-benchmark-v2.yml"
+}
