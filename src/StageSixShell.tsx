@@ -46,6 +46,26 @@ const fallback:StageSixStatus={
   principle:'Kimi K2 Base es la base MoE objetivo; solo se marcará activa cuando el endpoint GPU responda.'
 };
 
+function normalizeStatus(value:unknown):StageSixStatus{
+  const next=value&&typeof value==='object'?value as Partial<StageSixStatus>:{};
+  const models=next.models&&typeof next.models==='object'?next.models as Partial<StageSixStatus['models']>:{};
+  return{
+    ...fallback,
+    ...next,
+    reasoning:{...fallback.reasoning,...(next.reasoning||{})},
+    models:{
+      teacher:{...fallback.models.teacher,...(models.teacher||{})},
+      balanced:{...fallback.models.balanced,...(models.balanced||{})},
+      fast:{...fallback.models.fast,...(models.fast||{})},
+      kimi:{...fallback.models.kimi,...(models.kimi||{})},
+      open:{...fallback.models.open,...(models.open||{})},
+      own:{...fallback.models.own,...(models.own||{})}
+    },
+    pipeline:Array.isArray(next.pipeline)?next.pipeline:fallback.pipeline,
+    promotion:{...fallback.promotion,...(next.promotion||{})}
+  };
+}
+
 export function StageSixShell({children}:{children:ReactNode}){
   const [status,setStatus]=useState<StageSixStatus>(fallback);
   const [open,setOpen]=useState(false);
@@ -53,7 +73,7 @@ export function StageSixShell({children}:{children:ReactNode}){
   useEffect(()=>{
     fetch('/api/system/stage-6',{credentials:'include'})
       .then(async response=>response.ok?response.json():Promise.reject(new Error('stage-6 unavailable')))
-      .then(data=>setStatus(data as StageSixStatus))
+      .then(data=>setStatus(normalizeStatus(data)))
       .catch(()=>setStatus(fallback));
   },[]);
 
