@@ -41,6 +41,19 @@ jobs:
       - uses: actions/setup-python@v5
         with:
           python-version: '3.11'
+      - name: Repair deterministic math uniqueness
+        run: |
+          python - <<'PY'
+          from pathlib import Path
+          path=Path('model/hector-asi/data/stage6/generate-canonical-20260724.mjs')
+          text=path.read_text()
+          old="for(let i=0;i<160;i++){const item=mathFamilies[i%mathFamilies.length](i);addSft({id:`stage6-math-${String(i+1).padStart(3,'0')}`,capability:'mathematics',user:item.user,assistant:item.assistant,verification:{type:'exact-structured',expected:item.expected},family:item.family,index:i});}"
+          new="const mathPromptSet=new Set();\nfor(let candidate=0,accepted=0;accepted<160;candidate++){const item=mathFamilies[candidate%mathFamilies.length](candidate),key=normalize(item.user);if(mathPromptSet.has(key))continue;mathPromptSet.add(key);addSft({id:`stage6-math-${String(accepted+1).padStart(3,'0')}`,capability:'mathematics',user:item.user,assistant:item.assistant,verification:{type:'exact-structured',expected:item.expected},family:item.family,index:accepted});accepted++;}"
+          if old in text:
+              path.write_text(text.replace(old,new))
+          elif new not in text:
+              raise SystemExit('No se encontró el bucle matemático esperado')
+          PY
       - name: Materialize deterministic corpus
         id: generate
         shell: bash
@@ -69,12 +82,13 @@ jobs:
           npm ci
           npm run typecheck
           npm test
-      - name: Commit generated canonical files to the source branch
+      - name: Commit validated source and canonical files
         if: github.event_name == 'push'
         run: |
           git config user.name 'hector-stage6-data-bot'
           git config user.email 'actions@users.noreply.github.com'
-          git add model/hector-asi/data/stage6/generated/canonical-sft-20260724.jsonl \
+          git add model/hector-asi/data/stage6/generate-canonical-20260724.mjs \
+                  model/hector-asi/data/stage6/generated/canonical-sft-20260724.jsonl \
                   model/hector-asi/data/stage6/generated/canonical-preference-20260724.jsonl \
                   model/hector-asi/data/stage6/latest-batch.json
           if git diff --cached --quiet; then
