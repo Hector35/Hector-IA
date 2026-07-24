@@ -1,0 +1,82 @@
+{
+  "schemaVersion": 1,
+  "experimentId": "hector-asi-qwen15-v70-surgical",
+  "status": "rejected",
+  "decision": "retain-champion",
+  "sourceRuntime": "hector-asi-qwen15-v41",
+  "baseModel": {
+    "id": "Qwen/Qwen2.5-1.5B-Instruct",
+    "revision": "989aa7980e4cf806f80c7fef2b1adb7bc71aa306",
+    "sourceArtifactId": 8560331055,
+    "sourceAdapterSha256": "31bead5f59982d8e321517fd235b81f992f83d2e3792a55690c2a841ff0e28f8",
+    "sourceAdapterBytes": 73911112
+  },
+  "candidateArtifact": {
+    "runId": 30096912867,
+    "artifactId": 8598538423,
+    "name": "hector-asi-qwen15-v70-surgical-30096912867",
+    "artifactDigest": "sha256:3572e722ca68d900014b715ef61c6033bfe228f03077f0b379d526ab0f58ee9d",
+    "artifactBytes": 144286014,
+    "expiresAt": "2026-10-22T13:26:58Z",
+    "adapterSha256": "6b8d7b581f30465324b23c30366d69b5868c83ff18e630e5f103676029cf4916",
+    "adapterBytes": 73911112,
+    "replicasByteIdentical": true
+  },
+  "dataset": {
+    "trainRows": 24,
+    "focalRows": 4,
+    "replayRows": 20,
+    "validationRows": 10,
+    "hiddenRows": 18,
+    "criticalRows": 6,
+    "trainSha256": "2e6cfdd7332b9209fb895f657cc310b3e975214f6537c4829842841788e9ed7f",
+    "validationSha256": "faad27443107e13871c096888eabe2facb9da0de68dcfcd9e7bb28ddaf32cd67",
+    "hiddenSha256": "17560e21b728c93f822a0e21cb4b4261823ae5b6f92f3fe1188fdfd4b5679ccb",
+    "crossSplitOverlap": 0,
+    "provenance": "author-generated",
+    "license": "Apache-2.0-compatible",
+    "privateUserData": false
+  },
+  "training": {
+    "method": "surgical lora_B-only response-only SFT with dominant replay",
+    "trainable": "lora_B layers 22-27",
+    "epochs": 3,
+    "learningRate": 5e-7,
+    "eosLambda": 0.05,
+    "gradientClip": 0.08,
+    "maxLength": 144,
+    "seed": 3070,
+    "replicas": 2,
+    "python": "3.11.15",
+    "torch": "2.7.1+cpu",
+    "hardware": "GitHub Actions Ubuntu 24.04 Azure x86_64 CPU",
+    "replicaASeconds": 634.7437703609467,
+    "peakRssMb": 9597.01953125
+  },
+  "evaluation": {
+    "baselineValidationObjective": 1.742972418665886,
+    "candidateValidationObjective": 1.7333671778440476,
+    "baselineBehavioralPassed": 10,
+    "candidateBehavioralPassed": 10,
+    "behavioralTotal": 18,
+    "baselineCriticalPassed": 6,
+    "candidateCriticalPassed": 6,
+    "criticalTotal": 6,
+    "baselineMeanTokens": 18.88888888888889,
+    "candidateMeanTokens": 18.88888888888889,
+    "baselineMeanLatencyMs": 9006.35631922223,
+    "candidateMeanLatencyMs": 9089.889877222244,
+    "validationImproved": true,
+    "behavioralImprovement": false,
+    "criticalPerfect": true,
+    "noCriticalRegression": true,
+    "latencyAcceptable": true,
+    "tokenLengthAcceptable": true,
+    "eligibleForPromotion": false
+  },
+  "rollback": "hector-asi-qwen15-v41",
+  "doNotRepeat": {
+    "reason": "The surgical lora_B-only update preserved code, calibration, safety, latency and token length but failed to improve hidden greedy behavior beyond the champion's 10/18.",
+    "configuration": "4 focal + 20 replay; lora_B layers 22-27; LR 5e-7; EOS 0.05; clip 0.08; 3 epochs; seed 3070; split 24/10/18"
+  }
+}
