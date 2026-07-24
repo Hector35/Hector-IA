@@ -1,0 +1,51 @@
+name: Stage 6 Benchmark V2
+
+on:
+  pull_request:
+    paths:
+      - 'model/hector-asi/evals/benchmark-v2/**'
+      - '.github/workflows/stage6-benchmark-v2.yml'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  validate-benchmark-v2:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+      - name: Generate hidden benchmark deterministically
+        run: node model/hector-asi/evals/benchmark-v2/generate_benchmark_v2.mjs artifacts/benchmark-v2/hidden.jsonl
+      - name: Verify structure, hashes, balance and diversity
+        run: |
+          python model/hector-asi/evals/benchmark-v2/verify_benchmark_v2.py \
+            --hidden artifacts/benchmark-v2/hidden.jsonl \
+            --manifest artifacts/benchmark-v2/manifest.generated.json \
+            --report artifacts/benchmark-v2/verification.json
+      - name: Confirm historical mismatch remains quarantined
+        run: |
+          python - <<'PY'
+          import json
+          from pathlib import Path
+          p=json.loads(Path('model/hector-asi/evals/benchmark-v2/v41-history-reconciliation.json').read_text())
+          assert p['canonicalV41Score'] is None
+          assert p['trainingGateOpen'] is False
+          assert p['status']=='unresolved-evidence-mismatch'
+          PY
+      - name: Run repository tests
+        run: npm ci && npm test
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: hector-benchmark-v2-${{ github.run_id }}
+          path: artifacts/benchmark-v2
+          if-no-files-found: error
+          retention-days: 90
