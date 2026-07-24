@@ -1,0 +1,90 @@
+name: Hector Benchmark V2 scoring
+
+on:
+  pull_request:
+    paths:
+      - 'model/hector-asi/evals/benchmark_v2/**'
+      - '.github/workflows/hector-benchmark-v2-score.yml'
+  workflow_dispatch:
+    inputs:
+      predictions_path:
+        description: JSONL with one attributed prediction for every hidden case
+        required: false
+        default: ''
+      expected_model:
+        description: Exact frozen model identifier
+        required: false
+        default: hector-asi-qwen15-v41
+
+permissions:
+  contents: read
+
+jobs:
+  scorer-contract:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+      - name: Compile scorer and build sealed benchmark
+        run: |
+          python -m py_compile model/hector-asi/evals/benchmark_v2/score_predictions.py
+          python model/hector-asi/evals/benchmark_v2/build_benchmark_v2.py --out artifacts/benchmark-v2
+      - name: Generate deterministic scorer fixtures
+        run: |
+          python - <<'PY'
+          import json
+          from pathlib import Path
+          hidden=[json.loads(x) for x in Path('artifacts/benchmark-v2/hidden.jsonl').read_text().splitlines() if x.strip()]
+          perfect=[];fallback=[]
+          for row in hidden:
+              v=row['verifier']
+              if v['type']=='numeric': answer=str(v['expected'])
+              elif v['type']=='python_function':
+                  prompt=row['prompt'].lower()
+                  if 'valores mayores' in prompt: answer='```python\ndef solve(xs):\n return sorted(xs, reverse=True)[:'+str(4+(int(row['id'].split('-')[-1])%5))+']\n```'
+                  elif 'cuente palabras' in prompt: answer='```python\ndef solve(text):\n import re\n from collections import Counter\n return dict(Counter(re.findall(r"[a-záéíóúñü]+", text.lower())))\n```'
+                  elif 'agrupe pares' in prompt: answer='```python\ndef solve(rows):\n import math\n out={}\n for k,v in rows:\n  if isinstance(v,(int,float)) and math.isfinite(v): out[k]=out.get(k,0)+v\n return out\n```'
+                  else: answer='```python\ndef solve(graph,start):\n from collections import deque\n d={start:0};q=deque([start])\n while q:\n  u=q.popleft()\n  for v in graph.get(u,[]):\n   if v not in d:d[v]=d[u]+1;q.append(v)\n return d\n```'
+              else: answer='; '.join(v['requiredConcepts'])+'.'
+              perfect.append({'id':row['id'],'answer':answer,'requestedModel':'hector-asi-qwen15-v41','effectiveModel':'hector-asi-qwen15-v41','fallback':False})
+              fallback.append({'id':row['id'],'answer':answer,'requestedModel':'hector-asi-qwen15-v41','effectiveModel':'@cf/qwen/qwen3-30b-a3b-fp8','fallback':True})
+          for name,data in [('perfect',perfect),('fallback',fallback)]:Path(f'artifacts/{name}.jsonl').write_text(''.join(json.dumps(x,ensure_ascii=False)+'\n' for x in data))
+          PY
+      - name: Perfect attributed fixture must score and keep prompts sealed
+        run: |
+          python model/hector-asi/evals/benchmark_v2/score_predictions.py --hidden artifacts/benchmark-v2/hidden.jsonl --predictions artifacts/perfect.jsonl --expected-model hector-asi-qwen15-v41 --output artifacts/perfect-report.json
+          python - <<'PY'
+          import json
+          r=json.load(open('artifacts/perfect-report.json'))
+          assert r['hiddenCases']==512
+          assert r['effectiveModelAttributionPassed'] is True
+          assert r['scorePercent']>=99
+          assert all('prompt' not in x for x in r['failures'])
+          PY
+      - name: Fallback attribution must be rejected
+        run: |
+          set +e
+          python model/hector-asi/evals/benchmark_v2/score_predictions.py --hidden artifacts/benchmark-v2/hidden.jsonl --predictions artifacts/fallback.jsonl --expected-model hector-asi-qwen15-v41 --output artifacts/fallback-report.json
+          status=$?
+          test "$status" -eq 2
+          python - <<'PY'
+          import json
+          r=json.load(open('artifacts/fallback-report.json'))
+          assert r['attributionFailureCount']==512
+          assert r['scorePercent']==0
+          PY
+      - name: Score supplied sealed predictions
+        if: github.event_name == 'workflow_dispatch' && inputs.predictions_path != ''
+        run: |
+          test -f "${{ inputs.predictions_path }}"
+          python model/hector-asi/evals/benchmark_v2/score_predictions.py --hidden artifacts/benchmark-v2/hidden.jsonl --predictions "${{ inputs.predictions_path }}" --expected-model "${{ inputs.expected_model }}" --output artifacts/real-report.json
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: benchmark-v2-scoring-${{ github.run_id }}
+          path: artifacts/*report.json
+          if-no-files-found: error
+          retention-days: 30
