@@ -2,6 +2,7 @@ import {useEffect,useState,type ReactNode} from 'react';
 import {BrainCircuit,Check,Clock3,Cpu,Database,Network,Sparkles,Target,X,Zap} from 'lucide-react';
 
 type TrainingTarget={repository:string;label:string;role:string;totalParameters:string;activeParameters:string;contextLength:number;customWeights:boolean};
+type Qwen397Model={provider:string;model:string;label:string;role:string;mode:string;enabled:boolean;endpointConfigured:boolean;totalParameters:string;activeParameters:string;contextLength:number;extendedContextLength:number;multimodal:boolean;thinking:boolean;trainable:boolean;license:string;reason:string};
 
 export type StageSixStatus={
   stage:number;
@@ -14,6 +15,7 @@ export type StageSixStatus={
     teacher:{provider:string;model:string;role:string};
     balanced:{provider:string;model:string;role:string};
     fast:{provider:string;model:string;role:string};
+    qwen397:Qwen397Model;
     kimi:{provider:string;model:string;label:string;role:string;mode:string;enabled:boolean;endpointConfigured:boolean;totalParameters:string;activeParameters:string;contextLength:number;multimodal:boolean;thinking:boolean;reason:string;trainingTarget:TrainingTarget};
     open:{provider:string;model:string;role:string};
     own:{runtimeId:string;label:string;role:string;mode:string;enabled:boolean};
@@ -29,16 +31,17 @@ const fallback:StageSixStatus={
   status:'loading',
   active:true,
   experienceMode:'maximum-intelligence',
-  reasoning:{effort:'high',deliberation:'force',description:'Kimi K2.5 es el cerebro abierto operativo; cualquier fallback se identifica.'},
+  reasoning:{effort:'high',deliberation:'force',description:'Qwen3.5-397B-A17B es el cerebro principal; cualquier fallback se identifica.'},
   models:{
     teacher:{provider:'openai',model:'GPT-5.6 reasoning',role:'maestro y verificador'},
     balanced:{provider:'openai',model:'GPT-5.6 balanced',role:'respaldo equilibrado'},
     fast:{provider:'openai',model:'GPT-5.6 fast',role:'ruta rápida disponible'},
+    qwen397:{provider:'qwen-open-weights',model:'Qwen/Qwen3.5-397B-A17B',label:'Héctor Qwen 397B',role:'cerebro principal multimodal, thinking y agentivo',mode:'pending-endpoint',enabled:true,endpointConfigured:false,totalParameters:'397B',activeParameters:'17B',contextLength:262144,extendedContextLength:1010000,multimodal:true,thinking:true,trainable:true,license:'Apache-2.0',reason:'Integrado en la PWA; falta conectar el endpoint y su secreto.'},
     kimi:{
-      provider:'moonshot-open-weights',model:'moonshotai/Kimi-K2.5',label:'Héctor Kimi K2.5',role:'cerebro operativo multimodal y agentivo',mode:'pending-endpoint',enabled:true,endpointConfigured:false,totalParameters:'1T',activeParameters:'32B',contextLength:262144,multimodal:true,thinking:true,reason:'Integrado en la PWA; falta conectar el endpoint.',
-      trainingTarget:{repository:'moonshotai/Kimi-K2-Base',label:'Kimi K2 Base · objetivo entrenable',role:'trainable-foundation',totalParameters:'1T',activeParameters:'32B',contextLength:131072,customWeights:false}
+      provider:'moonshot-open-weights',model:'moonshotai/Kimi-K2.5',label:'Héctor Kimi K2.5',role:'respaldo MoE multimodal',mode:'pending-endpoint',enabled:true,endpointConfigured:false,totalParameters:'1T',activeParameters:'32B',contextLength:262144,multimodal:true,thinking:true,reason:'Respaldo integrado; endpoint pendiente.',
+      trainingTarget:{repository:'moonshotai/Kimi-K2-Base',label:'Kimi K2 Base',role:'secondary-trainable-foundation',totalParameters:'1T',activeParameters:'32B',contextLength:131072,customWeights:false}
     },
-    open:{provider:'huggingface',model:'Qwen/Qwen3-8B',role:'fallback abierto de transición'},
+    open:{provider:'huggingface',model:'Qwen/Qwen3-8B',role:'fallback abierto ligero de transición'},
     own:{runtimeId:'hector-asi-qwen15-v41',label:'Héctor Qwen15 V41',role:'campeón propio vigente',mode:'verificando',enabled:false}
   },
   pipeline:[
@@ -48,7 +51,7 @@ const fallback:StageSixStatus={
     {id:'autonomy',label:'Autonomía del modelo propio',target:90,unit:'%'}
   ],
   promotion:{minimumAbsoluteBenchmarkGain:.03,requiresMultipleCapabilityGains:true,requiresReproducibility:true,requiresRollback:true},
-  principle:'Kimi K2.5 mejora la PWA desde el uso diario; Kimi K2 Base permanece como fundamento entrenable para pesos propios.'
+  principle:'Qwen3.5-397B-A17B es el cerebro principal y fundamento entrenable abierto; sólo se marca activo cuando responde su endpoint.'
 };
 
 function normalizeStatus(value:unknown):StageSixStatus{
@@ -63,6 +66,7 @@ function normalizeStatus(value:unknown):StageSixStatus{
       teacher:{...fallback.models.teacher,...(models.teacher||{})},
       balanced:{...fallback.models.balanced,...(models.balanced||{})},
       fast:{...fallback.models.fast,...(models.fast||{})},
+      qwen397:{...fallback.models.qwen397,...(models.qwen397||{})},
       kimi:{...fallback.models.kimi,...kimi,trainingTarget:{...fallback.models.kimi.trainingTarget,...(kimi.trainingTarget||{})}},
       open:{...fallback.models.open,...(models.open||{})},
       own:{...fallback.models.own,...(models.own||{})}
@@ -83,36 +87,38 @@ export function StageSixShell({children}:{children:ReactNode}){
       .catch(()=>setStatus(fallback));
   },[]);
 
+  const qwenReady=status.models.qwen397.endpointConfigured;
   const kimiReady=status.models.kimi.endpointConfigured;
 
   return <>
     {children}
-    <button className="s6Badge" type="button" onClick={()=>setOpen(true)} aria-label="Abrir estado de Kimi K2.5">
+    <button className="s6Badge" type="button" onClick={()=>setOpen(true)} aria-label="Abrir estado de Qwen 397B">
       <span className="s6Pulse"/>
-      <strong>KIMI K2.5</strong>
-      <small>{kimiReady?'ACTIVO':'PREPARADO'}</small>
+      <strong>QWEN 397B</strong>
+      <small>{qwenReady?'ACTIVO':'PREPARADO'}</small>
     </button>
-    {open&&<div className="s6Overlay" role="dialog" aria-modal="true" aria-label="Estado de Kimi K2.5">
-      <button className="s6Backdrop" type="button" onClick={()=>setOpen(false)} aria-label="Cerrar estado de Kimi K2.5"/>
+    {open&&<div className="s6Overlay" role="dialog" aria-modal="true" aria-label="Estado de Qwen 397B">
+      <button className="s6Backdrop" type="button" onClick={()=>setOpen(false)} aria-label="Cerrar estado de Qwen 397B"/>
       <section className="s6Panel">
         <header>
-          <div><span>CEREBRO OPERATIVO ABIERTO</span><h2>{status.models.kimi.label}</h2><p>{status.models.kimi.model}</p></div>
+          <div><span>CEREBRO PRINCIPAL ABIERTO</span><h2>{status.models.qwen397.label}</h2><p>{status.models.qwen397.model}</p></div>
           <button type="button" onClick={()=>setOpen(false)} aria-label="Cerrar"><X/></button>
         </header>
 
         <article className="s6Hero">
           <div className="s6HeroIcon"><BrainCircuit/></div>
-          <div><span>MULTIMODAL · THINKING · AGENTES</span><strong>{status.models.kimi.totalParameters} totales · {status.models.kimi.activeParameters} activos</strong><small>{status.models.kimi.reason}</small></div>
-          <em>{kimiReady?<><Sparkles/>ACTIVO</>:<><Clock3/>PENDIENTE</>}</em>
+          <div><span>MULTIMODAL · THINKING · MoE</span><strong>{status.models.qwen397.totalParameters} totales · {status.models.qwen397.activeParameters} activos</strong><small>{status.models.qwen397.reason}</small></div>
+          <em>{qwenReady?<><Sparkles/>ACTIVO</>:<><Clock3/>PENDIENTE</>}</em>
         </article>
 
         <section className="s6Section">
           <h3>Arquitectura elegida</h3>
           <div className="s6Brains">
-            <article><Network/><div><span>USO DIARIO</span><strong>{status.models.kimi.label}</strong><small>{kimiReady?'Endpoint conectado · 256K de contexto':'Integrado; endpoint y secreto pendientes'}</small></div>{kimiReady?<Check/>:<Clock3/>}</article>
-            <article><Cpu/><div><span>ENTRENAMIENTO PROPIO</span><strong>{status.models.kimi.trainingTarget.label}</strong><small>{status.models.kimi.trainingTarget.repository} · requiere infraestructura multi-GPU</small></div><Target/></article>
-            <article><Zap/><div><span>MAESTRO</span><strong>{status.models.teacher.model}</strong><small>Verificación, generación de datos y respaldo de alta precisión</small></div><Check/></article>
-            <article><Cpu/><div><span>FALLBACK ABIERTO</span><strong>{status.models.open.model}</strong><small>Transición cuando Kimi no esté disponible</small></div><Check/></article>
+            <article><Network/><div><span>USO DIARIO</span><strong>{status.models.qwen397.label}</strong><small>{qwenReady?'Endpoint conectado · 262K de contexto nativo':'Integrado; endpoint y secreto pendientes'}</small></div>{qwenReady?<Check/>:<Clock3/>}</article>
+            <article><Cpu/><div><span>ENTRENAMIENTO PROPIO</span><strong>{status.models.qwen397.model}</strong><small>Pesos Apache 2.0 · adaptación distribuida cuando exista cómputo suficiente</small></div><Target/></article>
+            <article><Network/><div><span>RESPALDO MoE</span><strong>{status.models.kimi.label}</strong><small>{kimiReady?'Kimi K2.5 conectado':'Kimi K2.5 preparado como segundo nivel'}</small></div>{kimiReady?<Check/>:<Clock3/>}</article>
+            <article><Zap/><div><span>MAESTRO</span><strong>{status.models.teacher.model}</strong><small>Verificación, datos y respaldo de alta precisión</small></div><Check/></article>
+            <article><Cpu/><div><span>FALLBACK LIGERO</span><strong>{status.models.open.model}</strong><small>Workers AI cuando los endpoints grandes no estén disponibles</small></div><Check/></article>
             <article><Network/><div><span>CAMPEÓN PROPIO</span><strong>{status.models.own.label}</strong><small>{status.models.own.mode} · permanece hasta ser superado</small></div><Check/></article>
           </div>
         </section>
