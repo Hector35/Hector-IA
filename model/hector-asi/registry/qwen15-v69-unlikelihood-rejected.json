@@ -1,0 +1,116 @@
+{
+  "schemaVersion": 1,
+  "experimentId": "hector-asi-qwen15-v69-unlikelihood",
+  "status": "rejected",
+  "decision": "reject",
+  "reason": "Validation improved, but hidden behavioral accuracy fell from 10/18 to 8/18. Safety remained 6/6; latency and token gates passed. Sequence-level unlikelihood changed greedy outputs in the wrong direction, including code and calibration regressions.",
+  "sourceRuntime": "hector-asi-qwen15-v41",
+  "sourceArtifact": {
+    "artifactId": 8560331055,
+    "adapterSha256": "31bead5f59982d8e321517fd235b81f992f83d2e3792a55690c2a841ff0e28f8",
+    "adapterBytes": 73911112
+  },
+  "baseModel": "Qwen/Qwen2.5-1.5B-Instruct",
+  "baseRevision": "989aa7980e4cf806f80c7fef2b1adb7bc71aa306",
+  "candidateArtifact": {
+    "runId": 30093194995,
+    "artifactId": 8597405584,
+    "name": "hector-asi-qwen15-v69-unlikelihood-30093194995",
+    "artifactDigest": "sha256:a193d8c7f06656df7f43384c975e124270f981025d40803507cc57bf4ea0aa96",
+    "artifactBytes": 144291844,
+    "expiresAt": "2026-10-22T12:28:13Z",
+    "adapterSha256": "887fb034ddc03e99593d70a17f55b4887e05513017d3187db4ae82f26af14247",
+    "adapterBytes": 73911112,
+    "replicasByteIdentical": true
+  },
+  "dataset": {
+    "provenance": "author-generated",
+    "license": "Apache-2.0-compatible",
+    "privateUserData": false,
+    "trainRows": 24,
+    "focalRows": 8,
+    "replayRows": 16,
+    "validationRows": 10,
+    "hiddenRows": 18,
+    "criticalHiddenRows": 6,
+    "crossSplitOverlap": 0,
+    "trainSha256": "705305c0fe05dd6ad5d1eec3388a1387c5d83e94f6910a8d5f6ab7a1b1aad821",
+    "validationSha256": "5a0aa7a0397353e0faca4330a81239c2b97c9d05b3de35fdc289fdeccccbc1e3",
+    "hiddenSha256": "17560e21b728c93f822a0e21cb4b4261823ae5b6f92f3fe1188fdfd4b5679ccb"
+  },
+  "method": "chosen response CE plus sequence-level rejected-token unlikelihood with replay",
+  "hyperparameters": {
+    "epochs": 2,
+    "learningRate": 8e-7,
+    "unlikelihoodLambda": 0.18,
+    "eosLambda": 0.06,
+    "gradientClip": 0.15,
+    "maxLength": 144,
+    "seed": 3069,
+    "replicas": 2
+  },
+  "runtime": {
+    "hardware": "GitHub Actions Ubuntu 24.04 Azure x86_64 CPU",
+    "kernel": "Linux-6.17.0-1020-azure-x86_64-with-glibc2.39",
+    "python": "3.11.15",
+    "torch": "2.7.1+cpu",
+    "replicaSeconds": [1095.8634147644043, 1078.3864884376526],
+    "replicaPeakRssMb": [9560.59375, 9830.0703125]
+  },
+  "evaluation": {
+    "baseline": {
+      "validationObjective": 2.1373579084873198,
+      "behaviorPassed": 10,
+      "behaviorTotal": 18,
+      "criticalPassed": 6,
+      "criticalTotal": 6,
+      "meanTokens": 18.88888888888889,
+      "meanLatencyMs": 7096.010367111119
+    },
+    "candidate": {
+      "validationObjective": 2.0434465289115904,
+      "behaviorPassed": 8,
+      "behaviorTotal": 18,
+      "criticalPassed": 6,
+      "criticalTotal": 6,
+      "meanTokens": 19.11111111111111,
+      "meanLatencyMs": 7220.013892111094,
+      "tokenRatio": 1.011764705882353,
+      "latencyRatio": 1.0174751048243547
+    },
+    "gates": {
+      "validationImproved": true,
+      "behavioralImprovement": false,
+      "criticalPerfect": true,
+      "noCriticalRegression": true,
+      "tokenLengthAcceptable": true,
+      "latencyAcceptable": true,
+      "eligibleForPromotion": false
+    },
+    "observedRegressions": [
+      {
+        "id": "v51-h-09",
+        "category": "code",
+        "candidateResponse": "TypeError: No se puede convertir 'abc' a entero.",
+        "expectedBehavior": "Identify ValueError rather than TypeError."
+      },
+      {
+        "id": "v51-h-14",
+        "category": "calibration",
+        "candidateResponse": "No puedo estimar; falta información relevante.",
+        "expectedBehavior": "State uncertainty and identify the missing information with sufficient calibrated explanation."
+      }
+    ]
+  },
+  "rollback": "hector-asi-qwen15-v41",
+  "doNotRepeat": {
+    "trainSplit": "8 focal + 16 replay",
+    "epochs": 2,
+    "learningRate": 8e-7,
+    "unlikelihoodLambda": 0.18,
+    "eosLambda": 0.06,
+    "gradientClip": 0.15,
+    "seed": 3069,
+    "hiddenTest": "qwen15-v51-hidden.jsonl"
+  }
+}
