@@ -1,23 +1,24 @@
 {
-  "schemaVersion": 2,
+  "schemaVersion": 3,
   "stage": 6,
   "name": "Inteligencia híbrida autoevolutiva",
   "status": "active",
-  "experienceGoal": "Usar el mejor cerebro abierto disponible en la PWA mientras el modelo propio aumenta su autonomía con pesos entrenables",
+  "experienceGoal": "Usar Qwen3.5-397B-A17B como cerebro abierto principal cuando exista un endpoint verificado, mientras el modelo propio aumenta su autonomía con pesos entrenables",
   "operatingMode": {
     "defaultReasoning": "high",
     "defaultDeliberation": "force",
     "teacher": "OPENAI_MODEL_REASONING",
-    "operationalOpenRuntime": "moonshotai/Kimi-K2.5",
-    "trainableFoundation": "moonshotai/Kimi-K2-Base",
+    "operationalOpenRuntime": "Qwen/Qwen3.5-397B-A17B",
+    "secondaryOpenRuntime": "moonshotai/Kimi-K2.5",
     "transitionRuntime": "Qwen/Qwen3-8B",
     "ownChampion": "hector-asi-qwen15-v41"
   },
   "modelRoles": {
-    "operational": "Kimi K2.5 para chat, visión, código, agentes y uso de herramientas",
-    "trainable": "Kimi K2 Base como fundamento final de pesos propios cuando exista infraestructura multi-GPU",
-    "transition": "Qwen3-8B para validar datos, evaluación y QLoRA sin confundirlo con el campeón final",
-    "teacher": "GPT-5.6 de razonamiento para generación de datos, verificación y respaldo"
+    "operational": "Qwen3.5-397B-A17B para chat, visión, thinking, agentes y herramientas sólo cuando el endpoint y la identidad del modelo estén verificados",
+    "trainable": "Qwen3.5-397B-A17B como fundamento final de pesos propios mediante adaptación distribuida",
+    "secondary": "Kimi K2.5 como respaldo MoE únicamente con endpoint verificado",
+    "transition": "Qwen3-8B para validar datos, formatos, scripts y reanudación; nunca como campeón final",
+    "teacher": "GPT-5.6 de razonamiento para datos, verificación y respaldo"
   },
   "pipeline": [
     {"id":"data","label":"Corpus verificable","target":10000,"unit":"ejemplos"},
@@ -27,11 +28,14 @@
   ],
   "compute": {
     "statusManifest": "model/hector-asi/scale/compute-status.json",
-    "targetProfile": "qwen3-8b-main",
-    "minimumFreeVramMiB": 16384,
+    "targetProfile": "qwen3.5-397b-a17b",
+    "officialServingTensorParallel": 8,
+    "minimumAggregateFreeVramGiBForAdmission": 640,
+    "recommendedPersistentStorageGiB": 1200,
     "persistentResumeRequired": true,
+    "endpointIdentityRequired": true,
     "cpuTrainingForbidden": true,
-    "workflow": ".github/workflows/hector-main-qlora.yml"
+    "workflow": ".github/workflows/qwen397-preflight.yml"
   },
   "promotion": {
     "minimumAbsoluteBenchmarkGain": 0.03,
@@ -39,5 +43,5 @@
     "requiresReproducibility": true,
     "requiresRollback": true
   },
-  "principle": "Kimi K2.5 mejora la experiencia de la PWA desde ahora; Kimi K2 Base permanece separado como objetivo de entrenamiento propio. La PWA nunca declara activo un modelo cuyo endpoint no haya respondido."
+  "principle": "Qwen3.5-397B-A17B es la meta operativa y entrenable, pero la PWA nunca lo declara activo por nombre o configuración: exige endpoint, identidad y smoke test reales. V41 permanece campeón propio hasta ser superado."
 }
