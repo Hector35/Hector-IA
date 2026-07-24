@@ -1,0 +1,39 @@
+{
+  "schemaVersion": 1,
+  "corpusId": "stage6-corpus-v1",
+  "status": "candidate-pending-ci",
+  "canonicalExamples": 0,
+  "candidateExamples": 2048,
+  "targetExamples": 10000,
+  "trainExamples": 1792,
+  "validationExamples": 256,
+  "sha256": "9012302d2ffce271ec28a2b760cfb12d42f1641c7abe863054a6366a981933d4",
+  "bytes": 1373759,
+  "capabilities": {
+    "mathematics": 256,
+    "code": 256,
+    "planning": 256,
+    "tools": 256,
+    "causality": 256,
+    "verification": 256,
+    "calibration": 256,
+    "metacognition": 256
+  },
+  "difficulty": {
+    "1": 512,
+    "2": 512,
+    "3": 512,
+    "4": 512
+  },
+  "license": "Apache-2.0",
+  "provenance": "deterministic-author-generated",
+  "generatorSeed": 62026,
+  "quality": {
+    "accepted": false,
+    "rejected": null,
+    "exactDuplicates": null,
+    "benchmarkV2Checked": false,
+    "reason": "El conteo canónico permanece en cero hasta que CI reproduzca el hash y confirme cero contaminación con Benchmark V2."
+  },
+  "artifact": null
+}
