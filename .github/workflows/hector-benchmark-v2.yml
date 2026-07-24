@@ -4,6 +4,7 @@ on:
     branches: [main]
     paths:
       - 'model/hector-asi/evals/benchmark_v2/**'
+      - 'model/hector-asi/data/**'
       - '.github/workflows/hector-benchmark-v2.yml'
   workflow_dispatch:
 permissions:
@@ -20,7 +21,7 @@ jobs:
       - name: Compile and generate two replicas
         run: |
           set -euo pipefail
-          python -m py_compile model/hector-asi/evals/benchmark_v2/build_benchmark_v2.py
+          python -m py_compile model/hector-asi/evals/benchmark_v2/*.py
           python model/hector-asi/evals/benchmark_v2/build_benchmark_v2.py --out artifacts/benchmark-v2-a
           python model/hector-asi/evals/benchmark_v2/build_benchmark_v2.py --out artifacts/benchmark-v2-b
           diff -ru artifacts/benchmark-v2-a artifacts/benchmark-v2-b
@@ -28,44 +29,64 @@ jobs:
         run: |
           set -euo pipefail
           python - <<'PY'
-          import hashlib
-          import json
+          import hashlib,json
           from collections import Counter
           from pathlib import Path
-
-          root = Path('artifacts/benchmark-v2-a')
-          rows = [json.loads(line) for line in (root / 'hidden.jsonl').read_text().splitlines() if line.strip()]
-          manifest = json.loads((root / 'manifest.json').read_text())
-          env = json.loads(Path('model/hector-asi/evals/benchmark_v2/canonical_environment.json').read_text())
-          status = json.loads(Path('model/hector-asi/evals/benchmark_v2/status.json').read_text())
-          categories = ('mathematics','code','planning','tool_use','causality','calibration','metacognition','transfer')
-
-          assert len(rows) == 512
-          assert len({row['id'] for row in rows}) == 512
-          assert len({' '.join(row['prompt'].lower().split()) for row in rows}) == 512
-          assert Counter(row['category'] for row in rows) == Counter({category: 64 for category in categories})
-          assert all(row['split'] == 'hidden' and row['benchmarkVersion'] == '2.1.0' for row in rows)
-          assert {row['verifier']['type'] for row in rows} == {'numeric','python_function','structured_rubric'}
-          digest = hashlib.sha256((root / 'hidden.jsonl').read_bytes()).hexdigest()
-          assert digest == manifest['hiddenSha256']
+          root=Path('artifacts/benchmark-v2-a')
+          rows=[json.loads(line) for line in (root/'hidden.jsonl').read_text().splitlines() if line.strip()]
+          manifest=json.loads((root/'manifest.json').read_text())
+          env=json.loads(Path('model/hector-asi/evals/benchmark_v2/canonical_environment.json').read_text())
+          status=json.loads(Path('model/hector-asi/evals/benchmark_v2/status.json').read_text())
+          categories=('mathematics','code','planning','tool_use','causality','calibration','metacognition','transfer')
+          assert len(rows)==512
+          assert len({row['id'] for row in rows})==512
+          assert len({' '.join(row['prompt'].lower().split()) for row in rows})==512
+          assert Counter(row['category'] for row in rows)==Counter({category:64 for category in categories})
+          assert all(row['split']=='hidden' and row['benchmarkVersion']=='2.1.0' for row in rows)
+          assert {row['verifier']['type'] for row in rows}=={'numeric','python_function','structured_rubric'}
+          digest=hashlib.sha256((root/'hidden.jsonl').read_bytes()).hexdigest()
+          assert digest==manifest['hiddenSha256']
           assert env['historicalEquivalence']['resolved'] is True
-          assert env['trainingGate']['minimumHiddenCases'] <= len(rows)
-          assert 'qwen3-8b-base' in env['requiredComparisons']
-          assert status['hiddenCases'] == len(rows)
+          assert env['trainingGate']['minimumHiddenCases']<=len(rows)
+          assert {'qwen3-8b-base','qwen35-397b-base','kimi-k2.5'}<=set(env['requiredComparisons'])
+          assert status['hiddenCases']==len(rows)
           assert status['trainingGates']['minimumHiddenCases']['open'] is True
           assert status['trainingGates']['v41Below85Percent']['open'] is False
-          print(json.dumps({
-              'hiddenCases': len(rows),
-              'sha256': digest,
-              'categories': manifest['categoryCounts'],
-              'historicalEquivalenceResolved': True,
-              'requiredComparisons': env['requiredComparisons'],
-              'trainingAuthorized': False
-          }, sort_keys=True))
+          assert status['scoringReady'] is True and status['contaminationToolReady'] is True
+          print(json.dumps({'hiddenCases':len(rows),'sha256':digest,'categories':manifest['categoryCounts'],'historicalEquivalenceResolved':True,'trainingAuthorized':False},sort_keys=True))
           PY
-      - name: Upload sealed benchmark candidate
+      - name: Self-test deterministic scorer
+        run: |
+          set -euo pipefail
+          mkdir -p artifacts/self-test
+          cat > artifacts/self-test/cases.jsonl <<'EOF'
+          {"id":"n","benchmarkVersion":"2.1.0","category":"mathematics","verifier":{"type":"numeric","expected":42,"tolerance":0}}
+          {"id":"c","benchmarkVersion":"2.1.0","category":"code","verifier":{"type":"python_function","entrypoint":"solve","tests":[{"input":[3],"expected":6}],"timeoutSeconds":2}}
+          {"id":"r","benchmarkVersion":"2.1.0","category":"planning","verifier":{"type":"structured_rubric","requiredConcepts":["aislar","métrica","rollback","verificar"],"forbiddenClaims":["cambiar todo"],"minimumConcepts":4}}
+          EOF
+          cat > artifacts/self-test/responses.jsonl <<'EOF'
+          {"id":"n","response":"El resultado es 42.","model":"self-test","effectiveModel":"self-test","fallback":false}
+          {"id":"c","response":"```python\ndef solve(x):\n    return x*2\n```","model":"self-test","effectiveModel":"self-test","fallback":false}
+          {"id":"r","response":"Primero aislar, observar una métrica, preparar rollback y verificar después.","model":"self-test","effectiveModel":"self-test","fallback":false}
+          EOF
+          python model/hector-asi/evals/benchmark_v2/score_responses.py --benchmark artifacts/self-test/cases.jsonl --responses artifacts/self-test/responses.jsonl --out artifacts/self-test/score.json
+          python - <<'PY'
+          import json
+          report=json.load(open('artifacts/self-test/score.json'))
+          assert report['score']==1 and report['trainingGateEligible'] is True
+          PY
+      - name: Run contamination gate when canonical corpus exists
+        run: |
+          set -euo pipefail
+          mapfile -t corpus < <(find model/hector-asi/data -type f -name '*.jsonl' 2>/dev/null | sort || true)
+          if [ ${#corpus[@]} -eq 0 ]; then
+            echo '{"status":"pending-canonical-corpus","clean":false}' > artifacts/contamination.json
+            exit 0
+          fi
+          python model/hector-asi/evals/benchmark_v2/check_contamination.py --benchmark artifacts/benchmark-v2-a/hidden.jsonl --corpus "${corpus[@]}" --out artifacts/contamination.json
+      - name: Upload sealed benchmark and gates
         uses: actions/upload-artifact@v4
         with:
           name: hector-benchmark-v2-${{ github.run_id }}
-          path: artifacts/benchmark-v2-a
+          path: artifacts
           retention-days: 90
