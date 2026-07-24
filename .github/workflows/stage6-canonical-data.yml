@@ -1,0 +1,56 @@
+name: Stage 6 canonical data
+
+on:
+  push:
+    branches:
+      - 'stage6-data/**'
+    paths:
+      - 'model/hector-asi/data/stage6/**'
+      - '.github/workflows/stage6-canonical-data.yml'
+  pull_request:
+    paths:
+      - 'model/hector-asi/data/stage6/**'
+      - '.github/workflows/stage6-canonical-data.yml'
+
+permissions:
+  contents: read
+
+jobs:
+  materialize-and-verify:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+      - name: Materialize canonical corpus
+        run: node model/hector-asi/data/stage6/generate-canonical-20260724-1329.mjs
+      - name: Verify materialized corpus
+        run: |
+          node - <<'NODE'
+          const fs=require('fs');
+          const crypto=require('crypto');
+          const root='model/hector-asi/data/stage6';
+          const jsonl=fs.readFileSync(`${root}/canonical-20260724-1329.jsonl`,'utf8');
+          const manifest=JSON.parse(fs.readFileSync(`${root}/canonical-20260724-1329.manifest.json`,'utf8'));
+          const rows=jsonl.trim().split('\n').map(JSON.parse);
+          const prompts=new Set(rows.map(x=>x.messages[1].content));
+          const answers=new Set(rows.map(x=>x.messages[2].content));
+          const digest=crypto.createHash('sha256').update(jsonl).digest('hex');
+          if(rows.length!==640)throw new Error(`Expected 640 rows, got ${rows.length}`);
+          if(prompts.size!==rows.length)throw new Error('Duplicate prompts detected');
+          if(answers.size!==rows.length)throw new Error('Duplicate answers detected');
+          if(!rows.every(x=>x.metadata?.verifier?.kind&&x.metadata?.source&&x.metadata?.license==='CC0-1.0'&&x.metadata?.benchmark_excluded===true))throw new Error('Metadata gate failed');
+          if(manifest.sha256!==digest)throw new Error('Manifest SHA mismatch');
+          console.log(JSON.stringify({ok:true,examples:rows.length,sha256:digest,capabilities:manifest.capabilities,difficulty:manifest.difficulty}));
+          NODE
+      - name: Upload canonical corpus artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: stage6-canonical-20260724-1329
+          path: |
+            model/hector-asi/data/stage6/canonical-20260724-1329.jsonl
+            model/hector-asi/data/stage6/canonical-20260724-1329.manifest.json
+          if-no-files-found: error
+          retention-days: 30
