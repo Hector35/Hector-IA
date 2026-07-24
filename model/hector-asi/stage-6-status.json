@@ -1,0 +1,68 @@
+{
+  "schemaVersion": 1,
+  "stage": 6,
+  "generatedAt": "2026-07-24T13:17:22-06:00",
+  "contract": "model/hector-asi/stage-6-plan.json",
+  "champion": {
+    "runtimeId": "hector-asi-qwen15-v41",
+    "status": "active",
+    "promotedCandidate": null,
+    "reason": "No existe candidato principal elegible bajo Benchmark V2."
+  },
+  "candidate": {
+    "id": null,
+    "status": "blocked-before-training",
+    "hypothesis": "qwen3-8b-canonical-scale-sft-v1",
+    "artifact": null
+  },
+  "gates": {
+    "canonicalCorpus": {
+      "required": 10000,
+      "canonical": 0,
+      "candidate": 2048,
+      "open": false,
+      "source": "PR #788; CI rechazó su validación, por lo que no se cuenta como canónico"
+    },
+    "benchmarkV2": {
+      "required": 500,
+      "current": 512,
+      "open": true,
+      "version": "2.1.0",
+      "source": "model/hector-asi/evals/benchmark_v2/status.json"
+    },
+    "trainableChampionFailures": {
+      "required": 100,
+      "current": 0,
+      "open": false,
+      "reason": "V41 todavía no ha sido evaluado una vez bajo el entorno congelado de Benchmark V2"
+    },
+    "compute": {
+      "pipelineReady": true,
+      "gpuAttached": false,
+      "freeVramMiB": 0,
+      "minimumFreeVramMiB": 16384,
+      "resumeRoundTrip": false,
+      "open": false,
+      "reason": "No existe un runner GPU autorizado conectado al repositorio"
+    }
+  },
+  "autonomy": {
+    "measuredPercent": null,
+    "targetPercent": 90,
+    "status": "not-measurable-until-v41-benchmark-v2"
+  },
+  "integratedAssets": [
+    "Benchmark V2 2.1.0 con 512 casos ocultos",
+    "pipeline QLoRA GPU-only, reanudable y con checkpoints persistentes",
+    "manifiesto de cómputo estructurado"
+  ],
+  "closedDuplicates": [754, 759, 769, 773],
+  "promotion": {
+    "decision": "hold-v41",
+    "minimumAbsoluteGain": 0.03,
+    "requiresMultiCapabilityGain": true,
+    "requiresReproducibility": true,
+    "requiresRollback": true
+  },
+  "nextBottleneck": "Ejecutar V41 una sola vez sobre Benchmark V2 y publicar al menos 100 fallos entrenables; en paralelo corregir la validación del corpus candidato sin contarlo como canónico antes de CI."
+}
