@@ -1,0 +1,119 @@
+name: Hector main QLoRA
+
+on:
+  workflow_dispatch:
+    inputs:
+      profile:
+        description: Scale profile
+        required: true
+        default: qwen3-8b-main
+        type: choice
+        options:
+          - qwen3-8b-main
+      train_path:
+        description: Canonical train JSONL path
+        required: true
+        default: model/hector-asi/data/canonical/train.jsonl
+      validation_path:
+        description: Canonical validation JSONL path
+        required: true
+        default: model/hector-asi/data/canonical/validation.jsonl
+      hidden_path:
+        description: Benchmark V2 hidden JSONL path
+        required: true
+        default: model/hector-asi/evals/benchmark-v2/hidden.jsonl
+      resume:
+        description: Resume latest checkpoint in attached persistent workspace
+        required: true
+        default: true
+        type: boolean
+
+permissions:
+  contents: read
+
+concurrency:
+  group: hector-main-qlora
+  cancel-in-progress: false
+
+jobs:
+  syntax-and-data-gates:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+      - name: Compile scale pipeline
+        run: python -m py_compile model/hector-asi/scale/probe_compute.py model/hector-asi/scale/preflight.py model/hector-asi/scale/train_qlora_main.py
+      - name: Verify canonical corpus gates before requesting GPU
+        run: |
+          test -f "${{ inputs.train_path }}"
+          test -f "${{ inputs.validation_path }}"
+          test -f "${{ inputs.hidden_path }}"
+          python - <<'PY'
+          import json
+          from pathlib import Path
+          paths = {
+            'train': Path('${{ inputs.train_path }}'),
+            'validation': Path('${{ inputs.validation_path }}'),
+            'hidden': Path('${{ inputs.hidden_path }}'),
+          }
+          counts = {}
+          for name, path in paths.items():
+            count = 0
+            for line in path.read_text().splitlines():
+              if line.strip():
+                json.loads(line)
+                count += 1
+            counts[name] = count
+          print(counts)
+          assert counts['train'] >= 10000, counts
+          assert counts['validation'] > 0, counts
+          assert counts['hidden'] >= 500, counts
+          PY
+
+  gpu-main-run:
+    needs: syntax-and-data-gates
+    runs-on: [self-hosted, linux, x64, gpu]
+    timeout-minutes: 1440
+    env:
+      HF_HOME: ${{ runner.temp }}/hf-cache
+      TOKENIZERS_PARALLELISM: 'true'
+      PYTHONUNBUFFERED: '1'
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+      - name: Install pinned training stack
+        run: pip install --upgrade pip && pip install -r model/hector-asi/scale/requirements.txt
+      - name: Probe attached GPU
+        run: python model/hector-asi/scale/probe_compute.py --output artifacts/compute-probe.json
+      - name: Enforce all main-run gates
+        run: |
+          python model/hector-asi/scale/preflight.py \
+            --config model/hector-asi/scale/${{ inputs.profile }}.json \
+            --train "${{ inputs.train_path }}" \
+            --validation "${{ inputs.validation_path }}" \
+            --hidden "${{ inputs.hidden_path }}" \
+            --probe artifacts/compute-probe.json \
+            --output artifacts/main-run-preflight.json
+      - name: Train resumable QLoRA candidate
+        run: |
+          python model/hector-asi/scale/train_qlora_main.py \
+            --config model/hector-asi/scale/${{ inputs.profile }}.json \
+            --train "${{ inputs.train_path }}" \
+            --validation "${{ inputs.validation_path }}" \
+            --hidden "${{ inputs.hidden_path }}" \
+            --output artifacts/${{ inputs.profile }} \
+            ${{ inputs.resume && '--resume' || '' }}
+      - name: Archive checkpoint and immutable evidence
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: hector-${{ inputs.profile }}-${{ github.run_id }}
+          path: artifacts/
+          if-no-files-found: error
+          retention-days: 90
+          compression-level: 0
