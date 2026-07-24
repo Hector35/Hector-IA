@@ -1,0 +1,48 @@
+{
+  "schemaVersion": 2,
+  "stage": 6,
+  "profile": "qwen35-397b-a17b-main",
+  "baseModel": "Qwen/Qwen3.5-397B-A17B",
+  "champion": "hector-asi-qwen15-v41",
+  "status": "blocked",
+  "trainingAllowed": false,
+  "requirements": {
+    "canonicalTrainExamples": 10000,
+    "hiddenBenchmarkCases": 500,
+    "trainableChampionFailures": 100,
+    "minimumAbsoluteBenchmarkGain": 0.03,
+    "reproducibleRuns": 2,
+    "rollbackRequired": true,
+    "cpuTrainingForbidden": true,
+    "distributedCheckpointResumeRequired": true,
+    "explicitBudgetMxnRequired": true
+  },
+  "observed": {
+    "canonicalTrainExamples": 640,
+    "hiddenBenchmarkCases": 512,
+    "trainableChampionFailures": 0,
+    "distributedHardwareVerified": false,
+    "resumeRoundTripVerified": false,
+    "budgetMaximumMxn": null,
+    "estimatedMaximumCostMxn": null,
+    "provider": null,
+    "hardware": null,
+    "adapter": null,
+    "checkpoint": null,
+    "replicasCompleted": 0
+  },
+  "gates": {
+    "data": false,
+    "benchmark": true,
+    "failures": false,
+    "hardware": false,
+    "resume": false,
+    "budget": false,
+    "costWithinBudget": false
+  },
+  "decision": {
+    "action": "do-not-train",
+    "reason": "Sólo la puerta del benchmark está abierta. Faltan 9,360 ejemplos, 100 fallos entrenables de V41, hardware distribuido con resume y un presupuesto máximo explícito.",
+    "nextRequiredArtifact": "Predicciones selladas de V41 sobre Benchmark V2 y manifiesto de al menos 100 fallos entrenables."
+  }
+}
