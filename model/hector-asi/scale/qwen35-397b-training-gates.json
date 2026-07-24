@@ -1,0 +1,38 @@
+{
+  "schemaVersion": 1,
+  "stage": 6,
+  "profile": "qwen35-397b-a17b-main",
+  "baseModel": "Qwen/Qwen3.5-397B-A17B",
+  "champion": "hector-asi-qwen15-v41",
+  "status": "blocked",
+  "trainingAllowed": false,
+  "requirements": {
+    "canonicalTrainExamples": 10000,
+    "hiddenBenchmarkCases": 500,
+    "trainableChampionFailures": 100,
+    "minimumAbsoluteBenchmarkGain": 0.03,
+    "reproducibleRuns": 2,
+    "rollbackRequired": true,
+    "cpuTrainingForbidden": true,
+    "distributedCheckpointResumeRequired": true,
+    "explicitBudgetMxnRequired": true
+  },
+  "observed": {
+    "canonicalTrainExamples": 0,
+    "hiddenBenchmarkCases": 0,
+    "trainableChampionFailures": 0,
+    "distributedHardwareVerified": false,
+    "resumeRoundTripVerified": false,
+    "budgetMaximumMxn": null,
+    "estimatedMaximumCostMxn": null,
+    "datasetHash": null,
+    "benchmarkHash": null,
+    "baseModelRevision": null,
+    "tokenizerRevision": null
+  },
+  "decision": {
+    "action": "do-not-train",
+    "reason": "Las puertas de datos, evaluación, cómputo distribuido, reanudación y presupuesto están cerradas.",
+    "nextArtifact": "model/hector-asi/scale/preflight_qwen397b.py"
+  }
+}
