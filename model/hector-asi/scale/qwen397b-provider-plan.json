@@ -1,0 +1,82 @@
+{
+  "schemaVersion": 1,
+  "updatedAt": "2026-07-24T21:54:25Z",
+  "targetModel": "Qwen/Qwen3.5-397B-A17B",
+  "decision": "managed-serverless-api-first",
+  "status": "blocked-before-checkout",
+  "effectiveEndpointVerified": false,
+  "spend": {
+    "actualMxn": 0,
+    "maximumMxn": null,
+    "billingEnabled": false
+  },
+  "preferred": {
+    "provider": "Together AI",
+    "service": "Serverless Models",
+    "modelId": "Qwen/Qwen3.5-397B-A17B",
+    "apiCompatibility": "OpenAI-compatible",
+    "contextTokens": 262144,
+    "modalities": ["text", "image"],
+    "capabilities": ["chat", "vision", "function-calling", "json-mode"],
+    "pricing": {
+      "currency": "USD",
+      "inputPerMillionTokens": 0.6,
+      "cachedInputPerMillionTokens": 0.35,
+      "outputPerMillionTokens": 3.6
+    },
+    "reason": "Exact model ID, serverless billing, vision and function calling without a dedicated multi-GPU commitment.",
+    "source": "https://docs.together.ai/docs/serverless/models"
+  },
+  "alternatives": [
+    {
+      "provider": "Alibaba Cloud Model Studio",
+      "region": "US (Virginia)",
+      "service": "Pay-as-you-go model API",
+      "modelId": "qwen3.5-397b-a17b",
+      "apiCompatibility": "OpenAI-compatible",
+      "contextTokens": 262144,
+      "capabilities": ["thinking", "function-calling", "built-in-tools", "structured-output"],
+      "pricing": {
+        "currency": "CNY",
+        "inputPerMillionTokensUpTo128K": 1.2,
+        "outputPerMillionTokensUpTo128K": 7.2,
+        "inputPerMillionTokens128KTo256K": 3,
+        "outputPerMillionTokens128KTo256K": 18
+      },
+      "freeQuotaVerified": false,
+      "source": "https://help.aliyun.com/en/model-studio/model-pricing"
+    },
+    {
+      "provider": "Alibaba Cloud Model Studio",
+      "service": "Dedicated deployment",
+      "modelId": "qwen3.5-397b-a17b",
+      "minimumPublishedHourlyPrice": {
+        "currency": "CNY",
+        "amount": 400
+      },
+      "decision": "rejected-without-explicit-training-budget",
+      "reason": "A dedicated deployment is materially more expensive than serverless inference and is not sufficient by itself to authorize training.",
+      "source": "https://help.aliyun.com/en/model-studio/create-deployment-api"
+    }
+  ],
+  "activationGates": {
+    "explicitBudgetMxn": false,
+    "providerAccount": false,
+    "paymentOrPromotionalCredit": false,
+    "apiKeyStoredAsSecret": false,
+    "textSmokeTest": false,
+    "visionSmokeTest": false,
+    "toolCallingSmokeTest": false,
+    "requestedModelEqualsEffectiveModel": false,
+    "fallbackDisabledDuringVerification": false,
+    "rateLimitConfigured": false,
+    "spendAlertConfigured": false,
+    "automaticCutoffConfigured": false
+  },
+  "secretNames": [
+    "QWEN_397B_BASE_URL",
+    "QWEN_397B_TOKEN",
+    "QWEN_397B_MODEL"
+  ],
+  "nextAction": "Define an explicit MXN ceiling, create or authorize the provider account, store the API key as a Cloudflare/GitHub secret, then run the exact-model smoke test."
+}
