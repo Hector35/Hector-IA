@@ -1,0 +1,75 @@
+name: Qwen 397B preflight
+
+on:
+  workflow_dispatch:
+    inputs:
+      run_endpoint_smoke:
+        description: Run endpoint identity and inference smoke test
+        type: boolean
+        required: true
+        default: false
+  pull_request:
+    paths:
+      - 'model/hector-asi/scale/**'
+      - 'model/hector-asi/stage-6-plan.json'
+      - '.github/workflows/qwen397-preflight.yml'
+
+permissions:
+  contents: read
+
+jobs:
+  static-validation:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+      - name: Compile probes
+        run: python -m py_compile model/hector-asi/scale/probe_qwen397.py model/hector-asi/scale/smoke_qwen397_endpoint.py
+      - name: Validate JSON contracts
+        run: |
+          python - <<'PY'
+          import json
+          for path in ['model/hector-asi/stage-6-plan.json','model/hector-asi/scale/compute-status.json']:
+              with open(path, encoding='utf-8') as handle: json.load(handle)
+          PY
+      - name: Prove GitHub-hosted runner is not admitted
+        run: |
+          python model/hector-asi/scale/probe_qwen397.py --output artifacts/qwen397-github-hosted.json
+          python - <<'PY'
+          import json
+          data=json.load(open('artifacts/qwen397-github-hosted.json'))
+          assert data['admission']['cpuTrainingForbidden'] is True
+          assert data['eligibleForEndpointSmoke'] is False
+          PY
+      - uses: actions/upload-artifact@v4
+        with:
+          name: qwen397-static-preflight
+          path: artifacts/qwen397-github-hosted.json
+
+  endpoint-smoke:
+    if: ${{ github.event_name == 'workflow_dispatch' && inputs.run_endpoint_smoke }}
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+      - name: Verify endpoint identity and response
+        env:
+          QWEN_397B_BASE_URL: ${{ secrets.QWEN_397B_BASE_URL }}
+          QWEN_397B_TOKEN: ${{ secrets.QWEN_397B_TOKEN }}
+        run: |
+          test -n "$QWEN_397B_BASE_URL"
+          test -n "$QWEN_397B_TOKEN"
+          python model/hector-asi/scale/smoke_qwen397_endpoint.py \
+            --base-url "$QWEN_397B_BASE_URL" \
+            --token-env QWEN_397B_TOKEN \
+            --output artifacts/qwen397-endpoint.json
+      - uses: actions/upload-artifact@v4
+        with:
+          name: qwen397-endpoint-evidence
+          path: artifacts/qwen397-endpoint.json
