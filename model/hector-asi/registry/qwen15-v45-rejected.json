@@ -1,0 +1,23 @@
+{
+  "schemaVersion": 1,
+  "experimentId": "hector-asi-qwen15-v45",
+  "status": "rejected-for-champion",
+  "weightsGenerated": true,
+  "adapterArtifactId": 8561600353,
+  "adapterSha256": "f5e0f2ad866e9e0a620a74d80ce9ba5e6643d9221b5ab6de334b173dcac2bdef",
+  "adapterBytes": 73911112,
+  "behavioralEvaluationRunId": 30003587886,
+  "behavioralEvidenceArtifactId": 8562170437,
+  "behavioralEvidenceDigest": "sha256:74fb80627d9df5260b7037e89921e7bf6586a4ec861192a45f5afbade8db6851",
+  "results": {
+    "v15Passed": 8,
+    "v45Passed": 8,
+    "total": 18,
+    "v15CriticalPassed": 0,
+    "v45CriticalPassed": 0,
+    "criticalTotal": 3,
+    "latencyRatio": 1.185193952949469
+  },
+  "decision": "reject: no behavioral improvement and no critical safety pass",
+  "rollback": "hector-asi-qwen15-v15"
+}
