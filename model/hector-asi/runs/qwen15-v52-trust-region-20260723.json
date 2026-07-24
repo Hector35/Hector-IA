@@ -1,0 +1,83 @@
+{
+  "schemaVersion": 1,
+  "experimentId": "hector-asi-qwen15-v52-trust-region",
+  "status": "rejected-for-champion",
+  "decision": "retain-v41",
+  "baseModel": "Qwen/Qwen2.5-1.5B-Instruct",
+  "baseRevision": "989aa7980e4cf806f80c7fef2b1adb7bc71aa306",
+  "sourceChampion": {
+    "runtimeId": "hector-asi-qwen15-v41",
+    "artifactId": 8560331055,
+    "adapterSha256": "31bead5f59982d8e321517fd235b81f992f83d2e3792a55690c2a841ff0e28f8",
+    "adapterBytes": 73911112
+  },
+  "training": {
+    "runId": 30043546353,
+    "artifactId": 8578779597,
+    "artifactDigest": "sha256:5f9a752c1cc66ca44b99129994f6e18680edd032ee234e7034391b299936d5a5",
+    "artifactExpiresAt": "2026-10-21T20:47:08Z",
+    "adapterSha256": "9262236700308b41ab24cc284c50d3eb55288483948c612a245185c3676314aa",
+    "adapterBytes": 73911112,
+    "replicasByteIdentical": true,
+    "method": "one-epoch chosen CE plus reduced unlikelihood with parameter trust-region anchoring",
+    "hyperparameters": {
+      "epochs": 1,
+      "learningRate": 0.000002,
+      "unlikelihoodLambda": 0.25,
+      "anchorLambda": 0.02,
+      "maxLength": 160,
+      "seed": 3052
+    },
+    "runtime": {
+      "secondsPerReplica": 650.882123708725,
+      "peakRssMb": 11851.15234375,
+      "python": "3.11.15",
+      "torch": "2.7.1+cpu",
+      "hardware": "Linux-6.17.0-1020-azure-x86_64-with-glibc2.39"
+    }
+  },
+  "dataset": {
+    "trainExamples": 16,
+    "validationExamples": 6,
+    "hiddenTestExamples": 18,
+    "crossSplitOverlap": 0,
+    "privateUserData": false,
+    "license": "author-generated Apache-2.0-compatible",
+    "trainSha256": "b63b40c7d43b4e62b3566b4093270f33ece8e23c5a9a9bda89552cc55156e138",
+    "validationSha256": "37193509ec439fb51b9dbdb6d3ff6783efcc11ce808e18d342094bb6d64800c1",
+    "hiddenTestSha256": "17560e21b728c93f822a0e21cb4b4261823ae5b6f92f3fe1188fdfd4b5679ccb"
+  },
+  "comparison": {
+    "validationObjective": {
+      "v41": 2.4076154828071594,
+      "v52": 2.3234113653500876,
+      "relativeImprovement": 0.03497242403492897
+    },
+    "behavior": {
+      "v41Passed": 11,
+      "v52Passed": 10,
+      "total": 18,
+      "v41CriticalPassed": 6,
+      "v52CriticalPassed": 6,
+      "criticalTotal": 6,
+      "v41MeanLatencyMs": 7886.345599333337,
+      "v52MeanLatencyMs": 9622.729878888898,
+      "latencyRatio": 1.2201760318115331
+    }
+  },
+  "gates": {
+    "weightsChanged": true,
+    "replicasByteIdentical": true,
+    "validationImproved": true,
+    "criticalPerfect": true,
+    "noCriticalRegression": true,
+    "latencyAcceptable": true,
+    "behavioralImprovement": false,
+    "eligibleForChampion": false
+  },
+  "finding": "The trust-region update reduced validation preference objective and preserved all six critical safety passes, but lost one general behavioral case and increased mean latency by 22.0%, so it cannot replace v41.",
+  "doNotRepeat": [
+    "one epoch, LR 2e-6, unlikelihood lambda 0.25, anchor lambda 0.02, seed 3052 on this 16/6/18 split"
+  ],
+  "rollback": "hector-asi-qwen15-v41"
+}
