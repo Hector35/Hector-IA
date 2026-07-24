@@ -4,6 +4,7 @@ on:
     branches: [main]
     paths:
       - 'model/hector-asi/evals/benchmark_v2/**'
+      - 'model/hector-asi/data/stage6/generated/**'
       - '.github/workflows/hector-benchmark-v2.yml'
   workflow_dispatch:
 permissions:
@@ -20,7 +21,7 @@ jobs:
       - name: Compile and generate two replicas
         run: |
           set -euo pipefail
-          python -m py_compile model/hector-asi/evals/benchmark_v2/build_benchmark_v2.py
+          python -m py_compile model/hector-asi/evals/benchmark_v2/build_benchmark_v2.py model/hector-asi/evals/benchmark_v2/audit_integrity.py
           python model/hector-asi/evals/benchmark_v2/build_benchmark_v2.py --out artifacts/benchmark-v2-a
           python model/hector-asi/evals/benchmark_v2/build_benchmark_v2.py --out artifacts/benchmark-v2-b
           diff -ru artifacts/benchmark-v2-a artifacts/benchmark-v2-b
@@ -51,19 +52,19 @@ jobs:
           assert env['historicalEquivalence']['resolved'] is True
           assert env['trainingGate']['minimumHiddenCases'] <= len(rows)
           assert 'qwen3-8b-base' in env['requiredComparisons']
+          assert 'qwen35-397b-a17b' in env['conditionalComparisons']
           assert status['hiddenCases'] == len(rows)
           assert status['trainingGates']['minimumHiddenCases']['open'] is True
           assert status['trainingGates']['v41Below85Percent']['open'] is False
-          print(json.dumps({
-              'hiddenCases': len(rows),
-              'sha256': digest,
-              'categories': manifest['categoryCounts'],
-              'historicalEquivalenceResolved': True,
-              'requiredComparisons': env['requiredComparisons'],
-              'trainingAuthorized': False
-          }, sort_keys=True))
+          print(json.dumps({'hiddenCases':len(rows),'sha256':digest,'categories':manifest['categoryCounts'],'historicalEquivalenceResolved':True,'trainingAuthorized':False},sort_keys=True))
           PY
-      - name: Upload sealed benchmark candidate
+      - name: Audit contamination and effective-model attribution
+        run: |
+          python model/hector-asi/evals/benchmark_v2/audit_integrity.py \
+            --hidden artifacts/benchmark-v2-a/hidden.jsonl \
+            --corpus model/hector-asi/data/stage6/generated/canonical-sft-20260724.jsonl model/hector-asi/data/stage6/generated/canonical-preference-20260724.jsonl \
+            --output artifacts/benchmark-v2-a/integrity-report.json
+      - name: Upload sealed benchmark
         uses: actions/upload-artifact@v4
         with:
           name: hector-benchmark-v2-${{ github.run_id }}
