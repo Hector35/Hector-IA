@@ -1,0 +1,42 @@
+{
+  "schemaVersion": 1,
+  "stage": 6,
+  "component": "compute-and-scale",
+  "status": "blocked",
+  "targetProfile": "qwen3-8b-main",
+  "targetModel": "Qwen/Qwen3-8B",
+  "pipelineReady": true,
+  "cpuTrainingForbidden": true,
+  "requiredHardware": {
+    "runnerLabels": ["self-hosted", "linux", "x64", "gpu"],
+    "minimumFreeVramMiB": 16384,
+    "recommendedSystemRamGiB": 32,
+    "persistentStorageGiB": 80
+  },
+  "observedHardware": {
+    "gpuAttached": false,
+    "gpuModel": null,
+    "freeVramMiB": 0,
+    "reason": "No existe un runner GPU autorizado conectado al repositorio."
+  },
+  "gates": {
+    "canonicalTrainExamples": {"required": 10000, "observed": 0, "open": false},
+    "hiddenBenchmarkCases": {"required": 500, "observed": 0, "open": false},
+    "trainableChampionFailures": {"required": 100, "observed": 0, "open": false},
+    "gpuAdmission": {"required": true, "observed": false, "open": false},
+    "resumeRoundTrip": {"required": true, "observed": false, "open": false}
+  },
+  "features": [
+    "4-bit NF4 QLoRA",
+    "double quantization",
+    "packing",
+    "gradient accumulation",
+    "gradient checkpointing",
+    "bf16/fp16 mixed precision",
+    "persistent checkpoint resume",
+    "immutable dataset and adapter hashes",
+    "artifact upload without CPU fallback"
+  ],
+  "nextCommand": "python model/hector-asi/scale/probe_compute.py --output artifacts/compute-probe.json",
+  "mainWorkflow": ".github/workflows/hector-main-qlora.yml"
+}
