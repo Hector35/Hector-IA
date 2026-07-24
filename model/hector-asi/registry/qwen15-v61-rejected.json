@@ -1,0 +1,90 @@
+{
+  "schemaVersion": 1,
+  "experimentId": "hector-asi-qwen15-v61-minrisk",
+  "status": "rejected-for-champion",
+  "decision": "retain-v41",
+  "baseModel": "Qwen/Qwen2.5-1.5B-Instruct",
+  "baseRevision": "989aa7980e4cf806f80c7fef2b1adb7bc71aa306",
+  "sourceChampion": {
+    "runtimeId": "hector-asi-qwen15-v41",
+    "artifactId": 8560331055,
+    "adapterSha256": "31bead5f59982d8e321517fd235b81f992f83d2e3792a55690c2a841ff0e28f8",
+    "adapterBytes": 73911112
+  },
+  "training": {
+    "runId": 30064094310,
+    "artifactId": 8586081971,
+    "artifactDigest": "sha256:8942de0f76a6f7ebdfd81a650fcbec3dcc407c920597fbfdc8dea44c8af9e168",
+    "artifactExpiresAt": "2026-10-22T03:23:13Z",
+    "adapterSha256": "d99e304551273d7c081a9168549e76843b83552f7bc62b55898345882f416321",
+    "adapterBytes": 73911112,
+    "replicasByteIdentical": true,
+    "method": "offline minimum-risk surrogate with chosen/rejected ranking, chosen response CE, explicit EOS loss and LoRA trust-region",
+    "hyperparameters": {
+      "epochs": 3,
+      "learningRate": 0.000002,
+      "maxLength": 160,
+      "rankLambda": 0.70,
+      "chosenCeLambda": 0.35,
+      "eosLambda": 0.25,
+      "anchorLambda": 0.03,
+      "seed": 3061
+    },
+    "runtime": {
+      "secondsPerReplica": 992.9947738647461,
+      "peakRssMb": 11876.57421875,
+      "python": "3.11.15",
+      "torch": "2.7.1+cpu",
+      "hardware": "Linux-6.17.0-1020-azure-x86_64-with-glibc2.39"
+    }
+  },
+  "dataset": {
+    "trainExamples": 12,
+    "validationExamples": 4,
+    "hiddenTestExamples": 18,
+    "criticalHiddenExamples": 6,
+    "crossSplitOverlap": 0,
+    "privateUserData": false,
+    "license": "author-generated Apache-2.0-compatible",
+    "trainSha256": "0e3ebe36614675b9f94907fe42ebb82551e9387d4ed07ac35894f19df84db106",
+    "validationSha256": "11155446c7125dc75544fa42630ac3109acfe627adfaf7adfb3e238a9ee09a60",
+    "hiddenTestSha256": "17560e21b728c93f822a0e21cb4b4261823ae5b6f92f3fe1188fdfd4b5679ccb"
+  },
+  "comparison": {
+    "validationObjective": {
+      "v41": 1.2869393825531006,
+      "v61": 1.1813926696777344,
+      "relativeImprovement": 0.0820140006291865
+    },
+    "behavior": {
+      "v41Passed": 10,
+      "v61Passed": 9,
+      "total": 18,
+      "v41CriticalPassed": 6,
+      "v61CriticalPassed": 6,
+      "criticalTotal": 6,
+      "v41MeanTokens": 18.88888888888889,
+      "v61MeanTokens": 20.0,
+      "tokenRatio": 1.0588235294117647,
+      "v41MeanLatencyMs": 7915.0213793333305,
+      "v61MeanLatencyMs": 8496.75334683334,
+      "latencyRatio": 1.0734972073504379
+    }
+  },
+  "gates": {
+    "weightsChanged": true,
+    "replicasByteIdentical": true,
+    "validationImproved": true,
+    "behavioralImprovement": false,
+    "criticalPerfect": true,
+    "noCriticalRegression": true,
+    "latencyAcceptable": true,
+    "tokenLengthAcceptable": false,
+    "eligibleForChampion": false
+  },
+  "finding": "The explicit EOS objective did not shorten generations enough to satisfy the token gate and reduced hidden behavioral accuracy from 10/18 to 9/18. Critical safety remained 6/6 and validation improved, but the candidate is not globally better than V41.",
+  "doNotRepeat": [
+    "minimum-risk surrogate from V41 with rank lambda 0.70, chosen CE 0.35, EOS 0.25, anchor 0.03, LR 2e-6, 3 epochs, seed 3061 and this 12/4/18 split"
+  ],
+  "rollback": "hector-asi-qwen15-v41"
+}
