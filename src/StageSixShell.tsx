@@ -1,135 +1,29 @@
-import {useEffect,useState,type ReactNode} from 'react';
-import {BrainCircuit,Check,Clock3,Cpu,Database,Network,Sparkles,Target,X,Zap} from 'lucide-react';
+import {useCallback,useEffect,useState,type ReactNode} from 'react';
+import {ArrowRight,BrainCircuit,Check,Clock3,Cpu,Gauge,Layers3,Network,Rocket,ShieldCheck,Sparkles,Target,X,Zap} from 'lucide-react';
 
 type TrainingTarget={repository:string;label:string;role:string;totalParameters:string;activeParameters:string;contextLength:number;customWeights:boolean};
+type Qwen397Model={provider:string;model:string;label:string;role:string;mode:string;enabled:boolean;endpointConfigured:boolean;totalParameters:string;activeParameters:string;contextLength:number;extendedContextLength:number;multimodal:boolean;thinking:boolean;trainable:boolean;license:string;reason:string};
+type StageView='overview'|'architecture'|'factory';
+type PipelineItem={id:string;label:string;target:number;stretchTarget?:number;unit:string;current?:number;status?:string};
 
-export type StageSixStatus={
-  stage:number;
-  name:string;
-  status:string;
-  active:boolean;
-  experienceMode:string;
-  reasoning:{effort:string;deliberation:string;description:string};
-  models:{
-    teacher:{provider:string;model:string;role:string};
-    balanced:{provider:string;model:string;role:string};
-    fast:{provider:string;model:string;role:string};
-    kimi:{provider:string;model:string;label:string;role:string;mode:string;enabled:boolean;endpointConfigured:boolean;totalParameters:string;activeParameters:string;contextLength:number;multimodal:boolean;thinking:boolean;reason:string;trainingTarget:TrainingTarget};
-    open:{provider:string;model:string;role:string};
-    own:{runtimeId:string;label:string;role:string;mode:string;enabled:boolean};
-  };
-  pipeline:Array<{id:string;label:string;target:number;stretchTarget?:number;unit:string}>;
-  promotion:{minimumAbsoluteBenchmarkGain:number;requiresMultipleCapabilityGains:boolean;requiresReproducibility:boolean;requiresRollback:boolean};
-  principle:string;
-};
+export type StageSixStatus={stage:number;name:string;status:string;active:boolean;experienceMode:string;reasoning:{effort:string;deliberation:string;description:string};models:{teacher:{provider:string;model:string;role:string};balanced:{provider:string;model:string;role:string};fast:{provider:string;model:string;role:string};qwen397:Qwen397Model;kimi:{provider:string;model:string;label:string;role:string;mode:string;enabled:boolean;endpointConfigured:boolean;totalParameters:string;activeParameters:string;contextLength:number;multimodal:boolean;thinking:boolean;reason:string;trainingTarget:TrainingTarget};open:{provider:string;model:string;role:string};own:{runtimeId:string;label:string;role:string;mode:string;enabled:boolean}};pipeline:PipelineItem[];promotion:{minimumAbsoluteBenchmarkGain:number;requiresMultipleCapabilityGains:boolean;requiresReproducibility:boolean;requiresRollback:boolean};principle:string};
 
-const fallback:StageSixStatus={
-  stage:6,
-  name:'Inteligencia híbrida autoevolutiva',
-  status:'loading',
-  active:true,
-  experienceMode:'maximum-intelligence',
-  reasoning:{effort:'high',deliberation:'force',description:'Kimi K2.5 es el cerebro abierto operativo; cualquier fallback se identifica.'},
-  models:{
-    teacher:{provider:'openai',model:'GPT-5.6 reasoning',role:'maestro y verificador'},
-    balanced:{provider:'openai',model:'GPT-5.6 balanced',role:'respaldo equilibrado'},
-    fast:{provider:'openai',model:'GPT-5.6 fast',role:'ruta rápida disponible'},
-    kimi:{
-      provider:'moonshot-open-weights',model:'moonshotai/Kimi-K2.5',label:'Héctor Kimi K2.5',role:'cerebro operativo multimodal y agentivo',mode:'pending-endpoint',enabled:true,endpointConfigured:false,totalParameters:'1T',activeParameters:'32B',contextLength:262144,multimodal:true,thinking:true,reason:'Integrado en la PWA; falta conectar el endpoint.',
-      trainingTarget:{repository:'moonshotai/Kimi-K2-Base',label:'Kimi K2 Base · objetivo entrenable',role:'trainable-foundation',totalParameters:'1T',activeParameters:'32B',contextLength:131072,customWeights:false}
-    },
-    open:{provider:'huggingface',model:'Qwen/Qwen3-8B',role:'fallback abierto de transición'},
-    own:{runtimeId:'hector-asi-qwen15-v41',label:'Héctor Qwen15 V41',role:'campeón propio vigente',mode:'verificando',enabled:false}
-  },
-  pipeline:[
-    {id:'data',label:'Corpus verificable',target:10000,unit:'ejemplos'},
-    {id:'benchmark',label:'Benchmark V2',target:500,stretchTarget:1000,unit:'casos ocultos'},
-    {id:'failures',label:'Fallos entrenables de V41',target:100,unit:'casos'},
-    {id:'autonomy',label:'Autonomía del modelo propio',target:90,unit:'%'}
-  ],
-  promotion:{minimumAbsoluteBenchmarkGain:.03,requiresMultipleCapabilityGains:true,requiresReproducibility:true,requiresRollback:true},
-  principle:'Kimi K2.5 mejora la PWA desde el uso diario; Kimi K2 Base permanece como fundamento entrenable para pesos propios.'
-};
+const fallback:StageSixStatus={stage:6,name:'Inteligencia híbrida autoevolutiva',status:'loading',active:true,experienceMode:'maximum-intelligence',reasoning:{effort:'high',deliberation:'force',description:'Qwen3.5-397B-A17B es el cerebro principal; cualquier fallback se identifica.'},models:{teacher:{provider:'openai',model:'GPT-5.6 reasoning',role:'maestro y verificador'},balanced:{provider:'openai',model:'GPT-5.6 balanced',role:'respaldo equilibrado'},fast:{provider:'openai',model:'GPT-5.6 fast',role:'ruta rápida disponible'},qwen397:{provider:'qwen-open-weights',model:'Qwen/Qwen3.5-397B-A17B',label:'Héctor Qwen 397B',role:'cerebro principal multimodal, thinking y agentivo',mode:'pending-endpoint',enabled:true,endpointConfigured:false,totalParameters:'397B',activeParameters:'17B',contextLength:262144,extendedContextLength:1010000,multimodal:true,thinking:true,trainable:true,license:'Apache-2.0',reason:'Integrado en la PWA; falta conectar el endpoint y su secreto.'},kimi:{provider:'moonshot-open-weights',model:'moonshotai/Kimi-K2.5',label:'Héctor Kimi K2.5',role:'respaldo MoE multimodal',mode:'pending-endpoint',enabled:true,endpointConfigured:false,totalParameters:'1T',activeParameters:'32B',contextLength:262144,multimodal:true,thinking:true,reason:'Respaldo integrado; endpoint pendiente.',trainingTarget:{repository:'moonshotai/Kimi-K2-Base',label:'Kimi K2 Base',role:'secondary-trainable-foundation',totalParameters:'1T',activeParameters:'32B',contextLength:131072,customWeights:false}},open:{provider:'huggingface',model:'Qwen/Qwen3-8B',role:'fallback abierto ligero de transición'},own:{runtimeId:'hector-asi-qwen15-v41',label:'Héctor Qwen15 V41',role:'campeón propio vigente',mode:'artifact-only',enabled:false}},pipeline:[{id:'data',label:'Corpus verificable',target:10000,unit:'ejemplos'},{id:'benchmark',label:'Benchmark V2',target:500,stretchTarget:1000,unit:'casos ocultos'},{id:'failures',label:'Fallos entrenables de V41',target:100,unit:'casos'},{id:'compute',label:'Cómputo distribuido',target:1,unit:'entorno validado'},{id:'autonomy',label:'Autonomía del modelo propio',target:90,unit:'%'}],promotion:{minimumAbsoluteBenchmarkGain:.03,requiresMultipleCapabilityGains:true,requiresReproducibility:true,requiresRollback:true},principle:'Qwen3.5-397B-A17B es el cerebro principal y fundamento entrenable abierto; sólo se marca activo cuando responde su endpoint.'};
 
-function normalizeStatus(value:unknown):StageSixStatus{
-  const next=value&&typeof value==='object'?value as Partial<StageSixStatus>:{};
-  const models=next.models&&typeof next.models==='object'?next.models as Partial<StageSixStatus['models']>:{};
-  const kimi=models.kimi&&typeof models.kimi==='object'?models.kimi as Partial<StageSixStatus['models']['kimi']>:{};
-  return{
-    ...fallback,
-    ...next,
-    reasoning:{...fallback.reasoning,...(next.reasoning||{})},
-    models:{
-      teacher:{...fallback.models.teacher,...(models.teacher||{})},
-      balanced:{...fallback.models.balanced,...(models.balanced||{})},
-      fast:{...fallback.models.fast,...(models.fast||{})},
-      kimi:{...fallback.models.kimi,...kimi,trainingTarget:{...fallback.models.kimi.trainingTarget,...(kimi.trainingTarget||{})}},
-      open:{...fallback.models.open,...(models.open||{})},
-      own:{...fallback.models.own,...(models.own||{})}
-    },
-    pipeline:Array.isArray(next.pipeline)?next.pipeline:fallback.pipeline,
-    promotion:{...fallback.promotion,...(next.promotion||{})}
-  };
-}
+function normalizeStatus(value:unknown):StageSixStatus{const next=value&&typeof value==='object'?value as Partial<StageSixStatus>:{};const models=next.models&&typeof next.models==='object'?next.models as Partial<StageSixStatus['models']>:{};const kimi=models.kimi&&typeof models.kimi==='object'?models.kimi as Partial<StageSixStatus['models']['kimi']>:{};return{...fallback,...next,reasoning:{...fallback.reasoning,...(next.reasoning||{})},models:{teacher:{...fallback.models.teacher,...(models.teacher||{})},balanced:{...fallback.models.balanced,...(models.balanced||{})},fast:{...fallback.models.fast,...(models.fast||{})},qwen397:{...fallback.models.qwen397,...(models.qwen397||{})},kimi:{...fallback.models.kimi,...kimi,trainingTarget:{...fallback.models.kimi.trainingTarget,...(kimi.trainingTarget||{})}},open:{...fallback.models.open,...(models.open||{})},own:{...fallback.models.own,...(models.own||{})}},pipeline:Array.isArray(next.pipeline)?next.pipeline:fallback.pipeline,promotion:{...fallback.promotion,...(next.promotion||{})}}}
+function compactNumber(value:number){if(value>=1_000_000)return`${Math.round(value/100_000)/10}M`;if(value>=1_000)return`${Math.round(value/100)/10}K`;return value.toLocaleString('es-MX')}
+function ModelState({ready,pending='Preparado'}:{ready:boolean;pending?:string}){return <span className={`s6State ${ready?'ready':'pending'}`}>{ready?<Check/>:<Clock3/>}{ready?'Activo':pending}</span>}
+function RouteNode({name,detail,ready,kind}:{name:string;detail:string;ready:boolean;kind:string}){return <article className={`s6RouteNode ${ready?'ready':''}`}><span className="s6RouteIndex">{kind}</span><div><strong>{name}</strong><small>{detail}</small></div><ModelState ready={ready}/></article>}
 
 export function StageSixShell({children}:{children:ReactNode}){
-  const [status,setStatus]=useState<StageSixStatus>(fallback);
-  const [open,setOpen]=useState(false);
-
-  useEffect(()=>{
-    fetch('/api/system/stage-6',{credentials:'include'})
-      .then(async response=>response.ok?response.json():Promise.reject(new Error('stage-6 unavailable')))
-      .then(data=>setStatus(normalizeStatus(data)))
-      .catch(()=>setStatus(fallback));
-  },[]);
-
-  const kimiReady=status.models.kimi.endpointConfigured;
-
-  return <>
-    {children}
-    <button className="s6Badge" type="button" onClick={()=>setOpen(true)} aria-label="Abrir estado de Kimi K2.5">
-      <span className="s6Pulse"/>
-      <strong>KIMI K2.5</strong>
-      <small>{kimiReady?'ACTIVO':'PREPARADO'}</small>
-    </button>
-    {open&&<div className="s6Overlay" role="dialog" aria-modal="true" aria-label="Estado de Kimi K2.5">
-      <button className="s6Backdrop" type="button" onClick={()=>setOpen(false)} aria-label="Cerrar estado de Kimi K2.5"/>
-      <section className="s6Panel">
-        <header>
-          <div><span>CEREBRO OPERATIVO ABIERTO</span><h2>{status.models.kimi.label}</h2><p>{status.models.kimi.model}</p></div>
-          <button type="button" onClick={()=>setOpen(false)} aria-label="Cerrar"><X/></button>
-        </header>
-
-        <article className="s6Hero">
-          <div className="s6HeroIcon"><BrainCircuit/></div>
-          <div><span>MULTIMODAL · THINKING · AGENTES</span><strong>{status.models.kimi.totalParameters} totales · {status.models.kimi.activeParameters} activos</strong><small>{status.models.kimi.reason}</small></div>
-          <em>{kimiReady?<><Sparkles/>ACTIVO</>:<><Clock3/>PENDIENTE</>}</em>
-        </article>
-
-        <section className="s6Section">
-          <h3>Arquitectura elegida</h3>
-          <div className="s6Brains">
-            <article><Network/><div><span>USO DIARIO</span><strong>{status.models.kimi.label}</strong><small>{kimiReady?'Endpoint conectado · 256K de contexto':'Integrado; endpoint y secreto pendientes'}</small></div>{kimiReady?<Check/>:<Clock3/>}</article>
-            <article><Cpu/><div><span>ENTRENAMIENTO PROPIO</span><strong>{status.models.kimi.trainingTarget.label}</strong><small>{status.models.kimi.trainingTarget.repository} · requiere infraestructura multi-GPU</small></div><Target/></article>
-            <article><Zap/><div><span>MAESTRO</span><strong>{status.models.teacher.model}</strong><small>Verificación, generación de datos y respaldo de alta precisión</small></div><Check/></article>
-            <article><Cpu/><div><span>FALLBACK ABIERTO</span><strong>{status.models.open.model}</strong><small>Transición cuando Kimi no esté disponible</small></div><Check/></article>
-            <article><Network/><div><span>CAMPEÓN PROPIO</span><strong>{status.models.own.label}</strong><small>{status.models.own.mode} · permanece hasta ser superado</small></div><Check/></article>
-          </div>
-        </section>
-
-        <section className="s6Section">
-          <h3>Fábrica de autonomía</h3>
-          <div className="s6Targets">
-            {status.pipeline.map(item=><article key={item.id}>
-              <span>{item.id==='data'?<Database/>:<Target/>}</span>
-              <div><strong>{item.target.toLocaleString('es-MX')}{item.stretchTarget?`–${item.stretchTarget.toLocaleString('es-MX')}`:''}</strong><small>{item.label}</small></div>
-              <em>{item.unit}</em>
-            </article>)}
-          </div>
-        </section>
-
-        <p className="s6Principle">{status.principle}</p>
-      </section>
-    </div>}
-  </>;
+ const [status,setStatus]=useState<StageSixStatus>(fallback),[open,setOpen]=useState(false),[view,setView]=useState<StageView>('overview'),[loaded,setLoaded]=useState(false);
+ const load=useCallback(async()=>{try{const response=await fetch('/api/system/stage-6',{credentials:'include',cache:'no-store'});if(!response.ok)throw new Error('stage-6 unavailable');setStatus(normalizeStatus(await response.json()));setLoaded(true);if(!sessionStorage.getItem('hector-stage6-command-seen'))setOpen(true)}catch{}},[]);
+ useEffect(()=>{void load();const timer=window.setInterval(()=>void load(),10_000),onFocus=()=>void load();window.addEventListener('focus',onFocus);return()=>{window.clearInterval(timer);window.removeEventListener('focus',onFocus)}},[load]);
+ useEffect(()=>{if(!open)return;const previous=document.body.style.overflow;document.body.style.overflow='hidden';return()=>{document.body.style.overflow=previous}},[open]);
+ const qwenReady=status.models.qwen397.endpointConfigured,kimiReady=status.models.kimi.endpointConfigured,close=()=>{sessionStorage.setItem('hector-stage6-command-seen','1');setOpen(false)},bottleneck=qwenReady?'Completar corpus, benchmark y réplica entrenada':'Conectar un endpoint GPU verificable para Qwen 397B';
+ return <><div className="s6AppLayer" aria-hidden={open}>{children}</div><button className="s6CoreLauncher" type="button" onClick={()=>{setView('overview');setOpen(true)}} aria-label="Abrir Centro de Mando"><span className="s6CoreMark"><BrainCircuit/></span><span><strong>Qwen 397B</strong><small>{qwenReady?'núcleo activo':loaded?'núcleo preparado':'comprobando'}</small></span><ArrowRight/></button>{open&&<div className="s6Command" role="dialog" aria-modal="true" aria-label="Centro de Mando de Héctor"><div className="s6CommandNoise"/><section className="s6CommandSurface"><header className="s6CommandHeader"><div className="s6CommandBrand"><span>H</span><div><strong>Héctor OS</strong><small>Centro de Mando · Etapa 6</small></div></div><div className="s6HeaderState"><i className={qwenReady?'ready':''}/><span>{qwenReady?'Qwen 397B responde':'Arquitectura preparada'}</span></div><button type="button" onClick={close} aria-label="Cerrar Centro de Mando"><X/></button></header><div className="s6CommandBody"><nav className="s6CommandNav" aria-label="Secciones del Centro de Mando"><button className={view==='overview'?'active':''} onClick={()=>setView('overview')}><Gauge/><span>Resumen</span></button><button className={view==='architecture'?'active':''} onClick={()=>setView('architecture')}><Layers3/><span>Arquitectura</span></button><button className={view==='factory'?'active':''} onClick={()=>setView('factory')}><Rocket/><span>Fábrica neuronal</span></button></nav><main className="s6CommandMain">
+ {view==='overview'&&<div className="s6View s6Overview"><section className="s6CoreHero"><div className="s6CoreCopy"><div className="s6HeroState"><ModelState ready={qwenReady}/><span>Modelo abierto · {status.models.qwen397.license}</span></div><h1>Un cerebro grande.<br/>Una ruta verificable.</h1><p>Qwen3.5-397B-A17B dirige chat, visión y razonamiento. Cuando no está disponible, Héctor baja de nivel sin ocultar qué modelo respondió.</p><div className="s6HeroActions"><button className="primary" onClick={close}>Entrar a Héctor <ArrowRight/></button><button onClick={()=>setView('architecture')}>Ver arquitectura</button></div></div><div className={`s6CoreVisual ${qwenReady?'ready':''}`} aria-label="Núcleo Qwen 397B"><span className="s6Orbit one"/><span className="s6Orbit two"/><span className="s6Orbit three"/><div><BrainCircuit/><strong>397B</strong><small>17B activos</small></div></div><div className="s6CoreStats"><article><span>Parámetros</span><strong>{status.models.qwen397.totalParameters}</strong><small>MoE total</small></article><article><span>Activos</span><strong>{status.models.qwen397.activeParameters}</strong><small>por token</small></article><article><span>Contexto</span><strong>{compactNumber(status.models.qwen397.contextLength)}</strong><small>nativo</small></article></div></section><section className="s6OverviewGrid"><article className="s6RouteCard"><div className="s6SectionHead"><div><span>Ruta de inferencia</span><h2>Siempre sabes quién respondió</h2></div><Network/></div><div className="s6Route"><RouteNode kind="01" name="Qwen 397B" detail="Principal · multimodal · thinking" ready={qwenReady}/><RouteNode kind="02" name="Kimi K2.5" detail="Respaldo MoE de gran escala" ready={kimiReady}/><RouteNode kind="03" name="Workers AI" detail="Último fallback abierto" ready/></div></article><article className="s6ChampionCard"><div className="s6SectionHead"><div><span>Pesos propios</span><h2>Campeón actual</h2></div><ShieldCheck/></div><strong>{status.models.own.label}</strong><p>V41 permanece como campeón propio hasta que un adaptador sobre una base mayor lo supere con evidencia reproducible.</p><div className="s6ChampionMeta"><span>{status.models.own.runtimeId}</span><span>{status.models.own.mode}</span></div></article></section><section className="s6Bottleneck"><Zap/><div><span>Cuello de botella actual</span><strong>{bottleneck}</strong></div><button onClick={()=>setView('factory')}>Ver puertas <ArrowRight/></button></section></div>}
+ {view==='architecture'&&<div className="s6View"><div className="s6PageTitle"><span>Arquitectura operativa</span><h1>Capacidad máxima sin fingir el runtime.</h1><p>Cada nivel tiene una función definida, un estado visible y una condición explícita de activación.</p></div><section className="s6ModelMatrix"><article className="primary"><div className="s6ModelIcon"><BrainCircuit/></div><div className="s6ModelTitle"><span>Cerebro principal</span><h2>{status.models.qwen397.label}</h2><code>{status.models.qwen397.model}</code></div><ModelState ready={qwenReady}/><p>{status.models.qwen397.reason}</p><dl><div><dt>Total</dt><dd>{status.models.qwen397.totalParameters}</dd></div><div><dt>Activos</dt><dd>{status.models.qwen397.activeParameters}</dd></div><div><dt>Contexto</dt><dd>{compactNumber(status.models.qwen397.contextLength)}</dd></div><div><dt>Licencia</dt><dd>{status.models.qwen397.license}</dd></div></dl></article><article><div className="s6ModelIcon"><Network/></div><div className="s6ModelTitle"><span>Respaldo grande</span><h2>{status.models.kimi.label}</h2><code>{status.models.kimi.model}</code></div><ModelState ready={kimiReady}/><p>{status.models.kimi.reason}</p><dl><div><dt>Total</dt><dd>{status.models.kimi.totalParameters}</dd></div><div><dt>Activos</dt><dd>{status.models.kimi.activeParameters}</dd></div><div><dt>Contexto</dt><dd>{compactNumber(status.models.kimi.contextLength)}</dd></div><div><dt>Rol</dt><dd>Fallback</dd></div></dl></article><article><div className="s6ModelIcon"><Sparkles/></div><div className="s6ModelTitle"><span>Maestro</span><h2>{status.models.teacher.model}</h2><code>{status.models.teacher.provider}</code></div><ModelState ready/><p>Genera datos difíciles, verifica soluciones y cubre tareas que todavía superan al modelo propio.</p></article><article><div className="s6ModelIcon"><Cpu/></div><div className="s6ModelTitle"><span>Puente económico</span><h2>{status.models.open.model}</h2><code>{status.models.open.provider}</code></div><ModelState ready/><p>Valida formatos, scripts, routing y reanudación. No puede convertirse en el campeón final.</p></article></section><section className="s6TruthRule"><ShieldCheck/><div><strong>Regla de verdad del sistema</strong><p>La interfaz sólo muestra Qwen o Kimi como activos cuando su endpoint está configurado y responde. Todo fallback queda registrado.</p></div></section></div>}
+ {view==='factory'&&<div className="s6View"><div className="s6PageTitle"><span>Fábrica neuronal</span><h1>Cinco puertas antes de promover un nuevo cerebro.</h1><p>Una meta no cuenta como avance hasta que exista evidencia en el repositorio y pueda repetirse.</p></div><section className="s6Pipeline">{status.pipeline.map((item,index)=>{const known=typeof item.current==='number',percent=known?Math.max(0,Math.min(100,(item.current!/item.target)*100)):0;return <article key={item.id}><span className="s6PipelineNumber">0{index+1}</span><div className="s6PipelineCopy"><strong>{item.label}</strong><small>{known?`${item.current!.toLocaleString('es-MX')} de ${item.target.toLocaleString('es-MX')} ${item.unit}`:`Meta: ${item.target.toLocaleString('es-MX')}${item.stretchTarget?`–${item.stretchTarget.toLocaleString('es-MX')}`:''} ${item.unit}`}</small></div><span className={`s6Evidence ${known?'known':''}`}>{known?'Medido':'Sin manifiesto'}</span><div className={`s6Progress ${known?'known':''}`}><i style={{width:`${percent}%`}}/></div></article>})}</section><section className="s6PromotionRules"><div className="s6SectionHead"><div><span>Puerta de promoción</span><h2>Un empate no es progreso</h2></div><Target/></div><div className="s6RuleGrid"><article><strong>+{Math.round(status.promotion.minimumAbsoluteBenchmarkGain*100)} puntos</strong><small>ganancia absoluta mínima</small></article><article><strong>Varias capacidades</strong><small>no una sola prueba memorizada</small></article><article><strong>Réplica</strong><small>resultado reproducible</small></article><article><strong>Rollback</strong><small>regreso seguro a V41</small></article></div></section><p className="s6Principle">{status.principle}</p></div>}
+ </main></div></section></div>}</>;
 }
