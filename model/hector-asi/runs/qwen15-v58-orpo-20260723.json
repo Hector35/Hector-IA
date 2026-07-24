@@ -1,0 +1,27 @@
+{
+  "schemaVersion": 1,
+  "experimentId": "hector-asi-qwen15-v58-orpo",
+  "sourceRunId": 30056851709,
+  "sourceCommit": "1042fdafe5cddd2597098a852fe02ae56cfbf5cf",
+  "artifact": {
+    "id": 8583455221,
+    "name": "hector-asi-qwen15-v58-orpo-30056851709",
+    "digest": "sha256:7db81d4387d6e94ff8fe12ac4a84c7e1ddd4b9812d5cd49757ccec6d6acff367",
+    "expiresAt": "2026-10-22T00:40:21Z",
+    "adapterPath": "hector-asi-qwen15-v58-a/adapter/adapter_model.safetensors",
+    "adapterSha256": "382388b29a3947da7f0c713529314ae6776ab8a9a977602a4c131bf8e0657df0",
+    "adapterBytes": 73911112,
+    "replicasByteIdentical": true
+  },
+  "baseVsCandidate": {
+    "validationObjective": [2.4774484038352966, 2.4207305908203125],
+    "behaviorPassed": [11, 11],
+    "behaviorTotal": 18,
+    "criticalPassed": [6, 6],
+    "criticalTotal": 6,
+    "meanTokens": [20.88888888888889, 20.944444444444443],
+    "meanLatencyMs": [8012.4112032777775, 8181.940802111095]
+  },
+  "decision": "reject-and-retain-v41",
+  "reason": "No strict hidden behavioral improvement despite better validation objective and preserved safety/efficiency gates."
+}
