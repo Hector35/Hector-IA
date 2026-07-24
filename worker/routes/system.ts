@@ -3,9 +3,12 @@ import type {Bindings,Variables} from '../types';
 import {requireAuth} from '../lib/auth';
 import {SYSTEM_VERSION,RELEASED_AT,RELEASE_CHANGES,VERIFIED_CAPABILITIES,CURRENT_LIMITATIONS,shortImprovementPrompt} from '../intelligence/system-manifest';
 import {renderEvidenceSelfAnalysis} from '../intelligence/self-report';
+import {stageSixStatus} from '../intelligence/stage-six';
 
 export const systemInfo=new Hono<{Bindings:Bindings;Variables:Variables}>();
 systemInfo.use('*',requireAuth);
+
+systemInfo.get('/stage-6',c=>c.json(stageSixStatus(c.env)));
 
 systemInfo.get('/report',async c=>{
   const userId=c.get('userId');
@@ -24,7 +27,7 @@ systemInfo.get('/report',async c=>{
     '',
     'Todavía no existe una autoevaluación ejecutada. Escribe **“autoevalúate”** para generar pruebas, evidencia y un prompt de mejora.'
   ].join('\n');
-  return c.json({version:SYSTEM_VERSION,releasedAt:RELEASED_AT,changes:RELEASE_CHANGES,capabilities:VERIFIED_CAPABILITIES,limitations:CURRENT_LIMITATIONS,evaluation,prompt:shortImprovementPrompt(gaps),text});
+  return c.json({version:SYSTEM_VERSION,releasedAt:RELEASED_AT,changes:RELEASE_CHANGES,capabilities:VERIFIED_CAPABILITIES,limitations:CURRENT_LIMITATIONS,evaluation,prompt:shortImprovementPrompt(gaps),stageSix:stageSixStatus(c.env),text});
 });
 
 systemInfo.get('/model',async c=>{
@@ -32,6 +35,7 @@ systemInfo.get('/model',async c=>{
   const metadata=latest?.metadata_json?JSON.parse(latest.metadata_json):{};
   return c.json({
     current:{provider:latest?.provider||null,model:latest?.model||null,service:latest?.service||null,createdAt:latest?.created_at||null,tier:metadata.tier||null,reason:metadata.providerReason||metadata.reason||null,fallback:!!metadata.fallback},
-    configured:{cloudflare:c.env.CLOUDFLARE_AI_ENABLED!=='false'?c.env.CLOUDFLARE_MODEL_FAST||'@cf/meta/llama-3.1-8b-instruct-fast':null,openaiFast:c.env.OPENAI_MODEL_FAST||c.env.OPENAI_MODEL,openaiBalanced:c.env.OPENAI_MODEL_BALANCED||c.env.OPENAI_MODEL,openaiReasoning:c.env.OPENAI_MODEL_REASONING||c.env.OPENAI_MODEL}
+    configured:{cloudflare:c.env.CLOUDFLARE_AI_ENABLED!=='false'?c.env.CLOUDFLARE_MODEL_FAST||'@cf/meta/llama-3.1-8b-instruct-fast':null,openaiFast:c.env.OPENAI_MODEL_FAST||c.env.OPENAI_MODEL,openaiBalanced:c.env.OPENAI_MODEL_BALANCED||c.env.OPENAI_MODEL,openaiReasoning:c.env.OPENAI_MODEL_REASONING||c.env.OPENAI_MODEL},
+    stageSix:stageSixStatus(c.env)
   });
 });
