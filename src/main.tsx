@@ -1,18 +1,12 @@
-// Hector ASI Stage 6: hybrid maximum-intelligence operation with visible, verifiable status.
 import React from 'react';
 import ReactDOM from 'react-dom/client';
 import {HectorASIEvolutionApp} from './HectorASIEvolutionApp';
-import {StageSixShell} from './StageSixShell';
-import './hector-asi.css';
 import './hector-asi-markdown.css';
-import './hector-asi-operations.css';
-import './hector-asi-evolution.css';
-import './hector-asi-evolution-compact.css';
-import './stage-six.css';
+import './hector-reboot.css';
 
 ReactDOM.createRoot(document.getElementById('root')!).render(
   <React.StrictMode>
-    <StageSixShell><HectorASIEvolutionApp/></StageSixShell>
+    <HectorASIEvolutionApp/>
   </React.StrictMode>
 );
 
