@@ -26,15 +26,14 @@ describe('free-first call governor',()=>{
   expect(decideCallBudget({prompt:complex,reuse:'escalate',requestedPasses:3,reasoningLevel:'high'}).maxAdvancedCalls).toBe(3);
  });
 
- it('deduplica inferencias idénticas entre solicitudes distintas',async()=>{
+ it('deduplica inferencias idénticas entre solicitudes distintas sin ventana de carrera',async()=>{
   const decision=decideCallBudget({prompt:'valida datos',reuse:'escalate',requestedPasses:1,reasoningLevel:'auto'});
   const firstGovernor=createCallGovernor(decision),secondGovernor=createCallGovernor(decision);
   let release=()=>{};const gate=new Promise<void>(resolve=>{release=resolve;});
   const execute=vi.fn(async()=>{await gate;return'ok';});
   const first=firstGovernor.advanced({key:'same',justification:'resolver',execute});
-  await new Promise(resolve=>setTimeout(resolve,0));
   const second=secondGovernor.advanced({key:'same',justification:'resolver',execute});
-  await new Promise(resolve=>setTimeout(resolve,0));
+  expect(execute).toHaveBeenCalledTimes(1);
   release();
   expect(await Promise.all([first,second])).toEqual(['ok','ok']);
   expect(execute).toHaveBeenCalledTimes(1);

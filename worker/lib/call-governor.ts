@@ -46,17 +46,16 @@ export async function governExecutionPlan(plan:ExecutionPlan,input:{prompt:strin
  return{plan:governed,decision};
 }
 
-async function stableKey(value:string){
- const digest=await crypto.subtle.digest('SHA-256',new TextEncoder().encode(value));
- return[...new Uint8Array(digest)].map(item=>item.toString(16).padStart(2,'0')).join('');
-}
-
 export function createCallGovernor(decision:CallGovernorDecision){
  const metrics:CallGovernorMetrics={advancedCalls:0,deduplicatedCalls:0,blockedCalls:0,requestedPasses:decision.requestedPasses,executedPasses:0,estimatedAdvancedCallsSaved:decision.estimatedAdvancedCallsSaved,justifications:[decision.justification]};
  return{
   metrics,
   async advanced<T>(input:{key:string;justification:string;execute:()=>Promise<T>}):Promise<T>{
-   const key=await stableKey(input.key);
+   // The caller-provided key is already the identity contract for deduplication.
+   // Looking it up synchronously is essential: hashing it asynchronously created a
+   // race where two equal requests could both pass the lookup before either one
+   // registered its pending promise.
+   const key=input.key;
    const existing=SHARED_INFLIGHT.get(key) as Promise<T>|undefined;
    if(existing){metrics.deduplicatedCalls++;metrics.estimatedAdvancedCallsSaved+=decision.allowedPasses;metrics.justifications.push(`Inferencia en vuelo reutilizada: ${input.justification}`);return existing;}
    if(metrics.advancedCalls>=decision.maxAdvancedCalls){metrics.blockedCalls++;throw new Error(`Call governor bloqueó una inferencia avanzada redundante: ${input.justification}`);}
