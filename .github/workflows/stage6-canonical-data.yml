@@ -41,18 +41,25 @@ jobs:
       - uses: actions/setup-python@v5
         with:
           python-version: '3.11'
-      - name: Repair deterministic math uniqueness
+      - name: Repair deterministic generator invariants
         run: |
           python - <<'PY'
           from pathlib import Path
           path=Path('model/hector-asi/data/stage6/generate-canonical-20260724.mjs')
           text=path.read_text()
-          old="for(let i=0;i<160;i++){const item=mathFamilies[i%mathFamilies.length](i);addSft({id:`stage6-math-${String(i+1).padStart(3,'0')}`,capability:'mathematics',user:item.user,assistant:item.assistant,verification:{type:'exact-structured',expected:item.expected},family:item.family,index:i});}"
-          new="const mathPromptSet=new Set();\nfor(let candidate=0,accepted=0;accepted<160;candidate++){const item=mathFamilies[candidate%mathFamilies.length](candidate),key=normalize(item.user);if(mathPromptSet.has(key))continue;mathPromptSet.add(key);addSft({id:`stage6-math-${String(accepted+1).padStart(3,'0')}`,capability:'mathematics',user:item.user,assistant:item.assistant,verification:{type:'exact-structured',expected:item.expected},family:item.family,index:accepted});accepted++;}"
-          if old in text:
-              path.write_text(text.replace(old,new))
-          elif new not in text:
+          old_loop="for(let i=0;i<160;i++){const item=mathFamilies[i%mathFamilies.length](i);addSft({id:`stage6-math-${String(i+1).padStart(3,'0')}`,capability:'mathematics',user:item.user,assistant:item.assistant,verification:{type:'exact-structured',expected:item.expected},family:item.family,index:i});}"
+          new_loop="const mathPromptSet=new Set();\nfor(let candidate=0,accepted=0;accepted<160;candidate++){const item=mathFamilies[candidate%mathFamilies.length](candidate),key=normalize(item.user);if(mathPromptSet.has(key))continue;mathPromptSet.add(key);addSft({id:`stage6-math-${String(accepted+1).padStart(3,'0')}`,capability:'mathematics',user:item.user,assistant:item.assistant,verification:{type:'exact-structured',expected:item.expected},family:item.family,index:accepted});accepted++;}"
+          if old_loop in text:
+              text=text.replace(old_loop,new_loop)
+          elif new_loop not in text:
               raise SystemExit('No se encontró el bucle matemático esperado')
+          old_sha="const sha=value=>createHash('sha256').update(typeof value==='string'?value:JSON.stringify(value)).digest('hex');"
+          new_sha=old_sha+"\nconst fileSha=path=>createHash('sha256').update(readFileSync(path)).digest('hex');"
+          if 'const fileSha=' not in text:
+              if old_sha not in text: raise SystemExit('No se encontró helper SHA esperado')
+              text=text.replace(old_sha,new_sha)
+          text=text.replace("sha256:{sft:sha(readFileSync(sftPath)),preference:sha(readFileSync(prefPath))}","sha256:{sft:fileSha(sftPath),preference:fileSha(prefPath)}")
+          path.write_text(text)
           PY
       - name: Materialize deterministic corpus
         id: generate
