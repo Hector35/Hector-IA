@@ -42,6 +42,8 @@ function chatEndpoint(baseUrl:string){
   return `${normalized}/v1/chat/completions`;
 }
 
+type QwenContent=string|Array<{type:'text';text:string}|{type:'image_url';image_url:{url:string}}>;
+type QwenMessage={role:'system'|'user'|'assistant';content:QwenContent};
 type QwenChatResponse={
   id?:string;
   choices?:Array<{message?:{content?:string;reasoning_content?:string}}>;
@@ -49,7 +51,7 @@ type QwenChatResponse={
   error?:string|{message?:string};
 };
 
-export async function callQwen397(env:Bindings,instructions:string,messages:Array<{role:'user'|'assistant';content:string}>){
+async function requestQwen397(env:Bindings,messages:QwenMessage[],maxTokens:number){
   if(env.QWEN_397B_ENABLED==='false')throw new Error('Qwen 397B está desactivado');
   if(!hasQwen397Endpoint(env))throw new Error('Qwen 397B está integrado, pero falta conectar su endpoint');
   const configured=Number(env.QWEN_397B_TIMEOUT_MS);
@@ -61,14 +63,7 @@ export async function callQwen397(env:Bindings,instructions:string,messages:Arra
     const response=await fetch(chatEndpoint(env.QWEN_397B_BASE_URL!),{
       method:'POST',
       headers:{Authorization:`Bearer ${env.QWEN_397B_TOKEN!.trim()}`,'Content-Type':'application/json'},
-      body:JSON.stringify({
-        model,
-        messages:[{role:'system',content:instructions},...messages],
-        max_tokens:4096,
-        temperature:.6,
-        top_p:.95,
-        stream:false
-      }),
+      body:JSON.stringify({model,messages,max_tokens:maxTokens,temperature:.6,top_p:.95,stream:false}),
       signal:controller.signal
     });
     const data=await response.json() as QwenChatResponse;
@@ -90,4 +85,16 @@ export async function callQwen397(env:Bindings,instructions:string,messages:Arra
   }finally{
     clearTimeout(timer);
   }
+}
+
+export function callQwen397(env:Bindings,instructions:string,messages:Array<{role:'user'|'assistant';content:string}>){
+  return requestQwen397(env,[{role:'system',content:instructions},...messages],4096);
+}
+
+export function callQwen397Vision(env:Bindings,prompt:string,dataUrl:string){
+  const system='Eres el cerebro visual principal de Hector ASI. Analiza la imagen con precisión, distingue observaciones de inferencias y responde en español salvo petición contraria.';
+  return requestQwen397(env,[
+    {role:'system',content:system},
+    {role:'user',content:[{type:'text',text:prompt},{type:'image_url',image_url:{url:dataUrl}}]}
+  ],2048);
 }
