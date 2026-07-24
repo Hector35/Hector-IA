@@ -4,6 +4,9 @@ on:
   push:
     branches:
       - ui-rebuild/20260724-brutal
+  pull_request:
+    branches:
+      - main
   workflow_dispatch:
 
 permissions:
@@ -28,7 +31,7 @@ jobs:
           set +e
           npm test > /tmp/hector-test.log 2>&1
           status=$?
-          tail -n 220 /tmp/hector-test.log
+          tail -n 160 /tmp/hector-test.log
           exit $status
       - name: Build
         if: success()
