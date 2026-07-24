@@ -1,0 +1,120 @@
+name: Hector main QLoRA
+
+on:
+  workflow_dispatch:
+    inputs:
+      train_path:
+        description: Canonical train JSONL path
+        required: true
+        default: model/hector-asi/data/canonical/train.jsonl
+      validation_path:
+        description: Canonical validation JSONL path
+        required: true
+        default: model/hector-asi/data/canonical/validation.jsonl
+      hidden_path:
+        description: Benchmark V2 hidden JSONL path
+        required: true
+        default: model/hector-asi/evals/benchmark-v2/hidden.jsonl
+      persistent_root:
+        description: Persistent directory on the attached GPU runner
+        required: true
+        default: /opt/hector-training
+      resume:
+        description: Resume latest persistent checkpoint
+        required: true
+        default: true
+        type: boolean
+
+permissions:
+  contents: read
+
+concurrency:
+  group: hector-main-qlora
+  cancel-in-progress: false
+
+jobs:
+  syntax-and-data-gates:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+      - name: Compile scale pipeline
+        run: python -m py_compile model/hector-asi/scale/probe_compute.py model/hector-asi/scale/probe_resume.py model/hector-asi/scale/preflight.py model/hector-asi/scale/train_qlora_main.py
+      - name: Verify canonical data gates before requesting GPU
+        env:
+          TRAIN_PATH: ${{ inputs.train_path }}
+          VALIDATION_PATH: ${{ inputs.validation_path }}
+          HIDDEN_PATH: ${{ inputs.hidden_path }}
+        run: |
+          python - <<'PY'
+          import json, os
+          from pathlib import Path
+          paths={k:Path(v) for k,v in {'train':os.environ['TRAIN_PATH'],'validation':os.environ['VALIDATION_PATH'],'hidden':os.environ['HIDDEN_PATH']}.items()}
+          counts={}
+          for name,path in paths.items():
+              if not path.is_file(): raise SystemExit(f'missing {name}: {path}')
+              counts[name]=sum(1 for line in path.read_text().splitlines() if line.strip() and not json.loads(line) is None)
+          print(counts)
+          assert counts['train']>=10000, counts
+          assert counts['validation']>0, counts
+          assert counts['hidden']>=500, counts
+          PY
+
+  gpu-main-run:
+    needs: syntax-and-data-gates
+    runs-on: [self-hosted, linux, x64, gpu]
+    timeout-minutes: 1440
+    env:
+      HECTOR_TRAINING_ROOT: ${{ inputs.persistent_root }}
+      HF_HOME: ${{ inputs.persistent_root }}/hf-cache
+      TOKENIZERS_PARALLELISM: 'true'
+      PYTHONUNBUFFERED: '1'
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+      - name: Install pinned training stack
+        run: pip install --upgrade pip && pip install -r model/hector-asi/scale/requirements.txt
+      - name: Probe GPU and persistent resume storage
+        run: |
+          mkdir -p artifacts "$HECTOR_TRAINING_ROOT"
+          python model/hector-asi/scale/probe_compute.py --output artifacts/compute-probe.json
+          python model/hector-asi/scale/probe_resume.py --root "$HECTOR_TRAINING_ROOT" --output artifacts/resume-probe.json
+      - name: Enforce all main-run gates
+        run: |
+          python model/hector-asi/scale/preflight.py \
+            --config model/hector-asi/scale/qwen3-8b-main.json \
+            --train "${{ inputs.train_path }}" \
+            --validation "${{ inputs.validation_path }}" \
+            --hidden "${{ inputs.hidden_path }}" \
+            --probe artifacts/compute-probe.json \
+            --resume-probe artifacts/resume-probe.json \
+            --output artifacts/main-run-preflight.json
+      - name: Train resumable QLoRA candidate
+        run: |
+          python model/hector-asi/scale/train_qlora_main.py \
+            --config model/hector-asi/scale/qwen3-8b-main.json \
+            --train "${{ inputs.train_path }}" \
+            --validation "${{ inputs.validation_path }}" \
+            --hidden "${{ inputs.hidden_path }}" \
+            --output "$HECTOR_TRAINING_ROOT/qwen3-8b-main" \
+            ${{ inputs.resume && '--resume' || '' }}
+      - name: Collect immutable evidence
+        if: always()
+        run: |
+          mkdir -p artifacts/qwen3-8b-main
+          cp -f "$HECTOR_TRAINING_ROOT/qwen3-8b-main/run-manifest.json" artifacts/qwen3-8b-main/ 2>/dev/null || true
+          cp -rf "$HECTOR_TRAINING_ROOT/qwen3-8b-main/adapter" artifacts/qwen3-8b-main/ 2>/dev/null || true
+      - name: Upload evidence and adapter
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: hector-qwen3-8b-main-${{ github.run_id }}
+          path: artifacts/
+          if-no-files-found: error
+          retention-days: 90
+          compression-level: 0
