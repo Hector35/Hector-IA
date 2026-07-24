@@ -1,4 +1,5 @@
 import {describe,expect,it} from 'vitest';
+import {SYSTEM_VERSION} from './system-manifest';
 import {renderEvidenceSelfAnalysis} from './self-report';
 
 describe('renderEvidenceSelfAnalysis',()=>{
@@ -15,7 +16,8 @@ describe('renderEvidenceSelfAnalysis',()=>{
       averageLatencyMs:123,
       prompt:'Corrige la verificación con pruebas reproducibles.'
     });
-    expect(text).toContain('Héctor OS 2.6.0');
+    expect(text).toContain(`Héctor OS ${SYSTEM_VERSION}`);
+    expect(text).toContain('Etapa 6');
     expect(text).toContain('✓ **identidad**');
     expect(text).toContain('✗ **verificación**');
     expect(text).toContain('La introspección libre del modelo no cuenta como evidencia');
