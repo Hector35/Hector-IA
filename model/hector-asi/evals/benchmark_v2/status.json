@@ -1,12 +1,14 @@
 {
-  "schemaVersion": 1,
+  "schemaVersion": 2,
   "stage": 6,
   "component": "benchmark",
   "benchmarkVersion": "2.1.0",
-  "status": "candidate-ready-for-ci",
+  "status": "sealed-awaiting-model-runs",
   "historicalEquivalenceResolved": true,
+  "historicalResolution": "11/18 and 10/18 are separate non-comparable evaluations; neither is a Benchmark V2 score.",
   "hiddenCases": 512,
   "hiddenTarget": 1000,
+  "hiddenSha256": "generated-and-verified-by-hector-benchmark-v2-workflow",
   "categories": {
     "mathematics": 64,
     "code": 64,
@@ -15,39 +17,30 @@
     "causality": 64,
     "calibration": 64,
     "metacognition": 64,
-    "transfer": 64
+    "transfer": 64,
+    "multimodal": 0
   },
-  "verifiers": [
-    "numeric",
-    "python_function",
-    "structured_rubric"
-  ],
+  "multimodalStatus": "not-counted-until-image-assets-and-ground-truth-are-sealed",
+  "verifiers": ["numeric","python_function","structured_rubric"],
+  "scoringReady": true,
+  "scorerRevision": "hector-benchmark-v2-structured-3",
+  "contaminationToolReady": true,
   "requiredComparisons": [
-    "qwen25-15b-base",
-    "hector-asi-qwen15-v15",
-    "hector-asi-qwen15-v41",
-    "qwen3-8b-base"
+    {"id":"qwen25-15b-base","status":"pending"},
+    {"id":"hector-asi-qwen15-v15","status":"pending-artifact-run"},
+    {"id":"hector-asi-qwen15-v41","status":"pending-artifact-run"},
+    {"id":"qwen3-8b-base","status":"pending-endpoint-or-local-run"},
+    {"id":"qwen35-397b-base","status":"pending-verified-endpoint","attributionRule":"reject fallback or mismatched effective model"},
+    {"id":"kimi-k2.5","status":"pending-verified-endpoint","attributionRule":"reject fallback or mismatched effective model"}
   ],
+  "results": {},
   "trainingGates": {
-    "minimumHiddenCases": {
-      "target": 500,
-      "current": 512,
-      "open": true
-    },
-    "v41Below85Percent": {
-      "status": "pending-evaluation",
-      "open": false
-    },
-    "minimumTrainableV41Failures": {
-      "target": 100,
-      "current": 0,
-      "status": "pending-evaluation",
-      "open": false
-    },
-    "contaminationCheck": {
-      "status": "pending-canonical-corpus",
-      "open": false
-    }
+    "minimumHiddenCases": {"target":500,"current":512,"open":true},
+    "v41Below85Percent": {"status":"pending-canonical-v41-run","open":false},
+    "minimumTrainableV41Failures": {"target":100,"current":0,"status":"pending-canonical-v41-run","open":false},
+    "contaminationCheck": {"status":"tool-ready-awaiting-canonical-corpus","open":false},
+    "effectiveModelIdentity": {"status":"required-for-every-remote-model","open":false}
   },
-  "nextAction": "Run CI to seal the benchmark, then evaluate V41 once under the frozen environment."
+  "trainingAuthorized": false,
+  "nextAction": "Materialize the sealed 512-case artifact, run V41 exactly once with its adapter hash recorded, score with score_responses.py, then publish its failures only after the contamination gate is clean."
 }
