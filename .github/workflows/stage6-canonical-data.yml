@@ -76,7 +76,26 @@ jobs:
         if: steps.generate.outputs.status != '0'
         run: exit 1
       - name: Execute validators and 160 Python test suites
-        run: python model/hector-asi/data/stage6/verify-canonical-20260724.py
+        id: verify
+        shell: bash
+        run: |
+          set +e
+          python model/hector-asi/data/stage6/verify-canonical-20260724.py > verifier.log 2>&1
+          status=$?
+          cat verifier.log
+          echo "status=$status" >> "$GITHUB_OUTPUT"
+          exit 0
+      - name: Upload verifier diagnostics
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: stage6-verifier-log-${{ github.run_id }}
+          path: verifier.log
+          if-no-files-found: error
+          retention-days: 7
+      - name: Fail when verification failed
+        if: steps.verify.outputs.status != '0'
+        run: exit 1
       - name: Validate repository contracts
         run: |
           npm ci
