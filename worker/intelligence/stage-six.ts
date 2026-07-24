@@ -33,7 +33,7 @@ export function stageSixStatus(env:Bindings){
       balanced:{provider:'openai',model:env.OPENAI_MODEL_BALANCED||env.OPENAI_MODEL,role:'respaldo equilibrado'},
       fast:{provider:'openai',model:env.OPENAI_MODEL_FAST||env.OPENAI_MODEL,role:'ruta rápida disponible'},
       open:{provider:'huggingface',model:env.HECTOR_QWEN_MODEL||STAGE_SIX.targetOpenModel,role:'cerebro abierto de transición'},
-      own:{...chatChampionEvidence(),role:'cerebro propio en crecimiento',mode:ownMode,enabled:env.HECTOR_CUSTOM_MODEL_ENABLED==='true'}
+      own:{...chatChampionEvidence(),label:CHAT_CHAMPION.label,role:'cerebro propio en crecimiento',mode:ownMode,enabled:env.HECTOR_CUSTOM_MODEL_ENABLED==='true'}
     },
     pipeline:[
       {id:'data',label:'Corpus verificable',target:STAGE_SIX.targets.corpusExamples,unit:'ejemplos'},
