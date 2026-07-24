@@ -1,9 +1,27 @@
 import {FormEvent,useEffect,useMemo,useRef,useState} from 'react';
-import {Activity,ArrowUp,Brain,Check,Clock3,Database,File,GitBranch,History,Lock,LogOut,Network,Paperclip,Plus,Sparkles,Target,Trophy,X,Zap} from 'lucide-react';
+import {
+  Activity,
+  ArrowUp,
+  Check,
+  Clock3,
+  Cpu,
+  Database,
+  FileText,
+  Folder,
+  History,
+  LogOut,
+  MessageSquare,
+  Network,
+  Paperclip,
+  Plus,
+  Shield,
+  Target,
+  X
+} from 'lucide-react';
 import {api,type User} from './api';
 import {MarkdownMessage} from './MarkdownMessage';
-import {AutonomousActivity,executeOperation} from './hector-asi-operations';
-import modelRegistryJson from '../model/hector-asi/model-registry.json';
+
+type View='chat'|'system'|'history'|'files';
 
 type ChatMessage={
   id?:string;
@@ -18,210 +36,47 @@ type ChatMessage={
 };
 
 type PendingAttachment={file:File;preview?:string};
-type Overlay='history'|'account'|'evolution'|null;
-type EvolutionState='active'|'forming'|'locked';
 
-type RegistryCandidate={
-  id:string;
-  status:string;
-  baseModel?:{repository?:string;revision?:string;license?:string};
-  method?:{stage?:string;adapter?:string;precision?:string};
-  dataset?:{path?:string;manifest?:string;containsPrivateUserData?:boolean};
-  artifacts?:{adapterPath?:string;metricsPath?:string;storage?:string;committedToGit?:boolean};
-  promotionGate?:{
-    minimumHeldOutImprovement?:number;
-    maximumSecondaryRegression?:number;
-    criticalRegressionsAllowed?:number;
-    requiresReproducibleRun?:boolean;
-    requiresRollbackArtifact?:boolean;
+type StageStatus={
+  stage?:number;
+  name?:string;
+  status?:string;
+  principle?:string;
+  reasoning?:{effort?:string;deliberation?:string;description?:string};
+  models?:{
+    qwen397?:{label?:string;model?:string;endpointConfigured?:boolean;mode?:string;reason?:string;totalParameters?:string;activeParameters?:string;contextLength?:number};
+    kimi?:{label?:string;model?:string;endpointConfigured?:boolean;mode?:string;reason?:string};
+    open?:{model?:string;role?:string};
+    own?:{label?:string;runtimeId?:string;mode?:string;enabled?:boolean};
+    teacher?:{model?:string;provider?:string;role?:string};
   };
+  pipeline?:Array<{id:string;label:string;target:number;stretchTarget?:number;unit:string;observed?:number}>;
 };
 
-type ModelRegistry={
-  schemaVersion?:string;
-  project?:string;
-  champion?:string|{id?:string}|null;
-  candidates?:RegistryCandidate[];
-};
+const nav:Array<{id:View;label:string;icon:typeof MessageSquare}>=[
+  {id:'chat',label:'Chat',icon:MessageSquare},
+  {id:'system',label:'Sistema',icon:Activity},
+  {id:'history',label:'Historial',icon:History},
+  {id:'files',label:'Archivos',icon:Folder}
+];
 
-type SelfModel={
-  identity?:{name?:string;knowledgeVersion?:string;knowledgeVerifiedAt?:string};
-  runtime?:{
-    memories?:number;
-    workJobs?:{total?:number;completed?:number;blocked?:number};
-    scheduledTasks?:{total?:number;active?:number};
-    responseTraces?:number;
-    activeSystemContexts?:number;
-    latestEvaluation?:{score?:number;grade?:string;model?:string;created_at?:string}|null;
-  };
-  capabilities?:Array<{capability:string;components?:string[];evidence?:string;limit?:string}>;
-};
-
-type EvolutionModule={id:string;label:string;detail:string;state:EvolutionState};
-
-type EvolutionModel={
-  candidate:RegistryCandidate|null;
-  championId:string|null;
-  generation:string;
-  stage:string;
-  baseName:string;
-  methodName:string;
-  signature:string;
-  modules:EvolutionModule[];
-};
-
-type VisibleMilestone={title:string;detail:string};
-
-const modelRegistry=modelRegistryJson as ModelRegistry;
-
-async function jsonFetch(path:string,init?:RequestInit){
-  const response=await fetch(path,{credentials:'include',...init,headers:{'Content-Type':'application/json',...(init?.headers||{})}});
-  const data=await response.json().catch(()=>({}));
-  if(!response.ok)throw new Error(data.error||'No disponible');
-  return data;
-}
-
-function asksForModel(value:string){
-  return /(?:qué|que|cuál|cual).{0,30}(?:modelo|proveedor)|modelo.{0,20}(?:usas|usaste|utilizaste)|quién me respondió|quien me respondio/i.test(value);
-}
-
-function asksForOwnModelDevelopment(value:string){
-  return /(?:se|est[aá]).{0,24}(?:desarrollando|entrenando|creando).{0,36}(?:modelo|red neuronal)|(?:modelo|red neuronal).{0,28}(?:propio|de h[eé]ctor|hector asi)|como modelo/i.test(value);
-}
-
-function asksForSystemReport(value:string){
-  return /actualizaci[oó]n|qu[eé] cambi[oó]|qu[eé] puedes hacer ahora|limitaciones|autoanal[ií]za|autoeval[uú]a|problemas por resolver|estado del sistema/i.test(value);
-}
-
-function championId(value:ModelRegistry['champion']){
-  if(typeof value==='string')return value;
-  return value?.id||null;
-}
-
-function shortModelName(repository?:string){
-  if(!repository)return'Modelo base sin registrar';
-  return repository.split('/').filter(Boolean).at(-1)||repository;
-}
-
-function statusLabel(status?:string){
-  const labels:Record<string,string>={
-    planned:'Preparando primer candidato',
-    data_ready:'Datos listos para entrenamiento',
-    training:'Entrenando candidato',
-    trained:'Entrenamiento terminado',
-    evaluating:'Comprobando capacidades',
-    evaluated:'Candidato evaluado',
-    promoted:'Nueva generación promovida',
-    rejected:'Candidato descartado sin degradar al campeón'
-  };
-  return labels[status||'']||'Construyendo la primera generación';
-}
-
-function plainCapability(value:string){
-  const names:Record<string,string>={
-    'Identidad y autoconocimiento':'Conoce su estado',
-    'Memoria personal':'Recuerda contexto',
-    'Inteligencia alta multiagente':'Usa varios agentes',
-    'Programación autónoma':'Mejora su código',
-    'Investigación actual':'Investiga en la web',
-    'Trabajo programado':'Trabaja por ciclos',
-    'Archivos y evidencia':'Usa archivos',
-    'Aprendizaje correctivo':'Aprende de fallos'
-  };
-  return names[value]||value;
-}
-
-function visibleAchievement(evolution:EvolutionModel,selfModel?:SelfModel|null):VisibleMilestone{
-  const status=evolution.candidate?.status;
-  if(evolution.championId)return{title:'Primera generación promovida',detail:`${evolution.championId} ya superó sus pruebas y quedó como campeón.`};
-  if(status==='evaluated')return{title:'Candidato evaluado',detail:'La comparación ya terminó y está listo para una decisión de promoción.'};
-  if(status==='evaluating')return{title:'Evaluación en marcha',detail:'El candidato se está intentando refutar antes de permitirle avanzar.'};
-  if(status==='trained')return{title:'Primer entrenamiento terminado',detail:'Ya existe un candidato que puede compararse contra la base.'};
-  if(status==='training')return{title:'Entrenamiento real iniciado',detail:'Los adaptadores del primer candidato se están ajustando.'};
-  const dataReady=evolution.modules.find(item=>item.id==='data')?.state==='active';
-  const evaluationReady=evolution.modules.find(item=>item.id==='evaluation')?.state==='active';
-  if(dataReady&&evaluationReady)return{title:'Datos y pruebas preparados',detail:'El primer candidato ya tiene dataset versionado y reglas para demostrar si mejora.'};
-  const count=selfModel?.capabilities?.length||0;
-  if(count>0)return{title:`${count} capacidades operativas activas`,detail:'La app ya puede mostrar qué hace el sistema mientras nace el primer modelo propio.'};
-  return{title:'Núcleo conectado',detail:'La base abierta del modelo ya está registrada y lista para evolucionar.'};
-}
-
-function nextEvolution(evolution:EvolutionModel):VisibleMilestone{
-  const status=evolution.candidate?.status;
-  if(evolution.championId)return{title:'Superar al campeón actual',detail:'La siguiente generación solo aparecerá si gana sin regresiones críticas.'};
-  if(status==='evaluated')return{title:'Promover o descartar',detail:'Solo se desbloqueará un campeón si la evidencia demuestra una mejora real.'};
-  if(status==='evaluating')return{title:'Superar las pruebas ocultas',detail:'Debe mejorar frente a la base y conservar las capacidades secundarias.'};
-  if(status==='trained')return{title:'Comprobar el candidato',detail:'Se medirá contra la base con pruebas no vistas.'};
-  if(status==='training')return{title:'Completar el entrenamiento',detail:'Después se medirá antes de permitirle crecer.'};
-  if(status==='data_ready')return{title:'Iniciar el primer entrenamiento',detail:'Los datos ya están listos para producir el primer candidato.'};
-  return{title:'Entrenar el primer candidato',detail:'Al terminar, se comparará contra la base y solo avanzará si gana.'};
-}
-
-function ownModelDevelopmentAnswer(evolution:EvolutionModel){
-  const candidate=evolution.candidate;
-  const dataset=candidate?.dataset?.manifest?'sí, versionado':'todavía no registrado';
-  const gates=candidate?.promotionGate?'sí, definidas':'todavía no definidas';
-  return `## Sí: Hector ASI tiene un modelo propio en desarrollo\n\n- **Base abierta:** ${candidate?.baseModel?.repository||evolution.baseName}\n- **Adaptación:** ${evolution.methodName}\n- **Estado real:** ${evolution.stage}\n- **Dataset:** ${dataset}\n- **Pruebas de promoción:** ${gates}\n- **Campeón propio:** ${evolution.championId||'aún no existe'}\n\nEl chat productivo todavía puede usar modelos externos mientras el candidato propio se entrena y demuestra que mejora. No se declarará como modelo de Hector hasta superar evaluación y promoción.`;
-}
-
-function buildEvolution(selfModel?:SelfModel|null):EvolutionModel{
-  const candidates=modelRegistry.candidates||[];
-  const candidate=candidates[0]||null;
-  const champion=championId(modelRegistry.champion);
-  const status=candidate?.status||'planned';
-  const trainingActive=['training','trained','evaluating','evaluated','promoted'].includes(status);
-  const trainingLocked=status==='rejected';
-  const systemCapabilities=selfModel?.capabilities?.length||0;
-  const baseName=shortModelName(candidate?.baseModel?.repository);
-  const methodName=[candidate?.method?.adapter?.toUpperCase(),candidate?.method?.stage?.toUpperCase()].filter(Boolean).join(' + ')||'Método por definir';
-  const modules:EvolutionModule[]=[
-    {id:'core',label:'Núcleo',detail:baseName,state:candidate?.baseModel?.repository?'active':'locked'},
-    {id:'data',label:'Datos',detail:candidate?.dataset?.manifest?'Dataset versionado':'Sin dataset registrado',state:candidate?.dataset?.manifest?'active':'locked'},
-    {id:'training',label:'Entrenamiento',detail:methodName,state:trainingLocked?'locked':trainingActive?'active':'forming'},
-    {id:'evaluation',label:'Evaluación',detail:candidate?.promotionGate?'Puertas de promoción definidas':'Sin reglas registradas',state:candidate?.promotionGate?'active':'locked'},
-    {id:'system',label:'Sistema cognitivo',detail:selfModel?`${systemCapabilities} capacidades documentadas`:'Leyendo estado real',state:selfModel?'active':'forming'},
-    {id:'champion',label:'Campeón',detail:champion||'Aún no existe una versión promovida',state:champion?'active':'locked'}
-  ];
-  return{
-    candidate,
-    championId:champion,
-    generation:champion?champion:'Generación de origen',
-    stage:champion?`Campeón activo · ${statusLabel(status)}`:statusLabel(status),
-    baseName,
-    methodName,
-    signature:JSON.stringify({
-      schema:modelRegistry.schemaVersion,
-      champion:modelRegistry.champion,
-      candidates:candidates.map(item=>({id:item.id,status:item.status,base:item.baseModel?.repository,method:item.method})),
-      capabilities:selfModel?.capabilities?.map(item=>item.capability)||[],
-      latestEvaluation:selfModel?.runtime?.latestEvaluation||null
-    }),
-    modules
-  };
+function messageModel(message?:ChatMessage){
+  if(!message)return{model:'Sin respuesta todavía',provider:'—',fallback:false};
+  return{model:message.model||'Modelo no reportado',provider:message.provider||'Proveedor no reportado',fallback:Boolean(message.fallback)};
 }
 
 export function HectorASIEvolutionApp(){
   const [user,setUser]=useState<User|null|undefined>();
   useEffect(()=>{api.me().then(result=>setUser(result.user)).catch(()=>setUser(null))},[]);
-
-  if(user===undefined)return <Splash/>;
+  if(user===undefined)return <div className="hxBoot"><span>H</span><p>INICIANDO</p></div>;
   if(!user)return <Login onDone={setUser}/>;
-  return <EvolutionWorkspace user={user} onLogout={()=>api.logout().finally(()=>setUser(null))}/>;
-}
-
-function Splash(){
-  return <div className="haSplash eaSplash" aria-label="Iniciando Hector ASI">
-    <NeuralOrganism modules={buildEvolution(null).modules} compact/>
-    <h1>Hector ASI</h1>
-    <p>Leyendo su estado evolutivo</p>
-  </div>;
+  return <Workspace user={user} onLogout={()=>api.logout().finally(()=>setUser(null))}/>;
 }
 
 function Login({onDone}:{onDone:(user:User)=>void}){
   const [register,setRegister]=useState(false);
   const [busy,setBusy]=useState(false);
   const [error,setError]=useState('');
-
   const submit=async(event:FormEvent<HTMLFormElement>)=>{
     event.preventDefault();
     setBusy(true);
@@ -238,78 +93,54 @@ function Login({onDone}:{onDone:(user:User)=>void}){
       setBusy(false);
     }
   };
-
-  return <main className="haLogin eaLogin">
-    <section className="haLoginIdentity eaLoginIdentity">
-      <NeuralOrganism modules={buildEvolution(null).modules} compact/>
-      <h1>Hector ASI</h1>
-      <p>Observa cómo se construye, comprueba qué aprende y habla con él desde el mismo lugar.</p>
+  return <main className="hxLogin">
+    <section className="hxLoginBrand">
+      <div className="hxMark">H</div>
+      <h1>HÉCTOR<br/>OS</h1>
+      <p>Una sola interfaz. Un solo objetivo. Resolver.</p>
+      <small><Shield/> Sesión privada</small>
     </section>
-    <form className="haLoginForm" onSubmit={submit}>
+    <form className="hxLoginForm" onSubmit={submit}>
+      <div><span>{register?'NUEVO PROPIETARIO':'ACCESO'}</span><h2>{register?'Crear cuenta':'Entrar'}</h2></div>
       {register&&<label>Nombre<input name="name" defaultValue="Héctor" autoComplete="name" required/></label>}
       <label>Correo<input name="email" type="email" autoComplete="email" required/></label>
       <label>Contraseña<input name="password" type="password" minLength={10} autoComplete={register?'new-password':'current-password'} required/></label>
-      {error&&<div className="haError" role="alert">{error}</div>}
-      <button className="haLoginButton" disabled={busy}>{busy?'Procesando…':register?'Crear acceso':'Entrar'}</button>
-      <button type="button" className="haTextButton" onClick={()=>setRegister(value=>!value)}>{register?'Ya tengo acceso':'Configurar por primera vez'}</button>
+      {error&&<div className="hxError" role="alert">{error}</div>}
+      <button className="hxPrimary" disabled={busy}>{busy?'PROCESANDO':register?'CREAR':'ENTRAR'}</button>
+      <button className="hxLink" type="button" onClick={()=>setRegister(value=>!value)}>{register?'Ya tengo cuenta':'Configurar por primera vez'}</button>
     </form>
   </main>;
 }
 
-function EvolutionWorkspace({user,onLogout}:{user:User;onLogout:()=>void}){
+function Workspace({user,onLogout}:{user:User;onLogout:()=>void}){
+  const [view,setView]=useState<View>('chat');
   const [messages,setMessages]=useState<ChatMessage[]>([]);
   const [history,setHistory]=useState<any[]>([]);
+  const [files,setFiles]=useState<any[]>([]);
+  const [stage,setStage]=useState<StageStatus|null>(null);
   const [conversationId,setConversationId]=useState<string>();
   const [text,setText]=useState('');
   const [busy,setBusy]=useState(false);
-  const [overlay,setOverlay]=useState<Overlay>(null);
-  const [attachment,setAttachment]=useState<PendingAttachment>();
   const [notice,setNotice]=useState('');
-  const [activityRefresh,setActivityRefresh]=useState(0);
-  const [selfModel,setSelfModel]=useState<SelfModel|null>(null);
-  const [evolutionNotice,setEvolutionNotice]=useState('');
+  const [attachment,setAttachment]=useState<PendingAttachment>();
   const fileInput=useRef<HTMLInputElement>(null);
-  const composerInput=useRef<HTMLTextAreaElement>(null);
+  const composer=useRef<HTMLTextAreaElement>(null);
   const end=useRef<HTMLDivElement>(null);
 
-  const evolution=useMemo(()=>buildEvolution(selfModel),[selfModel]);
-  const loadHistory=()=>api.conversations().then(result=>setHistory(result.items||[]));
-  const loadSelfModel=()=>jsonFetch('/api/intelligence/self-model').then(result=>setSelfModel(result as SelfModel)).catch(()=>setSelfModel(null));
+  const loadHistory=()=>api.conversations().then(result=>setHistory(result.items||[])).catch(()=>setHistory([]));
+  const loadFiles=()=>api.files().then(result=>setFiles(result.items||[])).catch(()=>setFiles([]));
+  const loadStage=()=>api.stageSix().then(setStage).catch(()=>setStage(null));
 
-  useEffect(()=>{void Promise.all([loadHistory(),loadSelfModel()])},[]);
-  useEffect(()=>{
-    try{
-      const key='hector-asi-evolution-signature';
-      const previous=window.localStorage.getItem(key);
-      if(previous&&previous!==evolution.signature){
-        setEvolutionNotice(visibleAchievement(evolution,selfModel).title);
-        navigator.vibrate?.([24,45,24]);
-      }
-      window.localStorage.setItem(key,evolution.signature);
-    }catch{}
-  },[evolution,selfModel]);
-  useEffect(()=>{
-    if(!conversationId)return;
-    const timer=window.setInterval(()=>{
-      if(busy)return;
-      api.conversationMessages(conversationId).then(result=>setMessages(result.items||[])).catch(()=>{});
-    },8000);
-    return()=>window.clearInterval(timer);
-  },[conversationId,busy]);
-  useEffect(()=>{
-    end.current?.scrollIntoView({behavior:messages.length?'smooth':'auto',block:'end'});
-  },[messages,busy,notice,activityRefresh]);
+  useEffect(()=>{void Promise.all([loadHistory(),loadFiles(),loadStage()])},[]);
+  useEffect(()=>{end.current?.scrollIntoView({behavior:messages.length?'smooth':'auto',block:'end'})},[messages,busy,notice]);
 
+  const lastAssistant=useMemo(()=>[...messages].reverse().find(item=>item.role==='assistant'),[messages]);
+  const effective=messageModel(lastAssistant);
   const title=useMemo(()=>{
-    if(!conversationId)return 'Nueva conversación';
+    if(!conversationId)return'Nueva conversación';
     const current=history.find(item=>item.id===conversationId);
     return current?.alias||current?.title||'Conversación';
   },[conversationId,history]);
-
-  const focusComposer=()=>{
-    setOverlay(null);
-    window.setTimeout(()=>composerInput.current?.focus(),60);
-  };
 
   const fresh=()=>{
     setConversationId(undefined);
@@ -317,16 +148,17 @@ function EvolutionWorkspace({user,onLogout}:{user:User;onLogout:()=>void}){
     setText('');
     setAttachment(undefined);
     setNotice('');
-    setOverlay(null);
+    setView('chat');
+    window.setTimeout(()=>composer.current?.focus(),40);
   };
 
   const openConversation=async(id:string)=>{
-    setNotice('Abriendo conversación…');
+    setNotice('Cargando conversación');
     try{
       const result=await api.conversationMessages(id);
       setConversationId(id);
       setMessages(result.items||[]);
-      setOverlay(null);
+      setView('chat');
     }finally{
       setNotice('');
     }
@@ -341,275 +173,229 @@ function EvolutionWorkspace({user,onLogout}:{user:User;onLogout:()=>void}){
     event?.preventDefault();
     const prompt=text.trim();
     if((!prompt&&!attachment)||busy)return;
-
     const selected=attachment;
-    const userContent=prompt||(selected?.file.type.startsWith('image/')?'Analiza esta imagen.':'Registra y analiza este archivo.');
+    const userContent=prompt||(selected?.file.type.startsWith('image/')?'Analiza esta imagen.':'Analiza este archivo.');
     setText('');
     setAttachment(undefined);
     setMessages(current=>[...current,{role:'user',content:userContent,attachmentName:selected?.file.name,attachmentPreview:selected?.preview}]);
     setBusy(true);
-    setNotice(selected?'Procesando archivo y solicitud…':'Pensando y ejecutando…');
-
+    setNotice(selected?'Procesando archivo':'Razonando');
     try{
       if(selected?.file.type.startsWith('image/')){
         const result=await api.vision(selected.file,userContent);
-        setMessages(current=>[...current,{role:'assistant',content:result.answer||'La imagen fue procesada.',provider:result.provider||'openai',model:result.model,modelTier:'vision'}]);
+        setMessages(current=>[...current,{role:'assistant',content:result.answer||'Imagen procesada.',provider:result.provider,model:result.model,fallback:result.fallback,modelTier:'vision'}]);
       }else{
         let requestText=userContent;
         if(selected){
           await api.upload(selected.file);
-          requestText=`${userContent}\n\nArchivo privado disponible: ${selected.file.name}. Trabaja con él cuando la capacidad correspondiente esté disponible y confirma qué pudiste comprobar.`;
+          requestText=`${userContent}\n\nArchivo privado cargado: ${selected.file.name}. Indica exactamente qué pudiste comprobar.`;
+          await loadFiles();
         }
-
-        const operation=!selected?await executeOperation(requestText):null;
-        if(operation){
-          setMessages(items=>[...items,{role:'assistant',...operation}]);
-          setActivityRefresh(value=>value+1);
-        }else if(asksForOwnModelDevelopment(requestText)){
-          setMessages(items=>[...items,{role:'assistant',content:ownModelDevelopmentAnswer(evolution),provider:'system',model:'Hector ASI registry',modelTier:'verified'}]);
-        }else if(asksForModel(requestText)){
-          const result=await jsonFetch('/api/system/model');
-          const current=result.current||{};
-          const content=current.model
-            ?`## Modelo real de la respuesta anterior\n- **Proveedor:** ${current.provider}\n- **Modelo:** ${current.model}\n- **Nivel:** ${current.tier||'no registrado'}\n- **Motivo:** ${current.reason||'no registrado'}\n- **Fallback:** ${current.fallback?'sí':'no'}`
-            :'Aún no hay una respuesta de IA registrada.';
-          setMessages(items=>[...items,{role:'assistant',content,provider:current.provider?.toLowerCase()||'system',model:current.model,modelTier:current.tier,fallback:current.fallback}]);
-        }else if(asksForSystemReport(requestText)){
-          if(/autoanal[ií]za|autoeval[uú]a/i.test(requestText))await jsonFetch('/api/intelligence/self-evaluate',{method:'POST',body:'{}'});
-          const result=await jsonFetch('/api/system/report');
-          setMessages(items=>[...items,{role:'assistant',content:result.text,provider:'system',model:`Hector ASI ${result.version||''}`.trim(),modelTier:'verified'}]);
-          void loadSelfModel();
-        }else{
-          const result=await api.chat(requestText,conversationId,{reasoning:'high',deliberation:'auto'});
-          setConversationId(result.conversationId);
-          setMessages(items=>[...items,{...result.message,provider:result.provider,model:result.model,fallback:result.fallback,modelTier:result.modelTier}]);
-          await loadHistory();
-          void loadSelfModel();
-        }
+        const result=await api.chat(requestText,conversationId,{reasoning:'high',deliberation:'auto'});
+        setConversationId(result.conversationId);
+        setMessages(current=>[...current,{...result.message,provider:result.provider,model:result.model,fallback:result.fallback,modelTier:result.modelTier}]);
+        await Promise.all([loadHistory(),loadStage()]);
       }
     }catch(reason){
-      setMessages(current=>[...current,{role:'assistant',content:`No pude completar la acción: ${reason instanceof Error?reason.message:'error desconocido'}`,provider:'system',model:'error-report'}]);
+      setMessages(current=>[...current,{role:'assistant',content:`No pude completar la acción: ${reason instanceof Error?reason.message:'error desconocido'}`,provider:'system',model:'error'}]);
     }finally{
       setBusy(false);
       setNotice('');
     }
   };
 
-  return <div className="haApp eaApp">
-    <header className="haTopbar">
-      <button className="haIconButton" onClick={()=>setOverlay('history')} aria-label="Abrir historial"><History/></button>
-      <button className="haTopIdentity eaTopIdentity" onClick={()=>setOverlay('evolution')} aria-label="Ver evolución de Hector ASI">
-        <strong>Hector ASI</strong>
-        <span><i className={busy?'busy':''}/>{busy?'Trabajando':evolution.stage}</span>
-      </button>
-      <button className="haAvatar" onClick={()=>setOverlay('account')} aria-label="Abrir cuenta">{user.name.slice(0,1).toUpperCase()}</button>
-    </header>
+  return <div className="hxApp">
+    <aside className="hxRail">
+      <button className="hxLogo" type="button" onClick={fresh} aria-label="Nuevo chat">H</button>
+      <nav>{nav.map(item=>{
+        const Icon=item.icon;
+        return <button type="button" key={item.id} className={view===item.id?'active':''} onClick={()=>setView(item.id)} aria-label={item.label}><Icon/><span>{item.label}</span></button>;
+      })}</nav>
+      <button className="hxLogout" type="button" onClick={onLogout} aria-label="Cerrar sesión"><LogOut/><span>Salir</span></button>
+    </aside>
 
-    <main className="haConversation eaConversation" aria-label={title}>
-      {messages.length===0
-        ?<EvolutionHome evolution={evolution} selfModel={selfModel} busy={busy} notice={evolutionNotice} talk={focusComposer} details={()=>setOverlay('evolution')}/>
-        :<EvolutionStrip evolution={evolution} busy={busy} open={()=>setOverlay('evolution')}/>} 
+    <section className="hxSurface">
+      <header className="hxHeader">
+        <div><span>HÉCTOR OS</span><strong>{view==='chat'?title:nav.find(item=>item.id===view)?.label}</strong></div>
+        <button className={`hxRuntime ${effective.fallback?'fallback':''}`} type="button" onClick={()=>setView('system')}>
+          <i/>
+          <span><small>RESPONDIÓ</small><b>{effective.model}</b></span>
+        </button>
+        <button className="hxUser" type="button" onClick={onLogout} aria-label="Cerrar sesión">{user.name.slice(0,1).toUpperCase()}</button>
+      </header>
 
-      <section className="haMessages" aria-live="polite">
-        {messages.map((message,index)=><Message key={message.id||`${message.role}-${index}`} message={message}/>)}
-        {busy&&<article className="haMessage assistant thinking" aria-label="Hector ASI está trabajando"><div><span/><span/><span/></div></article>}
-        {notice&&<div className="haNotice"><Clock3/>{notice}</div>}
-      </section>
-      <AutonomousActivity refreshToken={activityRefresh}/>
+      {view==='chat'&&<ChatView
+        messages={messages}
+        busy={busy}
+        notice={notice}
+        attachment={attachment}
+        text={text}
+        setText={setText}
+        setAttachment={setAttachment}
+        chooseAttachment={chooseAttachment}
+        send={send}
+        fresh={fresh}
+        composer={composer}
+        fileInput={fileInput}
+        end={end}
+      />}
+      {view==='system'&&<SystemView stage={stage} effective={effective}/>} 
+      {view==='history'&&<HistoryView items={history} activeId={conversationId} fresh={fresh} open={openConversation}/>} 
+      {view==='files'&&<FilesView items={files} chooseAttachment={chooseAttachment} sendToChat={()=>setView('chat')} fileInput={fileInput}/>} 
+    </section>
+
+    <nav className="hxMobileNav">{nav.map(item=>{
+      const Icon=item.icon;
+      return <button type="button" key={item.id} className={view===item.id?'active':''} onClick={()=>setView(item.id)}><Icon/><span>{item.label}</span></button>;
+    })}</nav>
+  </div>;
+}
+
+function ChatView({messages,busy,notice,attachment,text,setText,setAttachment,chooseAttachment,send,fresh,composer,fileInput,end}:{
+  messages:ChatMessage[];
+  busy:boolean;
+  notice:string;
+  attachment:PendingAttachment|undefined;
+  text:string;
+  setText:(value:string)=>void;
+  setAttachment:(value:PendingAttachment|undefined)=>void;
+  chooseAttachment:(file?:File)=>void;
+  send:(event?:FormEvent)=>Promise<void>;
+  fresh:()=>void;
+  composer:React.RefObject<HTMLTextAreaElement|null>;
+  fileInput:React.RefObject<HTMLInputElement|null>;
+  end:React.RefObject<HTMLDivElement|null>;
+}){
+  return <main className="hxChat">
+    <section className="hxThread" aria-live="polite">
+      {messages.length===0&&<div className="hxEmpty">
+        <h1>¿QUÉ<br/>HACEMOS?</h1>
+        <p>Pregunta, investiga, programa o inicia un trabajo. La respuesta mostrará el modelo que realmente contestó.</p>
+        <div className="hxPrompts">
+          <button type="button" onClick={()=>setText('Analiza el estado real de Héctor OS y dime el siguiente cuello de botella.')}>Auditar Héctor</button>
+          <button type="button" onClick={()=>setText('Investiga una solución y separa hechos, inferencias y límites.')}>Investigar</button>
+          <button type="button" onClick={()=>setText('Diseña un plan ejecutable con pruebas y rollback.')}>Planificar</button>
+        </div>
+      </div>}
+      {messages.map((message,index)=><Message key={message.id||`${message.role}-${index}`} message={message}/>) }
+      {busy&&<article className="hxMessage assistant hxThinking"><div className="hxRole">H</div><div><span/><span/><span/></div></article>}
+      {notice&&<div className="hxNotice"><Clock3/>{notice}</div>}
       <div ref={end}/>
-    </main>
+    </section>
 
-    <form className="haComposer" onSubmit={send}>
-      {attachment&&<div className="haAttachmentPreview">
-        {attachment.preview?<img src={attachment.preview} alt="Vista previa del archivo"/>:<File/>}
+    <form className="hxComposer" onSubmit={send}>
+      {attachment&&<div className="hxAttachment">
+        {attachment.preview?<img src={attachment.preview} alt="Archivo seleccionado"/>:<FileText/>}
         <span>{attachment.file.name}</span>
         <button type="button" onClick={()=>setAttachment(undefined)} aria-label="Quitar archivo"><X/></button>
       </div>}
-      <div className="haComposerInner">
-        <button className="haAttach" type="button" onClick={()=>fileInput.current?.click()} aria-label="Adjuntar archivo"><Paperclip/></button>
-        <textarea ref={composerInput} value={text} onChange={event=>setText(event.target.value)} onKeyDown={event=>{
+      <div className="hxComposeRow">
+        <button type="button" className="hxAttach" onClick={()=>fileInput.current?.click()} aria-label="Adjuntar"><Paperclip/></button>
+        <textarea ref={composer} value={text} onChange={event=>setText(event.target.value)} onKeyDown={event=>{
           if(event.key==='Enter'&&!event.shiftKey){event.preventDefault();void send()}
-        }} rows={1} placeholder="Habla con Hector ASI…" aria-label="Mensaje para Hector ASI"/>
-        <button className="haSend" aria-label="Enviar" disabled={busy||(!text.trim()&&!attachment)}><ArrowUp/></button>
+        }} rows={1} placeholder="Escribe una instrucción…" aria-label="Mensaje"/>
+        <button className="hxSend" aria-label="Enviar" disabled={busy||(!text.trim()&&!attachment)}><ArrowUp/></button>
       </div>
+      <div className="hxComposeMeta"><button type="button" onClick={fresh}><Plus/> NUEVO</button><span>ENTER PARA ENVIAR · SHIFT+ENTER PARA SALTO</span></div>
       <input ref={fileInput} type="file" hidden onChange={event=>{chooseAttachment(event.target.files?.[0]);event.currentTarget.value=''}}/>
-      <small>La evolución solo cambia cuando existe evidencia real.</small>
     </form>
-
-    {overlay==='history'&&<HistorySheet history={history} activeId={conversationId} close={()=>setOverlay(null)} fresh={fresh} open={openConversation}/>} 
-    {overlay==='account'&&<AccountSheet user={user} close={()=>setOverlay(null)} logout={onLogout}/>} 
-    {overlay==='evolution'&&<EvolutionSheet evolution={evolution} selfModel={selfModel} close={()=>setOverlay(null)} talk={focusComposer}/>} 
-  </div>;
-}
-
-function EvolutionHome({evolution,selfModel,busy,notice,talk,details}:{evolution:EvolutionModel;selfModel:SelfModel|null;busy:boolean;notice:string;talk:()=>void;details:()=>void}){
-  const abilities=(selfModel?.capabilities||[]).slice(0,4);
-  const achievement=visibleAchievement(evolution,selfModel);
-  const next=nextEvolution(evolution);
-  const growth=evolution.modules.filter(item=>item.state==='active').length;
-  return <section className={`eaHome ${notice?'celebrating':''}`}>
-    {notice&&<div className="eaCelebration" role="status"><Sparkles/><span><small>HECTOR EVOLUCIONÓ</small><strong>{notice}</strong></span></div>}
-    <NeuralOrganism modules={evolution.modules} busy={busy} growth={growth} celebrating={Boolean(notice)}/>
-    <div className="eaIdentity">
-      <span>{evolution.generation}</span>
-      <h1>Hector ASI</h1>
-      <p>{evolution.stage}</p>
-    </div>
-
-    <section className="eaVisibleGrowth" aria-label="Crecimiento visible de Hector ASI">
-      <article className="eaUnlockCard">
-        <div className="eaUnlockMark"><Sparkles/></div>
-        <div><span>DESBLOQUEO REAL</span><strong>{achievement.title}</strong><small>{achievement.detail}</small></div>
-      </article>
-
-      <div className="eaNowCan">
-        <header><span>AHORA PUEDE</span><strong>{abilities.length||'—'} activas</strong></header>
-        <div className="eaAbilityChips">
-          {abilities.length>0
-            ?abilities.map(item=><span className="eaAbilityChip" key={item.capability}><Check/>{plainCapability(item.capability)}</span>)
-            :<span className="eaAbilityChip waiting"><Clock3/>Leyendo capacidades reales</span>}
-        </div>
-      </div>
-
-      <article className="eaNextUnlock">
-        <Target/>
-        <div><span>SIGUIENTE EVOLUCIÓN</span><strong>{next.title}</strong><small>{next.detail}</small></div>
-      </article>
-    </section>
-
-    <div className="eaPrimaryActions">
-      <button className="eaTalk" onClick={talk}><Zap/>Hablar con Héctor</button>
-      <button className="eaDetails" onClick={details}><Network/>Detalles técnicos</button>
-    </div>
-  </section>;
-}
-
-function EvolutionStrip({evolution,busy,open}:{evolution:EvolutionModel;busy:boolean;open:()=>void}){
-  return <button className="eaStrip" onClick={open}>
-    <NeuralOrganism modules={evolution.modules} busy={busy} compact/>
-    <span><strong>{evolution.generation}</strong><small>{busy?'Pensando y actuando':evolution.stage}</small></span>
-    <Network/>
-  </button>;
-}
-
-function NeuralOrganism({modules,busy=false,compact=false,growth,celebrating=false}:{modules:EvolutionModule[];busy?:boolean;compact?:boolean;growth?:number;celebrating?:boolean}){
-  const state=(id:string)=>modules.find(module=>module.id===id)?.state||'locked';
-  const resolvedGrowth=growth??modules.filter(module=>module.state==='active').length;
-  const particles=Array.from({length:Math.min(6,resolvedGrowth)},(_,index)=>index);
-  return <div className={`eaOrganism ${compact?'compact':''} ${busy?'busy':''} ${celebrating?'celebrating':''}`} data-growth={resolvedGrowth} aria-label="Organismo evolutivo de Hector ASI">
-    <svg className="eaConnections" viewBox="0 0 300 300" aria-hidden="true">
-      <line x1="150" y1="150" x2="150" y2="34" className={state('data')}/>
-      <line x1="150" y1="150" x2="252" y2="92" className={state('training')}/>
-      <line x1="150" y1="150" x2="252" y2="208" className={state('evaluation')}/>
-      <line x1="150" y1="150" x2="150" y2="266" className={state('champion')}/>
-      <line x1="150" y1="150" x2="48" y2="208" className={state('system')}/>
-      <line x1="150" y1="150" x2="48" y2="92" className={state('core')}/>
-    </svg>
-    {!compact&&<div className="eaParticles" aria-hidden="true">{particles.map(index=><i key={index} className={`eaParticle particle-${index+1}`}/>)}</div>}
-    <div className="eaCore"><span>H</span><i/></div>
-    <EvolutionNode id="data" state={state('data')} label="Datos" icon={<Database/>}/>
-    <EvolutionNode id="training" state={state('training')} label="Entrenamiento" icon={<Activity/>}/>
-    <EvolutionNode id="evaluation" state={state('evaluation')} label="Evaluación" icon={<Target/>}/>
-    <EvolutionNode id="champion" state={state('champion')} label="Campeón" icon={<Trophy/>}/>
-    <EvolutionNode id="system" state={state('system')} label="Sistema" icon={<Network/>}/>
-    <EvolutionNode id="core" state={state('core')} label="Núcleo" icon={<Brain/>}/>
-  </div>;
-}
-
-function EvolutionNode({id,state,label,icon}:{id:string;state:EvolutionState;label:string;icon:React.ReactNode}){
-  return <div className={`eaNode node-${id} ${state}`} aria-label={`${label}: ${state}`}><span>{state==='locked'?<Lock/>:icon}</span><small>{label}</small></div>;
-}
-
-function EvolutionSheet({evolution,selfModel,close,talk}:{evolution:EvolutionModel;selfModel:SelfModel|null;close:()=>void;talk:()=>void}){
-  const runtime=selfModel?.runtime;
-  return <div className="haOverlay" role="dialog" aria-modal="true" aria-label="Evolución de Hector ASI">
-    <button className="haOverlayBackdrop" onClick={close} aria-label="Cerrar evolución"/>
-    <section className="haSheet eaEvolutionSheet">
-      <header><div><span>Estado verificable</span><h2>Evolución</h2></div><button onClick={close} aria-label="Cerrar"><X/></button></header>
-      <div className="eaSheetHero">
-        <NeuralOrganism modules={evolution.modules} compact/>
-        <div><span>{evolution.generation}</span><strong>{evolution.stage}</strong><small>Base: {evolution.baseName} · {evolution.methodName}</small></div>
-      </div>
-
-      <section className="eaSheetSection">
-        <h3>Qué existe ahora</h3>
-        <div className="eaModuleList">
-          {evolution.modules.map(module=><article key={module.id} className={module.state}>
-            <span>{module.state==='active'?<Check/>:module.state==='forming'?<Sparkles/>:<Lock/>}</span>
-            <div><strong>{module.label}</strong><small>{module.detail}</small></div>
-            <em>{module.state==='active'?'Activo':module.state==='forming'?'Formándose':'Pendiente'}</em>
-          </article>)}
-        </div>
-      </section>
-
-      <section className="eaSheetSection">
-        <h3>Evidencia acumulada por el sistema</h3>
-        <div className="eaRuntimeGrid">
-          <div><strong>{runtime?.memories||0}</strong><span>memorias registradas</span></div>
-          <div><strong>{runtime?.workJobs?.completed||0}</strong><span>trabajos completados</span></div>
-          <div><strong>{runtime?.responseTraces||0}</strong><span>respuestas trazadas</span></div>
-          <div><strong>{runtime?.latestEvaluation?.score??'—'}</strong><span>última evaluación</span></div>
-        </div>
-      </section>
-
-      {(selfModel?.capabilities?.length||0)>0&&<section className="eaSheetSection">
-        <h3>Capacidades operativas comprobables</h3>
-        <div className="eaCapabilityList">
-          {selfModel!.capabilities!.map(item=><details key={item.capability}>
-            <summary><strong>{item.capability}</strong><span>{item.evidence||'Ver evidencia'}</span></summary>
-            <p>{item.limit||'Sin límite documentado.'}</p>
-          </details>)}
-        </div>
-      </section>}
-
-      <button className="eaSheetTalk" onClick={talk}><Zap/>Hablar con Hector ASI</button>
-      {!evolution.championId&&<p className="eaHonesty"><Lock/>La comparación entre generaciones se activará cuando exista el primer campeón entrenado y promovido.</p>}
-    </section>
-  </div>;
+  </main>;
 }
 
 function Message({message}:{message:ChatMessage}){
-  const isAssistant=message.role==='assistant';
-  return <article className={`haMessage ${message.role}`}>
-    <div className="haMessageBody">
-      {message.attachmentPreview&&<img className="haMessageImage" src={message.attachmentPreview} alt={message.attachmentName||'Archivo adjunto'}/>} 
-      {message.attachmentName&&!message.attachmentPreview&&<div className="haMessageFile"><File/><span>{message.attachmentName}</span></div>}
-      {isAssistant?<MarkdownMessage content={message.content}/>:<p>{message.content}</p>}
-      {isAssistant&&(message.provider||message.model)&&<details className="haEvidence">
-        <summary><Check/><span>Respuesta registrada</span></summary>
-        <div>
-          {message.provider&&<span>Proveedor <strong>{message.provider}</strong></span>}
-          {message.model&&<span>Modelo <strong>{message.model}</strong></span>}
-          {message.modelTier&&<span>Nivel <strong>{message.modelTier}</strong></span>}
-          <span>Fallback <strong>{message.fallback?'sí':'no'}</strong></span>
-        </div>
-      </details>}
+  const assistant=message.role==='assistant';
+  return <article className={`hxMessage ${assistant?'assistant':'user'}`}>
+    <div className="hxRole">{assistant?'H':'TÚ'}</div>
+    <div className="hxMessageBody">
+      {message.attachmentPreview&&<img className="hxMessageImage" src={message.attachmentPreview} alt={message.attachmentName||'Adjunto'}/>} 
+      {assistant?<MarkdownMessage content={message.content}/>:<p>{message.content}</p>}
+      {assistant&&<footer>
+        <span>{message.provider||'proveedor no reportado'}</span>
+        <b>{message.model||'modelo no reportado'}</b>
+        {message.fallback&&<em>FALLBACK</em>}
+      </footer>}
     </div>
   </article>;
 }
 
-function HistorySheet({history,activeId,close,fresh,open}:{history:any[];activeId?:string;close:()=>void;fresh:()=>void;open:(id:string)=>Promise<void>}){
-  return <div className="haOverlay" role="dialog" aria-modal="true" aria-label="Historial de conversaciones">
-    <button className="haOverlayBackdrop" onClick={close} aria-label="Cerrar historial"/>
-    <section className="haSheet">
-      <header><div><span>Hector ASI</span><h2>Conversaciones</h2></div><button onClick={close} aria-label="Cerrar"><X/></button></header>
-      <button className="haNewChat" onClick={fresh}><Plus/>Nueva conversación</button>
-      <div className="haHistoryList">
-        {history.length===0?<p className="haEmptyHistory">Aún no hay conversaciones guardadas.</p>:history.map(item=><button key={item.id} className={activeId===item.id?'active':''} onClick={()=>void open(item.id)}>
-          <span>{item.alias||item.title||'Sin título'}</span><small>{item.updated_at?'Guardada':'Conversación'}</small>
-        </button>)}
-      </div>
+function SystemView({stage,effective}:{stage:StageStatus|null;effective:{model:string;provider:string;fallback:boolean}}){
+  const qwen=stage?.models?.qwen397;
+  const kimi=stage?.models?.kimi;
+  const open=stage?.models?.open;
+  const own=stage?.models?.own;
+  const teacher=stage?.models?.teacher;
+  const targetModel=qwen?.model||'Qwen/Qwen3.5-397B-A17B';
+  const targetReady=Boolean(qwen?.endpointConfigured);
+  const route=[
+    {name:qwen?.label||'Qwen 397B',detail:targetModel,state:targetReady?'ACTIVO':'PENDIENTE'},
+    {name:kimi?.label||'Kimi K2.5',detail:kimi?.model||'moonshotai/Kimi-K2.5',state:kimi?.endpointConfigured?'ACTIVO':'RESPALDO'},
+    {name:open?.model||'Workers AI',detail:open?.role||'Fallback disponible',state:'DISPONIBLE'}
+  ];
+  return <main className="hxSystem">
+    <section className="hxSystemHero">
+      <div><span>OBJETIVO PRINCIPAL</span><h1>397B</h1><p>{targetModel}</p></div>
+      <div className={`hxSystemState ${targetReady?'ready':''}`}><i/><strong>{targetReady?'CONECTADO':'NO CONECTADO'}</strong><small>{qwen?.reason||'La interfaz no lo marcará activo hasta recibir una respuesta real.'}</small></div>
     </section>
-  </div>;
+
+    <section className="hxEffective">
+      <span>ÚLTIMO MODELO EFECTIVO</span>
+      <strong>{effective.model}</strong>
+      <p>{effective.provider}{effective.fallback?' · respondió mediante fallback':''}</p>
+    </section>
+
+    <section className="hxRoute">
+      <header><h2>RUTA DE INFERENCIA</h2><span>ORDEN REAL</span></header>
+      {route.map((item,index)=><article key={item.name}><b>{String(index+1).padStart(2,'0')}</b><div><strong>{item.name}</strong><small>{item.detail}</small></div><span>{item.state}</span></article>)}
+    </section>
+
+    <section className="hxSystemGrid">
+      <article><Cpu/><span>CAMPEÓN PROPIO</span><strong>{own?.label||own?.runtimeId||'V41'}</strong><small>{own?.mode||'Permanece hasta ser superado'}</small></article>
+      <article><Network/><span>MAESTRO</span><strong>{teacher?.model||'GPT-5.6 reasoning'}</strong><small>{teacher?.role||'Datos y verificación'}</small></article>
+      <article><Database/><span>CONTEXTO</span><strong>{qwen?.contextLength?`${Math.round(qwen.contextLength/1024)}K`:'262K'}</strong><small>Objetivo nativo</small></article>
+      <article><Target/><span>ACTIVOS</span><strong>{qwen?.activeParameters||'17B'}</strong><small>Por token</small></article>
+    </section>
+
+    <section className="hxGates">
+      <header><h2>PUERTAS DE ENTRENAMIENTO</h2><span>SIN PORCENTAJES INVENTADOS</span></header>
+      {(stage?.pipeline||[
+        {id:'data',label:'Corpus verificable',target:10000,unit:'ejemplos'},
+        {id:'benchmark',label:'Benchmark V2',target:500,unit:'casos'},
+        {id:'failures',label:'Fallos entrenables',target:100,unit:'casos'},
+        {id:'autonomy',label:'Autonomía propia',target:90,unit:'%'}
+      ]).map(item=><article key={item.id}>
+        <div>{typeof item.observed==='number'?<Check/>:<Clock3/>}</div>
+        <span><strong>{item.label}</strong><small>{typeof item.observed==='number'?`${item.observed.toLocaleString('es-MX')} registrados`:'Sin conteo integrado confirmado'}</small></span>
+        <b>{item.target.toLocaleString('es-MX')} {item.unit}</b>
+      </article>)}
+    </section>
+    <p className="hxPrinciple">{stage?.principle||'El nombre del modelo no cuenta como integración. Sólo una respuesta verificada cambia el estado.'}</p>
+  </main>;
 }
 
-function AccountSheet({user,close,logout}:{user:User;close:()=>void;logout:()=>void}){
-  return <div className="haOverlay" role="dialog" aria-modal="true" aria-label="Cuenta">
-    <button className="haOverlayBackdrop" onClick={close} aria-label="Cerrar cuenta"/>
-    <section className="haSheet haAccountSheet">
-      <header><div><span>Cuenta privada</span><h2>{user.name}</h2></div><button onClick={close} aria-label="Cerrar"><X/></button></header>
-      <div className="haAccountStatus"><Sparkles/><div><strong>Hector ASI</strong><span>Sesión activa y protegida</span></div></div>
-      <button className="haLogout" onClick={logout}><LogOut/>Cerrar sesión</button>
+function HistoryView({items,activeId,fresh,open}:{items:any[];activeId?:string;fresh:()=>void;open:(id:string)=>Promise<void>}){
+  return <main className="hxListView">
+    <header><div><span>CONVERSACIONES</span><h1>HISTORIAL</h1></div><button type="button" onClick={fresh}><Plus/>NUEVO</button></header>
+    <section className="hxList">
+      {items.length===0&&<div className="hxListEmpty">No hay conversaciones guardadas.</div>}
+      {items.map((item,index)=><button type="button" key={item.id} className={activeId===item.id?'active':''} onClick={()=>void open(item.id)}>
+        <b>{String(index+1).padStart(2,'0')}</b>
+        <span><strong>{item.alias||item.title||'Conversación'}</strong><small>{item.updated_at||item.created_at||'Sin fecha'}</small></span>
+        <MessageSquare/>
+      </button>)}
     </section>
-  </div>;
+  </main>;
+}
+
+function FilesView({items,chooseAttachment,sendToChat,fileInput}:{items:any[];chooseAttachment:(file?:File)=>void;sendToChat:()=>void;fileInput:React.RefObject<HTMLInputElement|null>}){
+  return <main className="hxListView">
+    <header><div><span>BIBLIOTECA PRIVADA</span><h1>ARCHIVOS</h1></div><button type="button" onClick={()=>fileInput.current?.click()}><Paperclip/>ADJUNTAR</button></header>
+    <section className="hxFiles">
+      {items.length===0&&<div className="hxListEmpty">No hay archivos guardados.</div>}
+      {items.map(item=><a href={`/api/files/${item.id}/download`} key={item.id}>
+        <FileText/>
+        <span><strong>{item.name}</strong><small>{Math.ceil(Number(item.size_bytes||0)/1024).toLocaleString('es-MX')} KB</small></span>
+      </a>)}
+    </section>
+    <input ref={fileInput} type="file" hidden onChange={event=>{chooseAttachment(event.target.files?.[0]);sendToChat();event.currentTarget.value=''}}/>
+  </main>;
 }
