@@ -1,0 +1,35 @@
+{
+  "schemaVersion": 1,
+  "stage": 6,
+  "batchId": "stage6-canonical-20260724-1329",
+  "targetModel": "Qwen/Qwen3.5-397B-A17B",
+  "branch": "stage6-data/20260724-1329",
+  "state": "source-committed-validation-pending",
+  "canonicalExamples": 640,
+  "targetExamples": 10000,
+  "progressPercent": 6.4,
+  "capabilities": {
+    "mathematics": 160,
+    "code": 160,
+    "planning": 80,
+    "causal_reasoning": 80,
+    "calibration": 80,
+    "verification": 80,
+    "multimodal": 0
+  },
+  "quality": {
+    "deterministic": true,
+    "exactDuplicateGate": true,
+    "structuredVerifierPerExample": true,
+    "license": "CC0-1.0",
+    "benchmarkExcluded": true
+  },
+  "materializer": "model/hector-asi/data/stage6/generate-canonical-20260724-1329.mjs",
+  "workflow": ".github/workflows/stage6-canonical-data.yml",
+  "blockers": [
+    "GitHub Actions must materialize and hash the JSONL artifact",
+    "multimodal examples require image assets with ground truth",
+    "9360 additional approved examples remain before the training gate"
+  ],
+  "updatedAt": "2026-07-24T13:29:38-06:00"
+}
