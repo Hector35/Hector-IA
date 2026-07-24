@@ -1,0 +1,111 @@
+{
+  "schemaVersion": 1,
+  "experimentId": "hector-asi-qwen15-v68-interpolate",
+  "status": "rejected",
+  "decision": "reject",
+  "reason": "Validation-selected interpolation chose alpha=1.0 and improved the continuous validation objective, latency and output length, but hidden behavioral accuracy fell from 10/18 to 8/18. The candidate is therefore ineligible for champion promotion.",
+  "source": {
+    "runtime": "hector-asi-qwen15-v41",
+    "artifactId": 8560331055,
+    "adapterSha256": "31bead5f59982d8e321517fd235b81f992f83d2e3792a55690c2a841ff0e28f8",
+    "adapterBytes": 73911112,
+    "baseModel": "Qwen/Qwen2.5-1.5B-Instruct",
+    "baseRevision": "989aa7980e4cf806f80c7fef2b1adb7bc71aa306"
+  },
+  "candidate": {
+    "runtime": "hector-asi-qwen15-v68-interpolate",
+    "githubRunId": 30089409018,
+    "artifactId": 8595671166,
+    "artifactName": "hector-asi-qwen15-v68-interpolate-30089409018",
+    "artifactDigest": "sha256:a3a967005ef48513675f31571dbea02d0addeb1cd711ce9fe3be3a0861587ddd",
+    "artifactBytes": 1009839720,
+    "artifactExpiresAt": "2026-10-22T11:23:43Z",
+    "adapterSha256": "29f994485b99443f898cb41fc7026ea91932b118c651c8b2067568213b3904c1",
+    "adapterBytes": 73911080,
+    "replicasByteIdentical": true,
+    "selectedAlpha": 1.0
+  },
+  "dataset": {
+    "trainRows": 24,
+    "focalRows": 8,
+    "replayRows": 16,
+    "validationRows": 10,
+    "hiddenRows": 18,
+    "criticalRows": 6,
+    "crossSplitOverlap": 0,
+    "privateUserData": false,
+    "provenance": "author-generated",
+    "license": "Apache-2.0-compatible",
+    "trainSha256": "98350de4f476691594586b3ea179fced028a6b3f6399bf574af1b0530f5876d6",
+    "validationSha256": "a6c11e00fcfdfa7ccba87beac18acd658c1d87de85dc3b60576003f128550151",
+    "hiddenSha256": "17560e21b728c93f822a0e21cb4b4261823ae5b6f92f3fe1188fdfd4b5679ccb"
+  },
+  "training": {
+    "method": "response-only LoRA with validation-selected source-to-candidate adapter interpolation",
+    "epochs": 2,
+    "learningRate": 0.0000012,
+    "eosLambda": 0.08,
+    "maxLength": 144,
+    "seed": 3068,
+    "alphas": [0.15, 0.25, 0.4, 0.6, 1.0],
+    "selectedAlpha": 1.0,
+    "replicas": 2,
+    "python": "3.11.15",
+    "torch": "2.7.1+cpu",
+    "hardware": "GitHub Actions Ubuntu 24.04 Azure x86_64 CPU",
+    "replicaSeconds": [805.9573636054993, 783.4573316574097],
+    "replicaPeakRssMb": [11284.78125, 11061.88671875]
+  },
+  "evaluation": {
+    "baseline": {
+      "validationObjective": 1.8652393519878387,
+      "hiddenPassed": 10,
+      "hiddenTotal": 18,
+      "criticalPassed": 6,
+      "criticalTotal": 6,
+      "meanTokens": 18.88888888888889,
+      "meanLatencyMsReplicaA": 6859.56211677778,
+      "meanLatencyMsReplicaB": 6671.888604166649
+    },
+    "candidate": {
+      "validationObjective": 1.7284167908132075,
+      "hiddenPassed": 8,
+      "hiddenTotal": 18,
+      "criticalPassed": 6,
+      "criticalTotal": 6,
+      "meanTokens": 16.666666666666668,
+      "meanLatencyMsReplicaA": 6241.946428944484,
+      "meanLatencyMsReplicaB": 6263.170913333346
+    },
+    "gates": {
+      "weightsChanged": true,
+      "replicasByteIdentical": true,
+      "validationImproved": true,
+      "behavioralImprovement": false,
+      "criticalPerfect": true,
+      "noCriticalRegression": true,
+      "latencyAcceptable": true,
+      "tokenLengthAcceptable": true,
+      "eligibleForChampion": false
+    },
+    "observedRegressions": [
+      "hidden behavioral score decreased by two cases despite validation improvement",
+      "validation selected the full update alpha=1.0, so interpolation did not provide a protective trust region"
+    ]
+  },
+  "rollback": {
+    "runtime": "hector-asi-qwen15-v41",
+    "artifactId": 8560331055,
+    "adapterSha256": "31bead5f59982d8e321517fd235b81f992f83d2e3792a55690c2a841ff0e28f8"
+  },
+  "doNotRepeat": {
+    "exactConfiguration": true,
+    "method": "response-only LoRA plus validation-only interpolation",
+    "epochs": 2,
+    "learningRate": 0.0000012,
+    "eosLambda": 0.08,
+    "seed": 3068,
+    "split": "24/10/18",
+    "alphas": [0.15, 0.25, 0.4, 0.6, 1.0]
+  }
+}
