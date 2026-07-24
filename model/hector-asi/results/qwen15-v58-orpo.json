@@ -1,0 +1,81 @@
+{
+  "schemaVersion": 1,
+  "experimentId": "hector-asi-qwen15-v58-orpo",
+  "status": "rejected",
+  "doNotRepeat": true,
+  "decision": "reject-no-strict-behavioral-improvement",
+  "baseModel": "Qwen/Qwen2.5-1.5B-Instruct",
+  "baseRevision": "989aa7980e4cf806f80c7fef2b1adb7bc71aa306",
+  "sourceRuntime": "hector-asi-qwen15-v41",
+  "method": "response-only ORPO-style chosen CE plus length-normalized preference and LoRA trust penalty",
+  "dataset": {
+    "trainRows": 8,
+    "validationRows": 4,
+    "hiddenRows": 18,
+    "criticalHiddenRows": 6,
+    "license": "author-generated Apache-2.0-compatible",
+    "privateUserData": false,
+    "crossSplitOverlap": 0,
+    "trainSha256": "5226d48089aec97719fc4a39795cb900f1dea2bcf1abcb3a5fdab1f90c14b4f0",
+    "validationSha256": "d40f0b5ddc39b307360b65e924b91b719097d76748cd17af0dbf1b2ba3afc853",
+    "hiddenSha256": "17560e21b728c93f822a0e21cb4b4261823ae5b6f92f3fe1188fdfd4b5679ccb"
+  },
+  "hyperparameters": {
+    "epochs": 2,
+    "lr": 0.000002,
+    "beta": 0.2,
+    "orpoLambda": 0.35,
+    "anchorLambda": 0.02,
+    "maxLength": 160,
+    "seed": 3058
+  },
+  "artifact": {
+    "githubRunId": 30056851709,
+    "artifactId": 8583455221,
+    "name": "hector-asi-qwen15-v58-orpo-30056851709",
+    "digest": "sha256:7db81d4387d6e94ff8fe12ac4a84c7e1ddd4b9812d5cd49757ccec6d6acff367",
+    "adapterPath": "adapter/adapter_model.safetensors",
+    "adapterBytes": 73911112,
+    "adapterSha256": "382388b29a3947da7f0c713529314ae6776ab8a9a977602a4c131bf8e0657df0",
+    "replicas": 2,
+    "byteIdentical": true,
+    "expiresAt": "2026-10-22T00:40:21Z"
+  },
+  "comparison": {
+    "baselineValidationObjective": 2.4774484038352966,
+    "candidateValidationObjective": 2.4207305908203125,
+    "validationRelativeImprovement": 0.022894657823055,
+    "baselineBehavioralPassed": 11,
+    "candidateBehavioralPassed": 11,
+    "behavioralTotal": 18,
+    "baselineCriticalPassed": 6,
+    "candidateCriticalPassed": 6,
+    "criticalTotal": 6,
+    "baselineMeanLatencyMs": 8012.4112032777775,
+    "candidateMeanLatencyMs": 8126.202429500001,
+    "latencyRatio": 1.0244183463812824,
+    "baselineMeanTokens": 20.88888888888889,
+    "candidateMeanTokens": 20.944444444444443,
+    "tokenRatio": 1.002659574468085
+  },
+  "gates": {
+    "weightsGenerated": true,
+    "replicasByteIdentical": true,
+    "validationImproved": true,
+    "behavioralImprovement": false,
+    "criticalPerfect": true,
+    "noCriticalRegression": true,
+    "latencyAcceptable": true,
+    "tokenLengthAcceptable": true,
+    "eligibleForPromotion": false
+  },
+  "runtime": {
+    "secondsPerReplica": 660.346536397934,
+    "peakRssMb": 11135.06640625,
+    "hardware": "Linux-6.17.0-1020-azure-x86_64-with-glibc2.39",
+    "python": "3.11.15",
+    "torch": "2.7.1+cpu"
+  },
+  "rollback": "hector-asi-qwen15-v41",
+  "notes": "V58 reduced the sealed ORPO validation objective and preserved perfect critical safety, acceptable latency, and output length, but tied V41 at 11/18 behavioral cases. It is rejected because promotion requires a strict behavioral win."
+}
