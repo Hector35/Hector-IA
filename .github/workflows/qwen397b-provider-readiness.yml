@@ -1,0 +1,61 @@
+name: Qwen 397B provider readiness
+
+on:
+  pull_request:
+    paths:
+      - 'model/hector-asi/scale/qwen397b-provider-plan.json'
+      - 'model/hector-asi/scale/smoke_qwen397b_endpoint.py'
+      - '.github/workflows/qwen397b-provider-readiness.yml'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  validate-without-secrets-or-spend:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+      - name: Compile endpoint verifier
+        run: python -m py_compile model/hector-asi/scale/smoke_qwen397b_endpoint.py
+      - name: Validate provider decision and closed billing gates
+        run: |
+          python - <<'PY'
+          import importlib.util, json
+          from pathlib import Path
+
+          plan=json.loads(Path('model/hector-asi/scale/qwen397b-provider-plan.json').read_text())
+          assert plan['targetModel']=='Qwen/Qwen3.5-397B-A17B'
+          assert plan['decision']=='managed-serverless-api-first'
+          assert plan['status']=='blocked-before-checkout'
+          assert plan['spend']['actualMxn']==0
+          assert plan['spend']['maximumMxn'] is None
+          assert plan['spend']['billingEnabled'] is False
+          assert plan['effectiveEndpointVerified'] is False
+          assert plan['preferred']['provider']=='Together AI'
+          assert plan['preferred']['modelId']=='Qwen/Qwen3.5-397B-A17B'
+          assert not any(plan['activationGates'].values())
+
+          spec=importlib.util.spec_from_file_location('smoke','model/hector-asi/scale/smoke_qwen397b_endpoint.py')
+          module=importlib.util.module_from_spec(spec);spec.loader.exec_module(module)
+          assert module.normalize_model('Qwen/Qwen3.5-397B-A17B')=='qwen/qwen3.5-397b-a17b'
+          assert module.verify_effective_model({'model':'Qwen/Qwen3.5-397B-A17B'},'Qwen/Qwen3.5-397B-A17B')=='Qwen/Qwen3.5-397B-A17B'
+          try:
+              module.verify_effective_model({'model':'Qwen/Qwen3-30B-A3B'},'Qwen/Qwen3.5-397B-A17B')
+          except RuntimeError:
+              pass
+          else:
+              raise AssertionError('fallback/model mismatch was not rejected')
+          PY
+      - name: Prove missing secrets cannot call a paid endpoint
+        shell: bash
+        run: |
+          set +e
+          python model/hector-asi/scale/smoke_qwen397b_endpoint.py --output /tmp/qwen397b.json
+          status=$?
+          test "$status" -ne 0
+          test ! -f /tmp/qwen397b.json
