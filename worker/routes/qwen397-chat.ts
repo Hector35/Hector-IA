@@ -13,6 +13,9 @@ export const qwen397Chat=new Hono<{Bindings:Bindings;Variables:Variables}>();
 qwen397Chat.use('/qwen397-chat',requireAuth);
 qwen397Chat.use('/qwen397-status',requireAuth);
 
+type RoutedOutput={text:string;id:string;model:string;usage?:{input_tokens?:number;output_tokens?:number}};
+type FallbackResult={out:RoutedOutput;provider:string;fallbackLevel:1|2;reason:string};
+
 async function ensureConversation(db:D1Database,userId:string,conversationId:string|undefined,message:string){
   if(conversationId){
     const existing=await db.prepare('SELECT id FROM conversations WHERE id=? AND user_id=?').bind(conversationId,userId).first();
@@ -47,6 +50,21 @@ CONTEXTO DINÁMICO
 ${context}`;
 }
 
+async function fallbackAfterQwen(env:Bindings,system:string,history:Array<{role:'user'|'assistant';content:string}>,message:string,baseReason:string):Promise<FallbackResult>{
+  if(hasKimiEndpoint(env)){
+    try{
+      const out=await callKimiK2_5(env,`${system}\n\nQwen 397B no estuvo disponible. Responde como fallback Kimi identificado.`,history);
+      return{out,provider:'Kimi K2.5 endpoint',fallbackLevel:1,reason:`${baseReason}; se usó Kimi K2.5`};
+    }catch(error){
+      const kimiError=error instanceof Error?error.message:'error desconocido';
+      const out=await callCloudflare(env,`${system}\n\nQwen 397B y Kimi K2.5 no estuvieron disponibles. Responde como fallback Workers AI identificado.`,message);
+      return{out,provider:'Cloudflare',fallbackLevel:2,reason:`${baseReason}; Kimi K2.5 falló: ${kimiError}; se usó Workers AI`};
+    }
+  }
+  const out=await callCloudflare(env,`${system}\n\nQwen 397B no estuvo disponible y Kimi K2.5 no está configurado. Responde como fallback Workers AI identificado.`,message);
+  return{out,provider:'Cloudflare',fallbackLevel:2,reason:`${baseReason}; Kimi K2.5 no está configurado; se usó Workers AI`};
+}
+
 qwen397Chat.get('/qwen397-status',c=>c.json(qwen397Status(c.env)));
 
 qwen397Chat.post('/qwen397-chat',async c=>{
@@ -71,41 +89,24 @@ qwen397Chat.post('/qwen397-chat',async c=>{
 
   const qwenConfigured=hasQwen397Endpoint(c.env);
   const kimiConfigured=hasKimiEndpoint(c.env);
-  let out:{text:string;id:string;model:string;usage?:{input_tokens?:number;output_tokens?:number}};
+  let out:RoutedOutput;
   let provider='Qwen 397B endpoint';
   let fallback=false;
   let reason='Qwen3.5-397B-A17B respondió desde el endpoint configurado';
-  let fallbackLevel=0;
+  let fallbackLevel:0|1|2=0;
 
   try{
     if(qwenConfigured){
       try{
         out=await callQwen397(c.env,system,history);
       }catch(error){
-        fallback=true;
-        fallbackLevel=1;
-        reason=`Qwen 397B falló: ${error instanceof Error?error.message:'error desconocido'}`;
-        if(kimiConfigured){
-          provider='Kimi K2.5 endpoint';
-          out=await callKimiK2_5(c.env,`${system}\n\nQwen 397B no estuvo disponible. Responde como fallback Kimi identificado.`,history);
-        }else{
-          provider='Cloudflare';
-          fallbackLevel=2;
-          out=await callCloudflare(c.env,`${system}\n\nQwen 397B no estuvo disponible. Responde como fallback Workers AI identificado.`,message);
-        }
+        const qwenError=error instanceof Error?error.message:'error desconocido';
+        const routed=await fallbackAfterQwen(c.env,system,history,message,`Qwen 397B falló: ${qwenError}`);
+        out=routed.out;provider=routed.provider;fallback=true;fallbackLevel=routed.fallbackLevel;reason=routed.reason;
       }
-    }else if(kimiConfigured){
-      fallback=true;
-      fallbackLevel=1;
-      provider='Kimi K2.5 endpoint';
-      reason='Qwen 397B está integrado, pero faltan QWEN_397B_BASE_URL y QWEN_397B_TOKEN; se usó Kimi K2.5';
-      out=await callKimiK2_5(c.env,`${system}\n\nQwen 397B aún no tiene endpoint. Responde como fallback Kimi identificado.`,history);
     }else{
-      fallback=true;
-      fallbackLevel=2;
-      provider='Cloudflare';
-      reason='Qwen 397B y Kimi K2.5 no tienen endpoint configurado; se usó Workers AI';
-      out=await callCloudflare(c.env,`${system}\n\nQwen 397B aún no tiene endpoint. Responde como fallback Workers AI identificado.`,message);
+      const routed=await fallbackAfterQwen(c.env,system,history,message,'Qwen 397B no tiene endpoint y secreto configurados');
+      out=routed.out;provider=routed.provider;fallback=true;fallbackLevel=routed.fallbackLevel;reason=routed.reason;
     }
 
     const contract=enforceResponseContract(message,out.text);
