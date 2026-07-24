@@ -1,8 +1,9 @@
 {
-  "schemaVersion": 2,
+  "schemaVersion": 3,
   "stage": 6,
   "name": "Inteligencia híbrida autoevolutiva",
   "status": "active",
+  "statusManifest": "model/hector-asi/stage-6-status.json",
   "experienceGoal": "Usar el mejor cerebro abierto disponible en la PWA mientras el modelo propio aumenta su autonomía con pesos entrenables",
   "operatingMode": {
     "defaultReasoning": "high",
@@ -10,19 +11,20 @@
     "teacher": "OPENAI_MODEL_REASONING",
     "operationalOpenRuntime": "moonshotai/Kimi-K2.5",
     "trainableFoundation": "moonshotai/Kimi-K2-Base",
-    "transitionRuntime": "Qwen/Qwen3-8B",
+    "immediateTrainableBase": "Qwen/Qwen3-8B",
     "ownChampion": "hector-asi-qwen15-v41"
   },
   "modelRoles": {
     "operational": "Kimi K2.5 para chat, visión, código, agentes y uso de herramientas",
-    "trainable": "Kimi K2 Base como fundamento final de pesos propios cuando exista infraestructura multi-GPU",
-    "transition": "Qwen3-8B para validar datos, evaluación y QLoRA sin confundirlo con el campeón final",
+    "trainableFinal": "Kimi K2 Base como fundamento final de pesos propios cuando exista infraestructura multi-GPU",
+    "trainableImmediate": "Qwen3-8B para el siguiente entrenamiento principal sujeto a las cuatro puertas",
     "teacher": "GPT-5.6 de razonamiento para generación de datos, verificación y respaldo"
   },
   "pipeline": [
     {"id":"data","label":"Corpus verificable","target":10000,"unit":"ejemplos"},
     {"id":"benchmark","label":"Benchmark V2","target":500,"stretchTarget":1000,"unit":"casos ocultos"},
     {"id":"failures","label":"Fallos entrenables de V41","target":100,"unit":"casos"},
+    {"id":"compute","label":"GPU y reanudación persistente","target":16384,"unit":"MiB VRAM libre"},
     {"id":"autonomy","label":"Autonomía propia final","target":90,"unit":"porcentaje"}
   ],
   "compute": {
@@ -39,5 +41,5 @@
     "requiresReproducibility": true,
     "requiresRollback": true
   },
-  "principle": "Kimi K2.5 mejora la experiencia de la PWA desde ahora; Kimi K2 Base permanece separado como objetivo de entrenamiento propio. La PWA nunca declara activo un modelo cuyo endpoint no haya respondido."
+  "principle": "El estado visible proviene de un único manifiesto canónico. V41 permanece campeón y ninguna nueva Vxx se autoriza hasta abrir corpus, fallos entrenables, GPU y reanudación; Benchmark V2 ya está abierto."
 }
