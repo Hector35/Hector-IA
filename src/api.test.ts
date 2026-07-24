@@ -24,12 +24,13 @@ describe('Stage 6 maximum-intelligence mode',()=>{
  });
 
  it('preserves an explicitly selected runtime while raising cognition',()=>{
-  expect(stageSixChatOptions({runtime:'hector-qwen'})).toEqual({runtime:'hector-qwen',reasoning:'high',deliberation:'force'});
+  expect(stageSixChatOptions({runtime:'hector-qwen397'})).toEqual({runtime:'hector-qwen397',reasoning:'high',deliberation:'force'});
  });
 
- it('recognizes Kimi K2.5 and Kimi K2 Base as explicit Kimi selections',()=>{
+ it('recognizes Qwen 397B and Kimi K2.5 as explicit model selections',()=>{
+  expect(usesSelectedModelChat('usa Qwen 397B')).toBe(true);
+  expect(usesSelectedModelChat('habla con Qwen3.5-397B')).toBe(true);
   expect(usesSelectedModelChat('usa Kimi K2.5')).toBe(true);
-  expect(usesSelectedModelChat('habla con Kimi K2 Base')).toBe(true);
   expect(usesSelectedModelChat('hola')).toBe(false);
  });
 });
