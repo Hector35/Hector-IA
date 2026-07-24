@@ -1,0 +1,88 @@
+{
+  "schemaVersion": 1,
+  "experimentId": "hector-asi-qwen15-v60-kto",
+  "status": "rejected-for-champion",
+  "decision": "retain-v41",
+  "baseModel": "Qwen/Qwen2.5-1.5B-Instruct",
+  "baseRevision": "989aa7980e4cf806f80c7fef2b1adb7bc71aa306",
+  "sourceChampion": {
+    "runtimeId": "hector-asi-qwen15-v41",
+    "artifactId": 8560331055,
+    "adapterSha256": "31bead5f59982d8e321517fd235b81f992f83d2e3792a55690c2a841ff0e28f8",
+    "adapterBytes": 73911112
+  },
+  "training": {
+    "runId": 30061948123,
+    "artifactId": 8585310196,
+    "artifactDigest": "sha256:c889b69ebc732cf621ccf45910aefebd59c37493a2029adcd8dbf07522478f84",
+    "artifactExpiresAt": "2026-10-22T02:33:43Z",
+    "adapterSha256": "2fa4fe9a0d08a797ab4544d2a31b51f3c204d68f9c3bd17cc71e9b7cc28ec6a6",
+    "adapterBytes": 73911112,
+    "replicasByteIdentical": true,
+    "method": "KTO-style prospect objective with frozen V41 reference, length-normalized log-ratios and LoRA trust penalty",
+    "hyperparameters": {
+      "epochs": 3,
+      "learningRate": 0.000002,
+      "beta": 0.12,
+      "anchorLambda": 0.03,
+      "maxLength": 160,
+      "seed": 3060
+    },
+    "runtime": {
+      "secondsPerReplica": 923.7975561618805,
+      "peakRssMb": 11976.78515625,
+      "python": "3.11.15",
+      "torch": "2.7.1+cpu",
+      "hardware": "Linux-6.17.0-1020-azure-x86_64-with-glibc2.39"
+    }
+  },
+  "dataset": {
+    "trainExamples": 10,
+    "validationExamples": 4,
+    "hiddenTestExamples": 18,
+    "criticalHiddenExamples": 6,
+    "crossSplitOverlap": 0,
+    "privateUserData": false,
+    "license": "author-generated Apache-2.0-compatible",
+    "trainSha256": "1a723987a3af55cf021d26f2eff09ac02587eb8e420ebf1ce3caff5d13aeb6e6",
+    "validationSha256": "99a2ffb1be45d31d9e8e2ccdd251a271d77cedbdf882c160bdc75688f2a7b5a6",
+    "hiddenTestSha256": "17560e21b728c93f822a0e21cb4b4261823ae5b6f92f3fe1188fdfd4b5679ccb"
+  },
+  "comparison": {
+    "validationObjective": {
+      "v41": 0.9530773758888245,
+      "v60": 0.9074510335922241,
+      "relativeImprovement": 0.0478737644609503
+    },
+    "behavior": {
+      "v41Passed": 11,
+      "v60Passed": 11,
+      "total": 18,
+      "v41CriticalPassed": 6,
+      "v60CriticalPassed": 6,
+      "criticalTotal": 6,
+      "v41MeanTokens": 20.88888888888889,
+      "v60MeanTokens": 25.166666666666668,
+      "tokenRatio": 1.2047872340425532,
+      "v41MeanLatencyMs": 7243.935305666669,
+      "v60MeanLatencyMs": 8460.739801388885,
+      "latencyRatio": 1.1679756160674646
+    }
+  },
+  "gates": {
+    "weightsChanged": true,
+    "replicasByteIdentical": true,
+    "validationImproved": true,
+    "behavioralImprovement": false,
+    "criticalPerfect": true,
+    "noCriticalRegression": true,
+    "latencyAcceptable": false,
+    "tokenLengthAcceptable": false,
+    "eligibleForChampion": false
+  },
+  "finding": "KTO improved the held-out preference objective and preserved all six critical safety cases, but did not improve discrete behavioral accuracy. It increased mean output tokens by 20.48% and mean latency by 16.80%, failing both efficiency gates.",
+  "doNotRepeat": [
+    "KTO-style prospect objective from V41 with beta 0.12, anchor 0.03, LR 2e-6, 3 epochs, seed 3060 and this 10/4/18 split"
+  ],
+  "rollback": "hector-asi-qwen15-v41"
+}
