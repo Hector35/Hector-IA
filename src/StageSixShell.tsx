@@ -1,5 +1,5 @@
 import {useEffect,useState,type ReactNode} from 'react';
-import {BrainCircuit,Check,Cpu,Database,Network,Sparkles,Target,X,Zap} from 'lucide-react';
+import {BrainCircuit,Check,Clock3,Cpu,Database,Network,Sparkles,Target,X,Zap} from 'lucide-react';
 
 export type StageSixStatus={
   stage:number;
@@ -12,6 +12,7 @@ export type StageSixStatus={
     teacher:{provider:string;model:string;role:string};
     balanced:{provider:string;model:string;role:string};
     fast:{provider:string;model:string;role:string};
+    kimi:{provider:string;model:string;label:string;role:string;mode:string;enabled:boolean;endpointConfigured:boolean;totalParameters:string;activeParameters:string;reason:string};
     open:{provider:string;model:string;role:string};
     own:{runtimeId:string;label:string;role:string;mode:string;enabled:boolean};
   };
@@ -26,12 +27,13 @@ const fallback:StageSixStatus={
   status:'loading',
   active:true,
   experienceMode:'maximum-intelligence',
-  reasoning:{effort:'high',deliberation:'force',description:'Razonamiento alto y doble deliberación para el chat normal.'},
+  reasoning:{effort:'high',deliberation:'force',description:'Kimi K2 Base es el objetivo abierto del chat; cualquier fallback se identifica.'},
   models:{
     teacher:{provider:'openai',model:'GPT-5.6 reasoning',role:'cerebro maestro'},
     balanced:{provider:'openai',model:'GPT-5.6 balanced',role:'respaldo equilibrado'},
     fast:{provider:'openai',model:'GPT-5.6 fast',role:'ruta rápida disponible'},
-    open:{provider:'huggingface',model:'Qwen/Qwen3-8B',role:'cerebro abierto de transición'},
+    kimi:{provider:'moonshot-open-weights',model:'moonshotai/Kimi-K2-Base',label:'Héctor Kimi K2 Base',role:'base MoE principal',mode:'pending-endpoint',enabled:true,endpointConfigured:false,totalParameters:'1T',activeParameters:'32B',reason:'Preparado en la PWA; falta conectar el endpoint GPU.'},
+    open:{provider:'huggingface',model:'Qwen/Qwen3-8B',role:'fallback abierto de transición'},
     own:{runtimeId:'hector-asi-qwen15-v41',label:'Héctor Qwen15 V41',role:'cerebro propio en crecimiento',mode:'verificando',enabled:false}
   },
   pipeline:[
@@ -41,7 +43,7 @@ const fallback:StageSixStatus={
     {id:'autonomy',label:'Autonomía del modelo propio',target:90,unit:'%'}
   ],
   promotion:{minimumAbsoluteBenchmarkGain:.03,requiresMultipleCapabilityGains:true,requiresReproducibility:true,requiresRollback:true},
-  principle:'GPT-5.6 alta opera desde ahora; el modelo abierto y el campeón propio absorben progresivamente tareas verificadas.'
+  principle:'Kimi K2 Base es la base MoE objetivo; solo se marcará activa cuando el endpoint GPU responda.'
 };
 
 export function StageSixShell({children}:{children:ReactNode}){
@@ -55,32 +57,35 @@ export function StageSixShell({children}:{children:ReactNode}){
       .catch(()=>setStatus(fallback));
   },[]);
 
+  const kimiReady=status.models.kimi.endpointConfigured;
+
   return <>
     {children}
-    <button className="s6Badge" type="button" onClick={()=>setOpen(true)} aria-label="Abrir estado de Etapa 6">
+    <button className="s6Badge" type="button" onClick={()=>setOpen(true)} aria-label="Abrir estado de Kimi K2 Base">
       <span className="s6Pulse"/>
-      <strong>ETAPA 6</strong>
-      <small>GPT-5.6 ALTA</small>
+      <strong>KIMI K2</strong>
+      <small>{kimiReady?'BASE ACTIVA':'BASE PREPARADA'}</small>
     </button>
-    {open&&<div className="s6Overlay" role="dialog" aria-modal="true" aria-label="Estado de Etapa 6">
-      <button className="s6Backdrop" type="button" onClick={()=>setOpen(false)} aria-label="Cerrar Etapa 6"/>
+    {open&&<div className="s6Overlay" role="dialog" aria-modal="true" aria-label="Estado de Kimi K2 Base">
+      <button className="s6Backdrop" type="button" onClick={()=>setOpen(false)} aria-label="Cerrar estado de Kimi K2 Base"/>
       <section className="s6Panel">
         <header>
-          <div><span>ARQUITECTURA ACTIVA</span><h2>Etapa {status.stage}</h2><p>{status.name}</p></div>
+          <div><span>ARQUITECTURA ABIERTA OBJETIVO</span><h2>{status.models.kimi.label}</h2><p>{status.models.kimi.model}</p></div>
           <button type="button" onClick={()=>setOpen(false)} aria-label="Cerrar"><X/></button>
         </header>
 
         <article className="s6Hero">
           <div className="s6HeroIcon"><BrainCircuit/></div>
-          <div><span>MODO DE EXPERIENCIA</span><strong>Máxima inteligencia</strong><small>{status.reasoning.description}</small></div>
-          <em><Sparkles/>ACTIVA</em>
+          <div><span>MODELO MoE</span><strong>{status.models.kimi.totalParameters} totales · {status.models.kimi.activeParameters} activos</strong><small>{status.models.kimi.reason}</small></div>
+          <em>{kimiReady?<><Sparkles/>ACTIVA</>:<><Clock3/>PENDIENTE</>}</em>
         </article>
 
         <section className="s6Section">
           <h3>Cerebros conectados</h3>
           <div className="s6Brains">
-            <article><Zap/><div><span>MAESTRO</span><strong>{status.models.teacher.model}</strong><small>Razonamiento alto y síntesis final</small></div><Check/></article>
-            <article><Cpu/><div><span>ABIERTO</span><strong>{status.models.open.model}</strong><small>Base de transición de 8B</small></div><Check/></article>
+            <article><Network/><div><span>BASE PRINCIPAL</span><strong>{status.models.kimi.label}</strong><small>{kimiReady?'Endpoint GPU conectado':'Visible en PWA; endpoint GPU pendiente'}</small></div>{kimiReady?<Check/>:<Clock3/>}</article>
+            <article><Zap/><div><span>MAESTRO</span><strong>{status.models.teacher.model}</strong><small>Entrenamiento, evaluación y síntesis autorizada</small></div><Check/></article>
+            <article><Cpu/><div><span>TRANSICIÓN</span><strong>{status.models.open.model}</strong><small>Fallback abierto mientras Kimi se conecta</small></div><Check/></article>
             <article><Network/><div><span>PROPIO</span><strong>{status.models.own.label}</strong><small>{status.models.own.mode} · autonomía en crecimiento</small></div><Check/></article>
           </div>
         </section>
