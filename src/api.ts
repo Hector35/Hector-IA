@@ -1,138 +1,29 @@
 export type User={id:string;name:string};
-export type HectorRuntimeId='auto'|'hector-kimi'|'hector-base'|'hector-qwen'|'hector-experimental';
+export type HectorRuntimeId='auto'|'hector-qwen397'|'hector-kimi'|'hector-base'|'hector-qwen'|'hector-experimental';
 export type ChatOptions={reasoning?:'auto'|'high';deliberation?:'auto'|'force'|'off';runtime?:HectorRuntimeId};
-
 export const STAGE_SIX_CHAT_OPTIONS={reasoning:'high',deliberation:'force'} as const;
-
 const advancedChatSignals=/\b(implementa|refactoriza|audita|investiga|demuestra|optimiza|arquitectura|debug|depura|c[oó]digo|typescript|javascript|python|react|worker|cloudflare|github|api|sql|d1|r2|deploy|workflow|salud|m[eé]dic|dolor|s[ií]ntoma|dosis|finanzas|saldo|banco|contrase[ñn]a|password|token|secreto|privado|legal|contrato|hoy|actual|reciente|noticia|precio|clima|busca|internet)\b/i;
-const selectedModelSignals=/^\s*\/modelos?\b|^\s*\/modelo\s+(?:h[eé]ctor\s+)?(?:base|qwen|kimi|propio|experimental|qwen15(?:-(?:v10|v41))?)\b|\b(?:usa|habla con|responde con)\s+(?:(?:mi|tu|el)\s+modelo(?:\s+propio|\s+experimental)?|(?:h[eé]ctor\s+)?(?:base|qwen|kimi)|kimi[- ]?k2(?:[ .-]?5|[- ]?base)?|hector-asi-qwen15-(?:v10|v41))\b/i;
+const selectedModelSignals=/^\s*\/modelos?\b|^\s*\/modelo\s+(?:h[eé]ctor\s+)?(?:base|qwen|qwen397|kimi|propio|experimental|qwen15(?:-(?:v10|v41))?)\b|\b(?:usa|habla con|responde con)\s+(?:(?:mi|tu|el)\s+modelo(?:\s+propio|\s+experimental)?|(?:h[eé]ctor\s+)?(?:base|qwen|kimi)|qwen(?:3[ .-]?5)?[- ]?397b?|kimi[- ]?k2(?:[ .-]?5|[- ]?base)?|hector-asi-qwen15-(?:v10|v41))\b/i;
+const qwen397Signals=/^\s*\/modelo\s+(?:h[eé]ctor\s+)?(?:qwen|qwen397)\b|\b(?:usa|habla con|responde con)\s+(?:h[eé]ctor\s+)?(?:qwen|qwen(?:3[ .-]?5)?[- ]?397b?)\b/i;
 const kimiSignals=/^\s*\/modelo\s+(?:h[eé]ctor\s+)?kimi\b|\b(?:usa|habla con|responde con)\s+(?:h[eé]ctor\s+)?(?:kimi|kimi[- ]?k2(?:[ .-]?5|[- ]?base)?)\b/i;
 const customMinuteSchedule=/^\s*cada\s+(\d{1,5})\s+minutos?\b/i;
 const autonomousWork=/\b(modo trabajo|no te detengas|hasta (?:dejar(?:la|lo)?|terminar|completar)(?:lo|la)?\s+(?:funcionando|terminado|completo)?|contin[uú]a hasta)\b/i;
-
-export function chatOptionsForRuntime(message:string,options:ChatOptions={}):ChatOptions{
- const text=message.trim();
- const canUseOperationalBase=text.length>0&&text.length<=700&&!advancedChatSignals.test(text);
- if(canUseOperationalBase&&options.reasoning==='high'&&options.deliberation!=='force'&&!options.runtime)return{reasoning:'auto',deliberation:'off'};
- return options;
-}
-
-export function stageSixChatOptions(options:ChatOptions={}):ChatOptions{
- return{...options,reasoning:STAGE_SIX_CHAT_OPTIONS.reasoning,deliberation:STAGE_SIX_CHAT_OPTIONS.deliberation};
-}
-
+export function chatOptionsForRuntime(message:string,options:ChatOptions={}):ChatOptions{const text=message.trim(),canUseOperationalBase=text.length>0&&text.length<=700&&!advancedChatSignals.test(text);if(canUseOperationalBase&&options.reasoning==='high'&&options.deliberation!=='force'&&!options.runtime)return{reasoning:'auto',deliberation:'off'};return options;}
+export function stageSixChatOptions(options:ChatOptions={}):ChatOptions{return{...options,reasoning:STAGE_SIX_CHAT_OPTIONS.reasoning,deliberation:STAGE_SIX_CHAT_OPTIONS.deliberation};}
 export function usesSelectedModelChat(message:string,options:ChatOptions={}){return Boolean(options.runtime)||selectedModelSignals.test(message);}
-
-async function request<T>(path:string,init?:RequestInit):Promise<T>{
- const res=await fetch(`/api${path}`,{...init,headers:{...(init?.body instanceof FormData?{}:{'Content-Type':'application/json'}),...init?.headers}});
- const data=await res.json().catch(()=>({}));
- if(!res.ok){const error=new Error(data.error||'Error de conexión') as Error&{data?:any};error.data=data;throw error;}
- return data;
-}
-
-function operationResult(content:string,conversationId:string|undefined,model:string){
- return{
-  conversationId,
-  message:{id:`operation-${Date.now()}`,role:'assistant',content},
-  provider:'Héctor OS',
-  model,
-  fallback:false,
-  modelTier:'deterministic-operation'
- };
-}
-
-async function chat(message:string,conversationId?:string,options:ChatOptions={}):Promise<any>{
- const text=message.trim();
- const schedule=text.match(customMinuteSchedule);
- if(schedule){
-  const intervalMinutes=Math.max(1,Math.min(10080,Number(schedule[1])));
-  const firstRunAt=new Date(Date.now()+intervalMinutes*60_000).toISOString();
-  await request('/schedules',{
-   method:'POST',
-   body:JSON.stringify({
-    title:text.slice(0,100),
-    prompt:text,
-    kind:'agent',
-    cadence:'custom_minutes',
-    intervalMinutes,
-    firstRunAt,
-    reasoningLevel:'high',
-    autonomyMode:'continuous',
-    allowWeb:true
-   })
-  });
-  return operationResult(`Programación creada\n\nSe ejecutará cada ${intervalMinutes} minutos con razonamiento alto y autonomía continua. Sus ejecuciones y resultados aparecerán aquí mismo.`,conversationId,'scheduler');
- }
- if(autonomousWork.test(text)){
-  await request('/work-mode',{method:'POST',body:JSON.stringify({goal:text})});
-  return operationResult('Trabajo autónomo iniciado\n\nEl seguimiento aparecerá automáticamente dentro de este chat mientras Héctor continúa hasta verificar el objetivo.',conversationId,'work-mode');
- }
- const selected=usesSelectedModelChat(text,options);
- const kimiRequested=options.runtime==='hector-kimi'||kimiSignals.test(text)||!selected;
- if(kimiRequested)return request<any>('/intelligence/kimi-chat',{method:'POST',body:JSON.stringify({message:text,conversationId,...stageSixChatOptions(options)})});
- return request<any>('/intelligence/model-chat',{method:'POST',body:JSON.stringify({message:text,conversationId,runtime:options.runtime||'auto'})});
-}
-
+async function request<T>(path:string,init?:RequestInit):Promise<T>{const res=await fetch(`/api${path}`,{...init,headers:{...(init?.body instanceof FormData?{}:{'Content-Type':'application/json'}),...init?.headers}});const data=await res.json().catch(()=>({}));if(!res.ok){const error=new Error(data.error||'Error de conexión') as Error&{data?:any};error.data=data;throw error;}return data;}
+function operationResult(content:string,conversationId:string|undefined,model:string){return{conversationId,message:{id:`operation-${Date.now()}`,role:'assistant',content},provider:'Héctor OS',model,fallback:false,modelTier:'deterministic-operation'};}
+async function chat(message:string,conversationId?:string,options:ChatOptions={}):Promise<any>{const text=message.trim(),schedule=text.match(customMinuteSchedule);if(schedule){const intervalMinutes=Math.max(1,Math.min(10080,Number(schedule[1]))),firstRunAt=new Date(Date.now()+intervalMinutes*60_000).toISOString();await request('/schedules',{method:'POST',body:JSON.stringify({title:text.slice(0,100),prompt:text,kind:'agent',cadence:'custom_minutes',intervalMinutes,firstRunAt,reasoningLevel:'high',autonomyMode:'continuous',allowWeb:true})});return operationResult(`Programación creada\n\nSe ejecutará cada ${intervalMinutes} minutos con razonamiento alto y autonomía continua. Sus ejecuciones y resultados aparecerán aquí mismo.`,conversationId,'scheduler');}if(autonomousWork.test(text)){await request('/work-mode',{method:'POST',body:JSON.stringify({goal:text})});return operationResult('Trabajo autónomo iniciado\n\nEl seguimiento aparecerá automáticamente dentro de este chat mientras Héctor continúa hasta verificar el objetivo.',conversationId,'work-mode');}const selected=usesSelectedModelChat(text,options),qwenRequested=options.runtime==='hector-qwen397'||qwen397Signals.test(text)||!selected;if(qwenRequested)return request<any>('/intelligence/qwen397-chat',{method:'POST',body:JSON.stringify({message:text,conversationId,...stageSixChatOptions(options)})});const kimiRequested=options.runtime==='hector-kimi'||kimiSignals.test(text);if(kimiRequested)return request<any>('/intelligence/kimi-chat',{method:'POST',body:JSON.stringify({message:text,conversationId,...stageSixChatOptions(options)})});return request<any>('/intelligence/model-chat',{method:'POST',body:JSON.stringify({message:text,conversationId,runtime:options.runtime||'auto'})});}
 export const api={
- me:()=>request<{user:User}>('/auth/me'),
- login:(email:string,password:string)=>request<{user:User}>('/auth/login',{method:'POST',body:JSON.stringify({email,password})}),
- register:(name:string,email:string,password:string)=>request<{user:User}>('/auth/register',{method:'POST',body:JSON.stringify({name,email,password})}),
- logout:()=>request('/auth/logout',{method:'POST'}),
- dashboard:()=>request<any>('/dashboard'),
- conversations:()=>request<any>('/conversations'),
- conversationMessages:(id:string)=>request<any>(`/conversations/${id}/messages`),
- models:()=>request<any>('/intelligence/models'),
- kimiStatus:()=>request<any>('/intelligence/kimi-status'),
- stageSix:()=>request<any>('/system/stage-6'),
- chat,
- chatAgents:(conversationId:string)=>request<any>(`/chat-agents/${conversationId}`),
- createChatAgent:(conversationId:string,data:any)=>request<any>(`/chat-agents/${conversationId}`,{method:'POST',body:JSON.stringify(data)}),
- updateChatAgent:(conversationId:string,agentId:string,data:any)=>request<any>(`/chat-agents/${conversationId}/${agentId}`,{method:'PUT',body:JSON.stringify(data)}),
- deleteChatAgent:(conversationId:string,agentId:string)=>request<any>(`/chat-agents/${conversationId}/${agentId}`,{method:'DELETE'}),
- runChatAgents:(conversationId:string,data:any={})=>request<any>(`/chat-agents/${conversationId}/run`,{method:'POST',body:JSON.stringify(data)}),
- pauseChatAgentRun:(conversationId:string,runId:string)=>request<any>(`/chat-agents/${conversationId}/runs/${runId}/pause`,{method:'POST'}),
- delegations:()=>request<any>('/delegations'),
- delegation:(id:string)=>request<any>(`/delegations/${id}`),
- createDelegation:(data:{sourceConversationId:string;target:string;instruction:string;maxIterations:number;stopOnSuccess?:boolean})=>request<any>('/delegations',{method:'POST',body:JSON.stringify(data)}),
- pauseDelegation:(id:string)=>request<any>(`/delegations/${id}/pause`,{method:'POST'}),
- resumeDelegation:(id:string)=>request<any>(`/delegations/${id}/resume`,{method:'POST'}),
- setConversationAlias:(conversationId:string,alias:string)=>request<any>(`/delegations/aliases/${conversationId}`,{method:'PUT',body:JSON.stringify({alias})}),
- projects:()=>request<any>('/projects'),
- project:(id:string)=>request<any>(`/projects/${id}`),
- projectTaskMessages:(projectId:string,taskId:string)=>request<any>(`/projects/${projectId}/tasks/${taskId}/messages`),
- createProjectFromMessage:(data:any)=>request<any>('/projects/from-message',{method:'POST',body:JSON.stringify(data)}),
- pauseProject:(id:string)=>request<any>(`/projects/${id}/pause`,{method:'POST'}),
- resumeProject:(id:string)=>request<any>(`/projects/${id}/resume`,{method:'POST'}),
- intelligenceStatus:()=>request<any>('/intelligence/status'),
- deliberationStatus:()=>request<any>('/intelligence/deliberation-status'),
- selfEvaluate:()=>request<any>('/intelligence/self-evaluate',{method:'POST'}),
- improvementPrompts:()=>request<any>('/intelligence/prompts'),
- markPromptSent:(id:string)=>request<any>(`/intelligence/prompts/${id}/sent`,{method:'POST'}),
- agentJobs:()=>request<any>('/agent/jobs'),
- agentJob:(id:string)=>request<any>(`/agent/jobs/${id}`),
- createAgentJob:(data:any)=>request<any>('/agent/jobs',{method:'POST',body:JSON.stringify(data)}),
- retryAgentJob:(id:string)=>request<any>(`/agent/jobs/${id}/retry`,{method:'POST'}),
- vision:(image:File,prompt:string)=>{const form=new FormData();form.append('image',image);form.append('prompt',prompt);return request<any>('/vision',{method:'POST',body:form});},
- usage:()=>request<any>('/usage'),
- assistantContext:()=>request<any>('/assistant/context'),
- assistantSkills:()=>request<any>('/assistant/skills'),
- assistantSettings:()=>request<any>('/assistant/settings'),
- saveAssistantSettings:(settings:any)=>request<any>('/assistant/settings',{method:'PUT',body:JSON.stringify(settings)}),
- requestUpdate:(requestText:string)=>request<any>('/assistant/updates',{method:'POST',body:JSON.stringify({request:requestText})}),
- factoryProjects:()=>request<any>('/factory/projects'),
- cloneApp:(name:string)=>request<any>('/factory/clone',{method:'POST',body:JSON.stringify({name})}),
- generatedApis:()=>request<any>('/api-factory/apis'),
- createGeneratedApi:(data:any)=>request<any>('/api-factory/apis',{method:'POST',body:JSON.stringify(data)}),
- workJobs:()=>request<any>('/work/jobs'),
- createWork:(data:any)=>request<any>('/work/jobs',{method:'POST',body:JSON.stringify(data)}),
- workJob:(id:string)=>request<any>(`/work/jobs/${id}`),
- workEvidence:(id:string)=>request<any>(`/work-evidence/jobs/${id}`),
- workEvidenceScreenshot:(jobId:string,evidenceId:string)=>`/api/work-evidence/jobs/${jobId}/${evidenceId}/screenshot`,
- workEvidenceReport:(jobId:string,evidenceId:string)=>`/api/work-evidence/jobs/${jobId}/${evidenceId}/report`,
- trackAction:(action:string)=>request('/assistant/event',{method:'POST',body:JSON.stringify({action})}),
- memories:()=>request<any>('/memories'),
- addMemory:(content:string)=>request('/memories',{method:'POST',body:JSON.stringify({content,importance:3})}),
- removeMemory:(id:string)=>request(`/memories/${id}`,{method:'DELETE'}),
- files:()=>request<any>('/files'),
- upload:(file:File)=>{const form=new FormData();form.append('file',file);return request('/files',{method:'POST',body:form});}
+ me:()=>request<{user:User}>('/auth/me'),login:(email:string,password:string)=>request<{user:User}>('/auth/login',{method:'POST',body:JSON.stringify({email,password})}),register:(name:string,email:string,password:string)=>request<{user:User}>('/auth/register',{method:'POST',body:JSON.stringify({name,email,password})}),logout:()=>request('/auth/logout',{method:'POST'}),
+ dashboard:()=>request<any>('/dashboard'),conversations:()=>request<any>('/conversations'),conversationMessages:(id:string)=>request<any>(`/conversations/${id}/messages`),models:()=>request<any>('/intelligence/models'),qwen397Status:()=>request<any>('/intelligence/qwen397-status'),kimiStatus:()=>request<any>('/intelligence/kimi-status'),stageSix:()=>request<any>('/system/stage-6'),chat,
+ chatAgents:(conversationId:string)=>request<any>(`/chat-agents/${conversationId}`),createChatAgent:(conversationId:string,data:any)=>request<any>(`/chat-agents/${conversationId}`,{method:'POST',body:JSON.stringify(data)}),updateChatAgent:(conversationId:string,agentId:string,data:any)=>request<any>(`/chat-agents/${conversationId}/${agentId}`,{method:'PUT',body:JSON.stringify(data)}),deleteChatAgent:(conversationId:string,agentId:string)=>request<any>(`/chat-agents/${conversationId}/${agentId}`,{method:'DELETE'}),runChatAgents:(conversationId:string,data:any={})=>request<any>(`/chat-agents/${conversationId}/run`,{method:'POST',body:JSON.stringify(data)}),pauseChatAgentRun:(conversationId:string,runId:string)=>request<any>(`/chat-agents/${conversationId}/runs/${runId}/pause`,{method:'POST'}),
+ delegations:()=>request<any>('/delegations'),delegation:(id:string)=>request<any>(`/delegations/${id}`),createDelegation:(data:{sourceConversationId:string;target:string;instruction:string;maxIterations:number;stopOnSuccess?:boolean})=>request<any>('/delegations',{method:'POST',body:JSON.stringify(data)}),pauseDelegation:(id:string)=>request<any>(`/delegations/${id}/pause`,{method:'POST'}),resumeDelegation:(id:string)=>request<any>(`/delegations/${id}/resume`,{method:'POST'}),setConversationAlias:(conversationId:string,alias:string)=>request<any>(`/delegations/aliases/${conversationId}`,{method:'PUT',body:JSON.stringify({alias})}),
+ projects:()=>request<any>('/projects'),project:(id:string)=>request<any>(`/projects/${id}`),projectTaskMessages:(projectId:string,taskId:string)=>request<any>(`/projects/${projectId}/tasks/${taskId}/messages`),createProjectFromMessage:(data:any)=>request<any>('/projects/from-message',{method:'POST',body:JSON.stringify(data)}),pauseProject:(id:string)=>request<any>(`/projects/${id}/pause`,{method:'POST'}),resumeProject:(id:string)=>request<any>(`/projects/${id}/resume`,{method:'POST'}),
+ intelligenceStatus:()=>request<any>('/intelligence/status'),deliberationStatus:()=>request<any>('/intelligence/deliberation-status'),selfEvaluate:()=>request<any>('/intelligence/self-evaluate',{method:'POST'}),improvementPrompts:()=>request<any>('/intelligence/prompts'),markPromptSent:(id:string)=>request<any>(`/intelligence/prompts/${id}/sent`,{method:'POST'}),
+ agentJobs:()=>request<any>('/agent/jobs'),agentJob:(id:string)=>request<any>(`/agent/jobs/${id}`),createAgentJob:(data:any)=>request<any>('/agent/jobs',{method:'POST',body:JSON.stringify(data)}),retryAgentJob:(id:string)=>request<any>(`/agent/jobs/${id}/retry`,{method:'POST'}),
+ vision:(image:File,prompt:string)=>{const f=new FormData();f.append('image',image);f.append('prompt',prompt);return request<any>('/vision',{method:'POST',body:f});},usage:()=>request<any>('/usage'),assistantContext:()=>request<any>('/assistant/context'),assistantSkills:()=>request<any>('/assistant/skills'),assistantSettings:()=>request<any>('/assistant/settings'),saveAssistantSettings:(settings:any)=>request<any>('/assistant/settings',{method:'PUT',body:JSON.stringify(settings)}),requestUpdate:(requestText:string)=>request<any>('/assistant/updates',{method:'POST',body:JSON.stringify({request:requestText})}),
+ factoryProjects:()=>request<any>('/factory/projects'),cloneApp:(name:string)=>request<any>('/factory/clone',{method:'POST',body:JSON.stringify({name})}),generatedApis:()=>request<any>('/api-factory/apis'),createGeneratedApi:(data:any)=>request<any>('/api-factory/apis',{method:'POST',body:JSON.stringify(data)}),
+ workJobs:()=>request<any>('/work/jobs'),createWork:(data:any)=>request<any>('/work/jobs',{method:'POST',body:JSON.stringify(data)}),workJob:(id:string)=>request<any>(`/work/jobs/${id}`),workEvidence:(id:string)=>request<any>(`/work-evidence/jobs/${id}`),workEvidenceScreenshot:(jobId:string,evidenceId:string)=>`/api/work-evidence/jobs/${jobId}/${evidenceId}/screenshot`,workEvidenceReport:(jobId:string,evidenceId:string)=>`/api/work-evidence/jobs/${jobId}/${evidenceId}/report`,trackAction:(action:string)=>request('/assistant/event',{method:'POST',body:JSON.stringify({action})}),
+ memories:()=>request<any>('/memories'),addMemory:(content:string)=>request('/memories',{method:'POST',body:JSON.stringify({content,importance:3})}),removeMemory:(id:string)=>request(`/memories/${id}`,{method:'DELETE'}),files:()=>request<any>('/files'),upload:(file:File)=>{const f=new FormData();f.append('file',file);return request('/files',{method:'POST',body:f});}
 };
