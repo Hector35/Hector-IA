@@ -5,7 +5,7 @@ on:
     paths:
       - '.github/workflows/hector-model-qwen15-v65-curriculum-training.yml'
       - 'model/hector-asi/training/train_qwen15_v65_curriculum.py'
-      - 'model/hector-asi/data/generate_qwen15_v65_curriculum.py'
+      - 'model/hector-asi/capability_loop/build_curriculum_v65.py'
   workflow_dispatch:
 permissions:
   contents: read
@@ -36,8 +36,8 @@ jobs:
       - name: Generate sealed curriculum and validate trainer
         run: |
           set -euo pipefail
-          python -m py_compile model/hector-asi/data/generate_qwen15_v65_curriculum.py model/hector-asi/training/train_qwen15_v65_curriculum.py
-          python model/hector-asi/data/generate_qwen15_v65_curriculum.py --out "$DATA"
+          python -m py_compile model/hector-asi/capability_loop/build_curriculum_v65.py model/hector-asi/training/train_qwen15_v65_curriculum.py
+          python model/hector-asi/capability_loop/build_curriculum_v65.py --out "$DATA"
           python - <<'PY'
           import json,os
           from pathlib import Path
