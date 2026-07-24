@@ -1,0 +1,75 @@
+{
+  "schemaVersion": 1,
+  "benchmarkVersion": "2.1.0",
+  "status": "canonical-candidate",
+  "historicalEquivalence": {
+    "resolved": true,
+    "conclusion": "The reported V41 scores 11/18 and 10/18 are not equivalent measurements.",
+    "evidence": [
+      {
+        "measurement": "promotion-evaluation",
+        "score": "11/18",
+        "critical": "3/3",
+        "datasetSha256": "71e2fc1eeac8e84615f67799dcf14b79c962f04126581f69e8be574db1bb0a6a",
+        "sourceRunId": 30005174985,
+        "notes": "V41 was compared with V15 and promoted using an 18-case dataset containing three critical cases."
+      },
+      {
+        "measurement": "later-v51-family-hidden-evaluation",
+        "score": "10/18",
+        "critical": "6/6",
+        "notes": "Later candidates reused a different sealed hidden set with six critical cases and a different scoring contract."
+      }
+    ],
+    "rootCause": [
+      "different hidden dataset revisions",
+      "different critical-case composition (3 versus 6)",
+      "evaluator/scoring contract changed between experiment families"
+    ],
+    "rule": "Historical scores must never be compared unless benchmark version, dataset SHA, system prompt, tokenizer revision, generation settings and scorer revision are identical."
+  },
+  "models": [
+    {
+      "id": "qwen25-15b-base",
+      "repository": "Qwen/Qwen2.5-1.5B-Instruct",
+      "revision": "989aa7980e4cf806f80c7fef2b1adb7bc71aa306",
+      "tokenizerRevision": "same-as-model-revision",
+      "role": "small-base-control"
+    },
+    {
+      "id": "hector-asi-qwen15-v15",
+      "repository": "Qwen/Qwen2.5-1.5B-Instruct",
+      "role": "historical-control"
+    },
+    {
+      "id": "hector-asi-qwen15-v41",
+      "repository": "Qwen/Qwen2.5-1.5B-Instruct",
+      "role": "current-own-champion"
+    },
+    {
+      "id": "qwen3-8b-base",
+      "repository": "Qwen/Qwen3-8B",
+      "role": "stage6-open-base-control"
+    }
+  ],
+  "systemPrompt": "Responde en español. Resuelve la tarea con precisión; usa evidencia o verificación cuando corresponda y no inventes información ausente.",
+  "generation": {
+    "doSample": false,
+    "temperature": 0,
+    "maxNewTokens": 256,
+    "repetitionPenalty": 1.0
+  },
+  "scorerRevision": "hector-benchmark-v2-structured-2",
+  "requiredComparisons": [
+    "qwen25-15b-base",
+    "hector-asi-qwen15-v15",
+    "hector-asi-qwen15-v41",
+    "qwen3-8b-base"
+  ],
+  "trainingGate": {
+    "minimumHiddenCases": 500,
+    "targetHiddenCases": 1000,
+    "maximumV41Score": 0.85,
+    "minimumTrainableV41Failures": 100
+  }
+}
