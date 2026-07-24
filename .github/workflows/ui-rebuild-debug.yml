@@ -1,0 +1,35 @@
+name: UI rebuild concise validation
+
+on:
+  push:
+    branches:
+      - ui-rebuild/20260724-brutal
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  concise-test:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+      - run: npm ci
+      - name: Typecheck
+        run: npm run typecheck
+      - name: Tests with concise failure output
+        shell: bash
+        run: |
+          set +e
+          npm test > /tmp/hector-test.log 2>&1
+          status=$?
+          tail -n 220 /tmp/hector-test.log
+          exit $status
+      - name: Build
+        if: success()
+        run: npm run build
