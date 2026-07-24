@@ -7,6 +7,15 @@ on:
     paths:
       - model/hector-asi/data/stage6/generate-canonical-20260724.mjs
       - model/hector-asi/data/stage6/verify-canonical-20260724.py
+      - model/hector-asi/data/stage6/latest-batch.json
+      - .github/workflows/stage6-canonical-data.yml
+  pull_request:
+    branches:
+      - main
+    paths:
+      - model/hector-asi/data/stage6/generate-canonical-20260724.mjs
+      - model/hector-asi/data/stage6/verify-canonical-20260724.py
+      - model/hector-asi/data/stage6/latest-batch.json
       - .github/workflows/stage6-canonical-data.yml
   workflow_dispatch:
 
@@ -42,6 +51,7 @@ jobs:
           npm run typecheck
           npm test
       - name: Commit generated canonical files to the source branch
+        if: github.event_name == 'push'
         run: |
           git config user.name 'hector-stage6-data-bot'
           git config user.email 'actions@users.noreply.github.com'
