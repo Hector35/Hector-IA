@@ -1,5 +1,5 @@
 {
-  "schemaVersion": 1,
+  "schemaVersion": 2,
   "stage": 6,
   "name": "Inteligencia híbrida autoevolutiva",
   "status": "active",
@@ -17,6 +17,14 @@
     {"id":"failures","label":"Fallos entrenables de V41","target":100,"unit":"casos"},
     {"id":"autonomy","label":"Autonomía propia final","target":90,"unit":"porcentaje"}
   ],
+  "compute": {
+    "statusManifest": "model/hector-asi/scale/compute-status.json",
+    "targetProfile": "qwen3-8b-main",
+    "minimumFreeVramMiB": 16384,
+    "persistentResumeRequired": true,
+    "cpuTrainingForbidden": true,
+    "workflow": ".github/workflows/hector-main-qlora.yml"
+  },
   "promotion": {
     "minimumAbsoluteBenchmarkGain": 0.03,
     "requiresMultipleCapabilityGains": true,
