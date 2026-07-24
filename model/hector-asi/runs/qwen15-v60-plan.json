@@ -1,0 +1,14 @@
+{
+  "schemaVersion": 1,
+  "experimentId": "hector-asi-qwen15-v60-kto",
+  "status": "training-planned",
+  "sourceRuntime": "hector-asi-qwen15-v41",
+  "sourceArtifactId": 8560331055,
+  "sourceAdapterSha256": "31bead5f59982d8e321517fd235b81f992f83d2e3792a55690c2a841ff0e28f8",
+  "method": "KTO-style prospect objective with frozen V41 reference, length-normalized log-ratios and LoRA trust penalty",
+  "dataset": {"trainRows": 10, "validationRows": 4, "hiddenRows": 18, "criticalHiddenRows": 6, "privateUserData": false, "license": "author-generated Apache-2.0-compatible", "crossSplitOverlap": 0},
+  "hyperparameters": {"epochs": 3, "learningRate": 0.000002, "beta": 0.12, "anchorLambda": 0.03, "maxLength": 160, "maxNewTokens": 64, "seed": 3060},
+  "replicas": 2,
+  "promotionGates": {"behavioralImprovement": true, "criticalPerfect": true, "noCriticalRegression": true, "latencyRatioMax": 1.15, "tokenRatioMax": 1.05, "byteIdenticalReplicas": true},
+  "rollback": "hector-asi-qwen15-v41"
+}
