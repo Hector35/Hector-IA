@@ -1,0 +1,87 @@
+{
+  "schemaVersion": 1,
+  "experimentId": "hector-asi-qwen15-v73-agem",
+  "status": "rejected",
+  "decision": "keep-specialist-not-champion",
+  "champion": {
+    "model": "hector-asi-qwen15-v41",
+    "artifactId": 8560331055,
+    "adapterSha256": "31bead5f59982d8e321517fd235b81f992f83d2e3792a55690c2a841ff0e28f8"
+  },
+  "candidate": {
+    "runId": 30108333468,
+    "artifactId": 8603097542,
+    "artifactName": "hector-asi-qwen15-v73-agem-30108333468",
+    "artifactDigest": "sha256:20c17309e76549cc28737884fa9c3b66f092d1c6d51571434c27454f6a5dd5ae",
+    "artifactBytes": 144285915,
+    "artifactExpiresAt": "2026-10-22T16:13:42Z",
+    "adapterSha256": "c3a2762c8067b98d7911136f5dc12619086df26504838328d61ac6e943f2da23",
+    "adapterBytes": 73911112,
+    "replicasByteIdentical": true
+  },
+  "source": {
+    "model": "Qwen/Qwen2.5-1.5B-Instruct",
+    "revision": "989aa7980e4cf806f80c7fef2b1adb7bc71aa306",
+    "adapter": "hector-asi-qwen15-v41"
+  },
+  "dataset": {
+    "trainRows": 32,
+    "focalRows": 12,
+    "replayRows": 20,
+    "validationRows": 14,
+    "hiddenRows": 18,
+    "criticalRows": 6,
+    "crossSplitOverlap": 0,
+    "trainSha256": "c2eecf0876178e5b25bf6c05f6d27129200a86168e35fd54d5239e5b7d0553c9",
+    "validationSha256": "55d6b6379496dfae26d117930d96c7211869d7f2ef8484d00efb7f04a2e8e6ae",
+    "hiddenSha256": "17560e21b728c93f822a0e21cb4b4261823ae5b6f92f3fe1188fdfd4b5679ccb",
+    "provenance": "author-generated",
+    "license": "Apache-2.0-compatible",
+    "privateUserData": false
+  },
+  "training": {
+    "method": "A-GEM constrained response-only LoRA",
+    "trainableFactors": ["lora_A", "lora_B"],
+    "layers": "18-27",
+    "epochs": 3,
+    "learningRate": 2.5e-7,
+    "weightDecay": 0.035,
+    "eosLambda": 0.05,
+    "gradientClip": 0.08,
+    "maxLength": 144,
+    "seed": 3073,
+    "replicas": 2,
+    "projectedConflictsFinalEpoch": 2,
+    "hardware": "GitHub Actions Ubuntu 24.04 Azure x86_64 CPU",
+    "python": "3.11.15",
+    "pytorch": "2.7.1+cpu"
+  },
+  "evaluation": {
+    "baselineValidationObjective": 2.4677989780902863,
+    "candidateValidationObjective": 2.462328451020377,
+    "baselineBehaviorPassed": 10,
+    "candidateBehaviorPassed": 10,
+    "behaviorTotal": 18,
+    "baselineCriticalPassed": 6,
+    "candidateCriticalPassed": 6,
+    "criticalTotal": 6,
+    "tokenRatio": 1.0,
+    "latencyRatios": [0.9471913052137655, 0.9954259426057342]
+  },
+  "gates": {
+    "weightsChanged": true,
+    "replicasByteIdentical": true,
+    "validationImproved": true,
+    "behavioralImprovement": false,
+    "criticalPerfect": true,
+    "noCriticalRegression": true,
+    "latencyAcceptable": true,
+    "tokenLengthAcceptable": true,
+    "eligibleForPromotion": false
+  },
+  "rollback": "hector-asi-qwen15-v41",
+  "doNotRepeat": {
+    "reason": "A-GEM preserved the champion behavior and safety but did not improve any hidden behavioral case.",
+    "exactConfiguration": "12 focal + 20 replay; lora_A/lora_B layers 18-27; LR 2.5e-7; weight decay 0.035; EOS 0.05; clip 0.08; 3 epochs; seed 3073; split 32/14/18"
+  }
+}
