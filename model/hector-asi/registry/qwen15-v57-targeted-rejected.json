@@ -1,0 +1,98 @@
+{
+  "schemaVersion": 1,
+  "experimentId": "hector-asi-qwen15-v57-targeted",
+  "status": "rejected-for-champion",
+  "decision": "retain-v41",
+  "baseModel": "Qwen/Qwen2.5-1.5B-Instruct",
+  "baseRevision": "989aa7980e4cf806f80c7fef2b1adb7bc71aa306",
+  "sourceChampion": {
+    "runtimeId": "hector-asi-qwen15-v41",
+    "artifactId": 8560331055,
+    "adapterSha256": "31bead5f59982d8e321517fd235b81f992f83d2e3792a55690c2a841ff0e28f8",
+    "adapterBytes": 73911112
+  },
+  "training": {
+    "runId": 30053466862,
+    "artifactId": 8582556667,
+    "artifactDigest": "sha256:d001a37a0b68c5eb59ea8ffef525d9093b269b9e1d5911de8e415633c13923d8",
+    "artifactExpiresAt": "2026-10-21T23:31:39Z",
+    "adapterSha256": "37b6f483dc5282867739dafc89239bc4b2b0e3b4947dbdcf146915736bd630e6",
+    "adapterBytes": 73911112,
+    "replicasByteIdentical": true,
+    "method": "continued LoRA SFT from v41 with assistant-response-only weighted focal curriculum",
+    "hyperparameters": {
+      "epochs": 2,
+      "bestEpoch": 2,
+      "learningRate": 0.000003,
+      "maxLength": 144,
+      "maxNewTokens": 64,
+      "optimizer": "AdamW",
+      "seed": 3057,
+      "clip": 0.5,
+      "weightDecay": 0.02
+    },
+    "runtime": {
+      "secondsPerReplica": 1134.4046294689178,
+      "peakRssMb": 11305.01171875,
+      "python": "3.11.15",
+      "torch": "2.7.1+cpu",
+      "hardware": "Linux-6.17.0-1020-azure-x86_64-with-glibc2.39"
+    }
+  },
+  "dataset": {
+    "trainExamples": 40,
+    "validationExamples": 8,
+    "hiddenTestExamples": 24,
+    "criticalHiddenExamples": 6,
+    "crossSplitOverlap": 0,
+    "privateUserData": false,
+    "license": "author-generated Apache-2.0-compatible",
+    "trainSha256": "6e7f0714c0de90a97f4af5e6c31886261e5f86a986b31c9a0440ba113891daa6",
+    "validationSha256": "899650670d1647967b7eb310e146f0783c08111ac314779db8e022ccf1bf667a",
+    "hiddenTestSha256": "2bd7f963aa952dbfecfcbc6b0183dfd0d36aabd6cc256ee1495d16242cfcb8fd"
+  },
+  "comparison": {
+    "validationLoss": {
+      "v41": 1.9058509580790997,
+      "v57": 1.71776969358325,
+      "relativeImprovement": 0.09868623970754567
+    },
+    "hiddenTestLoss": {
+      "v41": 1.8130484021579225,
+      "v57": 1.4994295747407402,
+      "relativeImprovement": 0.17297873958792692,
+      "ratio": 0.8270212604120731
+    },
+    "behavior": {
+      "v41Passed": 10,
+      "v57Passed": 10,
+      "total": 24,
+      "v41CriticalPassed": 5,
+      "v57CriticalPassed": 4,
+      "criticalTotal": 6,
+      "v41MeanTokens": 18.666666666666668,
+      "v57MeanTokens": 20.333333333333332,
+      "tokenRatio": 1.0892857142857142,
+      "v41MeanLatencyMs": 6804.1758482500045,
+      "v57MeanLatencyMs": 7506.218657333345,
+      "latencyRatio": 1.10317822830283
+    }
+  },
+  "gates": {
+    "weightsChanged": true,
+    "replicasByteIdentical": true,
+    "validationImproved": true,
+    "hiddenLossWithinFivePercent": true,
+    "latencyWithinFifteenPercent": true,
+    "tokensWithinFivePercent": false,
+    "behavioralImprovement": false,
+    "criticalPerfect": false,
+    "noCriticalRegression": false,
+    "eligibleForChampion": false
+  },
+  "finding": "The focal response-only curriculum substantially improved validation and hidden NLL but produced no net behavioral gain, regressed one critical safety case, increased output length and increased latency. Lower NLL did not translate into a safer or more capable greedy policy.",
+  "doNotRepeat": [
+    "assistant-response-only weighted focal SFT from v41 with 40/8/24 split, LR 3e-6, 2 epochs, max length 144, max new tokens 64 and seed 3057"
+  ],
+  "rollback": "hector-asi-qwen15-v41"
+}
