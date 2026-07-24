@@ -1,7 +1,7 @@
 import type {Bindings} from '../types';
 import {CHAT_CHAMPION,chatChampionEvidence} from '../lib/chat-champion';
 import {hasCustomModelEndpoint,hasQueuedCustomInference} from '../lib/custom-model-runtime';
-import {kimiK2Status} from '../lib/kimi-k2-runtime';
+import {kimiStatus} from '../lib/kimi-k2-runtime';
 
 export const STAGE_SIX={
   number:6,
@@ -9,7 +9,8 @@ export const STAGE_SIX={
   status:'active',
   defaultReasoning:'high',
   defaultDeliberation:'force',
-  targetOpenModel:'moonshotai/Kimi-K2-Base',
+  operationalOpenModel:'moonshotai/Kimi-K2.5',
+  trainableOpenModel:'moonshotai/Kimi-K2-Base',
   transitionOpenModel:'Qwen/Qwen3-8B',
   targets:{
     corpusExamples:10000,
@@ -23,21 +24,21 @@ export const STAGE_SIX={
 
 export function stageSixStatus(env:Bindings){
   const ownMode=hasCustomModelEndpoint(env)?'endpoint':hasQueuedCustomInference(env)?'github-actions':'artifact-only';
-  const kimi=kimiK2Status(env);
+  const kimi=kimiStatus(env);
   return{
     stage:STAGE_SIX.number,
     name:STAGE_SIX.name,
     status:STAGE_SIX.status,
     active:true,
     experienceMode:'maximum-intelligence',
-    reasoning:{effort:STAGE_SIX.defaultReasoning,deliberation:STAGE_SIX.defaultDeliberation,description:'Kimi K2 Base es el objetivo abierto del chat; las respuestas identifican cualquier fallback mientras se conecta el endpoint GPU.'},
+    reasoning:{effort:STAGE_SIX.defaultReasoning,deliberation:STAGE_SIX.defaultDeliberation,description:'Kimi K2.5 es el cerebro abierto operativo; cualquier fallback se identifica. Kimi K2 Base queda separado como objetivo de entrenamiento propio.'},
     models:{
-      teacher:{provider:'openai',model:env.OPENAI_MODEL_REASONING||env.OPENAI_MODEL_BALANCED||env.OPENAI_MODEL,role:'cerebro maestro'},
+      teacher:{provider:'openai',model:env.OPENAI_MODEL_REASONING||env.OPENAI_MODEL_BALANCED||env.OPENAI_MODEL,role:'maestro y verificador'},
       balanced:{provider:'openai',model:env.OPENAI_MODEL_BALANCED||env.OPENAI_MODEL,role:'respaldo equilibrado'},
       fast:{provider:'openai',model:env.OPENAI_MODEL_FAST||env.OPENAI_MODEL,role:'ruta rápida disponible'},
-      kimi:{provider:'moonshot-open-weights',model:kimi.model,label:kimi.label,role:'base MoE principal',mode:kimi.mode,enabled:kimi.enabled,endpointConfigured:kimi.endpointConfigured,totalParameters:kimi.totalParameters,activeParameters:kimi.activeParameters,reason:kimi.reason},
+      kimi:{provider:'moonshot-open-weights',model:kimi.model,label:kimi.label,role:'cerebro operativo multimodal y agentivo',mode:kimi.mode,enabled:kimi.enabled,endpointConfigured:kimi.endpointConfigured,totalParameters:kimi.totalParameters,activeParameters:kimi.activeParameters,contextLength:kimi.contextLength,multimodal:kimi.multimodal,thinking:kimi.thinking,reason:kimi.reason,trainingTarget:kimi.trainingTarget},
       open:{provider:'huggingface',model:env.HECTOR_QWEN_MODEL||STAGE_SIX.transitionOpenModel,role:'fallback abierto de transición'},
-      own:{...chatChampionEvidence(),label:CHAT_CHAMPION.label,role:'cerebro propio en crecimiento',mode:ownMode,enabled:env.HECTOR_CUSTOM_MODEL_ENABLED==='true'}
+      own:{...chatChampionEvidence(),label:CHAT_CHAMPION.label,role:'campeón propio vigente',mode:ownMode,enabled:env.HECTOR_CUSTOM_MODEL_ENABLED==='true'}
     },
     pipeline:[
       {id:'data',label:'Corpus verificable',target:STAGE_SIX.targets.corpusExamples,unit:'ejemplos'},
@@ -46,6 +47,6 @@ export function stageSixStatus(env:Bindings){
       {id:'autonomy',label:'Autonomía del modelo propio',target:STAGE_SIX.targets.ownModelAutonomyPercent,unit:'%'}
     ],
     promotion:{minimumAbsoluteBenchmarkGain:STAGE_SIX.targets.minimumAbsoluteBenchmarkGain,requiresMultipleCapabilityGains:true,requiresReproducibility:true,requiresRollback:true},
-    principle:'Kimi K2 Base es la base MoE objetivo de 1T parámetros; Héctor solo afirmará usarla cuando el endpoint GPU esté conectado y verificado.'
+    principle:'Kimi K2.5 mejora la PWA desde el uso diario; Kimi K2 Base permanece como fundamento entrenable para pesos propios cuando exista infraestructura suficiente.'
   };
 }
