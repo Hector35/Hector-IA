@@ -1,0 +1,53 @@
+name: Qwen 397B training admission
+
+on:
+  pull_request:
+    paths:
+      - 'model/hector-asi/scale/qwen35-397b-training-gates.json'
+      - 'model/hector-asi/scale/preflight_qwen397b.py'
+      - '.github/workflows/qwen397b-training-admission.yml'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  verify-blocked-state:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+      - name: Compile preflight
+        run: python -m py_compile model/hector-asi/scale/preflight_qwen397b.py
+      - name: Verify missing gates cannot launch training
+        shell: bash
+        run: |
+          mkdir -p /tmp/hector-empty artifacts
+          echo '{"qwen397bEligible":false}' > /tmp/hector-empty/hardware.json
+          echo '{"ok":false}' > /tmp/hector-empty/resume.json
+          set +e
+          python model/hector-asi/scale/preflight_qwen397b.py \
+            --config model/hector-asi/scale/qwen35-397b-training-gates.json \
+            --train /tmp/hector-empty/train.jsonl \
+            --hidden /tmp/hector-empty/hidden.jsonl \
+            --failures /tmp/hector-empty/failures.jsonl \
+            --hardware-report /tmp/hector-empty/hardware.json \
+            --resume-report /tmp/hector-empty/resume.json \
+            --output artifacts/qwen397b-admission.json
+          status=$?
+          test "$status" -eq 2
+          python - <<'PY'
+          import json
+          report=json.load(open('artifacts/qwen397b-admission.json'))
+          assert report['eligible'] is False
+          assert report['decision']=='do-not-train'
+          assert not any(report['gates'].values())
+          PY
+      - uses: actions/upload-artifact@v4
+        with:
+          name: qwen397b-training-admission
+          path: artifacts/qwen397b-admission.json
+          if-no-files-found: error
