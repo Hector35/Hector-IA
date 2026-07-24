@@ -1,0 +1,67 @@
+name: Stage 6 canonical data
+
+on:
+  push:
+    branches:
+      - stage6-data/20260724-verified
+    paths:
+      - model/hector-asi/data/stage6/generate-canonical-20260724.mjs
+      - model/hector-asi/data/stage6/verify-canonical-20260724.py
+      - .github/workflows/stage6-canonical-data.yml
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+concurrency:
+  group: stage6-canonical-data-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  materialize-and-verify:
+    runs-on: ubuntu-latest
+    timeout-minutes: 25
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+      - name: Materialize deterministic corpus
+        run: node model/hector-asi/data/stage6/generate-canonical-20260724.mjs
+      - name: Execute validators and 160 Python test suites
+        run: python model/hector-asi/data/stage6/verify-canonical-20260724.py
+      - name: Validate repository contracts
+        run: |
+          npm ci
+          npm run typecheck
+          npm test
+      - name: Commit generated canonical files to the source branch
+        run: |
+          git config user.name 'hector-stage6-data-bot'
+          git config user.email 'actions@users.noreply.github.com'
+          git add model/hector-asi/data/stage6/generated/canonical-sft-20260724.jsonl \
+                  model/hector-asi/data/stage6/generated/canonical-preference-20260724.jsonl \
+                  model/hector-asi/data/stage6/latest-batch.json
+          if git diff --cached --quiet; then
+            echo 'No generated changes to commit.'
+          else
+            git commit -m 'data(stage6): materialize validated 640-example canonical batch [skip ci]'
+            git push origin HEAD:${GITHUB_REF_NAME}
+          fi
+      - name: Upload immutable corpus evidence
+        uses: actions/upload-artifact@v4
+        with:
+          name: stage6-canonical-20260724-${{ github.run_id }}
+          path: |
+            model/hector-asi/data/stage6/generated/canonical-sft-20260724.jsonl
+            model/hector-asi/data/stage6/generated/canonical-preference-20260724.jsonl
+            model/hector-asi/data/stage6/latest-batch.json
+          if-no-files-found: error
+          retention-days: 90
+          compression-level: 0
