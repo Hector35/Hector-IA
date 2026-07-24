@@ -1,0 +1,50 @@
+name: Hector model v65 capability curriculum
+
+on:
+  pull_request:
+    branches: [main]
+    paths:
+      - '.github/workflows/hector-model-v65-curriculum.yml'
+      - 'model/hector-asi/capability_loop/**'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  build-and-validate-curriculum:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+      - name: Compile generator
+        run: python -m py_compile model/hector-asi/capability_loop/build_curriculum_v65.py
+      - name: Generate sealed splits twice
+        run: |
+          set -euo pipefail
+          python model/hector-asi/capability_loop/build_curriculum_v65.py --out artifacts/v65-a
+          python model/hector-asi/capability_loop/build_curriculum_v65.py --out artifacts/v65-b
+          diff -ru artifacts/v65-a artifacts/v65-b
+      - name: Validate scale, isolation and gates
+        run: |
+          python - <<'PY'
+          import json
+          from pathlib import Path
+          m=json.loads(Path('artifacts/v65-a/manifest.json').read_text())
+          assert m['counts']=={'train':144,'validation':36,'hidden':36}
+          assert m['criticalHidden']>=6
+          assert len(m['capabilities'])>=4
+          assert m['promotionGates']['hiddenBehaviorGainMinimum']>=3
+          assert m['promotionGates']['criticalPassRate']==1.0
+          assert m['promotionGates']['replicasByteIdentical'] is True
+          print(json.dumps(m,sort_keys=True))
+          PY
+      - name: Upload immutable curriculum candidate
+        uses: actions/upload-artifact@v4
+        with:
+          name: hector-v65-capability-curriculum-${{ github.run_id }}
+          path: artifacts/v65-a
+          retention-days: 90
