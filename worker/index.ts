@@ -7,6 +7,8 @@ import {openInteraction} from './routes/open-interaction';
 import {agent} from './routes/agent';
 import {intelligence} from './routes/intelligence';
 import {modelChat} from './routes/model-chat';
+import {qwen397Chat} from './routes/qwen397-chat';
+import {qwen397Vision} from './routes/qwen397-vision';
 import {kimiChat} from './routes/kimi-chat';
 import {selfModel} from './routes/self-model';
 import {cognitiveBudget} from './routes/cognitive-budget';
@@ -42,7 +44,7 @@ import {CHAT_CHAMPION,chatChampionEvidence} from './lib/chat-champion';
 
 const app=new Hono<{Bindings:Bindings;Variables:Variables}>();
 app.use('*',secureHeaders({contentSecurityPolicy:{defaultSrc:["'self'"],connectSrc:["'self'"],imgSrc:["'self'",'data:'],styleSrc:["'self'","'unsafe-inline'"]}}));
-app.route('/control/v1',control);app.route('/generated',generated);app.route('/self-improve/v1',selfImprove);app.route('/runner/v1',runner);app.route('/runner/v1',pwaRunnerStatus);app.route('/evidence/v1',evidence);app.route('/api/auth',auth);app.route('/api/agent',agent);app.route('/api/intelligence',selfModel);app.route('/api/intelligence/budget',cognitiveBudget);app.route('/api/intelligence/benchmark',intelligenceBenchmark);app.route('/api/intelligence/plan-incidents',planDriftIncidents);app.route('/api/intelligence',kimiChat);app.route('/api/intelligence',modelChat);app.route('/api/intelligence',intelligence);app.route('/api/notifications',operationalNotifications);app.route('/api/work-mode',workMode);app.route('/api/system',systemInfo);app.route('/api/delegations',delegations);app.route('/api/projects',projectGovernance);app.route('/api/projects',projects);app.route('/api/pwa-factory',pwaFactory);app.route('/api/conversations',conversations);app.route('/api/chat-agents',chatAgents);app.route('/api/work-evidence',workEvidence);app.route('/api/memory',memoryStatus);app.route('/api/provider-health',providerHealth);app.route('/api/response-traces',responseTraces);app.route('/api/schedules',schedules);app.route('/api',intelligence);app.route('/api',openInteraction);app.route('/api',api);
+app.route('/control/v1',control);app.route('/generated',generated);app.route('/self-improve/v1',selfImprove);app.route('/runner/v1',runner);app.route('/runner/v1',pwaRunnerStatus);app.route('/evidence/v1',evidence);app.route('/api/auth',auth);app.route('/api/agent',agent);app.route('/api/intelligence',selfModel);app.route('/api/intelligence/budget',cognitiveBudget);app.route('/api/intelligence/benchmark',intelligenceBenchmark);app.route('/api/intelligence/plan-incidents',planDriftIncidents);app.route('/api/intelligence',qwen397Chat);app.route('/api/intelligence',kimiChat);app.route('/api/intelligence',modelChat);app.route('/api/intelligence',intelligence);app.route('/api/notifications',operationalNotifications);app.route('/api/work-mode',workMode);app.route('/api/system',systemInfo);app.route('/api/delegations',delegations);app.route('/api/projects',projectGovernance);app.route('/api/projects',projects);app.route('/api/pwa-factory',pwaFactory);app.route('/api/conversations',conversations);app.route('/api/chat-agents',chatAgents);app.route('/api/work-evidence',workEvidence);app.route('/api/memory',memoryStatus);app.route('/api/provider-health',providerHealth);app.route('/api/response-traces',responseTraces);app.route('/api/schedules',schedules);app.route('/api',qwen397Vision);app.route('/api',intelligence);app.route('/api',openInteraction);app.route('/api',api);
 app.get('/health',c=>c.json({ok:true,service:c.env.APP_NAME,customModel:{runtime:CHAT_CHAMPION.runtimeId,mode:hasCustomModelEndpoint(c.env)?'endpoint':hasQueuedCustomInference(c.env)?'github-actions':'unavailable',...chatChampionEvidence()}}));app.all('*',c=>c.env.ASSETS.fetch(c.req.raw));
 
 async function event(env:Bindings,jobId:string,message:string,progress:number){await env.DB.prepare('INSERT INTO work_events(id,job_id,message,progress) VALUES(?,?,?,?)').bind(crypto.randomUUID(),jobId,message,progress).run();}
@@ -63,23 +65,9 @@ async function processNext(env:Bindings){
   const execution=await executePlannedWork(env,{userId:job.user_id,prompt:workPrompt,allowWeb:Boolean(job.allow_web??1),reasoningLevel:high?'high':'auto',context:`Trabajo ${job.id}. Tipo: ${job.kind}. Intento ${job.attempt_count}/${job.max_attempts}.`});
   const {out,plan:executionPlan,verification,usage:u}=execution;
   await event(env,job.id,`Plan ${executionPlan.hash.slice(0,12)} ${verification.status==='exact'?'ejecutado exactamente':verification.status==='allowed-fallback'?'cumplido mediante fallback autorizado':'presentó desviación'}`,55);
-  if(!verification.ok){
-   await recordUsage(env,job,out,u,executionPlan,verification,'background-policy-drift-blocked');
-   throw new Error(`Ejecución bloqueada por desviación del plan cognitivo: ${verification.differences.join('; ')}`);
-  }
+  if(!verification.ok){await recordUsage(env,job,out,u,executionPlan,verification,'background-policy-drift-blocked');throw new Error(`Ejecución bloqueada por desviación del plan cognitivo: ${verification.differences.join('; ')}`);}
   const budgetMessage=budgetEvent(out.budgetDecision);if(budgetMessage)await event(env,job.id,budgetMessage,65);
-  if(continuous){
-   const parsed=parseWorkModeResult(out.text);
-   if(parsed.state!=='complete'){
-    const delay=parsed.state==='waiting'?parsed.retryAfterMinutes:2,progress=Math.min(95,15+Number(job.attempt_count||1)*4),wait=`+${delay} minutes`;
-    const advanced=await env.DB.prepare("UPDATE work_jobs SET status='queued',progress=?,result=?,last_error=NULL,next_retry_at=datetime('now',?),lease_token=NULL,lease_expires_at=NULL,heartbeat_at=CURRENT_TIMESTAMP,updated_at=CURRENT_TIMESTAMP WHERE id=? AND lease_token=?").bind(progress,parsed.text,wait,job.id,leaseToken).run();
-    if(!advanced.meta.changes)return;
-    await recordUsage(env,job,out,u,executionPlan,verification,parsed.state==='waiting'?'work-mode-waiting':'work-mode-cycle');
-    await event(env,job.id,parsed.state==='waiting'?`Dependencia externa detectada. Espera controlada de ${delay} minuto${delay===1?'':'s'} antes de reintentar.`:parsed.explicit?'El objetivo todavía no está completo. Iniciará otro ciclo con el progreso actual.':'No se recibió confirmación verificable de cierre. El trabajo continuará automáticamente.',progress);
-    return;
-   }
-   out.text=parsed.text||'Objetivo completado y verificado.';
-  }
+  if(continuous){const parsed=parseWorkModeResult(out.text);if(parsed.state!=='complete'){const delay=parsed.state==='waiting'?parsed.retryAfterMinutes:2,progress=Math.min(95,15+Number(job.attempt_count||1)*4),wait=`+${delay} minutes`;const advanced=await env.DB.prepare("UPDATE work_jobs SET status='queued',progress=?,result=?,last_error=NULL,next_retry_at=datetime('now',?),lease_token=NULL,lease_expires_at=NULL,heartbeat_at=CURRENT_TIMESTAMP,updated_at=CURRENT_TIMESTAMP WHERE id=? AND lease_token=?").bind(progress,parsed.text,wait,job.id,leaseToken).run();if(!advanced.meta.changes)return;await recordUsage(env,job,out,u,executionPlan,verification,parsed.state==='waiting'?'work-mode-waiting':'work-mode-cycle');await event(env,job.id,parsed.state==='waiting'?`Dependencia externa detectada. Espera controlada de ${delay} minuto${delay===1?'':'s'} antes de reintentar.`:parsed.explicit?'El objetivo todavía no está completo. Iniciará otro ciclo con el progreso actual.':'No se recibió confirmación verificable de cierre. El trabajo continuará automáticamente.',progress);return;}out.text=parsed.text||'Objetivo completado y verificado.';}
   await event(env,job.id,'Resultado obtenido; verificando criterios y limitaciones',80);
   const completed=await env.DB.prepare("UPDATE work_jobs SET status='completed',progress=100,result=?,last_error=NULL,lease_token=NULL,lease_expires_at=NULL,next_retry_at=NULL,heartbeat_at=CURRENT_TIMESTAMP,updated_at=CURRENT_TIMESTAMP WHERE id=? AND lease_token=?").bind(out.text,job.id,leaseToken).run();if(!completed.meta.changes)return;
   await env.DB.batch([env.DB.prepare("INSERT INTO work_events(id,job_id,message,progress) VALUES(?,?,?,100)").bind(crypto.randomUUID(),job.id,continuous?'Modo Trabajo completó y verificó el objetivo':'Resultado guardado bajo plan cognitivo verificado')]);
@@ -87,11 +75,7 @@ async function processNext(env:Bindings){
   await recordExperience(env,{jobId:job.id,userId:job.user_id,objective:job.prompt,status:'completed',result:out.text,skills:plan.skills,attempts:job.attempt_count,durationMs:Date.now()-started});
  }catch(e){
   const message=e instanceof Error?e.message:'Error';
-  if(continuous){
-   const retry=workModeFailureTransition(job.attempt_count),failed=await env.DB.prepare(`UPDATE work_jobs SET status='queued',last_error=?,next_retry_at=datetime('now','+${retry.delaySeconds} seconds'),lease_token=NULL,lease_expires_at=NULL,heartbeat_at=CURRENT_TIMESTAMP,updated_at=CURRENT_TIMESTAMP WHERE id=? AND lease_token=?`).bind(message,job.id,leaseToken).run();
-   if(failed.meta.changes){await event(env,job.id,`Error detectado; Modo Trabajo conservará el avance e intentará otra alternativa en ${retry.delaySeconds}s`,25);await recordExperience(env,{jobId:job.id,userId:job.user_id,objective:job.prompt,status:'queued',result:message,skills:plan.skills,attempts:job.attempt_count,durationMs:Date.now()-started});}
-   return;
-  }
+  if(continuous){const retry=workModeFailureTransition(job.attempt_count),failed=await env.DB.prepare(`UPDATE work_jobs SET status='queued',last_error=?,next_retry_at=datetime('now','+${retry.delaySeconds} seconds'),lease_token=NULL,lease_expires_at=NULL,heartbeat_at=CURRENT_TIMESTAMP,updated_at=CURRENT_TIMESTAMP WHERE id=? AND lease_token=?`).bind(message,job.id,leaseToken).run();if(failed.meta.changes){await event(env,job.id,`Error detectado; Modo Trabajo conservará el avance e intentará otra alternativa en ${retry.delaySeconds}s`,25);await recordExperience(env,{jobId:job.id,userId:job.user_id,objective:job.prompt,status:'queued',result:message,skills:plan.skills,attempts:job.attempt_count,durationMs:Date.now()-started});}return;}
   const retry=canRetry(job.attempt_count,job.max_attempts),delay=retryDelaySeconds(job.attempt_count),status=retry?'queued':'blocked',nextRetry=retry?`datetime('now','+${delay} seconds')`:'NULL';const failed=await env.DB.prepare(`UPDATE work_jobs SET status=?,result=?,last_error=?,next_retry_at=${nextRetry},lease_token=NULL,lease_expires_at=NULL,heartbeat_at=CURRENT_TIMESTAMP,updated_at=CURRENT_TIMESTAMP WHERE id=? AND lease_token=?`).bind(status,message,message,job.id,leaseToken).run();if(failed.meta.changes){await event(env,job.id,retry?`Error detectado; se intentará una alternativa en ${delay}s`:'Límite de intentos alcanzado; trabajo bloqueado',25);await recordExperience(env,{jobId:job.id,userId:job.user_id,objective:job.prompt,status,result:message,skills:plan.skills,attempts:job.attempt_count,durationMs:Date.now()-started});}
  }
 }
