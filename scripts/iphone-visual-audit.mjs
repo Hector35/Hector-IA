@@ -9,6 +9,7 @@ const devices=[
  {id:'iphone-13-pro',label:'iPhone 13 Pro',viewport:{width:390,height:844}}
 ];
 const views=[{label:'Chat único'}];
+const composerSelector='.hxComposer textarea, .haComposer textarea, .cxComposer textarea';
 
 function json(body,status=200){return{status,contentType:'application/json',body:JSON.stringify(body)};}
 function responseFor(url,method){
@@ -91,7 +92,7 @@ try{
   try{
    await page.goto(baseUrl,{waitUntil:'domcontentloaded',timeout:45000});
    await page.getByText(/Hector ASI|Héctor OS/i).last().waitFor({state:'visible',timeout:15000});
-   await page.locator('.haComposer textarea, .cxComposer textarea').first().waitFor({state:'visible',timeout:15000});
+   await page.locator(composerSelector).first().waitFor({state:'visible',timeout:15000});
    for(const view of views){
     await page.waitForTimeout(350);
     const overflow=await auditOverflow(page,device.viewport);
