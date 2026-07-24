@@ -1,0 +1,8 @@
+accelerate==1.9.0
+bitsandbytes==0.46.1
+datasets==4.0.0
+peft==0.16.0
+psutil==7.0.0
+safetensors==0.5.3
+transformers==4.53.2
+trl==0.19.1
