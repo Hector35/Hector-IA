@@ -1,6 +1,6 @@
 {
-  "schemaVersion": 1,
-  "updatedAt": "2026-07-24T21:54:25Z",
+  "schemaVersion": 2,
+  "updatedAt": "2026-07-24T22:52:51Z",
   "targetModel": "Qwen/Qwen3.5-397B-A17B",
   "decision": "managed-serverless-api-first",
   "status": "blocked-before-checkout",
@@ -8,7 +8,8 @@
   "spend": {
     "actualMxn": 0,
     "maximumMxn": null,
-    "billingEnabled": false
+    "billingEnabled": false,
+    "exchangeRatePolicy": "Must be supplied explicitly at execution time; never hard-code a live FX rate."
   },
   "preferred": {
     "provider": "Together AI",
@@ -17,48 +18,72 @@
     "apiCompatibility": "OpenAI-compatible",
     "contextTokens": 262144,
     "modalities": ["text", "image"],
-    "capabilities": ["chat", "vision", "function-calling", "json-mode"],
+    "capabilities": ["chat", "vision", "hybrid-thinking", "function-calling", "json-mode"],
     "pricing": {
       "currency": "USD",
       "inputPerMillionTokens": 0.6,
       "cachedInputPerMillionTokens": 0.35,
-      "outputPerMillionTokens": 3.6
+      "outputPerMillionTokens": 3.6,
+      "batchAvailable": false
     },
-    "reason": "Exact model ID, serverless billing, vision and function calling without a dedicated multi-GPU commitment.",
-    "source": "https://docs.together.ai/docs/serverless/models"
+    "reason": "Exact model ID, serverless billing, native image input and function calling without a dedicated multi-GPU commitment.",
+    "sources": [
+      "https://www.together.ai/models/qwen3-5-397b-a17b",
+      "https://www.together.ai/pricing",
+      "https://docs.together.ai/docs/inference/chat/reasoning",
+      "https://docs.together.ai/docs/inference/batch/overview"
+    ]
   },
   "alternatives": [
     {
       "provider": "Alibaba Cloud Model Studio",
-      "region": "US (Virginia)",
-      "service": "Pay-as-you-go model API",
+      "region": "Singapore international deployment",
+      "service": "Pay-as-you-go OpenAI-compatible model API",
       "modelId": "qwen3.5-397b-a17b",
       "apiCompatibility": "OpenAI-compatible",
       "contextTokens": 262144,
       "capabilities": ["thinking", "function-calling", "built-in-tools", "structured-output"],
-      "pricing": {
-        "currency": "CNY",
-        "inputPerMillionTokensUpTo128K": 1.2,
-        "outputPerMillionTokensUpTo128K": 7.2,
-        "inputPerMillionTokens128KTo256K": 3,
-        "outputPerMillionTokens128KTo256K": 18
+      "safetyControls": ["free-quota-only switch for eligible new international accounts", "cost monitoring", "high-spending alerts", "stop model calls"],
+      "freeQuota": {
+        "eligibility": "New international Model Studio users only; console verification required",
+        "durationDays": 90,
+        "verifiedForOwnerAccount": false
       },
-      "freeQuotaVerified": false,
-      "source": "https://help.aliyun.com/en/model-studio/model-pricing"
+      "pricing": {
+        "status": "console-or-current-pricing-page-verification-required-before-use",
+        "reason": "Published pricing is region and input-length tier dependent; do not copy a different region or currency into the runtime."
+      },
+      "sources": [
+        "https://www.alibabacloud.com/help/en/model-studio/text-generation-model",
+        "https://www.alibabacloud.com/help/en/model-studio/what-is-model-studio",
+        "https://www.alibabacloud.com/help/en/model-studio/model-pricing"
+      ]
     },
     {
       "provider": "Alibaba Cloud Model Studio",
+      "region": "Singapore",
       "service": "Dedicated deployment",
       "modelId": "qwen3.5-397b-a17b",
       "minimumPublishedHourlyPrice": {
-        "currency": "CNY",
-        "amount": 400
+        "currency": "USD",
+        "amount": 112
+      },
+      "publishedMonthlyPrice": {
+        "currency": "USD",
+        "amount": 52392
       },
       "decision": "rejected-without-explicit-training-budget",
-      "reason": "A dedicated deployment is materially more expensive than serverless inference and is not sufficient by itself to authorize training.",
-      "source": "https://help.aliyun.com/en/model-studio/create-deployment-api"
+      "reason": "Dedicated inference is vastly more expensive than serverless inference and still does not provide a fine-tuning run by itself.",
+      "source": "https://www.alibabacloud.com/help/en/model-studio/model-training-and-deployment-billing"
     }
   ],
+  "workloadSeparation": {
+    "serverlessInference": "Preferred for PWA text, image, tools and exact-model evaluation.",
+    "dedicatedInference": "Rejected until measured serverless demand justifies reserved throughput.",
+    "loraOrQloraTraining": "Requires a provider that explicitly exposes training or a distributed GPU cluster capable of loading the open weights, optimizer state, checkpoints and resume storage.",
+    "continuedPretraining": "Not authorized; substantially larger data and compute requirement than adapter training.",
+    "qwen3_8bBridge": "May validate schemas, scripts, resume and checkpoint plumbing only; cannot represent Qwen 397B quality or memory admission."
+  },
   "activationGates": {
     "explicitBudgetMxn": false,
     "providerAccount": false,
@@ -78,5 +103,6 @@
     "QWEN_397B_TOKEN",
     "QWEN_397B_MODEL"
   ],
-  "nextAction": "Define an explicit MXN ceiling, create or authorize the provider account, store the API key as a Cloudflare/GitHub secret, then run the exact-model smoke test."
+  "costEstimator": "model/hector-asi/scale/estimate_qwen397b_cost.py",
+  "nextAction": "Supply an explicit monthly MXN ceiling and complete provider account/payment or 2FA. Then estimate a bounded workload, store secrets, enable provider-side alerts/cutoff and run exact-model smoke tests."
 }
