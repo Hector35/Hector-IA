@@ -1,42 +1,86 @@
 {
-  "schemaVersion": 1,
+  "schemaVersion": 2,
   "stage": 6,
   "component": "compute-and-scale",
   "status": "blocked",
-  "targetProfile": "qwen3-8b-main",
-  "targetModel": "Qwen/Qwen3-8B",
-  "pipelineReady": true,
+  "targetProfile": "qwen3.5-397b-a17b",
+  "targetModel": "Qwen/Qwen3.5-397B-A17B",
+  "modelShape": {
+    "totalParameters": 397000000000,
+    "activeParametersPerToken": 17000000000,
+    "nativeContextTokens": 262144,
+    "architecture": "multimodal MoE",
+    "license": "Apache-2.0"
+  },
+  "pipelineReady": false,
+  "endpointVerified": false,
   "cpuTrainingForbidden": true,
-  "requiredHardware": {
-    "runnerLabels": ["self-hosted", "linux", "x64", "gpu"],
-    "minimumFreeVramMiB": 16384,
-    "recommendedSystemRamGiB": 32,
-    "persistentStorageGiB": 80
+  "storageEstimatesGiB": {
+    "bf16WeightsOnly": 740,
+    "fp8WeightsOnly": 370,
+    "int4WeightsOnlyTheoretical": 185,
+    "recommendedModelCacheAndArtifacts": 1200
+  },
+  "servingProfiles": {
+    "officialStandard": {
+      "frameworks": ["SGLang main", "vLLM nightly/main-compatible"],
+      "parallelism": {"tensorParallel": 8, "expertParallel": "supported when validated"},
+      "contextTokens": 262144,
+      "minimumAggregateVramGiB": 640,
+      "recommendedAggregateVramGiB": 1128,
+      "status": "not-observed"
+    },
+    "reducedContextSmoke": {
+      "contextTokens": 32768,
+      "minimumAggregateVramGiB": 480,
+      "status": "not-observed",
+      "note": "Only validates loading and API compatibility; it does not prove the required 262K operating profile."
+    }
+  },
+  "trainingProfiles": {
+    "loraOrQlora": {
+      "status": "not-validated",
+      "minimumClass": "distributed multi-GPU node or cluster",
+      "recommended": "8x H200 141GB or a larger aggregate-memory cluster with fast NVLink/InfiniBand and >=1.5TB local NVMe",
+      "note": "Active parameters do not reduce checkpoint storage; all experts must remain addressable. Exact memory must be measured with the chosen quantization and framework."
+    },
+    "fullPostTraining": {
+      "status": "out-of-reach-with-current-resources",
+      "minimumClass": "multi-node accelerator cluster",
+      "note": "Optimizer states, gradients and activations make full-parameter training materially larger than inference."
+    },
+    "pretraining": {
+      "status": "not-authorized-and-not-feasible",
+      "minimumClass": "large-scale datacenter cluster",
+      "note": "Not part of the current Héctor budget or infrastructure."
+    }
   },
   "observedHardware": {
-    "gpuAttached": false,
-    "gpuModel": null,
-    "freeVramMiB": 0,
-    "reason": "No existe un runner GPU autorizado conectado al repositorio."
+    "githubHostedGpu": false,
+    "selfHostedGpuRunnerObserved": false,
+    "gpuInventory": [],
+    "aggregateVramGiB": 0,
+    "systemRamGiB": null,
+    "freeStorageGiB": null,
+    "networkFabric": "unknown",
+    "reason": "No authorized GPU endpoint or self-hosted multi-GPU runner has been verified in this repository."
   },
   "gates": {
     "canonicalTrainExamples": {"required": 10000, "observed": 0, "open": false},
     "hiddenBenchmarkCases": {"required": 500, "observed": 0, "open": false},
     "trainableChampionFailures": {"required": 100, "observed": 0, "open": false},
-    "gpuAdmission": {"required": true, "observed": false, "open": false},
+    "endpointIdentity": {"required": "Qwen/Qwen3.5-397B-A17B", "observed": null, "open": false},
+    "distributedGpuAdmission": {"requiredAggregateVramGiB": 640, "observedAggregateVramGiB": 0, "open": false},
+    "persistentStorage": {"requiredGiB": 1200, "observedGiB": 0, "open": false},
     "resumeRoundTrip": {"required": true, "observed": false, "open": false}
   },
-  "features": [
-    "4-bit NF4 QLoRA",
-    "double quantization",
-    "packing",
-    "gradient accumulation",
-    "gradient checkpointing",
-    "bf16/fp16 mixed precision",
-    "persistent checkpoint resume",
-    "immutable dataset and adapter hashes",
-    "artifact upload without CPU fallback"
-  ],
-  "nextCommand": "python model/hector-asi/scale/probe_compute.py --output artifacts/compute-probe.json",
-  "mainWorkflow": ".github/workflows/hector-main-qlora.yml"
+  "fallbackPolicy": ["Qwen 397B verified endpoint", "Kimi K2.5 verified endpoint", "Workers AI"],
+  "secretsPolicy": {
+    "requiredOnlyAfterVerification": ["QWEN_397B_BASE_URL", "QWEN_397B_TOKEN"],
+    "currentlyEnabled": false,
+    "rule": "Never mark Qwen 397B active from configuration alone; require model identity and inference smoke tests."
+  },
+  "nextCommand": "python model/hector-asi/scale/probe_qwen397.py --output artifacts/qwen397-hardware.json",
+  "endpointSmokeCommand": "python model/hector-asi/scale/smoke_qwen397_endpoint.py --base-url $QWEN_397B_BASE_URL --token-env QWEN_397B_TOKEN --output artifacts/qwen397-endpoint.json",
+  "workflow": ".github/workflows/qwen397-preflight.yml"
 }
