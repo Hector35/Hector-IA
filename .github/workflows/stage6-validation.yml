@@ -1,0 +1,48 @@
+name: Stage 6 PWA validation
+on:
+  pull_request:
+    branches: [main]
+    paths:
+      - 'src/**'
+      - 'worker/**'
+      - 'public/**'
+      - 'index.html'
+      - 'wrangler.jsonc'
+      - 'model/hector-asi/stage-6-plan.json'
+      - '.github/workflows/stage6-validation.yml'
+  workflow_dispatch:
+permissions:
+  contents: read
+jobs:
+  validate-stage-six:
+    runs-on: ubuntu-latest
+    timeout-minutes: 25
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+          cache: npm
+      - run: npm ci
+      - name: Run validation with retained logs
+        id: validation
+        shell: bash
+        run: |
+          set +e
+          mkdir -p validation
+          npm run typecheck > validation/typecheck.log 2>&1
+          TYPECHECK=$?
+          npm test -- --run > validation/tests.log 2>&1
+          TESTS=$?
+          npm run build > validation/build.log 2>&1
+          BUILD=$?
+          printf '{"typecheck":%s,"tests":%s,"build":%s}\n' "$TYPECHECK" "$TESTS" "$BUILD" | tee validation/status.json
+          test "$TYPECHECK" -eq 0 -a "$TESTS" -eq 0 -a "$BUILD" -eq 0
+      - name: Upload validation evidence
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: stage6-validation-${{ github.run_id }}
+          path: validation
+          if-no-files-found: error
+          retention-days: 14
