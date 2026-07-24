@@ -1,0 +1,49 @@
+{
+  "schemaVersion": 1,
+  "stage": 6,
+  "candidateBase": "Qwen/Qwen3.5-397B-A17B",
+  "candidateType": "distributed-adapter",
+  "status": "blocked",
+  "decision": "do-not-train",
+  "observedAt": "2026-07-24T20:05:31Z",
+  "modelFacts": {
+    "totalParameters": "397B",
+    "activatedParameters": "17B",
+    "nativeContextTokens": 262144,
+    "license": "Apache-2.0",
+    "checkpointApproxBytes": 807000000000,
+    "revisionPinned": false,
+    "tokenizerHashPinned": false,
+    "modelIndexHashPinned": false
+  },
+  "gates": {
+    "canonicalCorpus": {"required": 10000, "observed": 0, "open": false, "evidence": "model/hector-asi/scale/compute-status.json"},
+    "hiddenBenchmark": {"required": 500, "observed": 0, "open": false, "evidence": "model/hector-asi/scale/compute-status.json"},
+    "v41TrainableFailures": {"required": 100, "observed": 0, "open": false, "evidence": "model/hector-asi/scale/compute-status.json"},
+    "distributedHardware": {"required": true, "observed": false, "open": false, "evidence": "No existe runner GPU distribuido autorizado"},
+    "persistentResume": {"required": true, "observed": false, "open": false, "evidence": "No existe round-trip de checkpoint persistente"},
+    "baselineEvaluation": {"required": true, "observed": false, "open": false, "evidence": "Qwen 397B limpio no ha sido evaluado bajo Benchmark V2"},
+    "immutableInputs": {"required": true, "observed": false, "open": false, "evidence": "Faltan revisión y hashes de modelo/tokenizer/datos/benchmark"},
+    "rollback": {"required": true, "observed": false, "open": false, "evidence": "No existe checkpoint de adaptador Qwen 397B"}
+  },
+  "allowedWorkWhileBlocked": [
+    "construir y verificar corpus",
+    "completar Benchmark V2",
+    "catalogar fallos de V41",
+    "probar scripts con Qwen3-8B sin promoverlo",
+    "conectar almacenamiento y runner distribuido",
+    "fijar revisión e hashes de entradas"
+  ],
+  "forbiddenWhileBlocked": [
+    "entrenamiento CPU",
+    "lanzar LoRA o QLoRA sobre Qwen 397B",
+    "crear una versión Vxx",
+    "declarar un adaptador o mejora inexistente",
+    "evaluar repetidamente el conjunto oculto"
+  ],
+  "artifact": null,
+  "adapterSha256": null,
+  "baseline": null,
+  "replication": null,
+  "promotion": "rejected-no-candidate"
+}
