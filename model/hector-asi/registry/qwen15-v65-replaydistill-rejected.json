@@ -1,0 +1,99 @@
+{
+  "schemaVersion": 1,
+  "experimentId": "hector-asi-qwen15-v65-replaydistill",
+  "status": "rejected-for-champion",
+  "decision": "retain-v41",
+  "baseModel": "Qwen/Qwen2.5-1.5B-Instruct",
+  "baseRevision": "989aa7980e4cf806f80c7fef2b1adb7bc71aa306",
+  "sourceChampion": {
+    "runtimeId": "hector-asi-qwen15-v41",
+    "artifactId": 8560331055,
+    "adapterSha256": "31bead5f59982d8e321517fd235b81f992f83d2e3792a55690c2a841ff0e28f8",
+    "adapterBytes": 73911112
+  },
+  "training": {
+    "runId": 30075469982,
+    "artifactId": 8590440166,
+    "artifactName": "hector-asi-qwen15-v65-replaydistill-30075469982",
+    "artifactDigest": "sha256:d7e545e4d80d6c4296be6add9c3a29b23b9345ecccdc70c5349c1c3a602d2dfc",
+    "artifactExpiresAt": "2026-10-22T07:26:30Z",
+    "adapterSha256": "18ac2f47885b7ac76b48e7a0bae5e4a2347fd2da44e31daec214f6595cd9d764",
+    "adapterBytes": 73911112,
+    "replicasByteIdentical": true,
+    "method": "middle-layer focal SFT with frozen-champion replay logit distillation",
+    "hyperparameters": {
+      "epochs": 3,
+      "learningRate": 0.0000015,
+      "maxLength": 144,
+      "distillLambda": 0.70,
+      "replayCe": 0.15,
+      "eosLambda": 0.08,
+      "firstTrainableLayer": 16,
+      "lastTrainableLayer": 23,
+      "seed": 3065
+    },
+    "runtime": {
+      "secondsReplicaA": 1050.7469863891602,
+      "secondsReplicaB": 1052.388811826706,
+      "peakRssMbReplicaA": 10975.91015625,
+      "peakRssMbReplicaB": 10657.5390625,
+      "python": "3.11.15",
+      "torch": "2.7.1+cpu",
+      "hardware": "GitHub-hosted Ubuntu 24.04 Azure x86_64 CPU"
+    }
+  },
+  "dataset": {
+    "trainExamples": 20,
+    "focalExamples": 8,
+    "replayExamples": 12,
+    "validationExamples": 8,
+    "hiddenTestExamples": 18,
+    "criticalHiddenExamples": 6,
+    "crossSplitOverlap": 0,
+    "privateUserData": false,
+    "license": "author-generated Apache-2.0-compatible",
+    "trainSha256": "39eadc2ee30b92513bab44f6b616c4dfbc2105ab26f62fb94a84d10739f28089",
+    "validationSha256": "00d2f9bd8d79856a19f05b0cd5f68b0674df2538c312071dc52c9095a02a955d",
+    "hiddenTestSha256": "17560e21b728c93f822a0e21cb4b4261823ae5b6f92f3fe1188fdfd4b5679ccb"
+  },
+  "comparison": {
+    "validationObjective": {
+      "v41": 2.1365309953689575,
+      "v65": 2.1024853736162186,
+      "relativeImprovement": 0.01593499541344131
+    },
+    "behavior": {
+      "v41Passed": 10,
+      "v65Passed": 9,
+      "total": 18,
+      "v41CriticalPassed": 6,
+      "v65CriticalPassed": 6,
+      "criticalTotal": 6,
+      "v41MeanTokens": 18.88888888888889,
+      "v65MeanTokens": 16.88888888888889,
+      "tokenRatio": 0.8941176470588236,
+      "v41MeanLatencyMsReplicaA": 7754.658435333333,
+      "v65MeanLatencyMsReplicaA": 7274.651808500032,
+      "v41MeanLatencyMsReplicaB": 7949.336213277761,
+      "v65MeanLatencyMsReplicaB": 7341.55600216665,
+      "latencyRatioReplicaA": 0.9381017307973193,
+      "latencyRatioReplicaB": 0.9235432766551912
+    }
+  },
+  "gates": {
+    "weightsChanged": true,
+    "replicasByteIdentical": true,
+    "validationImproved": true,
+    "behavioralImprovement": false,
+    "criticalPerfect": true,
+    "noCriticalRegression": true,
+    "latencyAcceptable": true,
+    "tokenLengthAcceptable": true,
+    "eligibleForChampion": false
+  },
+  "finding": "Frozen-champion replay-logit distillation over middle layers improved validation, shortened outputs and reduced latency while preserving all six critical safety cases, but hidden behavioral accuracy fell from 10/18 to 9/18. The replay constraint preserved safety and efficiency but did not prevent a non-critical capability regression, so V65 cannot replace V41.",
+  "doNotRepeat": [
+    "Middle-layer replay-distilled continuation from V41 with layers 16-23 trainable, 8 focal plus 12 replay examples, distill lambda 0.70, replay CE 0.15, EOS 0.08, LR 1.5e-6, 3 epochs, seed 3065 and this 20/8/18 split"
+  ],
+  "rollback": "hector-asi-qwen15-v41"
+}
