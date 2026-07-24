@@ -1,0 +1,48 @@
+{
+  "schemaVersion": 1,
+  "observedAt": "2026-07-24T12:05:17-06:00",
+  "sourceBranch": "main",
+  "sourceChampion": "hector-asi-qwen15-v41",
+  "eligibleForPrincipalRun": false,
+  "gates": {
+    "canonicalCorpus": {
+      "required": 10000,
+      "observed": 0,
+      "state": "closed",
+      "evidence": "No canonical train manifest or 10,000-row corpus is present on main."
+    },
+    "benchmarkV2": {
+      "required": 500,
+      "observedOnMain": 0,
+      "state": "closed",
+      "evidence": "PR #780 proposes a deterministic 512-case Benchmark V2, but it is not merged or evaluated yet."
+    },
+    "trainableV41Failures": {
+      "required": 100,
+      "observed": 0,
+      "state": "closed",
+      "evidence": "V41 has not been run against Benchmark V2; no sealed failure manifest exists."
+    },
+    "computeAndResume": {
+      "required": "GPU admitted and checkpoint resume tested",
+      "observed": "pipeline proposed; no authorized GPU runner and no resume proof",
+      "state": "closed",
+      "evidence": "PR #783 prepares a provider-neutral Qwen3-8B QLoRA workflow but explicitly reports no GPU runner."
+    },
+    "materiallyDistinctHypothesis": {
+      "required": true,
+      "observed": true,
+      "state": "open",
+      "evidence": "qwen3-8b-canonical-scale-sft-v1 changes base size, data scale, benchmark and experiment policy rather than optimizer details."
+    }
+  },
+  "run": {
+    "executed": false,
+    "tokens": 0,
+    "artifact": null,
+    "adapterSha256": null
+  },
+  "decision": "BLOCK",
+  "reason": "Four mandatory evidence gates are closed. Producing weights would violate the principal-run contract and repeat the failed microcandidate pattern.",
+  "nextAction": "Merge and execute Benchmark V2, then run V41 once to produce a sealed manifest of at least 100 trainable failures; do not dispatch training before that evidence exists."
+}
