@@ -41,7 +41,7 @@ function operationResult(content:string,conversationId:string|undefined,model:st
  };
 }
 
-async function chat(message:string,conversationId?:string,options:ChatOptions={}){
+async function chat(message:string,conversationId?:string,options:ChatOptions={}):Promise<any>{
  const text=message.trim();
  const schedule=text.match(customMinuteSchedule);
  if(schedule){
@@ -69,8 +69,8 @@ async function chat(message:string,conversationId?:string,options:ChatOptions={}
  }
  const selected=usesSelectedModelChat(text,options);
  const kimiRequested=options.runtime==='hector-kimi'||kimiSignals.test(text)||!selected;
- if(kimiRequested)return request('/intelligence/kimi-chat',{method:'POST',body:JSON.stringify({message:text,conversationId,...stageSixChatOptions(options)})});
- return request('/intelligence/model-chat',{method:'POST',body:JSON.stringify({message:text,conversationId,runtime:options.runtime||'auto'})});
+ if(kimiRequested)return request<any>('/intelligence/kimi-chat',{method:'POST',body:JSON.stringify({message:text,conversationId,...stageSixChatOptions(options)})});
+ return request<any>('/intelligence/model-chat',{method:'POST',body:JSON.stringify({message:text,conversationId,runtime:options.runtime||'auto'})});
 }
 
 export const api={
