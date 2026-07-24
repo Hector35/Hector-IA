@@ -10,6 +10,7 @@ const manifestPath=resolve(root,'model/hector-asi/data/stage6/latest-batch.json'
 const hiddenCandidates=[resolve(root,'model/hector-asi/evals/benchmark-v2/hidden.jsonl'),resolve(root,'model/hector-asi/evals/held-out-v1.jsonl')];
 const system='Eres Héctor ASI. Resuelve con precisión, separa hechos de inferencias y entrega resultados verificables.';
 const sha=value=>createHash('sha256').update(typeof value==='string'?value:JSON.stringify(value)).digest('hex');
+const fileSha=path=>createHash('sha256').update(readFileSync(path)).digest('hex');
 const difficulty=index=>['fácil','media','difícil'][index%3];
 const normalize=value=>value.toLowerCase().normalize('NFKD').replace(/[\u0300-\u036f]/g,'').replace(/[^a-z0-9]+/g,' ').trim();
 const fixed=value=>Number.isInteger(value)?String(value):String(Number(value.toFixed(6)));
@@ -38,7 +39,8 @@ const mathFamilies=[
   i=>{const km=1+(i*7)%80,meters=km*1000;return{family:'units',user:`Convierte ${km} km a metros y muestra el factor de conversión.`,assistant:`1 km=1000 m; ${km}·1000=${meters} m.`,expected:meters};},
   i=>{const a=60+(i*5)%40,b=70+(i*7)%30,wa=2+i%4,wb=3+(i*2)%5,result=(a*wa+b*wb)/(wa+wb);return{family:'weighted-average',user:`Calcula el promedio ponderado de ${a} con peso ${wa} y ${b} con peso ${wb}.`,assistant:`(${a}·${wa}+${b}·${wb})/(${wa}+${wb})=${fixed(result)}.`,expected:result};}
 ];
-for(let i=0;i<160;i++){const item=mathFamilies[i%mathFamilies.length](i);addSft({id:`stage6-math-${String(i+1).padStart(3,'0')}`,capability:'mathematics',user:item.user,assistant:item.assistant,verification:{type:'exact-structured',expected:item.expected},family:item.family,index:i});}
+const mathPromptSet=new Set();
+for(let candidate=0,accepted=0;accepted<160;candidate++){const item=mathFamilies[candidate%mathFamilies.length](candidate),key=normalize(item.user);if(mathPromptSet.has(key))continue;mathPromptSet.add(key);addSft({id:`stage6-math-${String(accepted+1).padStart(3,'0')}`,capability:'mathematics',user:item.user,assistant:item.assistant,verification:{type:'exact-structured',expected:item.expected},family:item.family,index:accepted});accepted++;}
 
 const codeFamilies=[
   {name:'sum_even',body:n=>`def ${n}(values):\n    return sum(x for x in values if x % 2 == 0)`,test:n=>`assert ${n}([1,2,3,4,6]) == 12\nassert ${n}([]) == 0`},
@@ -114,6 +116,6 @@ writeFileSync(sftPath,sft.map(row=>JSON.stringify(row)).join('\n')+'\n');
 writeFileSync(prefPath,preference.map(row=>JSON.stringify(row)).join('\n')+'\n');
 const distribution=all.reduce((acc,row)=>{acc[row.capability]=(acc[row.capability]||0)+1;return acc;},{});
 const difficultyDistribution=all.reduce((acc,row)=>{acc[row.difficulty]=(acc[row.difficulty]||0)+1;return acc;},{});
-const manifest={schemaVersion:1,batchId:'stage6-canonical-20260724',status:'generated-awaiting-executable-verification',targetModel:'Qwen/Qwen3.5-397B-A17B',totalExamples:all.length,sftExamples:sft.length,preferenceExamples:preference.length,multimodalExamples:0,distribution,difficultyDistribution,rejectedDuringGeneration:0,license:'CC0-1.0',containsPrivateUserData:false,benchmarkExcluded:true,files:{sft:'model/hector-asi/data/stage6/generated/canonical-sft-20260724.jsonl',preference:'model/hector-asi/data/stage6/generated/canonical-preference-20260724.jsonl'},sha256:{sft:sha(readFileSync(sftPath)),preference:sha(readFileSync(prefPath))},verification:{structural:true,exactDedup:true,semanticKeyDedup:true,benchmarkExactPromptCheck:true,pythonTests:false},note:'No se contabiliza como corpus canónico integrado hasta que verify-canonical-20260724.py pase todos los tests ejecutables.'};
+const manifest={schemaVersion:1,batchId:'stage6-canonical-20260724',status:'generated-awaiting-executable-verification',targetModel:'Qwen/Qwen3.5-397B-A17B',totalExamples:all.length,sftExamples:sft.length,preferenceExamples:preference.length,multimodalExamples:0,distribution,difficultyDistribution,rejectedDuringGeneration:0,license:'CC0-1.0',containsPrivateUserData:false,benchmarkExcluded:true,files:{sft:'model/hector-asi/data/stage6/generated/canonical-sft-20260724.jsonl',preference:'model/hector-asi/data/stage6/generated/canonical-preference-20260724.jsonl'},sha256:{sft:fileSha(sftPath),preference:fileSha(prefPath)},verification:{structural:true,exactDedup:true,semanticKeyDedup:true,benchmarkExactPromptCheck:true,pythonTests:false},note:'No se contabiliza como corpus canónico integrado hasta que verify-canonical-20260724.py pase todos los tests ejecutables.'};
 mkdirSync(dirname(manifestPath),{recursive:true});writeFileSync(manifestPath,JSON.stringify(manifest,null,2)+'\n');
 console.log(JSON.stringify({total:all.length,sft:sft.length,preference:preference.length,distribution,difficultyDistribution},null,2));
