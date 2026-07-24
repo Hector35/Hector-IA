@@ -2,8 +2,10 @@ export type User={id:string;name:string};
 export type HectorRuntimeId='auto'|'hector-base'|'hector-qwen'|'hector-experimental';
 export type ChatOptions={reasoning?:'auto'|'high';deliberation?:'auto'|'force'|'off';runtime?:HectorRuntimeId};
 
+export const STAGE_SIX_CHAT_OPTIONS={reasoning:'high',deliberation:'force'} as const;
+
 const advancedChatSignals=/\b(implementa|refactoriza|audita|investiga|demuestra|optimiza|arquitectura|debug|depura|c[oó]digo|typescript|javascript|python|react|worker|cloudflare|github|api|sql|d1|r2|deploy|workflow|salud|m[eé]dic|dolor|s[ií]ntoma|dosis|finanzas|saldo|banco|contrase[ñn]a|password|token|secreto|privado|legal|contrato|hoy|actual|reciente|noticia|precio|clima|busca|internet)\b/i;
-const selectedModelSignals=/^\s*\/modelos?\b|^\s*\/modelo\s+(?:h[eé]ctor\s+)?(?:base|qwen|propio|experimental|qwen15(?:-v10)?)\b|\b(?:usa|habla con|responde con)\s+(?:(?:mi|tu|el)\s+modelo(?:\s+propio|\s+experimental)?|(?:h[eé]ctor\s+)?(?:base|qwen)|hector-asi-qwen15-v10)\b/i;
+const selectedModelSignals=/^\s*\/modelos?\b|^\s*\/modelo\s+(?:h[eé]ctor\s+)?(?:base|qwen|propio|experimental|qwen15(?:-(?:v10|v41))?)\b|\b(?:usa|habla con|responde con)\s+(?:(?:mi|tu|el)\s+modelo(?:\s+propio|\s+experimental)?|(?:h[eé]ctor\s+)?(?:base|qwen)|hector-asi-qwen15-(?:v10|v41))\b/i;
 
 export function chatOptionsForRuntime(message:string,options:ChatOptions={}):ChatOptions{
  const text=message.trim();
@@ -12,12 +14,16 @@ export function chatOptionsForRuntime(message:string,options:ChatOptions={}):Cha
  return options;
 }
 
+export function stageSixChatOptions(options:ChatOptions={}):ChatOptions{
+ return{...options,reasoning:STAGE_SIX_CHAT_OPTIONS.reasoning,deliberation:STAGE_SIX_CHAT_OPTIONS.deliberation};
+}
+
 export function usesSelectedModelChat(message:string,options:ChatOptions={}){return Boolean(options.runtime)||selectedModelSignals.test(message);}
 
 async function request<T>(path:string,init?:RequestInit):Promise<T>{const res=await fetch(`/api${path}`,{...init,headers:{...(init?.body instanceof FormData?{}:{'Content-Type':'application/json'}),...init?.headers}});const data=await res.json().catch(()=>({}));if(!res.ok){const error=new Error(data.error||'Error de conexión') as Error&{data?:any};error.data=data;throw error}return data}
 export const api={
  me:()=>request<{user:User}>('/auth/me'),login:(email:string,password:string)=>request<{user:User}>('/auth/login',{method:'POST',body:JSON.stringify({email,password})}),register:(name:string,email:string,password:string)=>request<{user:User}>('/auth/register',{method:'POST',body:JSON.stringify({name,email,password})}),logout:()=>request('/auth/logout',{method:'POST'}),
- dashboard:()=>request<any>('/dashboard'),conversations:()=>request<any>('/conversations'),conversationMessages:(id:string)=>request<any>(`/conversations/${id}/messages`),models:()=>request<any>('/intelligence/models'),chat:(message:string,conversationId?:string,options:ChatOptions={})=>{const selected=usesSelectedModelChat(message,options),payload=selected?{message,conversationId,runtime:options.runtime||'auto'}:{message,conversationId,...chatOptionsForRuntime(message,options)};return request<any>(selected?'/intelligence/model-chat':'/intelligence/chat',{method:'POST',body:JSON.stringify(payload)})},
+ dashboard:()=>request<any>('/dashboard'),conversations:()=>request<any>('/conversations'),conversationMessages:(id:string)=>request<any>(`/conversations/${id}/messages`),models:()=>request<any>('/intelligence/models'),stageSix:()=>request<any>('/system/stage-6'),chat:(message:string,conversationId?:string,options:ChatOptions={})=>{const selected=usesSelectedModelChat(message,options),payload=selected?{message,conversationId,runtime:options.runtime||'auto'}:{message,conversationId,...stageSixChatOptions(options)};return request<any>(selected?'/intelligence/model-chat':'/intelligence/chat',{method:'POST',body:JSON.stringify(payload)})},
  chatAgents:(conversationId:string)=>request<any>(`/chat-agents/${conversationId}`),createChatAgent:(conversationId:string,data:any)=>request<any>(`/chat-agents/${conversationId}`,{method:'POST',body:JSON.stringify(data)}),updateChatAgent:(conversationId:string,agentId:string,data:any)=>request<any>(`/chat-agents/${conversationId}/${agentId}`,{method:'PUT',body:JSON.stringify(data)}),deleteChatAgent:(conversationId:string,agentId:string)=>request<any>(`/chat-agents/${conversationId}/${agentId}`,{method:'DELETE'}),runChatAgents:(conversationId:string,data:any={})=>request<any>(`/chat-agents/${conversationId}/run`,{method:'POST',body:JSON.stringify(data)}),pauseChatAgentRun:(conversationId:string,runId:string)=>request<any>(`/chat-agents/${conversationId}/runs/${runId}/pause`,{method:'POST'}),
  delegations:()=>request<any>('/delegations'),delegation:(id:string)=>request<any>(`/delegations/${id}`),createDelegation:(data:{sourceConversationId:string;target:string;instruction:string;maxIterations:number;stopOnSuccess?:boolean})=>request<any>('/delegations',{method:'POST',body:JSON.stringify(data)}),pauseDelegation:(id:string)=>request<any>(`/delegations/${id}/pause`,{method:'POST'}),resumeDelegation:(id:string)=>request<any>(`/delegations/${id}/resume`,{method:'POST'}),setConversationAlias:(conversationId:string,alias:string)=>request<any>(`/delegations/aliases/${conversationId}`,{method:'PUT',body:JSON.stringify({alias})}),
  projects:()=>request<any>('/projects'),project:(id:string)=>request<any>(`/projects/${id}`),projectTaskMessages:(projectId:string,taskId:string)=>request<any>(`/projects/${projectId}/tasks/${taskId}/messages`),createProjectFromMessage:(data:any)=>request<any>('/projects/from-message',{method:'POST',body:JSON.stringify(data)}),pauseProject:(id:string)=>request<any>(`/projects/${id}/pause`,{method:'POST'}),resumeProject:(id:string)=>request<any>(`/projects/${id}/resume`,{method:'POST'}),

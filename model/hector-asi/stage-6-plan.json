@@ -1,0 +1,27 @@
+{
+  "schemaVersion": 1,
+  "stage": 6,
+  "name": "Inteligencia híbrida autoevolutiva",
+  "status": "active",
+  "experienceGoal": "Igualar la experiencia de GPT-5.6 con razonamiento alto mientras el modelo propio aumenta su autonomía",
+  "operatingMode": {
+    "defaultReasoning": "high",
+    "defaultDeliberation": "force",
+    "teacher": "OPENAI_MODEL_REASONING",
+    "openRuntime": "Qwen/Qwen3-8B",
+    "ownChampion": "hector-asi-qwen15-v41"
+  },
+  "pipeline": [
+    {"id":"data","label":"Corpus verificable","target":10000,"unit":"ejemplos"},
+    {"id":"benchmark","label":"Benchmark V2","target":500,"stretchTarget":1000,"unit":"casos ocultos"},
+    {"id":"failures","label":"Fallos entrenables de V41","target":100,"unit":"casos"},
+    {"id":"autonomy","label":"Autonomía propia final","target":90,"unit":"porcentaje"}
+  ],
+  "promotion": {
+    "minimumAbsoluteBenchmarkGain": 0.03,
+    "requiresMultipleCapabilityGains": true,
+    "requiresReproducibility": true,
+    "requiresRollback": true
+  },
+  "principle": "GPT-5.6 alta opera como cerebro maestro desde el inicio; el modelo abierto y el modelo propio absorben progresivamente tareas verificadas."
+}

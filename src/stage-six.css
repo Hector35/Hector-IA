@@ -1,0 +1,44 @@
+.s6Badge{position:fixed;right:14px;bottom:calc(86px + env(safe-area-inset-bottom));z-index:62;display:grid;grid-template-columns:8px auto;grid-template-rows:auto auto;column-gap:8px;align-items:center;min-width:124px;padding:9px 12px;border:1px solid rgba(125,139,255,.28);border-radius:16px;background:linear-gradient(145deg,rgba(24,27,36,.96),rgba(12,14,19,.94));box-shadow:0 18px 54px rgba(0,0,0,.34),0 0 28px rgba(104,119,255,.1);color:#f3f5fb;backdrop-filter:blur(18px);cursor:pointer}
+.s6Badge .s6Pulse{grid-row:1/3;width:8px;height:8px;border-radius:50%;background:#65e2b8;box-shadow:0 0 0 5px rgba(101,226,184,.08),0 0 17px rgba(101,226,184,.72);animation:s6Pulse 1.8s ease-in-out infinite}
+.s6Badge strong{font-size:10px;letter-spacing:.12em;line-height:1.2;color:#b8bfff;text-align:left}
+.s6Badge small{font-size:8px;letter-spacing:.08em;color:#7f8796;text-align:left}
+@keyframes s6Pulse{50%{transform:scale(1.2);opacity:.76}}
+.s6Overlay{position:fixed;inset:0;z-index:120;display:grid;align-items:end;justify-items:center}
+.s6Backdrop{position:absolute;inset:0;border:0;background:rgba(3,4,7,.7);backdrop-filter:blur(7px)}
+.s6Panel{position:relative;width:min(100%,480px);max-height:min(86vh,820px);overflow:auto;overscroll-behavior:contain;padding:20px 18px calc(24px + env(safe-area-inset-bottom));border:1px solid rgba(255,255,255,.08);border-bottom:0;border-radius:28px 28px 0 0;background:radial-gradient(circle at 50% 0,rgba(111,94,255,.17),transparent 38%),#0d0f14;box-shadow:0 -30px 90px rgba(0,0,0,.5);color:#eef1f7}
+.s6Panel>header{display:flex;justify-content:space-between;align-items:flex-start;gap:16px;margin-bottom:16px}
+.s6Panel>header>div{display:grid;gap:3px}
+.s6Panel>header span,.s6Section h3,.s6Hero span,.s6Brains article span{font-size:9px;font-weight:850;letter-spacing:.13em;color:#8994ff}
+.s6Panel>header h2{font-size:31px;line-height:1;margin:2px 0;letter-spacing:-.055em}
+.s6Panel>header p{margin:0;color:#858d9b;font-size:12px}
+.s6Panel>header button{width:36px;height:36px;display:grid;place-items:center;border:1px solid rgba(255,255,255,.07);border-radius:13px;background:rgba(255,255,255,.035);color:#b9bfca;cursor:pointer}
+.s6Panel>header button svg{width:18px;height:18px}
+.s6Hero{display:grid;grid-template-columns:52px minmax(0,1fr) auto;align-items:center;gap:13px;padding:15px;border:1px solid rgba(108,226,187,.18);border-radius:20px;background:linear-gradient(135deg,rgba(82,222,178,.09),rgba(119,125,255,.1))}
+.s6HeroIcon{width:52px;height:52px;display:grid;place-items:center;border-radius:18px;background:radial-gradient(circle at 32% 25%,#f7fffc,#6fe1bb 62%,#7e88ff 132%);color:#08100d;box-shadow:0 15px 38px rgba(94,225,184,.14)}
+.s6HeroIcon svg{width:26px;height:26px}
+.s6Hero>div:nth-child(2){display:grid;gap:4px;min-width:0}
+.s6Hero strong{font-size:16px;color:#f6f8fb}
+.s6Hero small{font-size:10px;line-height:1.45;color:#8d95a3}
+.s6Hero em{display:flex;align-items:center;gap:5px;font-style:normal;font-size:8px;font-weight:850;letter-spacing:.09em;color:#71dfba}
+.s6Hero em svg{width:13px;height:13px}
+.s6Section{margin-top:22px}
+.s6Section h3{margin:0 0 10px;color:#747c8a;text-transform:uppercase}
+.s6Brains,.s6Targets{display:grid;gap:7px}
+.s6Brains article{display:grid;grid-template-columns:34px minmax(0,1fr) 18px;align-items:center;gap:10px;padding:11px 12px;border:1px solid rgba(255,255,255,.055);border-radius:15px;background:#151820}
+.s6Brains article>svg:first-child{width:18px;height:18px;color:#a3abff}
+.s6Brains article>svg:last-child{width:15px;height:15px;color:#69ddb7}
+.s6Brains article div{display:grid;gap:3px;min-width:0}
+.s6Brains article strong{font-size:12px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.s6Brains article small{font-size:9px;color:#747c8a}
+.s6Targets{grid-template-columns:repeat(2,minmax(0,1fr))}
+.s6Targets article{display:grid;grid-template-columns:30px minmax(0,1fr);grid-template-rows:auto auto;gap:3px 9px;padding:12px;border:1px solid rgba(255,255,255,.055);border-radius:16px;background:#14171e}
+.s6Targets article>span{grid-row:1/3;width:30px;height:30px;display:grid;place-items:center;border-radius:11px;background:rgba(129,140,255,.08);color:#9fa8ff}
+.s6Targets article>span svg{width:15px;height:15px}
+.s6Targets article div{display:grid;gap:2px;min-width:0}
+.s6Targets strong{font-size:17px;letter-spacing:-.04em}
+.s6Targets small{font-size:9px;line-height:1.35;color:#7b8391}
+.s6Targets em{grid-column:2;font-style:normal;font-size:8px;color:#626a77;text-transform:uppercase;letter-spacing:.06em}
+.s6Principle{margin:18px 0 0;padding:12px 13px;border-left:2px solid #7e89ff;border-radius:0 12px 12px 0;background:rgba(126,137,255,.055);font-size:10px;line-height:1.55;color:#8c94a2}
+@media(min-width:760px){.s6Overlay{align-items:center}.s6Panel{border-bottom:1px solid rgba(255,255,255,.08);border-radius:28px;max-height:82vh}.s6Badge{bottom:22px}}
+@media(max-width:420px){.s6Badge{right:10px;bottom:calc(82px + env(safe-area-inset-bottom));min-width:112px;padding:8px 10px}.s6Panel{padding-left:14px;padding-right:14px}.s6Targets{grid-template-columns:1fr}.s6Hero{grid-template-columns:46px minmax(0,1fr)}.s6HeroIcon{width:46px;height:46px;border-radius:16px}.s6Hero em{grid-column:2}}
+@media(prefers-reduced-motion:reduce){.s6Badge .s6Pulse{animation:none}}
