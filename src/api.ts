@@ -5,7 +5,7 @@ export type ChatOptions={reasoning?:'auto'|'high';deliberation?:'auto'|'force'|'
 export const STAGE_SIX_CHAT_OPTIONS={reasoning:'high',deliberation:'force'} as const;
 
 const advancedChatSignals=/\b(implementa|refactoriza|audita|investiga|demuestra|optimiza|arquitectura|debug|depura|c[oó]digo|typescript|javascript|python|react|worker|cloudflare|github|api|sql|d1|r2|deploy|workflow|salud|m[eé]dic|dolor|s[ií]ntoma|dosis|finanzas|saldo|banco|contrase[ñn]a|password|token|secreto|privado|legal|contrato|hoy|actual|reciente|noticia|precio|clima|busca|internet)\b/i;
-const selectedModelSignals=/^\s*\/modelos?\b|^\s*\/modelo\s+(?:h[eé]ctor\s+)?(?:base|qwen|propio|experimental|qwen15(?:-v10)?)\b|\b(?:usa|habla con|responde con)\s+(?:(?:mi|tu|el)\s+modelo(?:\s+propio|\s+experimental)?|(?:h[eé]ctor\s+)?(?:base|qwen)|hector-asi-qwen15-v10)\b/i;
+const selectedModelSignals=/^\s*\/modelos?\b|^\s*\/modelo\s+(?:h[eé]ctor\s+)?(?:base|qwen|propio|experimental|qwen15(?:-(?:v10|v41))?)\b|\b(?:usa|habla con|responde con)\s+(?:(?:mi|tu|el)\s+modelo(?:\s+propio|\s+experimental)?|(?:h[eé]ctor\s+)?(?:base|qwen)|hector-asi-qwen15-(?:v10|v41))\b/i;
 
 export function chatOptionsForRuntime(message:string,options:ChatOptions={}):ChatOptions{
  const text=message.trim();
