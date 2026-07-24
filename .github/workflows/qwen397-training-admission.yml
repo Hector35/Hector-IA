@@ -1,0 +1,47 @@
+name: Qwen 397B training admission
+
+on:
+  pull_request:
+    paths:
+      - 'model/hector-asi/training/**'
+      - 'model/hector-asi/scale/compute-status.json'
+      - '.github/workflows/qwen397-training-admission.yml'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  fail-closed-admission:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+      - name: Compile checker
+        run: python -m py_compile model/hector-asi/training/check_qwen397_admission.py
+      - name: Produce admission report
+        run: |
+          mkdir -p artifacts
+          python model/hector-asi/training/check_qwen397_admission.py --output artifacts/qwen397-admission-report.json
+      - name: Assert blocked state is honest
+        run: |
+          python - <<'PY'
+          import json
+          admission=json.load(open('model/hector-asi/training/qwen397-admission.json'))
+          report=json.load(open('artifacts/qwen397-admission-report.json'))
+          assert admission['status']=='blocked'
+          assert admission['decision']=='do-not-train'
+          assert admission['artifact'] is None
+          assert admission['adapterSha256'] is None
+          assert report['eligible'] is False
+          assert report['decision']=='do-not-train'
+          assert len(report['closedGates']) >= 1
+          PY
+      - uses: actions/upload-artifact@v4
+        with:
+          name: qwen397-training-admission-${{ github.run_id }}
+          path: artifacts/qwen397-admission-report.json
+          retention-days: 30
