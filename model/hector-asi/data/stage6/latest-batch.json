@@ -1,0 +1,64 @@
+{
+  "schemaVersion": 1,
+  "batchId": "stage6-canonical-20260724",
+  "status": "validated-not-yet-merged",
+  "targetModel": "Qwen/Qwen3.5-397B-A17B",
+  "totalExamples": 640,
+  "sftExamples": 560,
+  "preferenceExamples": 80,
+  "multimodalExamples": 0,
+  "distribution": {
+    "mathematics": 160,
+    "code": 160,
+    "planning": 80,
+    "causal-reasoning": 80,
+    "calibration": 80,
+    "verification": 80
+  },
+  "difficultyDistribution": {
+    "fácil": 216,
+    "media": 214,
+    "difícil": 210
+  },
+  "rejectedDuringGeneration": 0,
+  "license": "CC0-1.0",
+  "containsPrivateUserData": false,
+  "benchmarkExcluded": true,
+  "files": {
+    "sft": "model/hector-asi/data/stage6/generated/canonical-sft-20260724.jsonl",
+    "preference": "model/hector-asi/data/stage6/generated/canonical-preference-20260724.jsonl"
+  },
+  "sha256": {
+    "sft": "1a4254b1690f7880f2b09daf8be6cfb18d4b0fc11ba5e6008fe49eefeacc1bc4",
+    "preference": "a0153459f9016ee83aa9d53239ec394c7b9dfe105f5fad7bc88c5bef837aa423"
+  },
+  "verification": {
+    "structural": true,
+    "exactDedup": true,
+    "semanticKeyDedup": true,
+    "benchmarkExactPromptCheck": true,
+    "pythonTests": true,
+    "pythonTestsPassed": 160,
+    "rowHashes": true,
+    "fileHashes": true
+  },
+  "note": "Validado en la rama. Sólo cuenta como corpus integrado después de fusionar el PR a main.",
+  "verifiedCounts": {
+    "total": 640,
+    "sft": 560,
+    "preference": 80,
+    "capabilities": {
+      "mathematics": 160,
+      "code": 160,
+      "planning": 80,
+      "causal-reasoning": 80,
+      "calibration": 80,
+      "verification": 80
+    },
+    "difficulty": {
+      "fácil": 216,
+      "media": 214,
+      "difícil": 210
+    }
+  }
+}

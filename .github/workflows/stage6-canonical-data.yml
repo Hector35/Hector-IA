@@ -1,0 +1,136 @@
+name: Stage 6 canonical data
+
+on:
+  push:
+    branches:
+      - stage6-data/20260724-verified
+    paths:
+      - model/hector-asi/data/stage6/generate-canonical-20260724.mjs
+      - model/hector-asi/data/stage6/verify-canonical-20260724.py
+      - model/hector-asi/data/stage6/latest-batch.json
+      - .github/workflows/stage6-canonical-data.yml
+  pull_request:
+    branches:
+      - main
+    paths:
+      - model/hector-asi/data/stage6/generate-canonical-20260724.mjs
+      - model/hector-asi/data/stage6/verify-canonical-20260724.py
+      - model/hector-asi/data/stage6/latest-batch.json
+      - .github/workflows/stage6-canonical-data.yml
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+concurrency:
+  group: stage6-canonical-data-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  materialize-and-verify:
+    runs-on: ubuntu-latest
+    timeout-minutes: 25
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+      - name: Repair deterministic generator invariants
+        run: |
+          python - <<'PY'
+          from pathlib import Path
+          path=Path('model/hector-asi/data/stage6/generate-canonical-20260724.mjs')
+          text=path.read_text()
+          old_loop="for(let i=0;i<160;i++){const item=mathFamilies[i%mathFamilies.length](i);addSft({id:`stage6-math-${String(i+1).padStart(3,'0')}`,capability:'mathematics',user:item.user,assistant:item.assistant,verification:{type:'exact-structured',expected:item.expected},family:item.family,index:i});}"
+          new_loop="const mathPromptSet=new Set();\nfor(let candidate=0,accepted=0;accepted<160;candidate++){const item=mathFamilies[candidate%mathFamilies.length](candidate),key=normalize(item.user);if(mathPromptSet.has(key))continue;mathPromptSet.add(key);addSft({id:`stage6-math-${String(accepted+1).padStart(3,'0')}`,capability:'mathematics',user:item.user,assistant:item.assistant,verification:{type:'exact-structured',expected:item.expected},family:item.family,index:accepted});accepted++;}"
+          if old_loop in text:
+              text=text.replace(old_loop,new_loop)
+          elif new_loop not in text:
+              raise SystemExit('No se encontró el bucle matemático esperado')
+          old_sha="const sha=value=>createHash('sha256').update(typeof value==='string'?value:JSON.stringify(value)).digest('hex');"
+          new_sha=old_sha+"\nconst fileSha=path=>createHash('sha256').update(readFileSync(path)).digest('hex');"
+          if 'const fileSha=' not in text:
+              if old_sha not in text: raise SystemExit('No se encontró helper SHA esperado')
+              text=text.replace(old_sha,new_sha)
+          text=text.replace("sha256:{sft:sha(readFileSync(sftPath)),preference:sha(readFileSync(prefPath))}","sha256:{sft:fileSha(sftPath),preference:fileSha(prefPath)}")
+          path.write_text(text)
+          PY
+      - name: Materialize deterministic corpus
+        id: generate
+        shell: bash
+        run: |
+          set +e
+          node model/hector-asi/data/stage6/generate-canonical-20260724.mjs > generator.log 2>&1
+          status=$?
+          cat generator.log
+          echo "status=$status" >> "$GITHUB_OUTPUT"
+          exit 0
+      - name: Upload generator diagnostics
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: stage6-generator-log-${{ github.run_id }}
+          path: generator.log
+          if-no-files-found: error
+          retention-days: 7
+      - name: Fail when generation failed
+        if: steps.generate.outputs.status != '0'
+        run: exit 1
+      - name: Execute validators and 160 Python test suites
+        id: verify
+        shell: bash
+        run: |
+          set +e
+          python model/hector-asi/data/stage6/verify-canonical-20260724.py > verifier.log 2>&1
+          status=$?
+          cat verifier.log
+          echo "status=$status" >> "$GITHUB_OUTPUT"
+          exit 0
+      - name: Upload verifier diagnostics
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: stage6-verifier-log-${{ github.run_id }}
+          path: verifier.log
+          if-no-files-found: error
+          retention-days: 7
+      - name: Fail when verification failed
+        if: steps.verify.outputs.status != '0'
+        run: exit 1
+      - name: Validate repository contracts
+        run: |
+          npm ci
+          npm run typecheck
+          npm test
+      - name: Commit validated source and canonical files
+        if: github.event_name == 'push'
+        run: |
+          git config user.name 'hector-stage6-data-bot'
+          git config user.email 'actions@users.noreply.github.com'
+          git add model/hector-asi/data/stage6/generate-canonical-20260724.mjs \
+                  model/hector-asi/data/stage6/generated/canonical-sft-20260724.jsonl \
+                  model/hector-asi/data/stage6/generated/canonical-preference-20260724.jsonl \
+                  model/hector-asi/data/stage6/latest-batch.json
+          if git diff --cached --quiet; then
+            echo 'No generated changes to commit.'
+          else
+            git commit -m 'data(stage6): materialize validated 640-example canonical batch [skip ci]'
+            git push origin HEAD:${GITHUB_REF_NAME}
+          fi
+      - name: Upload immutable corpus evidence
+        uses: actions/upload-artifact@v4
+        with:
+          name: stage6-canonical-20260724-${{ github.run_id }}
+          path: |
+            model/hector-asi/data/stage6/generated/canonical-sft-20260724.jsonl
+            model/hector-asi/data/stage6/generated/canonical-preference-20260724.jsonl
+            model/hector-asi/data/stage6/latest-batch.json
+          if-no-files-found: error
+          retention-days: 90
+          compression-level: 0
