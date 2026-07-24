@@ -1,9 +1,10 @@
 {
   "schemaVersion": 1,
   "batchId": "stage6-canonical-20260724",
-  "status": "validated-not-yet-merged",
+  "status": "integrated",
   "targetModel": "Qwen/Qwen3.5-397B-A17B",
   "totalExamples": 640,
+  "integratedExamples": 640,
   "sftExamples": 560,
   "preferenceExamples": 80,
   "multimodalExamples": 0,
@@ -40,9 +41,14 @@
     "pythonTests": true,
     "pythonTestsPassed": 160,
     "rowHashes": true,
-    "fileHashes": true
+    "fileHashes": true,
+    "repositoryContracts": true
   },
-  "note": "Validado en la rama. Sólo cuenta como corpus integrado después de fusionar el PR a main.",
+  "mergedBy": {
+    "pullRequest": 805,
+    "mergeCommit": "7c4da5eb5323501e54119a2d584fd1aec4fcf599"
+  },
+  "note": "Lote validado e integrado en main. Cuenta como 640 ejemplos canónicos de la Etapa 6.",
   "verifiedCounts": {
     "total": 640,
     "sft": 560,
