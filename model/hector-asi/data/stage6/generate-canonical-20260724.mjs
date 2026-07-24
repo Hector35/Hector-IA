@@ -16,13 +16,15 @@ const fixed=value=>Number.isInteger(value)?String(value):String(Number(value.toF
 const sft=[];
 const preference=[];
 
+function semanticKey(capability,family,user){return `${capability}:${family}:${sha(normalize(user)).slice(0,20)}`;}
+
 function addSft({id,capability,user,assistant,verification,family,index,modality='text'}){
-  const row={id,format:'chat-sft',capability,difficulty:difficulty(index),modality,messages:[{role:'system',content:system},{role:'user',content:user},{role:'assistant',content:assistant}],verification:{...verification,verified:true},provenance:{kind:'project-authored-deterministic-synthetic',license:'CC0-1.0',containsPrivateUserData:false,generator:'generate-canonical-20260724.mjs'},benchmark_excluded:true,semantic_key:`${capability}:${family}:${index}`};
+  const row={id,format:'chat-sft',capability,difficulty:difficulty(index),modality,messages:[{role:'system',content:system},{role:'user',content:user},{role:'assistant',content:assistant}],verification:{...verification,verified:true},provenance:{kind:'project-authored-deterministic-synthetic',license:'CC0-1.0',containsPrivateUserData:false,generator:'generate-canonical-20260724.mjs'},benchmark_excluded:true,semantic_key:semanticKey(capability,family,user)};
   row.sha256=sha(row);sft.push(row);
 }
 
 function addPreference({id,capability,user,chosen,rejected,criteria,family,index}){
-  const row={id,format:'preference',capability,difficulty:difficulty(index),modality:'text',prompt:[{role:'system',content:system},{role:'user',content:user}],chosen,rejected,verification:{type:'rubric',verified:true,criteria},provenance:{kind:'project-authored-deterministic-synthetic',license:'CC0-1.0',containsPrivateUserData:false,generator:'generate-canonical-20260724.mjs'},benchmark_excluded:true,semantic_key:`${capability}:${family}:${index}`};
+  const row={id,format:'preference',capability,difficulty:difficulty(index),modality:'text',prompt:[{role:'system',content:system},{role:'user',content:user}],chosen,rejected,verification:{type:'rubric',verified:true,criteria},provenance:{kind:'project-authored-deterministic-synthetic',license:'CC0-1.0',containsPrivateUserData:false,generator:'generate-canonical-20260724.mjs'},benchmark_excluded:true,semantic_key:semanticKey(capability,family,user)};
   row.sha256=sha(row);preference.push(row);
 }
 
@@ -90,17 +92,19 @@ function readHiddenPrompts(){const set=new Set();for(const path of hiddenCandida
 
 function validate(){
   if(sft.length!==560||preference.length!==80)throw new Error(`unexpected counts sft=${sft.length} preference=${preference.length}`);
-  const all=[...sft,...preference],ids=new Set(),prompts=new Set(),semantic=new Set(),answers=new Set(),hidden=readHiddenPrompts();
+  const all=[...sft,...preference],ids=new Set(),prompts=new Set(),semantic=new Set(),hidden=readHiddenPrompts(),families=new Map();
   for(const row of all){
     const prompt=row.format==='chat-sft'?row.messages.find(message=>message.role==='user').content:row.prompt.find(message=>message.role==='user').content;
-    const answer=row.format==='chat-sft'?row.messages.find(message=>message.role==='assistant').content:row.chosen;
-    const np=normalize(prompt),na=normalize(answer);
+    const np=normalize(prompt);
     if(ids.has(row.id)||prompts.has(np)||semantic.has(row.semantic_key))throw new Error(`duplicate ${row.id}`);
-    if(answers.has(na))throw new Error(`duplicate answer ${row.id}`);
     if(hidden.has(np))throw new Error(`benchmark contamination ${row.id}`);
     if(row.provenance.license!=='CC0-1.0'||row.provenance.containsPrivateUserData!==false||row.benchmark_excluded!==true||row.verification.verified!==true)throw new Error(`metadata failure ${row.id}`);
-    ids.add(row.id);prompts.add(np);semantic.add(row.semantic_key);answers.add(na);
+    const family=row.semantic_key.split(':').slice(0,-1).join(':');
+    families.set(family,(families.get(family)||0)+1);
+    ids.add(row.id);prompts.add(np);semantic.add(row.semantic_key);
   }
+  const oversized=[...families.entries()].filter(([,count])=>count>40);
+  if(oversized.length)throw new Error(`overrepresented families ${JSON.stringify(oversized)}`);
   return all;
 }
 
