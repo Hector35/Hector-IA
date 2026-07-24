@@ -1,24 +1,31 @@
 {
-  "schemaVersion": 2,
+  "schemaVersion": 3,
   "stage": 6,
   "name": "Inteligencia híbrida autoevolutiva",
   "status": "active",
-  "experienceGoal": "Usar el mejor cerebro abierto disponible en la PWA mientras el modelo propio aumenta su autonomía con pesos entrenables",
+  "experienceGoal": "Usar Qwen3.5-397B-A17B como cerebro principal y fundamento entrenable abierto mientras Héctor aumenta su autonomía comprobada",
   "operatingMode": {
     "defaultReasoning": "high",
     "defaultDeliberation": "force",
     "teacher": "OPENAI_MODEL_REASONING",
-    "operationalOpenRuntime": "moonshotai/Kimi-K2.5",
-    "trainableFoundation": "moonshotai/Kimi-K2-Base",
+    "operationalOpenRuntime": "Qwen/Qwen3.5-397B-A17B",
+    "trainableFoundation": "Qwen/Qwen3.5-397B-A17B",
+    "secondaryRuntime": "moonshotai/Kimi-K2.5",
     "transitionRuntime": "Qwen/Qwen3-8B",
     "ownChampion": "hector-asi-qwen15-v41"
   },
   "modelRoles": {
-    "operational": "Kimi K2.5 para chat, visión, código, agentes y uso de herramientas",
-    "trainable": "Kimi K2 Base como fundamento final de pesos propios cuando exista infraestructura multi-GPU",
-    "transition": "Qwen3-8B para validar datos, evaluación y QLoRA sin confundirlo con el campeón final",
-    "teacher": "GPT-5.6 de razonamiento para generación de datos, verificación y respaldo"
+    "operational": "Qwen3.5-397B-A17B para chat, visión, código, agentes, herramientas y razonamiento con thinking",
+    "trainable": "Los mismos pesos abiertos Apache 2.0 de Qwen3.5-397B-A17B como objetivo final de adaptación distribuida",
+    "secondary": "Kimi K2.5 como respaldo MoE cuando Qwen 397B no responda",
+    "transition": "Qwen3-8B para pruebas económicas de datos y pipeline, sin convertirlo en campeón final",
+    "teacher": "GPT-5.6 de razonamiento para generación de datos, verificación y respaldo de alta precisión"
   },
+  "fallbackOrder": [
+    "Qwen/Qwen3.5-397B-A17B",
+    "moonshotai/Kimi-K2.5",
+    "Cloudflare Workers AI"
+  ],
   "pipeline": [
     {"id":"data","label":"Corpus verificable","target":10000,"unit":"ejemplos"},
     {"id":"benchmark","label":"Benchmark V2","target":500,"stretchTarget":1000,"unit":"casos ocultos"},
@@ -31,5 +38,5 @@
     "requiresReproducibility": true,
     "requiresRollback": true
   },
-  "principle": "Kimi K2.5 mejora la experiencia de la PWA desde ahora; Kimi K2 Base permanece separado como objetivo de entrenamiento propio. La PWA nunca declara activo un modelo cuyo endpoint no haya respondido."
+  "principle": "Qwen3.5-397B-A17B es el cerebro principal y el fundamento entrenable de gran escala. La PWA nunca declara activo un modelo cuyo endpoint no haya respondido, y V41 permanece campeón propio hasta ser superado de forma reproducible."
 }
