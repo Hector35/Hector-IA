@@ -1,15 +1,19 @@
-// Deliberate Hector ASI evolution and visible-growth redesign, guarded by visual-change-approved.
+// Hector ASI Stage 6: hybrid maximum-intelligence operation with visible, verifiable status.
 import React from 'react';
 import ReactDOM from 'react-dom/client';
 import {HectorASIEvolutionApp} from './HectorASIEvolutionApp';
+import {StageSixShell} from './StageSixShell';
 import './hector-asi.css';
 import './hector-asi-markdown.css';
 import './hector-asi-operations.css';
 import './hector-asi-evolution.css';
 import './hector-asi-evolution-compact.css';
+import './stage-six.css';
 
 ReactDOM.createRoot(document.getElementById('root')!).render(
-  <React.StrictMode><HectorASIEvolutionApp/></React.StrictMode>
+  <React.StrictMode>
+    <StageSixShell><HectorASIEvolutionApp/></StageSixShell>
+  </React.StrictMode>
 );
 
 if('serviceWorker' in navigator){
