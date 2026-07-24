@@ -1,0 +1,68 @@
+{
+  "schemaVersion": 1,
+  "cycle": "stage6-main-training",
+  "observedAt": "2026-07-24T19:04:46Z",
+  "decision": "BLOCK",
+  "trainingLaunched": false,
+  "weightsProduced": false,
+  "tokensTrained": 0,
+  "baseModel": "Qwen/Qwen3-8B",
+  "champion": "hector-asi-qwen15-v41",
+  "hypothesis": {
+    "id": "qwen3-8b-canonical-scale-sft-v1",
+    "materiallyDifferentFromV42ToV74": true,
+    "reason": "Cambio de escala de modelo y corpus canónico completo; no otra combinación de optimizadores sobre microdatos."
+  },
+  "gates": {
+    "canonicalCorpus": {
+      "required": 10000,
+      "verifiedOnMain": 0,
+      "candidateInOpenPullRequest": 2048,
+      "sourcePullRequest": 788,
+      "open": false,
+      "reason": "El lote de 2,048 ejemplos sigue como candidato y no alcanza 10,000."
+    },
+    "hiddenBenchmarkV2": {
+      "required": 500,
+      "verifiedOnMain": 512,
+      "sourcePullRequest": 792,
+      "open": true,
+      "reason": "Benchmark V2 sellado e integrado con 512 casos ocultos."
+    },
+    "trainableV41Failures": {
+      "required": 100,
+      "verified": 0,
+      "open": false,
+      "reason": "V41 aún no se ha ejecutado contra Benchmark V2 para producir un manifiesto sellado de fallos."
+    },
+    "gpuCompute": {
+      "required": "GPU >=16 GiB VRAM, reanudación persistente validada, sin fallback CPU",
+      "available": false,
+      "pipelinePullRequest": 796,
+      "open": false,
+      "reason": "No existe runner GPU autorizado; el pipeline QLoRA reanudable está pendiente de integración."
+    }
+  },
+  "canonicalComparison": {
+    "qwen3_8b_clean": null,
+    "qwen3_8b_adapted": null,
+    "v41": null,
+    "reason": "No se ejecuta comparación hasta congelar corpus, benchmark, tokenizer y entorno."
+  },
+  "artifact": null,
+  "promotion": {
+    "eligible": false,
+    "minimumAbsoluteGain": 0.03,
+    "requiresMultiCapabilityGain": true,
+    "requiresReproducibility": true,
+    "requiresRollback": true
+  },
+  "nextSingleAction": "Evaluar V41 una sola vez sobre el Benchmark V2 sellado y publicar al menos 100 fallos entrenables sin contaminar el test; en paralelo, integrar el corpus sólo después de validación y ampliar hasta 10,000.",
+  "doNotDo": [
+    "No entrenar en CPU",
+    "No crear V75 u otra variante horaria",
+    "No usar microdatasets",
+    "No evaluar repetidamente el test oculto",
+    "No declarar progreso neuronal sin pesos y comparación canónica"
+  ]
+}
