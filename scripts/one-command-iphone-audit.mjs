@@ -7,6 +7,8 @@ const devices=[
  {id:'iphone-se',label:'iPhone SE',viewport:{width:320,height:568}},
  {id:'iphone-13-pro',label:'iPhone 13 Pro',viewport:{width:390,height:844}}
 ];
+const composerSelector='.hxComposer textarea, .haComposer textarea';
+const messagesSelector='.hxThread, .haMessages';
 
 function json(body,status=200){return{status,contentType:'application/json',body:JSON.stringify(body)};}
 function responseFor(url,method){
@@ -34,12 +36,12 @@ function responseFor(url,method){
 
 async function waitForChat(page){
  await page.goto(baseUrl,{waitUntil:'domcontentloaded',timeout:45000});
- await page.locator('.haComposer textarea').waitFor({state:'visible',timeout:15000});
- await page.getByText('Hector ASI',{exact:true}).last().waitFor({state:'visible',timeout:15000});
+ await page.locator(composerSelector).first().waitFor({state:'visible',timeout:15000});
+ await page.getByText(/Hector ASI|Héctor OS/i).last().waitFor({state:'visible',timeout:15000});
 }
 
 async function runScheduleFlow(page){
- const textarea=page.locator('.haComposer textarea'),handle=await textarea.elementHandle();
+ const textarea=page.locator(composerSelector).first(),handle=await textarea.elementHandle();
  if(!handle)throw new Error('No se encontró la entrada única para Programaciones');
  const command='Cada 15 minutos revisa el estado del proyecto y reporta avances.';
  await textarea.fill(command);
@@ -53,13 +55,13 @@ async function runScheduleFlow(page){
  await page.getByText(/sus ejecuciones y resultados aparecerán aquí mismo/i).waitFor({state:'visible',timeout:10000});
  const cleared=await handle.evaluate(node=>node.value);
  if(cleared!=='')throw new Error('La entrada no se limpió después de crear la programación');
- await page.locator('.haMessages').waitFor({state:'visible',timeout:10000});
+ await page.locator(messagesSelector).first().waitFor({state:'visible',timeout:10000});
  return{command,payload,receiptVisible:true,inputCleared:true,sameChat:true};
 }
 
 async function runWorkFlow(page){
  await waitForChat(page);
- const textarea=page.locator('.haComposer textarea'),handle=await textarea.elementHandle();
+ const textarea=page.locator(composerSelector).first(),handle=await textarea.elementHandle();
  if(!handle)throw new Error('No se encontró la entrada única para Trabajo');
  const command='Termina la aplicación y no te detengas hasta dejarla funcionando.';
  await textarea.fill(command);
@@ -73,7 +75,7 @@ async function runWorkFlow(page){
  await page.getByText(/el seguimiento aparecerá automáticamente dentro de este chat/i).waitFor({state:'visible',timeout:10000});
  const cleared=await handle.evaluate(node=>node.value);
  if(cleared!=='')throw new Error('La entrada no se limpió después de activar Trabajo');
- await page.locator('.haMessages').waitFor({state:'visible',timeout:10000});
+ await page.locator(messagesSelector).first().waitFor({state:'visible',timeout:10000});
  return{command,payload,receiptVisible:true,inputCleared:true,sameChat:true};
 }
 
