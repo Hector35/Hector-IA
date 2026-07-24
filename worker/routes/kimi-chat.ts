@@ -5,7 +5,7 @@ import {requireAuth} from '../lib/auth';
 import {loadContextPack,renderContext} from '../lib/context';
 import {renderBootstrap} from '../intelligence/bootstrap';
 import {callCloudflare} from '../lib/providers';
-import {callKimiK2Base,hasKimiK2Endpoint,kimiK2Status} from '../lib/kimi-k2-runtime';
+import {callKimiK2_5,hasKimiEndpoint,kimiStatus} from '../lib/kimi-k2-runtime';
 import {enforceResponseContract} from '../lib/response-contract';
 
 export const kimiChat=new Hono<{Bindings:Bindings;Variables:Variables}>();
@@ -18,7 +18,7 @@ async function ensureConversation(db:D1Database,userId:string,conversationId:str
     if(existing)return conversationId;
   }
   const id=crypto.randomUUID();
-  await db.prepare('INSERT INTO conversations(id,user_id,title) VALUES(?,?,?)').bind(id,userId,message.slice(0,60)||'Chat Kimi K2').run();
+  await db.prepare('INSERT INTO conversations(id,user_id,title) VALUES(?,?,?)').bind(id,userId,message.slice(0,60)||'Chat Kimi K2.5').run();
   return id;
 }
 
@@ -31,10 +31,12 @@ async function saveRollingSummary(db:D1Database,userId:string,conversationId:str
 function instructions(context:string){
   return `${renderBootstrap()}
 
-RUNTIME OBJETIVO
-- Modelo solicitado: moonshotai/Kimi-K2-Base.
-- Arquitectura: MoE de 1T parámetros totales y 32B activos por token.
-- Este es un modelo base abierto; no afirmes que tiene pesos personalizados de Héctor.
+RUNTIME OPERATIVO
+- Modelo solicitado: moonshotai/Kimi-K2.5.
+- Arquitectura: MoE multimodal de 1T parámetros totales y 32B activos por token.
+- Contexto máximo del modelo: 256K tokens.
+- Usa razonamiento, herramientas y capacidades agentivas cuando aporten valor.
+- El objetivo entrenable separado es moonshotai/Kimi-K2-Base; no afirmes que K2.5 contiene pesos personalizados de Héctor.
 - Responde como Hector ASI, en español salvo petición contraria.
 - Distingue hechos, inferencias, acciones realizadas y límites.
 - Si el runtime reporta fallback, no afirmes que respondió Kimi.
@@ -43,7 +45,7 @@ CONTEXTO DINÁMICO
 ${context}`;
 }
 
-kimiChat.get('/kimi-status',c=>c.json(kimiK2Status(c.env)));
+kimiChat.get('/kimi-status',c=>c.json(kimiStatus(c.env)));
 
 kimiChat.post('/kimi-chat',async c=>{
   const parsed=z.object({
@@ -57,8 +59,7 @@ kimiChat.post('/kimi-chat',async c=>{
   const message=parsed.data.message.trim();
   const userId=c.get('userId');
   const conversationId=await ensureConversation(c.env.DB,userId,parsed.data.conversationId,message);
-  const userMessageId=crypto.randomUUID();
-  await c.env.DB.prepare('INSERT INTO messages(id,conversation_id,role,content) VALUES(?,?,?,?)').bind(userMessageId,conversationId,'user',message).run();
+  await c.env.DB.prepare('INSERT INTO messages(id,conversation_id,role,content) VALUES(?,?,?,?)').bind(crypto.randomUUID(),conversationId,'user',message).run();
 
   const pack=await loadContextPack(c.env,userId,conversationId,message);
   const system=instructions(renderContext(pack));
@@ -66,32 +67,38 @@ kimiChat.post('/kimi-chat',async c=>{
     .filter(item=>item.role==='user'||item.role==='assistant')
     .map(item=>({role:item.role as 'user'|'assistant',content:item.content}));
 
-  const endpointConfigured=hasKimiK2Endpoint(c.env);
+  const endpointConfigured=hasKimiEndpoint(c.env);
   let out:{text:string;id:string;model:string;usage?:{input_tokens?:number;output_tokens?:number}};
-  let provider:string;
+  let provider='Kimi K2.5 endpoint';
   let fallback=false;
-  let reason:string;
+  let reason='Kimi K2.5 respondió desde el endpoint configurado';
 
   try{
     if(endpointConfigured){
-      out=await callKimiK2Base(c.env,system,history);
-      provider='Kimi K2 endpoint';
-      reason='Kimi K2 Base respondió desde el endpoint GPU configurado';
+      try{
+        out=await callKimiK2_5(c.env,system,history);
+      }catch(error){
+        fallback=true;
+        provider='Cloudflare';
+        reason=`Kimi K2.5 falló y se aplicó fallback: ${error instanceof Error?error.message:'error desconocido'}`;
+        out=await callCloudflare(c.env,`${system}\n\nKimi K2.5 no estuvo disponible. Responde como fallback identificado y no lo suplantes.`,message);
+      }
     }else{
-      out=await callCloudflare(c.env,`${system}\n\nKimi K2 Base todavía no tiene endpoint conectado. Responde como fallback identificado, sin suplantarlo.`,message);
-      provider='Cloudflare';
       fallback=true;
-      reason='Kimi K2 Base está visible y seleccionado, pero falta conectar KIMI_K2_BASE_URL y KIMI_K2_TOKEN';
+      provider='Cloudflare';
+      reason='Kimi K2.5 está integrado, pero falta configurar KIMI_K2_BASE_URL y KIMI_K2_TOKEN';
+      out=await callCloudflare(c.env,`${system}\n\nKimi K2.5 todavía no tiene endpoint conectado. Responde como fallback identificado y no lo suplantes.`,message);
     }
 
     const contract=enforceResponseContract(message,out.text);
     const assistantMessageId=crypto.randomUUID();
-    const status=kimiK2Status(c.env);
+    const status=kimiStatus(c.env);
+    const effectiveKimi=!fallback&&endpointConfigured;
     await c.env.DB.batch([
       c.env.DB.prepare('INSERT INTO messages(id,conversation_id,role,content) VALUES(?,?,?,?)').bind(assistantMessageId,conversationId,'assistant',contract.text),
       c.env.DB.prepare('INSERT INTO api_usage(id,user_id,provider,service,model,input_units,cached_input_units,output_units,estimated_cost_usd,metadata_json) VALUES(?,?,?,?,?,?,?,?,?,?)').bind(
-        crypto.randomUUID(),userId,provider,'kimi-k2-chat',out.model,Number(out.usage?.input_tokens||0),0,Number(out.usage?.output_tokens||0),0,
-        JSON.stringify({runtimeId:'hector-kimi',requestedModel:status.model,tier:endpointConfigured?'open-moe-1t':'kimi-pending-fallback',reason,fallback,endpointConfigured,contractApplied:contract.applied,contractReasons:contract.reasons})
+        crypto.randomUUID(),userId,provider,'kimi-k2.5-chat',out.model,Number(out.usage?.input_tokens||0),0,Number(out.usage?.output_tokens||0),0,
+        JSON.stringify({runtimeId:'hector-kimi',requestedModel:status.model,trainingTarget:status.trainingTarget.repository,tier:effectiveKimi?'open-multimodal-moe-1t':'kimi-pending-fallback',reason,fallback,endpointConfigured,contractApplied:contract.applied,contractReasons:contract.reasons})
       )
     ]);
     await saveRollingSummary(c.env.DB,userId,conversationId);
@@ -101,15 +108,16 @@ kimiChat.post('/kimi-chat',async c=>{
       provider,
       model:out.model,
       requestedModel:status.model,
+      trainingTarget:status.trainingTarget,
       runtimeId:'hector-kimi',
       runtime:status,
       fallback,
       fallbackReason:fallback?reason:undefined,
-      modelTier:endpointConfigured?'open-moe-1t':'kimi-pending-fallback',
+      modelTier:effectiveKimi?'open-multimodal-moe-1t':'kimi-pending-fallback',
       usage:out.usage,
       contract:{applied:contract.applied,reasons:contract.reasons}
     });
   }catch(error){
-    return c.json({error:error instanceof Error?error.message:'Kimi K2 Base no respondió',runtime:kimiK2Status(c.env)},502);
+    return c.json({error:error instanceof Error?error.message:'Kimi K2.5 no respondió',runtime:kimiStatus(c.env)},502);
   }
 });

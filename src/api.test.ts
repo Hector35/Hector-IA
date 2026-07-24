@@ -1,5 +1,5 @@
 import {describe,expect,it} from 'vitest';
-import {chatOptionsForRuntime,stageSixChatOptions,STAGE_SIX_CHAT_OPTIONS} from './api';
+import {chatOptionsForRuntime,stageSixChatOptions,STAGE_SIX_CHAT_OPTIONS,usesSelectedModelChat} from './api';
 
 describe('Hector Base chat routing',()=>{
  it('routes ordinary conversation to the operational open base outside Stage 6',()=>{
@@ -25,5 +25,11 @@ describe('Stage 6 maximum-intelligence mode',()=>{
 
  it('preserves an explicitly selected runtime while raising cognition',()=>{
   expect(stageSixChatOptions({runtime:'hector-qwen'})).toEqual({runtime:'hector-qwen',reasoning:'high',deliberation:'force'});
+ });
+
+ it('recognizes Kimi K2.5 and Kimi K2 Base as explicit Kimi selections',()=>{
+  expect(usesSelectedModelChat('usa Kimi K2.5')).toBe(true);
+  expect(usesSelectedModelChat('habla con Kimi K2 Base')).toBe(true);
+  expect(usesSelectedModelChat('hola')).toBe(false);
  });
 });
