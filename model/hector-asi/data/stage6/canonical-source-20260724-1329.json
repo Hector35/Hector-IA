@@ -1,0 +1,15 @@
+{
+  "schemaVersion": 1,
+  "seed": 20260724,
+  "targetCount": 640,
+  "families": [
+    {"id":"math-arithmetic","count":80,"capability":"mathematics","difficulty":"easy-medium","generator":"arithmetic_v1"},
+    {"id":"math-linear","count":80,"capability":"mathematics","difficulty":"medium","generator":"linear_equation_v1"},
+    {"id":"code-even-squares","count":80,"capability":"code","difficulty":"easy-medium","generator":"python_even_squares_v1"},
+    {"id":"code-base-conversion","count":80,"capability":"code","difficulty":"medium","generator":"python_base_conversion_v1"},
+    {"id":"planning-single-resource","count":80,"capability":"planning","difficulty":"medium-hard","generator":"schedule_precedence_v1"},
+    {"id":"causal-scm","count":80,"capability":"causal_reasoning","difficulty":"medium","generator":"linear_scm_v1"},
+    {"id":"calibration","count":80,"capability":"calibration","difficulty":"easy-medium","generator":"confidence_label_v1"},
+    {"id":"verification","count":80,"capability":"verification","difficulty":"easy-medium","generator":"arithmetic_audit_v1"}
+  ]
+}
