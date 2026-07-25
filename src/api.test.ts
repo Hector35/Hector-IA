@@ -1,5 +1,5 @@
 import {describe,expect,it} from 'vitest';
-import {chatOptionsForRuntime,stageSixChatOptions,STAGE_SIX_CHAT_OPTIONS,usesSelectedModelChat} from './api';
+import {chatOptionsForRuntime,classifyQwen397Command,stageSixChatOptions,STAGE_SIX_CHAT_OPTIONS,usesSelectedModelChat} from './api';
 
 describe('Hector Base chat routing',()=>{
  it('routes ordinary conversation to the operational open base outside Stage 6',()=>{
@@ -31,5 +31,12 @@ describe('Stage 6 maximum-intelligence mode',()=>{
   expect(usesSelectedModelChat('usa Kimi K2.5')).toBe(true);
   expect(usesSelectedModelChat('habla con Kimi K2 Base')).toBe(true);
   expect(usesSelectedModelChat('hola')).toBe(false);
+ });
+
+ it('requires exact slash commands for Qwen status and live attestation',()=>{
+  expect(classifyQwen397Command('/estado-qwen397')).toBe('status');
+  expect(classifyQwen397Command('  /probar-qwen397  ')).toBe('probe');
+  expect(classifyQwen397Command('prueba Qwen 397B')).toBeNull();
+  expect(classifyQwen397Command('/probar-qwen397 ahora')).toBeNull();
  });
 });
