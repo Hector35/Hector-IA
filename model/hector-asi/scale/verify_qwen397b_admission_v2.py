@@ -20,6 +20,7 @@ def main() -> None:
     gates = {
         'data': int(obs['canonicalTrainExamples']) >= int(req['canonicalTrainExamples']),
         'benchmark': int(obs['hiddenBenchmarkCases']) >= int(req['hiddenBenchmarkCases']),
+        'benchmarkAggregateConsistency': bool(obs['benchmarkAggregateConsistencyVerified']),
         'failures': int(obs['trainableChampionFailures']) >= int(req['trainableChampionFailures']),
         'hardware': bool(obs['distributedHardwareVerified']),
         'resume': bool(obs['resumeRoundTripVerified']),
@@ -33,7 +34,7 @@ def main() -> None:
     }
     eligible = all(gates.values())
     evidence = {
-        'schemaVersion': 3,
+        'schemaVersion': 4,
         'baseModel': manifest['baseModel'],
         'champion': manifest['champion'],
         'eligible': eligible,
