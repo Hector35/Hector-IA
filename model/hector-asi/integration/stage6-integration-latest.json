@@ -1,6 +1,6 @@
 {
-  "schemaVersion": 1,
-  "generatedAt": "2026-07-25T18:05:00Z",
+  "schemaVersion": 2,
+  "generatedAt": "2026-07-25T18:36:00Z",
   "champion": {
     "id": "hector-asi-qwen15-v41",
     "base": "Qwen/Qwen2.5-1.5B-Instruct",
@@ -11,18 +11,27 @@
   "candidate": null,
   "promotionDecision": "retain-v41",
   "promotionReasons": [
-    "no new neural candidate with a real adapter or checkpoint",
-    "no sealed Benchmark V2 comparison against V41",
-    "no two confirmatory replicas",
+    "no new neural candidate evaluated on the sealed Benchmark V2",
+    "no paired comparison with at least 3 percentage points absolute gain",
+    "no two confirmatory replicas on the canonical benchmark",
+    "Benchmark V2 aggregate score and failure count are not internally reconciled",
     "training admission remains closed"
   ],
   "data": {
-    "verifiedExamples": 3800,
+    "verifiedExamples": 5400,
     "requiredExamples": 10000,
-    "remainingExamples": 6200,
+    "remainingExamples": 4600,
     "pwaHumanApprovedObserved": 0,
     "pwaExamplesInVersionedDatasets": 0,
     "directD1TrainingAllowed": false,
+    "feedbackLineage": {
+      "requiredStatus": "human_approved",
+      "requiredUserAccepted": true,
+      "cycle1ValidationRequired": true,
+      "versionedDatasetRequired": true,
+      "pendingAndRejectedForbidden": true,
+      "traceableExamples": 0
+    },
     "verifiedDatasetManifests": [
       {
         "name": "cognitive-depth-20260725",
@@ -33,19 +42,36 @@
         "containsPrivateUserData": false,
         "benchmarkExcluded": true,
         "integratedBy": "6a63aef9f101972b60febd704075cb3c423dd233"
+      },
+      {
+        "name": "v41-priority-depth-20260725",
+        "path": "generated in CI by model/hector-asi/data/stage6/generate-v41-priority-depth-20260725.py",
+        "generator": "model/hector-asi/data/stage6/generate-v41-priority-depth-20260725.py",
+        "count": 1600,
+        "verification": "deterministic two-run comparison, semantic deduplication, benchmark leakage checks and executable multi-file tests",
+        "containsPrivateUserData": false,
+        "benchmarkExcluded": true,
+        "integratedBy": "2560df6198005650727ce90ecaf510503d8a345f"
       }
     ],
     "sourceMerges": [
       "c70207b3fe4575a125dd3c6c2ddd43d9202a4d03",
       "5c7de5888e0c9b11ba41985b2a45f6969c13f3c0",
       "f17f6db9c0955a1cb511fa0278fbb22e77b8cabe",
-      "6a63aef9f101972b60febd704075cb3c423dd233"
+      "6a63aef9f101972b60febd704075cb3c423dd233",
+      "2560df6198005650727ce90ecaf510503d8a345f"
     ]
   },
   "benchmark": {
     "cases": 512,
     "hiddenSha256": "b8b774d21e2210482fdb417bd4c74eedea90e28c35b2fe1f58dc1fa4b65cc094",
     "v41PredictionsSha256": "025bcf6451b0ef68ce8df9836fe617e5f3299a3ad4b029d8ac7392827be59ba0",
+    "publishedScorePercent": 25.195,
+    "publishedFailureCount": 483,
+    "impliedCorrectFromScore": 129,
+    "impliedFailuresFromScore": 383,
+    "aggregateConsistencyVerified": false,
+    "aggregateConsistencyReason": "25.195 percent over 512 cases implies 129 correct and 383 failures, while failureCount is 483. Promotion thresholds cannot be trusted until one canonical scorer derives all aggregate fields.",
     "v41TrainableFailures": 449,
     "promotionGateIntegratedBy": "65d40fe7bffeac991ad8c11ba9834599ffa1918d"
   },
@@ -72,7 +98,8 @@
   },
   "gates": {
     "stagePlanAligned": true,
-    "benchmarkReady": true,
+    "benchmarkHashReady": true,
+    "benchmarkAggregateConsistencyReady": false,
     "trainableFailuresReady": true,
     "corpusReady": false,
     "budgetReady": false,
@@ -81,5 +108,5 @@
     "frozenDataModelTokenizerHashesReady": false,
     "trainingAuthorized": false
   },
-  "singleNextBlocker": "produce and integrate 6200 additional verified examples before allocating paid distributed training compute"
+  "singleNextBlocker": "reconcile Benchmark V2 aggregate semantics with one canonical scorer; after that, produce and integrate the remaining 4600 verified examples"
 }
