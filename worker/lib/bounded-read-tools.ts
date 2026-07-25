@@ -81,7 +81,7 @@ export async function executeReadOnlyTool(env:Bindings,userId:string,call:ReadOn
    const rows=await env.DB.prepare('SELECT id,kind,status,progress,result,updated_at FROM work_jobs WHERE user_id=? ORDER BY updated_at DESC LIMIT ?').bind(userId,call.arguments.limit).all<any>();
    result={count:rows.results.length,items:rows.results.map((row:any)=>({id:String(row.id),kind:String(row.kind||''),status:String(row.status||''),progress:Number(row.progress||0),result:row.result?String(row.result).slice(0,1200):null,updatedAt:row.updated_at||null}))};
   }
-  return{...base,success:true,durationMs:Date.now()-started,result:JSON.parse(compact(result))};
+  return{...base,success:true,durationMs:Date.now()-started,result};
  }catch(error){return{...base,success:false,durationMs:Date.now()-started,error:error instanceof Error?error.message:'error desconocido'};}
 }
 
