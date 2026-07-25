@@ -1,0 +1,56 @@
+/* Final mobile fidelity pass for the approved Héctor OS chat concept. */
+.hcAdd,.hcMic,.hcSend{width:44px;height:44px}
+
+@media(max-width:900px){
+  .hcHeader{
+    grid-template-columns:auto minmax(0,1fr) auto;
+    gap:8px;
+  }
+  .hcBrand{
+    min-width:0;
+    gap:8px;
+  }
+  .hcBrand>span{
+    width:34px;
+    height:34px;
+    flex:0 0 auto;
+  }
+  .hcBrand>b{
+    display:block;
+    overflow:hidden;
+    text-overflow:ellipsis;
+    white-space:nowrap;
+    font-size:10px;
+    letter-spacing:.12em;
+  }
+  .hcTitle{display:none}
+  .hcHeaderRight{gap:3px}
+  .hcRuntime{
+    max-width:126px;
+    height:32px;
+    padding:0 9px;
+  }
+  .hcRuntime span{
+    max-width:92px;
+    font-size:8px;
+  }
+  .hcIconButton{
+    width:38px;
+    height:38px;
+  }
+  .hcAdd,.hcMic,.hcSend{
+    width:44px;
+    height:44px;
+  }
+}
+
+@media(max-width:350px){
+  .hcHeader{gap:4px;padding-inline:10px}
+  .hcBrand{gap:6px}
+  .hcBrand>b{font-size:9px;letter-spacing:.08em}
+  .hcRuntime{max-width:94px;padding-inline:8px}
+  .hcRuntime span{max-width:63px}
+  .hcIconButton{width:36px;height:36px}
+  .hcQuickActions button{padding-inline:9px}
+  .hcQuickActions span{font-size:11px}
+}
