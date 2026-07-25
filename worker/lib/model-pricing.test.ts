@@ -8,6 +8,11 @@ describe('pricingForModel',()=>{
   expect(pricingForModel('gpt-5.6-luna').cachedInputPerMTok).toBe(.1);
   expect(pricingForModel('gpt-5.6').family).toBe('gpt-5.6-sol');
  });
+ it('reconoce Qwen 397B servido por la política cheapest',()=>{
+  const pricing=pricingForModel('Qwen/Qwen3.5-397B-A17B:cheapest');
+  expect(pricing).toMatchObject({family:'qwen3.5-397b-a17b:cheapest',inputPerMTok:.45,outputPerMTok:3,known:true});
+  expect(pricing.source).toBe('huggingface-inference-providers-2026-07-25');
+ });
  it('marca modelos desconocidos sin inventar que la tarifa es oficial',()=>{
   const pricing=pricingForModel('modelo-desconocido');
   expect(pricing.known).toBe(false);
@@ -23,6 +28,12 @@ describe('estimateModelCost',()=>{
   expect(result.cacheWrite).toBe(100_000);
   expect(result.longContext).toBe(true);
   expect(result.costUsd).toBeCloseTo(6.475,6);
+  expect(result.pricingKnown).toBe(true);
+ });
+ it('calcula Qwen 397B sin inventar recargos no publicados',()=>{
+  const result=estimateModelCost({input_tokens:1_000_000,output_tokens:100_000},'Qwen/Qwen3.5-397B-A17B');
+  expect(result.longContext).toBe(true);
+  expect(result.costUsd).toBeCloseTo(.75,6);
   expect(result.pricingKnown).toBe(true);
  });
  it('aplica recargo de contexto largo a entrada y salida',()=>{
