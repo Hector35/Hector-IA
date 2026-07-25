@@ -41,8 +41,11 @@ jobs:
           assert state['champion']['id']=='hector-asi-qwen15-v41'
           assert state['candidate'] is None
           assert state['promotionDecision']=='retain-v41'
-          assert state['data']['verifiedExamples']==2600
-          assert state['data']['remainingExamples']==7400
+          assert state['data']['verifiedExamples']==plan['pipeline'][0]['current']==3800
+          assert state['data']['requiredExamples']==plan['pipeline'][0]['target']==10000
+          assert state['data']['remainingExamples']==state['data']['requiredExamples']-state['data']['verifiedExamples']==6200
+          assert sum(int(x['count']) for x in state['data'].get('verifiedDatasetManifests',[]))<=state['data']['verifiedExamples']
+          assert any(x['name']=='cognitive-depth-20260725' and int(x['count'])==1200 for x in state['data'].get('verifiedDatasetManifests',[]))
           assert state['data']['pwaExamplesInVersionedDatasets']==0
           assert state['data']['directD1TrainingAllowed'] is False
           assert state['benchmark']['hiddenSha256']==bench['hiddenSha256']==taxonomy['benchmarkSha256']
@@ -66,7 +69,11 @@ jobs:
           python - <<'PY'
           import json
           m=json.load(open('/tmp/admission.json'))
+          assert m['schemaVersion']==2
           assert m['stagePlanDrift']['detected'] is False
+          assert m['corpusEvidence']['current']==3800
+          assert m['corpusEvidence']['required']==10000
+          assert m['corpusEvidence']['remaining']==6200
           assert m['trainingAuthorized'] is False
           assert m['decision']=='do-not-train'
           assert m['artifact'] is None
