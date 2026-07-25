@@ -1,0 +1,183 @@
+<!doctype html>
+<html lang="es-MX">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
+  <meta name="theme-color" content="#0a0b0d" />
+  <meta name="apple-mobile-web-app-capable" content="yes" />
+  <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
+  <title>Héctor Bridge</title>
+  <link rel="manifest" href="/manifest.webmanifest" />
+  <link rel="stylesheet" href="/bridge.css" />
+</head>
+<body>
+  <div class="bridgeShell">
+    <header class="bridgeHeader">
+      <a class="backLink" href="/" aria-label="Volver a Héctor OS">←</a>
+      <div>
+        <p class="eyebrow">HÉCTOR OS</p>
+        <h1>Bridge</h1>
+      </div>
+      <span class="statusPill" id="globalStatus">LOCAL</span>
+    </header>
+
+    <main>
+      <section class="heroCard">
+        <div>
+          <p class="eyebrow">CAPACIDADES REALES</p>
+          <h2>Ejecuta, transforma y escucha.</h2>
+          <p>Las herramientas locales funcionan en el iPhone sin entregar tus archivos a terceros. Las acciones sensibles siempre requieren un toque tuyo.</p>
+        </div>
+        <div class="capabilityGrid" aria-label="Resumen de capacidades">
+          <span>Python</span><span>JavaScript</span><span>Archivos</span><span>Audio FFT</span><span>Atajos</span><span>Navegación</span>
+        </div>
+      </section>
+
+      <nav class="tabBar" aria-label="Herramientas de Héctor Bridge">
+        <button class="tab active" data-tab="code">Código</button>
+        <button class="tab" data-tab="files">Archivos</button>
+        <button class="tab" data-tab="audio">Audio</button>
+        <button class="tab" data-tab="iphone">iPhone</button>
+        <button class="tab" data-tab="browser">Navegar</button>
+      </nav>
+
+      <section class="toolPanel active" id="panel-code">
+        <div class="sectionHeading">
+          <div><p class="eyebrow">LABORATORIO AISLADO</p><h2>Código y simulaciones</h2></div>
+          <span class="privacyBadge">Sin acceso a tus cookies</span>
+        </div>
+        <div class="controlRow">
+          <label>Lenguaje
+            <select id="languageSelect">
+              <option value="python">Python</option>
+              <option value="javascript">JavaScript</option>
+            </select>
+          </label>
+          <label>Límite
+            <select id="timeoutSelect">
+              <option value="5000">5 s</option>
+              <option value="15000" selected>15 s</option>
+              <option value="30000">30 s</option>
+            </select>
+          </label>
+          <button class="secondaryButton" id="loadExample">Ejemplo</button>
+        </div>
+        <textarea id="codeEditor" class="codeEditor" spellcheck="false" aria-label="Código a ejecutar">import math
+
+voltajes = [5.1, 5.0, 4.8, 4.6, 4.4]
+corriente_a = 0.72
+potencias = [round(v * corriente_a, 3) for v in voltajes]
+print("Potencias W:", potencias)
+print("Promedio W:", round(sum(potencias) / len(potencias), 3))
+print("Energía en 5 h (Wh):", round(sum(potencias) / len(potencias) * 5, 2))</textarea>
+        <div class="actionRow">
+          <button class="primaryButton" id="runCode">▶ Ejecutar</button>
+          <button class="dangerButton" id="stopCode" disabled>Detener</button>
+          <button class="ghostButton" id="clearOutput">Limpiar</button>
+        </div>
+        <div class="receiptHeader"><span>Salida verificable</span><span id="executionMeta">Sin ejecutar</span></div>
+        <pre class="outputConsole" id="codeOutput" aria-live="polite">Listo.</pre>
+      </section>
+
+      <section class="toolPanel" id="panel-files">
+        <div class="sectionHeading">
+          <div><p class="eyebrow">MANOS LOCALES</p><h2>Manipular archivos</h2></div>
+          <span class="privacyBadge">Procesamiento local</span>
+        </div>
+        <label class="dropZone" id="dropZone">
+          <input id="fileInput" type="file" multiple />
+          <strong>Seleccionar o soltar archivos</strong>
+          <span>TXT, CSV, JSON, imágenes y otros archivos para inspección.</span>
+        </label>
+        <div id="fileList" class="fileList"><p class="emptyState">Todavía no hay archivos.</p></div>
+        <div class="fileActions">
+          <button class="secondaryButton" id="inspectFiles">Inspeccionar</button>
+          <button class="secondaryButton" id="combineText">Unir textos</button>
+          <button class="secondaryButton" id="formatJson">Formatear JSON</button>
+          <button class="secondaryButton" id="csvToJson">CSV → JSON</button>
+          <button class="ghostButton" id="clearFiles">Vaciar</button>
+        </div>
+        <div class="receiptHeader"><span>Resultado</span><span id="fileMeta">0 archivos</span></div>
+        <pre class="outputConsole filesOutput" id="fileOutput">Selecciona archivos para comenzar.</pre>
+        <div id="downloadArea" class="downloadArea"></div>
+      </section>
+
+      <section class="toolPanel" id="panel-audio">
+        <div class="sectionHeading">
+          <div><p class="eyebrow">ANÁLISIS DEL ENTORNO</p><h2>Micrófono y espectro</h2></div>
+          <span class="privacyBadge">Permiso explícito</span>
+        </div>
+        <div class="audioMeters">
+          <article><span>Frecuencia dominante</span><strong id="dominantHz">0 Hz</strong></article>
+          <article><span>Nivel aproximado</span><strong id="dbLevel">−∞ dBFS</strong></article>
+          <article><span>Duración</span><strong id="recordingTime">00:00</strong></article>
+        </div>
+        <canvas id="waveformCanvas" width="900" height="220" aria-label="Forma de onda"></canvas>
+        <canvas id="spectrumCanvas" width="900" height="260" aria-label="Espectro de frecuencias"></canvas>
+        <div class="actionRow">
+          <button class="primaryButton" id="startAudio">● Iniciar análisis</button>
+          <button class="dangerButton" id="stopAudio" disabled>Detener</button>
+          <button class="secondaryButton" id="downloadAudio" disabled>Descargar grabación</button>
+        </div>
+        <p class="hint">Útil para comparar ventiladores, motores, vibraciones y cambios antes/después. No sustituye instrumental calibrado.</p>
+      </section>
+
+      <section class="toolPanel" id="panel-iphone">
+        <div class="sectionHeading">
+          <div><p class="eyebrow">PUENTE DE ATAJOS</p><h2>Acciones del iPhone</h2></div>
+          <span class="privacyBadge">Confirmación de iOS</span>
+        </div>
+        <div class="formStack">
+          <label>Nombre del atajo
+            <input id="shortcutName" value="Hector Bridge" />
+          </label>
+          <label>Comando o datos
+            <textarea id="shortcutPayload" rows="5">{"accion":"guardar_nota","texto":"Prueba enviada desde Héctor Bridge"}</textarea>
+          </label>
+        </div>
+        <div class="actionRow wrap">
+          <button class="primaryButton" id="runShortcut">Ejecutar Atajo</button>
+          <button class="secondaryButton" id="runClipboardShortcut">Usar portapapeles</button>
+          <button class="secondaryButton" id="openShortcuts">Abrir Atajos</button>
+          <button class="secondaryButton" id="openCurrentLocation">Abrir ubicación en Mapas</button>
+        </div>
+        <div class="infoCard">
+          <strong>Contrato del Atajo</strong>
+          <p>El atajo llamado <em>Hector Bridge</em> recibe texto o JSON. Puede decidir si crea una nota, recordatorio, archivo, ruta u otra acción permitida por iOS.</p>
+        </div>
+      </section>
+
+      <section class="toolPanel" id="panel-browser">
+        <div class="sectionHeading">
+          <div><p class="eyebrow">NAVEGADOR ASISTIDO</p><h2>Preparar operaciones web</h2></div>
+          <span class="pendingBadge">Remoto: pendiente</span>
+        </div>
+        <div class="formStack">
+          <label>Sitio
+            <input id="browserUrl" inputmode="url" placeholder="https://ejemplo.com" />
+          </label>
+          <label>Objetivo
+            <textarea id="browserTask" rows="5" placeholder="Ejemplo: compara precios, llena el borrador y detente antes de enviar."></textarea>
+          </label>
+        </div>
+        <div class="actionRow wrap">
+          <button class="primaryButton" id="openBrowserUrl">Abrir sitio</button>
+          <button class="secondaryButton" id="saveBrowserTask">Guardar tarea</button>
+          <button class="ghostButton" id="clearBrowserTasks">Borrar cola</button>
+        </div>
+        <div class="infoCard warning">
+          <strong>Estado honesto</strong>
+          <p>Esta versión abre sitios y conserva la tarea. La automatización con clics, formularios y capturas requerirá el navegador remoto aislado de la siguiente fase.</p>
+        </div>
+        <div id="browserQueue" class="browserQueue"></div>
+      </section>
+    </main>
+
+    <footer>
+      <span>Héctor Bridge MVP</span>
+      <span id="buildStamp">Local-first</span>
+    </footer>
+  </div>
+  <script type="module" src="/bridge.js"></script>
+</body>
+</html>
