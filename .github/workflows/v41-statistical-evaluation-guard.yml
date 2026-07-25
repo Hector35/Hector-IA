@@ -1,0 +1,51 @@
+name: V41 statistical evaluation guard
+on:
+  pull_request:
+    branches: [main]
+    paths:
+      - 'model/hector-asi/evals/benchmark_v2/build_statistical_evaluation_guard.py'
+      - 'model/hector-asi/evals/benchmark_v2/v41-benchmark-v2-latest.json'
+      - '.github/workflows/v41-statistical-evaluation-guard.yml'
+  workflow_dispatch:
+permissions:
+  contents: read
+jobs:
+  evaluate:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+      - name: Compile evaluator
+        run: python -m py_compile model/hector-asi/evals/benchmark_v2/build_statistical_evaluation_guard.py
+      - name: Generate report twice
+        run: |
+          python model/hector-asi/evals/benchmark_v2/build_statistical_evaluation_guard.py --input model/hector-asi/evals/benchmark_v2/v41-benchmark-v2-latest.json --output /tmp/report-a.json
+          python model/hector-asi/evals/benchmark_v2/build_statistical_evaluation_guard.py --input model/hector-asi/evals/benchmark_v2/v41-benchmark-v2-latest.json --output /tmp/report-b.json
+          cmp /tmp/report-a.json /tmp/report-b.json
+      - name: Verify promotion thresholds and fail-closed state
+        run: |
+          python - <<'PY'
+          import json
+          r=json.load(open('/tmp/report-a.json'))
+          assert r['champion']['model']=='hector-asi-qwen15-v41'
+          assert r['champion']['scorePercent']==25.195
+          assert r['promotionContract']['minimumAdditionalCorrectVsV41']==16
+          assert r['promotionContract']['minimumObservedScorePercent']==28.32
+          assert r['promotionContract']['requiresConfirmatoryReplica'] is True
+          assert r['promotionContract']['fallbackAllowed'] is False
+          assert r['candidateInventory']['eligibleCandidates']==[]
+          assert r['contaminationAudit']['detected'] is False
+          assert r['contaminationAudit']['newHiddenCasesAdded']==0
+          assert r['decision']=='keep-v41'
+          assert r['priorityOrder'][:4]==['calibration','planning','transfer','code']
+          PY
+      - name: Publish auditable evaluation report
+        uses: actions/upload-artifact@v4
+        with:
+          name: v41-statistical-evaluation-${{ github.run_id }}
+          path: /tmp/report-a.json
+          retention-days: 90
+          if-no-files-found: error
