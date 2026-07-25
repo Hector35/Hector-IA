@@ -1,5 +1,5 @@
 import {describe,expect,it} from 'vitest';
-import {chatOptionsForRuntime,classifyQwen397Command,stageSixChatOptions,STAGE_SIX_CHAT_OPTIONS,usesSelectedModelChat} from './api';
+import {chatOptionsForRuntime,classifyQwen397Command,classifySystemCommand,stageSixChatOptions,STAGE_SIX_CHAT_OPTIONS,usesSelectedModelChat} from './api';
 
 describe('Hector Base chat routing',()=>{
  it('routes ordinary conversation to the operational open base outside Stage 6',()=>{
@@ -38,5 +38,12 @@ describe('Stage 6 maximum-intelligence mode',()=>{
   expect(classifyQwen397Command('  /probar-qwen397  ')).toBe('probe');
   expect(classifyQwen397Command('prueba Qwen 397B')).toBeNull();
   expect(classifyQwen397Command('/probar-qwen397 ahora')).toBeNull();
+ });
+
+ it('requires the exact no-cost system quality audit command',()=>{
+  expect(classifySystemCommand('/auditar-10-10')).toBe('quality');
+  expect(classifySystemCommand('  /auditar-10-10 ')).toBe('quality');
+  expect(classifySystemCommand('auditar 10/10')).toBeNull();
+  expect(classifySystemCommand('/auditar-10-10 ahora')).toBeNull();
  });
 });

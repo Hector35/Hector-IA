@@ -6,12 +6,19 @@ on:
     paths:
       - 'model/hector-asi/integration/stage6-integration-latest.json'
       - 'model/hector-asi/stage-6-plan.json'
+      - 'model/hector-asi/system-quality-contract.json'
+      - 'model/hector-asi/data/stage6/generate-cognitive-depth-20260725.py'
       - 'model/hector-asi/registry/chat-champion.json'
       - 'model/hector-asi/evals/benchmark_v2/v41-benchmark-v2-latest.json'
       - 'model/hector-asi/scale/qwen35-397b-training-admission-v2.json'
       - 'model/hector-asi/verify_intelligence_state.py'
       - 'worker/intelligence/intelligence-state.ts'
       - 'worker/intelligence/stage-six.ts'
+      - 'worker/intelligence/system-quality.ts'
+      - 'worker/intelligence/system-quality.test.ts'
+      - 'worker/routes/system.ts'
+      - 'src/api.ts'
+      - 'src/api.test.ts'
       - 'wrangler.jsonc'
       - '.github/workflows/intelligence-state-consistency.yml'
   workflow_dispatch:
@@ -28,6 +35,8 @@ jobs:
       - uses: actions/setup-python@v5
         with:
           python-version: '3.11'
+      - name: Rebuild deterministic integrated manifest
+        run: python model/hector-asi/data/stage6/generate-cognitive-depth-20260725.py >/tmp/cognitive-depth-generation.json
       - name: Verify canonical state and all consumers
         run: python model/hector-asi/verify_intelligence_state.py
       - uses: actions/setup-node@v4
@@ -39,4 +48,4 @@ jobs:
       - name: Typecheck
         run: npm run typecheck
       - name: Focused tests
-        run: npx vitest run worker/lib/cognitive-runtime.test.ts worker/lib/qwen397-runtime.test.ts src/api.test.ts
+        run: npx vitest run worker/lib/cognitive-runtime.test.ts worker/lib/qwen397-runtime.test.ts worker/intelligence/system-quality.test.ts src/api.test.ts

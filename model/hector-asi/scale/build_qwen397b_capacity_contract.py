@@ -11,20 +11,27 @@ def profile(name,bits,fraction,opt=8,activation=64):
  return {'name':name,'bits':bits,'trainableFraction':fraction,'weightsGiB':gib(w),'gradientsGiB':gib(g),'optimizerGiB':gib(o),'activationReserveGiB':activation,'runtimeReserveGiB':gib(r),'estimatedPeakGiB':gib(peak),'checkpointGiB':gib(ck)}
 def topology(name,n,mem,usable,link): return {'name':name,'gpuCount':n,'memoryPerGpuGiB':mem,'usableFraction':usable,'usableClusterGiB':round(n*mem*usable,2),'interconnect':link,'verifiedAllocation':False}
 def transfer_seconds(size,gbps): return round(size*GIB*8/(gbps*1e9*.72),2)
-def manifest_count(path):
- m=json.loads(Path(path).read_text());return int(m['counts']['total']),m.get('sha256')
+def manifest(path):
+ m=json.loads(Path(path).read_text());return {'path':path,'name':str(m.get('name') or Path(path).stem),'count':int(m['counts']['total']),'manifestSha256':m.get('sha256'),'containsPrivateUserData':bool(m.get('containsPrivateUserData')),'benchmarkExcluded':bool(m.get('benchmarkExcluded'))}
 
 def build(state,extra_manifests):
  q=profile('qlora4bit-0.2pct',4,.002,8,96);l=profile('lora8bit-0.2pct',8,.002,8,128);f=profile('full16bit',16,1,8,384);modes=[q,l,f]
  tops=[topology('8xH100-80GB',8,80,.82,'NVLink/NVSwitch required'),topology('16xH100-80GB',16,80,.82,'NVLink/NVSwitch + multi-node fabric required'),topology('8xB200-192GB',8,192,.85,'NVLink/NVSwitch required'),topology('16xB200-192GB',16,192,.85,'NVLink/NVSwitch + multi-node fabric required')]
  for t in tops:t['fits']={m['name']:t['usableClusterGiB']>=m['estimatedPeakGiB'] for m in modes}
- extras=[]
+ declared={str(x['path']):x for x in state['data'].get('verifiedDatasetManifests',[])}
+ integrated=[];unintegrated=[]
  for p in extra_manifests:
-  c,h=manifest_count(p);extras.append({'path':p,'count':c,'manifestSha256':h})
- canonical=int(state['data']['verifiedExamples']);delta=sum(x['count'] for x in extras);effective=canonical+delta
+  item=manifest(p);expected=declared.get(p)
+  if expected:
+   assert int(expected['count'])==item['count'],f'integrated manifest count mismatch: {p}'
+   assert item['containsPrivateUserData'] is False,f'private data forbidden: {p}'
+   assert item['benchmarkExcluded'] is True,f'benchmark contamination risk: {p}'
+   integrated.append(item)
+  else:unintegrated.append(item)
+ canonical=int(state['data']['verifiedExamples']);delta=sum(x['count'] for x in unintegrated);effective=canonical+delta
  storage=round(max(x['checkpointGiB'] for x in modes)*3*1.25,2)
- gates={'corpus':effective>=state['data']['requiredExamples'],'benchmark':state['benchmark']['cases']>=512,'trainableFailures':state['benchmark']['v41TrainableFailures']>=100,'exactLiveEndpoint':bool(state['compute']['exactLiveEndpointAttested']),'distributedAllocation':bool(state['compute']['distributedGpuAllocationVerified']),'realWeightsResume':bool(state['compute']['real397BWeightsCheckpointResumeVerified']),'explicitBudget':isinstance(state['compute']['explicitBudgetMxn'],(int,float)) and state['compute']['explicitBudgetMxn']>=0,'frozenHashes':bool(state['gates']['frozenDataModelTokenizerHashesReady']),'canonicalStateSynchronized':delta==0}
- report={'schemaVersion':2,'targetModel':TARGET,'totalParameters':PARAMS,'activeParametersPerToken':ACTIVE,'canonicalStateSha256':sha(state),'corpus':{'canonical':canonical,'verifiedManifestDelta':delta,'effectiveVerified':effective,'required':state['data']['requiredExamples'],'canonicalStateDriftDetected':delta!=0,'unintegratedManifests':extras},'memoryProfiles':modes,'candidateTopologies':tops,'storageContract':{'checkpointGenerations':2,'atomicTemporaryGeneration':1,'safetyMultiplier':1.25,'minimumObjectStorageGiB':storage,'requiresVersioning':True,'requiresMultipartUpload':True,'requiresPerShardSha256':True,'requiresAtomicLatestPointer':True,'verifiedRemoteBucket':False},'bandwidthPlanning':{'assumedEfficiency':.72,'restoreEstimates':{str(g):{'restoreSecondsQlora':transfer_seconds(q['checkpointGiB'],g),'restoreSecondsFull':transfer_seconds(f['checkpointGiB'],g)} for g in (1,10,25,100,400)},'measured':False},'endpointAttestationContract':{'requestedModelMustEqual':TARGET,'effectiveModelMustEqual':TARGET,'fallbackMustBe':False,'responseModelFieldRequired':True,'liveInferencePerformed':False},'gates':gates,'trainingAuthorized':all(gates.values()),'actualCostMxn':0,'billingActivated':False,'decision':'do-not-train','blockingReasons':[k for k,v in gates.items() if not v],'scope':'planning and fail-closed infrastructure contract; no GPU, provider inference, checkout, or paid storage used'}
+ gates={'corpus':effective>=state['data']['requiredExamples'],'benchmark':state['benchmark']['cases']>=512,'trainableFailures':state['benchmark']['v41TrainableFailures']>=100,'exactLiveEndpoint':bool(state['compute']['exactLiveEndpointAttested']),'distributedAllocation':bool(state['compute']['distributedGpuAllocationVerified']),'realWeightsResume':bool(state['compute']['real397BWeightsCheckpointResumeVerified']),'explicitBudget':isinstance(state['compute']['explicitBudgetMxn'],(int,float)) and state['compute']['explicitBudgetMxn']>0,'frozenHashes':bool(state['gates']['frozenDataModelTokenizerHashesReady']),'canonicalStateSynchronized':delta==0 and len(integrated)==len(extra_manifests)}
+ report={'schemaVersion':3,'targetModel':TARGET,'totalParameters':PARAMS,'activeParametersPerToken':ACTIVE,'canonicalStateSha256':sha(state),'corpus':{'canonical':canonical,'verifiedManifestDelta':delta,'effectiveVerified':effective,'required':state['data']['requiredExamples'],'canonicalStateDriftDetected':delta!=0,'integratedManifestsVerified':integrated,'unintegratedManifests':unintegrated},'memoryProfiles':modes,'candidateTopologies':tops,'storageContract':{'checkpointGenerations':2,'atomicTemporaryGeneration':1,'safetyMultiplier':1.25,'minimumObjectStorageGiB':storage,'requiresVersioning':True,'requiresMultipartUpload':True,'requiresPerShardSha256':True,'requiresAtomicLatestPointer':True,'verifiedRemoteBucket':False},'bandwidthPlanning':{'assumedEfficiency':.72,'restoreEstimates':{str(g):{'restoreSecondsQlora':transfer_seconds(q['checkpointGiB'],g),'restoreSecondsFull':transfer_seconds(f['checkpointGiB'],g)} for g in (1,10,25,100,400)},'measured':False},'endpointAttestationContract':{'requestedModelMustEqual':TARGET,'effectiveModelMustEqual':TARGET,'fallbackMustBe':False,'responseModelFieldRequired':True,'liveInferencePerformed':False},'gates':gates,'trainingAuthorized':all(gates.values()),'actualCostMxn':0,'billingActivated':False,'decision':'do-not-train','blockingReasons':[k for k,v in gates.items() if not v],'scope':'planning and fail-closed infrastructure contract; no GPU, provider inference, checkout, or paid storage used'}
  report['sha256']=sha(report);return report
 
 def main():

@@ -6,8 +6,6 @@ from pathlib import Path
 
 ROOT=Path(__file__).resolve().parents[3]
 TARGET='Qwen/Qwen3.5-397B-A17B'
-CORPUS_CURRENT=2600
-CORPUS_REQUIRED=10000
 
 
 def sha(value):
@@ -22,6 +20,9 @@ def load(path):
 def build():
     bench=load(Path('model/hector-asi/evals/benchmark_v2/v41-benchmark-v2-latest.json'))
     plan=load(Path('model/hector-asi/stage-6-plan.json'))
+    state=load(Path('model/hector-asi/integration/stage6-integration-latest.json'))
+    corpus_current=int(state['data']['verifiedExamples'])
+    corpus_required=int(state['data']['requiredExamples'])
     budget=os.getenv('HECTOR_MAX_TRAINING_MXN','').strip()
     cluster_attestation=os.getenv('HECTOR_DISTRIBUTED_CLUSTER_ATTESTATION','').strip()
     remote_resume=os.getenv('HECTOR_REMOTE_RESUME_ATTESTATION','').strip()
@@ -32,10 +33,10 @@ def build():
     pwa_examples=int(os.getenv('HECTOR_PWA_VERIFIED_EXAMPLES','0'))
 
     gates={
-      'corpus':{'current':CORPUS_CURRENT,'required':CORPUS_REQUIRED,'open':CORPUS_CURRENT>=CORPUS_REQUIRED},
+      'corpus':{'current':corpus_current,'required':corpus_required,'open':corpus_current>=corpus_required},
       'benchmark':{'current':bench['gates']['benchmarkCases']['observed'],'required':500,'open':bench['gates']['benchmarkCases']['open']},
       'trainableFailures':{'current':bench['trainableFailureCount'],'required':100,'open':bench['trainableFailureCount']>=100},
-      'exactModelTarget':{'expected':TARGET,'open':True},
+      'exactModelTarget':{'expected':TARGET,'open':state['compute']['targetModel']==TARGET},
       'explicitBudgetMxn':{'value':float(budget) if budget else None,'open':bool(budget) and float(budget)>0},
       'distributedCluster':{'attestationPresent':bool(cluster_attestation),'open':bool(cluster_attestation)},
       'persistentRemoteResume':{'attestationPresent':bool(remote_resume),'open':bool(remote_resume)},
@@ -45,18 +46,19 @@ def build():
       'licenseFixed':{'value':license_id or None,'open':bool(license_id)},
     }
     stage_plan_drift={
-      'detected':plan.get('operatingMode',{}).get('trainableFoundation')!=TARGET,
+      'detected':plan.get('operatingMode',{}).get('trainableFoundation')!=TARGET or state['compute']['targetModel']!=TARGET,
       'declaredTrainableFoundation':plan.get('operatingMode',{}).get('trainableFoundation'),
+      'canonicalTargetModel':state['compute']['targetModel'],
       'requiredTrainableFoundation':TARGET,
       'blocking':True,
     }
     all_open=all(g['open'] for g in gates.values()) and not stage_plan_drift['detected']
     report={
-      'schemaVersion':1,
+      'schemaVersion':2,
       'targetModel':TARGET,
-      'champion':'hector-asi-qwen15-v41',
+      'champion':state['champion']['id'],
       'benchmark':{'scorePercent':bench['scorePercent'],'hiddenSha256':bench['hiddenSha256'],'predictionsSha256':bench['predictionsSha256']},
-      'corpusEvidence':{'current':CORPUS_CURRENT,'sourceMerges':['c70207b3fe4575a125dd3c6c2ddd43d9202a4d03','5c7de5888e0c9b11ba41985b2a45f6969c13f3c0'],'pwaVerifiedExamples':pwa_examples},
+      'corpusEvidence':{'current':corpus_current,'required':corpus_required,'remaining':corpus_required-corpus_current,'sourceMerges':state['data'].get('sourceMerges',[]),'verifiedDatasetManifests':state['data'].get('verifiedDatasetManifests',[]),'pwaVerifiedExamples':pwa_examples},
       'stagePlanDrift':stage_plan_drift,
       'gates':gates,
       'trainingAuthorized':all_open,
@@ -78,5 +80,6 @@ def main():
     Path(args.output).write_text(json.dumps(report,indent=2,sort_keys=True)+'\n',encoding='utf-8')
     print(json.dumps(report,sort_keys=True))
     raise SystemExit(0 if report['trainingAuthorized'] else 2)
+
 
 if __name__=='__main__': main()

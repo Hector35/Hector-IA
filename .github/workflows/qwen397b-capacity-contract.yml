@@ -6,6 +6,8 @@ on:
       - 'model/hector-asi/scale/build_qwen397b_capacity_contract.py'
       - 'model/hector-asi/integration/stage6-integration-latest.json'
       - 'model/hector-asi/data/stage6/generate-cognitive-depth-20260725.py'
+      - 'model/hector-asi/stage-6-plan.json'
+      - 'model/hector-asi/scale/qwen35-397b-training-admission-v2.json'
       - '.github/workflows/qwen397b-capacity-contract.yml'
   workflow_dispatch:
 permissions:
@@ -28,21 +30,25 @@ jobs:
           python model/hector-asi/scale/build_qwen397b_capacity_contract.py $args --output /tmp/capacity-a.json
           python model/hector-asi/scale/build_qwen397b_capacity_contract.py $args --output /tmp/capacity-b.json
           cmp /tmp/capacity-a.json /tmp/capacity-b.json
-      - name: Verify memory, topology, storage, drift and gates
+      - name: Verify memory, topology, storage, synchronization and gates
         run: |
           python - <<'PY'
           import json
           r=json.load(open('/tmp/capacity-a.json'))
+          assert r['schemaVersion']==3
           assert r['targetModel']=='Qwen/Qwen3.5-397B-A17B'
-          assert r['corpus']['canonical']==2600
-          assert r['corpus']['verifiedManifestDelta']==1200
+          assert r['corpus']['canonical']==3800
+          assert r['corpus']['verifiedManifestDelta']==0
           assert r['corpus']['effectiveVerified']==3800
           assert r['corpus']['required']==10000
-          assert r['corpus']['canonicalStateDriftDetected'] is True
+          assert r['corpus']['canonicalStateDriftDetected'] is False
+          assert len(r['corpus']['integratedManifestsVerified'])==1
+          assert r['corpus']['integratedManifestsVerified'][0]['count']==1200
+          assert r['corpus']['unintegratedManifests']==[]
           assert r['trainingAuthorized'] is False and r['decision']=='do-not-train'
           assert r['actualCostMxn']==0 and r['billingActivated'] is False
           assert r['gates']['benchmark'] is True and r['gates']['trainableFailures'] is True
-          assert r['gates']['corpus'] is False and r['gates']['canonicalStateSynchronized'] is False
+          assert r['gates']['corpus'] is False and r['gates']['canonicalStateSynchronized'] is True
           for gate in ('exactLiveEndpoint','distributedAllocation','realWeightsResume','explicitBudget','frozenHashes'):
               assert r['gates'][gate] is False
           q=next(x for x in r['memoryProfiles'] if x['name']=='qlora4bit-0.2pct')
