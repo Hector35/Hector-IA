@@ -1,7 +1,7 @@
 {
   "$schema": "node_modules/wrangler/config-schema.json",
   "name": "hector-os",
-  "main": "worker/index.ts",
+  "main": "worker/secure-entry.ts",
   "compatibility_date": "2026-07-19",
   "observability": { "enabled": true },
   "triggers": { "crons": ["* * * * *"] },

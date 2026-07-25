@@ -1,0 +1,33 @@
+{
+  "schemaVersion": 1,
+  "name": "Héctor API Security Boundary",
+  "version": "1.0.0",
+  "entrypoint": "worker/secure-entry.ts",
+  "wrappedWorker": "worker/index.ts",
+  "mutationPolicy": {
+    "protectedMethods": ["POST", "PUT", "PATCH", "DELETE"],
+    "protectedPrefixes": ["/api/", "/control/", "/runner/", "/self-improve/", "/generated/"],
+    "sameOrigin": "allow",
+    "crossOrigin": "deny",
+    "crossSite": "deny",
+    "serverClientsWithoutOrigin": "allow"
+  },
+  "responsePolicy": {
+    "requestId": true,
+    "apiCache": "no-store",
+    "referrerPolicy": "no-referrer",
+    "frameEmbedding": "deny",
+    "crossOriginOpenerPolicy": "same-origin",
+    "crossOriginResourcePolicy": "same-origin",
+    "contentTypeSniffing": "deny",
+    "hstsSeconds": 63072000,
+    "permissionsPolicy": true
+  },
+  "compatibility": {
+    "scheduledHandlerPreserved": true,
+    "safeReadsUnaffected": true,
+    "sameOriginPwaWritesAllowed": true,
+    "authenticatedServerClientsAllowed": true
+  },
+  "principle": "Las mutaciones del navegador deben proceder del mismo origen. Las lecturas y los clientes servidor-a-servidor sin cabeceras de navegador conservan compatibilidad, mientras todas las respuestas sensibles reciben aislamiento y no-cache."
+}

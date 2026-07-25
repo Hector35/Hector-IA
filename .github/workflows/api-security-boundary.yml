@@ -1,0 +1,46 @@
+name: API security boundary
+
+on:
+  pull_request:
+    branches: [main]
+    paths:
+      - 'model/hector-asi/api-security-boundary.json'
+      - 'worker/lib/security-boundary.ts'
+      - 'worker/lib/security-boundary.test.ts'
+      - 'worker/secure-entry.ts'
+      - 'wrangler.jsonc'
+      - '.github/workflows/api-security-boundary.yml'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  verify:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+      - run: npm ci
+      - name: Typecheck
+        run: npm run typecheck
+      - name: Test same-origin boundary
+        run: npx vitest run worker/lib/security-boundary.test.ts
+      - name: Verify secure entrypoint and fail-closed evidence
+        run: |
+          node - <<'NODE'
+          const fs=require('fs');
+          const wrangler=JSON.parse(fs.readFileSync('wrangler.jsonc','utf8'));
+          const manifest=JSON.parse(fs.readFileSync('model/hector-asi/api-security-boundary.json','utf8'));
+          const entry=fs.readFileSync('worker/secure-entry.ts','utf8');
+          if(wrangler.main!=='worker/secure-entry.ts')throw new Error('secure entrypoint is not active');
+          if(manifest.mutationPolicy.crossOrigin!=='deny'||manifest.mutationPolicy.crossSite!=='deny')throw new Error('cross-site writes must remain denied');
+          if(!entry.includes('cross_site_mutation_denied'))throw new Error('explicit denial response missing');
+          if(!entry.includes("worker.fetch(new Request(request,{headers}),env,ctx)"))throw new Error('wrapped worker execution missing');
+          if(!entry.includes('scheduled:worker.scheduled'))throw new Error('scheduled handler not preserved');
+          if(!entry.includes("Cache-Control','no-store"))throw new Error('sensitive no-store missing');
+          NODE
