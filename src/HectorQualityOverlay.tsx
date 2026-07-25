@@ -7,9 +7,9 @@ type QualityReport={score:number;maximum:number;grade:string;tenOutOfTen:boolean
 
 export function HectorQualityOverlay(){
  const [open,setOpen]=useState(false),[busy,setBusy]=useState(false),[report,setReport]=useState<QualityReport|null>(null),[error,setError]=useState('');
- const trigger=useRef<HTMLButtonElement>(null),close=useRef<HTMLButtonElement>(null);
+ const trigger=useRef<HTMLButtonElement>(null),close=useRef<HTMLButtonElement>(null),openedOnce=useRef(false);
  useEffect(()=>{const root=document.getElementById('root');root?.setAttribute('tabindex','-1');const onKey=(event:KeyboardEvent)=>{if(event.key==='Escape'&&open){event.preventDefault();setOpen(false)}};window.addEventListener('keydown',onKey);return()=>window.removeEventListener('keydown',onKey)},[open]);
- useEffect(()=>{if(open)window.setTimeout(()=>close.current?.focus(),30);else trigger.current?.focus({preventScroll:true})},[open]);
+ useEffect(()=>{if(open){openedOnce.current=true;window.setTimeout(()=>close.current?.focus(),30)}else if(openedOnce.current)trigger.current?.focus({preventScroll:true})},[open]);
  const load=async()=>{setBusy(true);setError('');try{setReport(await api.systemQuality())}catch(reason){setError(reason instanceof Error?reason.message:'No se pudo cargar la auditoría')}finally{setBusy(false)}};
  const show=()=>{setOpen(true);void load()};
  return <>
