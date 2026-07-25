@@ -32,11 +32,12 @@ describe('Héctor Bridge capability workspace',()=>{
   expect(worker).not.toContain('new AsyncFunction');
  });
 
- it('uses Pyodide in a web worker and limits the external runtime origin',()=>{
+ it('uses Pyodide in a web worker and blocks same-origin runner access',()=>{
   expect(worker).toContain('https://cdn.jsdelivr.net/pyodide/v314.0.2/full/');
   expect(worker).toContain('loadPackagesFromImports');
   expect(security).toContain("'wasm-unsafe-eval'");
-  expect(security).toContain("connect-src 'self' https://cdn.jsdelivr.net");
+  expect(security).toContain('connect-src https://cdn.jsdelivr.net');
+  expect(security).not.toContain("connect-src 'self' https://cdn.jsdelivr.net");
   expect(security).toContain("'/bridge.html'");
   expect(server).toContain("app.use('*',bridgeSecurity)");
   expect(server).toContain("app.route('/api/action-authority',actionAuthority)");
