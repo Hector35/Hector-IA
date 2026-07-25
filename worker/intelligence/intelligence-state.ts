@@ -8,7 +8,7 @@ function assert(condition:unknown,message:string):asserts condition{
 
 function buildCanonicalState(){
  const source:any=integration,benchmarkState:any=benchmark;
- assert(source.schemaVersion===1,'schemaVersion de integración');
+ assert(source.schemaVersion===2,'schemaVersion de integración');
  assert(source.champion.id===CHAT_CHAMPION.runtimeId,'campeón no coincide con el registro');
  assert(source.champion.base===CHAT_CHAMPION.baseModel,'base del campeón no coincide con el registro');
  assert(source.champion.adapterSha256===CHAT_CHAMPION.adapterSha256,'hash del adaptador no coincide');
@@ -17,18 +17,20 @@ function buildCanonicalState(){
  assert(source.benchmark.v41TrainableFailures===benchmarkState.trainableFailureCount,'fallos entrenables inconsistentes');
  assert(source.benchmark.hiddenSha256===benchmarkState.hiddenSha256,'hash del benchmark inconsistente');
  assert(source.benchmark.v41PredictionsSha256===benchmarkState.predictionsSha256,'hash de predicciones inconsistente');
+ assert(source.benchmark.publishedFailureCount===benchmarkState.failureCount,'failureCount publicado inconsistente');
  const corpusOpen=source.data.verifiedExamples>=source.data.requiredExamples;
- const benchmarkOpen=source.benchmark.cases>=benchmarkState.gates.benchmarkCases.required;
+ const benchmarkHashOpen=source.benchmark.cases>=benchmarkState.gates.benchmarkCases.required;
+ const benchmarkConsistencyOpen=Boolean(source.benchmark.aggregateConsistencyVerified);
  const failuresOpen=source.benchmark.v41TrainableFailures>=benchmarkState.gates.trainableFailures.required;
  const hardwareOpen=Boolean(source.compute.distributedGpuAllocationVerified);
  const resumeOpen=Boolean(source.compute.real397BWeightsCheckpointResumeVerified);
  const budgetValue:unknown=source.compute.explicitBudgetMxn;
  const budgetOpen=typeof budgetValue==='number'&&Number.isFinite(budgetValue)&&budgetValue>0;
  const liveAttestationOpen=Boolean(source.compute.exactLiveEndpointAttested);
- const trainingAllowed=corpusOpen&&benchmarkOpen&&failuresOpen&&hardwareOpen&&resumeOpen&&budgetOpen&&liveAttestationOpen;
+ const trainingAllowed=corpusOpen&&benchmarkHashOpen&&benchmarkConsistencyOpen&&failuresOpen&&hardwareOpen&&resumeOpen&&budgetOpen&&liveAttestationOpen;
  assert(source.gates.trainingAuthorized===trainingAllowed,'trainingAuthorized inconsistente');
  return Object.freeze({
-  schemaVersion:1,
+  schemaVersion:2,
   updatedAt:String(source.generatedAt),
   stage:6,
   name:'Inteligencia híbrida verificable',
@@ -42,7 +44,7 @@ function buildCanonicalState(){
   },
   pipeline:{
    corpus:{observed:Number(source.data.verifiedExamples),required:Number(source.data.requiredExamples),open:corpusOpen},
-   benchmark:{observed:Number(source.benchmark.cases),required:Number(benchmarkState.gates.benchmarkCases.required),open:benchmarkOpen},
+   benchmark:{observed:Number(source.benchmark.cases),required:Number(benchmarkState.gates.benchmarkCases.required),open:benchmarkHashOpen,aggregateConsistencyVerified:benchmarkConsistencyOpen},
    trainableFailures:{observed:Number(source.benchmark.v41TrainableFailures),required:Number(benchmarkState.gates.trainableFailures.required),open:failuresOpen},
    pwaHumanApproved:{observed:Number(source.data.pwaHumanApprovedObserved),required:1,open:Number(source.data.pwaHumanApprovedObserved)>=1},
    distributedHardware:{verified:hardwareOpen,open:hardwareOpen},
@@ -51,15 +53,16 @@ function buildCanonicalState(){
    liveExactModelAttestation:{verified:liveAttestationOpen,open:liveAttestationOpen}
   },
   training:{targetModel:String(source.compute.targetModel),allowed:trainingAllowed,decision:trainingAllowed?'train':'do-not-train',blockingReasons:[
+   !benchmarkConsistencyOpen?'benchmark aggregate semantics are inconsistent':null,
    !corpusOpen?'corpus below 10000 verified examples':null,
    !budgetOpen?'no explicit MXN ceiling':null,
    !hardwareOpen?'no allocated distributed GPU cluster':null,
    !resumeOpen?'no persistent real-model checkpoint resume proof':null,
    !liveAttestationOpen?'no live exact-model endpoint attestation':null
   ].filter((value):value is string=>Boolean(value))},
-  promotion:{minimumAbsoluteBenchmarkGain:.03,requiresMultipleCapabilityGains:true,requiresReproducibleRuns:2,requiresRollback:true,rejectFallbackAttribution:true},
-  evidence:{integrationGeneratedAt:String(source.generatedAt),benchmarkVersion:String(benchmarkState.benchmarkVersion),benchmarkSha256:String(benchmarkState.hiddenSha256),predictionsSha256:String(benchmarkState.predictionsSha256),benchmarkScorePercent:Number(benchmarkState.scorePercent),benchmarkFailureCount:Number(benchmarkState.failureCount),trainableFailureCount:Number(benchmarkState.trainableFailureCount),ownChampionArtifactId:CHAT_CHAMPION.artifactId,ownChampionAdapterSha256:CHAT_CHAMPION.adapterSha256,ownChampionPromotedAt:CHAT_CHAMPION.promotedAt},
-  principle:'La interfaz sólo acredita el modelo efectivo observado. Los pesos propios no se promueven sin benchmark sellado, réplica, rollback y ausencia de fallback.'
+  promotion:{minimumAbsoluteBenchmarkGain:.03,requiresMultipleCapabilityGains:true,requiresReproducibleRuns:2,requiresRollback:true,rejectFallbackAttribution:true,requiresCanonicalScorerConsistency:true},
+  evidence:{integrationGeneratedAt:String(source.generatedAt),benchmarkVersion:String(benchmarkState.benchmarkVersion),benchmarkSha256:String(benchmarkState.hiddenSha256),predictionsSha256:String(benchmarkState.predictionsSha256),benchmarkScorePercent:Number(benchmarkState.scorePercent),benchmarkFailureCount:Number(benchmarkState.failureCount),benchmarkAggregateConsistencyVerified:benchmarkConsistencyOpen,trainableFailureCount:Number(benchmarkState.trainableFailureCount),ownChampionArtifactId:CHAT_CHAMPION.artifactId,ownChampionAdapterSha256:CHAT_CHAMPION.adapterSha256,ownChampionPromotedAt:CHAT_CHAMPION.promotedAt},
+  principle:'La interfaz sólo acredita el modelo efectivo observado. Los pesos propios no se promueven sin scorer canónico consistente, benchmark sellado, réplica, rollback y ausencia de fallback.'
  });
 }
 
