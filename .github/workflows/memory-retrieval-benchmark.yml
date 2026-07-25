@@ -35,9 +35,12 @@ jobs:
           echo "$status" > artifacts/typecheck-status.txt
           exit "$status"
       - name: Measure retrieval
-        env:
-          MEMORY_REPORT_PATH: artifacts/memory-retrieval-v1.json
-        run: npx vitest run worker/lib/memory-retrieval.test.ts worker/lib/bounded-read-tools.test.ts
+        shell: bash
+        run: |
+          set -o pipefail
+          npx vitest run worker/lib/memory-retrieval.test.ts worker/lib/bounded-read-tools.test.ts 2>&1 | tee artifacts/memory-test.log
+          grep 'MEMORY_RETRIEVAL_REPORT=' artifacts/memory-test.log | tail -1 | sed 's/^.*MEMORY_RETRIEVAL_REPORT=//' > artifacts/memory-retrieval-v1.json
+          test -s artifacts/memory-retrieval-v1.json
       - name: Verify privacy and owner isolation contract
         run: |
           node - <<'NODE'
