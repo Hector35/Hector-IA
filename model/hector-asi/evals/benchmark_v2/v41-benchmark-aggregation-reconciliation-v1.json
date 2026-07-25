@@ -1,0 +1,41 @@
+{
+  "aggregateConsistencyVerified": true,
+  "benchmarkVersion": "2.1.0",
+  "checks": {
+    "capabilityCasesMatchTotal": true,
+    "failuresPlusFullPassesMatchTotal": true,
+    "partialCreditEquivalentNonNegative": true,
+    "partialCreditEquivalentNotGreaterThanFailures": true,
+    "trainableFailuresSubsetOfFailures": true,
+    "weightedScoreMatchesPublishedAfterRounding": true
+  },
+  "reconciliation": {
+    "capabilityCaseTotal": 512,
+    "fullPassCases": 29,
+    "fullPassRatePercent": 5.6640625,
+    "nonTrainableFailureCount": 34,
+    "partialCreditEquivalentCasesAmongFailures": 100.0,
+    "publishedFailureCount": 483,
+    "publishedScorePercent": 25.195,
+    "publishedTrainableFailureCount": 449,
+    "scoreRoundingDifferencePercentagePoints": 0.0003125,
+    "weightedPointEquivalentCases": 129.0,
+    "weightedScorePercentExact": 25.1953125
+  },
+  "schemaVersion": 1,
+  "semantics": {
+    "failureCount": "Number of cases below the full-pass criterion; failed cases may retain partial credit.",
+    "score": "Weighted normalized partial-credit points across capabilities.",
+    "trainableFailureCount": "Subset of failed cases admitted to the trainable failure taxonomy.",
+    "warning": "scorePercent is not a case pass rate and must not be converted to failureCount by cases * (1 - score)."
+  },
+  "sha256": "f915938d4fef00b2aa3fa0ae89009182a63fc4c3bccd57d2aa59ff5d6af9b205",
+  "source": {
+    "cases": 512,
+    "hiddenSha256": "b8b774d21e2210482fdb417bd4c74eedea90e28c35b2fe1f58dc1fa4b65cc094",
+    "predictionsSha256": "025bcf6451b0ef68ce8df9836fe617e5f3299a3ad4b029d8ac7392827be59ba0",
+    "publishedFailureCount": 483,
+    "publishedScorePercent": 25.195,
+    "publishedTrainableFailureCount": 449
+  }
+}
