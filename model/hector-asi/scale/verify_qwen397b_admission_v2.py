@@ -29,10 +29,11 @@ def main() -> None:
             and isinstance(obs['estimatedMaximumCostMxn'], (int, float))
             and 0 <= obs['estimatedMaximumCostMxn'] <= obs['budgetMaximumMxn']
         ),
+        'liveExactModelAttestation': bool(obs['liveExactModelAttested']),
     }
     eligible = all(gates.values())
     evidence = {
-        'schemaVersion': 2,
+        'schemaVersion': 3,
         'baseModel': manifest['baseModel'],
         'champion': manifest['champion'],
         'eligible': eligible,
@@ -43,6 +44,8 @@ def main() -> None:
         'observed': obs,
     }
 
+    assert manifest['trainingAllowed'] is eligible
+    assert manifest['gates'] == gates
     if not eligible:
         assert obs.get('adapter') is None
         assert obs.get('checkpoint') is None
