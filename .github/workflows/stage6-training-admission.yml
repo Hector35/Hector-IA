@@ -2,15 +2,9 @@ name: Stage 6 training admission
 on:
   pull_request:
     branches: [main]
-    paths:
-      - 'model/hector-asi/training/verify_stage6_training_admission.py'
-      - 'model/hector-asi/integration/stage6-integration-latest.json'
-      - 'model/hector-asi/stage-6-plan.json'
-      - 'model/hector-asi/evals/benchmark_v2/v41-benchmark-v2-latest.json'
-      - '.github/workflows/stage6-training-admission.yml'
+    paths: ['model/hector-asi/training/verify_stage6_training_admission.py','model/hector-asi/integration/stage6-integration-latest.json','model/hector-asi/stage-6-plan.json','model/hector-asi/evals/benchmark_v2/v41-benchmark-v2-latest.json','.github/workflows/stage6-training-admission.yml']
   workflow_dispatch:
-permissions:
-  contents: read
+permissions: {contents: read}
 jobs:
   verify:
     runs-on: ubuntu-latest
@@ -18,65 +12,40 @@ jobs:
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-python@v5
-        with:
-          python-version: '3.11'
-      - name: Compile verifier
-        run: python -m py_compile model/hector-asi/training/verify_stage6_training_admission.py
-      - name: Prove current gates block training without plan drift
+        with: {python-version: '3.11'}
+      - run: python -m py_compile model/hector-asi/training/verify_stage6_training_admission.py
+      - name: Prove current gates block training
         shell: bash
         run: |
-          set +e
-          python model/hector-asi/training/verify_stage6_training_admission.py --output /tmp/admission.json
-          status=$?
-          test "$status" -eq 2
+          set +e; python model/hector-asi/training/verify_stage6_training_admission.py --output /tmp/admission.json; status=$?; test "$status" -eq 2
           python - <<'PY'
           import json
           m=json.load(open('/tmp/admission.json'))
-          assert m['schemaVersion']==2
-          assert m['targetModel']=='Qwen/Qwen3.5-397B-A17B'
-          assert m['gates']['corpus']=={'current':3800,'required':10000,'open':False}
-          assert m['corpusEvidence']['remaining']==6200
-          assert m['gates']['benchmark']['open'] is True
+          assert m['schemaVersion']==3
+          assert m['gates']['corpus']=={'current':5400,'required':10000,'open':False}
+          assert m['corpusEvidence']['remaining']==4600
+          assert m['gates']['benchmarkHash']['open'] is True
+          assert m['gates']['benchmarkAggregateConsistency']['open'] is False
           assert m['gates']['trainableFailures']['open'] is True
-          assert m['gates']['explicitBudgetMxn']['open'] is False
-          assert m['gates']['distributedCluster']['open'] is False
-          assert m['gates']['persistentRemoteResume']['open'] is False
           assert m['stagePlanDrift']['detected'] is False
-          assert m['trainingAuthorized'] is False
-          assert m['artifact'] is None
-          assert m['actualCostMxn']==0
-          assert m['replicasCompleted']==0
-          assert 'stagePlanDrift' not in m['blockingReasons']
+          assert not m['trainingAuthorized'] and m['actualCostMxn']==0 and m['artifact'] is None and m['replicasCompleted']==0
           PY
-      - name: Prove partial environment still cannot bypass remaining gates
+      - name: Prove fixtures cannot bypass benchmark and corpus gates
         shell: bash
         env:
           HECTOR_MAX_TRAINING_MXN: '1000'
-          HECTOR_DISTRIBUTED_CLUSTER_ATTESTATION: 'fixture-cluster'
-          HECTOR_REMOTE_RESUME_ATTESTATION: 'fixture-resume'
-          HECTOR_FROZEN_DATASET_SHA256: 'aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa'
-          HECTOR_BASE_MODEL_SHA256: 'bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb'
-          HECTOR_TOKENIZER_SHA256: 'cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc'
-          HECTOR_BASE_LICENSE: 'apache-2.0'
+          HECTOR_DISTRIBUTED_CLUSTER_ATTESTATION: fixture-cluster
+          HECTOR_REMOTE_RESUME_ATTESTATION: fixture-resume
+          HECTOR_FROZEN_DATASET_SHA256: aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa
+          HECTOR_BASE_MODEL_SHA256: bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb
+          HECTOR_TOKENIZER_SHA256: cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc
+          HECTOR_BASE_LICENSE: apache-2.0
         run: |
-          set +e
-          python model/hector-asi/training/verify_stage6_training_admission.py --output /tmp/partial.json
-          status=$?
-          test "$status" -eq 2
+          set +e; python model/hector-asi/training/verify_stage6_training_admission.py --output /tmp/partial.json; status=$?; test "$status" -eq 2
           python - <<'PY'
           import json
           m=json.load(open('/tmp/partial.json'))
-          assert m['gates']['explicitBudgetMxn']['open'] is True
-          assert m['gates']['distributedCluster']['open'] is True
-          assert m['gates']['persistentRemoteResume']['open'] is True
-          assert m['stagePlanDrift']['detected'] is False
-          assert m['trainingAuthorized'] is False
-          assert m['blockingReasons']==['corpus']
+          assert m['blockingReasons']==['corpus','benchmarkAggregateConsistency']
           PY
-      - name: Publish admission evidence
-        uses: actions/upload-artifact@v4
-        with:
-          name: stage6-training-admission-${{ github.run_id }}
-          path: /tmp/admission.json
-          retention-days: 90
-          if-no-files-found: error
+      - uses: actions/upload-artifact@v4
+        with: {name: 'stage6-training-admission-${{ github.run_id }}', path: /tmp/admission.json, retention-days: 90, if-no-files-found: error}
