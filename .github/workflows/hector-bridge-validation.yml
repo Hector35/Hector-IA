@@ -1,0 +1,57 @@
+name: Hector Bridge validation
+
+on:
+  pull_request:
+    branches: [main]
+    paths:
+      - 'public/bridge.html'
+      - 'public/bridge.css'
+      - 'public/bridge.js'
+      - 'public/bridge-code-worker.mjs'
+      - 'public/manifest.webmanifest'
+      - 'public/sw.js'
+      - 'worker/bridge-security.ts'
+      - 'worker/index.ts'
+      - 'tests/hector-bridge-assets.test.ts'
+      - 'tests/service-worker-cache-policy.test.js'
+      - '.github/workflows/hector-bridge-validation.yml'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  verify-bridge:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+      - run: npm ci
+      - name: Typecheck
+        run: npm run typecheck
+      - name: Targeted Bridge tests
+        shell: bash
+        run: |
+          set -o pipefail
+          npx vitest run tests/hector-bridge-assets.test.ts tests/service-worker-cache-policy.test.js 2>&1 | tee bridge-test.log
+      - name: Full repository tests
+        shell: bash
+        run: |
+          set -o pipefail
+          npm test 2>&1 | tee full-test.log
+      - name: Build
+        run: npm run build
+      - name: Upload validation logs
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: hector-bridge-validation-logs
+          path: |
+            bridge-test.log
+            full-test.log
+          if-no-files-found: ignore
+          retention-days: 3
