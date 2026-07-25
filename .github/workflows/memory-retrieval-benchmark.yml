@@ -5,6 +5,7 @@ on:
     branches: [main]
     paths:
       - 'model/hector-asi/evals/memory-retrieval/benchmark-v1.json'
+      - 'model/hector-asi/evals/memory-retrieval/benchmark-v1-latest.json'
       - 'worker/lib/memory-retrieval.ts'
       - 'worker/lib/memory-retrieval.test.ts'
       - 'worker/lib/bounded-read-tools.ts'
@@ -41,18 +42,22 @@ jobs:
           npx vitest run worker/lib/memory-retrieval.test.ts worker/lib/bounded-read-tools.test.ts 2>&1 | tee artifacts/memory-test.log
           grep 'MEMORY_RETRIEVAL_REPORT=' artifacts/memory-test.log | tail -1 | sed 's/^.*MEMORY_RETRIEVAL_REPORT=//' > artifacts/memory-retrieval-v1.json
           test -s artifacts/memory-retrieval-v1.json
-      - name: Verify privacy and owner isolation contract
+      - name: Verify privacy, owner isolation and committed evidence
         run: |
           node - <<'NODE'
           const fs=require('fs');
           const benchmark=JSON.parse(fs.readFileSync('model/hector-asi/evals/memory-retrieval/benchmark-v1.json','utf8'));
+          const latest=JSON.parse(fs.readFileSync('model/hector-asi/evals/memory-retrieval/benchmark-v1-latest.json','utf8'));
           const report=JSON.parse(fs.readFileSync('artifacts/memory-retrieval-v1.json','utf8'));
           const source=fs.readFileSync('worker/lib/bounded-read-tools.ts','utf8');
-          if(benchmark.containsPrivateUserData!==false)throw new Error('benchmark must not contain private data');
-          if(benchmark.benchmarkExcludedFromTraining!==true)throw new Error('benchmark must remain excluded from training');
+          if(benchmark.containsPrivateUserData!==false||latest.containsPrivateUserData!==false)throw new Error('benchmark must not contain private data');
+          if(benchmark.benchmarkExcludedFromTraining!==true||latest.benchmarkExcludedFromTraining!==true)throw new Error('benchmark must remain excluded from training');
           if(!source.includes('WHERE user_id=? AND ('))throw new Error('owner filter missing before memory ranking');
           if(!source.includes('LIMIT 80'))throw new Error('candidate retrieval must remain bounded');
-          if(!report.passed)throw new Error('retrieval thresholds not met');
+          if(!report.passed||!latest.passed)throw new Error('retrieval thresholds not met');
+          for(const key of ['recallAtK','precisionAtK','mrr']){
+            if(Math.abs(report.metrics[key]-latest.metrics[key])>1e-12)throw new Error(`committed ${key} differs from measured evidence`);
+          }
           if(report.metrics.recallAtK<benchmark.thresholds.recallAtK)throw new Error('recall threshold failed');
           if(report.metrics.precisionAtK<benchmark.thresholds.precisionAtK)throw new Error('precision threshold failed');
           if(report.metrics.mrr<benchmark.thresholds.mrr)throw new Error('MRR threshold failed');
