@@ -1,0 +1,70 @@
+{
+  "schemaVersion": 1,
+  "updatedAt": "2026-07-25T11:30:00-06:00",
+  "stage": 6,
+  "name": "Inteligencia híbrida verificable",
+  "status": "active",
+  "models": {
+    "operational": {
+      "id": "Qwen/Qwen3.5-397B-A17B",
+      "label": "Héctor Qwen 397B",
+      "role": "cerebro principal multimodal",
+      "customWeights": false,
+      "liveExactModelAttested": false
+    },
+    "fallback": {
+      "id": "moonshotai/Kimi-K2.5",
+      "label": "Héctor Kimi K2.5",
+      "role": "primer fallback multimodal",
+      "customWeights": false
+    },
+    "lastFallback": {
+      "id": "@cf/qwen/qwen3-30b-a3b-fp8",
+      "label": "Workers AI Qwen3 30B A3B",
+      "role": "último fallback operativo",
+      "customWeights": false
+    },
+    "ownChampion": {
+      "id": "hector-asi-qwen15-v41",
+      "label": "Héctor Qwen15 v41 · pesos propios",
+      "baseModel": "Qwen/Qwen2.5-1.5B-Instruct",
+      "customWeights": true,
+      "productionEnabled": false,
+      "benchmarkScorePercent": 25.195
+    },
+    "teacher": {
+      "binding": "OPENAI_MODEL_REASONING",
+      "role": "maestro, crítico y generador de datos",
+      "chatDefault": false
+    }
+  },
+  "pipeline": {
+    "corpus": {"observed": 2600, "required": 10000, "open": false},
+    "benchmark": {"observed": 512, "required": 500, "open": true},
+    "trainableFailures": {"observed": 449, "required": 100, "open": true},
+    "distributedHardware": {"verified": false, "open": false},
+    "persistentRemoteResume": {"verified": false, "open": false},
+    "explicitBudgetMxn": {"value": null, "open": false},
+    "liveExactModelAttestation": {"verified": false, "open": false}
+  },
+  "training": {
+    "targetModel": "Qwen/Qwen3.5-397B-A17B",
+    "allowed": false,
+    "decision": "do-not-train",
+    "blockingReasons": [
+      "corpus below 10000 verified examples",
+      "no explicit MXN ceiling",
+      "no allocated distributed GPU cluster",
+      "no persistent remote checkpoint resume proof",
+      "no live exact-model endpoint attestation"
+    ]
+  },
+  "promotion": {
+    "minimumAbsoluteBenchmarkGain": 0.03,
+    "requiresMultipleCapabilityGains": true,
+    "requiresReproducibleRuns": 2,
+    "requiresRollback": true,
+    "rejectFallbackAttribution": true
+  },
+  "principle": "La interfaz sólo acredita el modelo efectivo observado. Los pesos propios no se promueven sin benchmark sellado, réplica, rollback y ausencia de fallback."
+}
