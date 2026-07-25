@@ -42,15 +42,15 @@ export function parseReadOnlyToolCall(text:string):ReadOnlyToolCall|null{
 class ArithmeticParser{
  private index=0;
  constructor(private readonly source:string){}
- parse(){const value=this.expression();this.space();if(this.index!==this.source.length)throw new Error(`símbolo no permitido en posición ${this.index+1}`);if(!Number.isFinite(value))throw new Error('resultado no finito');return value;}
- private space(){while(/\s/.test(this.source[this.index]||''))this.index++;}
- private take(value:string){this.space();if(this.source.startsWith(value,this.index)){this.index+=value.length;return true;}return false;}
- private expression(){let value=this.term();for(;;){if(this.take('+'))value+=this.term();else if(this.take('-'))value-=this.term();else return value;}}
- private term(){let value=this.power();for(;;){if(this.take('*')||this.take('×')||this.take('x')||this.take('X'))value*=this.power();else if(this.take('/')||this.take('÷')){const divisor=this.power();if(divisor===0)throw new Error('división entre cero');value/=divisor;}else return value;}}
- private power(){let value=this.unary();if(this.take('^')){const exponent=this.power();if(Math.abs(exponent)>12)throw new Error('exponente fuera del límite seguro');value=value**exponent;}return value;}
- private unary(){if(this.take('+'))return this.unary();if(this.take('-'))return-this.unary();return this.primary();}
- private primary(){if(this.take('(')){const value=this.expression();if(!this.take(')'))throw new Error('falta cerrar paréntesis');return value;}return this.number();}
- private number(){this.space();const start=this.index;let separator=false;while(this.index<this.source.length){const char=this.source[this.index];if(NUMBER.test(char)){this.index++;continue;}if((char==='.'||char===',')&&!separator){separator=true;this.index++;continue;}break;}if(start===this.index)throw new Error(`se esperaba un número en posición ${this.index+1}`);const token=this.source.slice(start,this.index).replace(',','.');if(token==='.'||token===',')throw new Error('número inválido');const value=Number(token);if(!Number.isFinite(value))throw new Error('número no finito');return value;}
+ parse():number{const value=this.expression();this.space();if(this.index!==this.source.length)throw new Error(`símbolo no permitido en posición ${this.index+1}`);if(!Number.isFinite(value))throw new Error('resultado no finito');return value;}
+ private space():void{while(/\s/.test(this.source[this.index]||''))this.index++;}
+ private take(value:string):boolean{this.space();if(this.source.startsWith(value,this.index)){this.index+=value.length;return true;}return false;}
+ private expression():number{let value:number=this.term();for(;;){if(this.take('+'))value+=this.term();else if(this.take('-'))value-=this.term();else return value;}}
+ private term():number{let value:number=this.power();for(;;){if(this.take('*')||this.take('×')||this.take('x')||this.take('X'))value*=this.power();else if(this.take('/')||this.take('÷')){const divisor=this.power();if(divisor===0)throw new Error('división entre cero');value/=divisor;}else return value;}}
+ private power():number{let value:number=this.unary();if(this.take('^')){const exponent=this.power();if(Math.abs(exponent)>12)throw new Error('exponente fuera del límite seguro');value=value**exponent;}return value;}
+ private unary():number{if(this.take('+'))return this.unary();if(this.take('-'))return-this.unary();return this.primary();}
+ private primary():number{if(this.take('(')){const value:number=this.expression();if(!this.take(')'))throw new Error('falta cerrar paréntesis');return value;}return this.number();}
+ private number():number{this.space();const start=this.index;let separator=false;while(this.index<this.source.length){const char=this.source[this.index];if(NUMBER.test(char)){this.index++;continue;}if((char==='.'||char===',')&&!separator){separator=true;this.index++;continue;}break;}if(start===this.index)throw new Error(`se esperaba un número en posición ${this.index+1}`);const token=this.source.slice(start,this.index).replace(',','.');if(token==='.'||token===',')throw new Error('número inválido');const value=Number(token);if(!Number.isFinite(value))throw new Error('número no finito');return value;}
 }
 
 export function calculateExpression(expression:string){
