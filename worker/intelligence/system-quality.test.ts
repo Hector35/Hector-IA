@@ -33,4 +33,14 @@ describe('system quality contract',()=>{
   expect(training?.score).toBeGreaterThan(3);
   expect(training?.score).toBeLessThan(4);
  });
+
+ it('awards verified automated UX evidence while preserving the manual audit gap',()=>{
+  const report=buildSystemQualityReport(emptyQualityMetrics());
+  const ux=report.dimensions.find(item=>item.id==='ux-accessibility');
+  expect(ux?.score).toBe(9);
+  expect(ux?.checks.find(item=>item.id==='chat-first')?.passed).toBe(true);
+  expect(ux?.checks.find(item=>item.id==='automated-accessibility')?.passed).toBe(true);
+  expect(ux?.checks.find(item=>item.id==='manual-accessibility')?.passed).toBe(false);
+  expect(ux?.gaps).toContain('Auditoría WCAG manual');
+ });
 });
