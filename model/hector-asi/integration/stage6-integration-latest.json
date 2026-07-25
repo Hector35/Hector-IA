@@ -1,6 +1,6 @@
 {
   "schemaVersion": 1,
-  "generatedAt": "2026-07-25T17:18:00Z",
+  "generatedAt": "2026-07-25T18:05:00Z",
   "champion": {
     "id": "hector-asi-qwen15-v41",
     "base": "Qwen/Qwen2.5-1.5B-Instruct",
@@ -17,15 +17,29 @@
     "training admission remains closed"
   ],
   "data": {
-    "verifiedExamples": 2600,
+    "verifiedExamples": 3800,
     "requiredExamples": 10000,
-    "remainingExamples": 7400,
+    "remainingExamples": 6200,
     "pwaHumanApprovedObserved": 0,
     "pwaExamplesInVersionedDatasets": 0,
     "directD1TrainingAllowed": false,
+    "verifiedDatasetManifests": [
+      {
+        "name": "cognitive-depth-20260725",
+        "path": "model/hector-asi/data/stage6/cognitive-depth-20260725.json",
+        "generator": "model/hector-asi/data/stage6/generate-cognitive-depth-20260725.py",
+        "count": 1200,
+        "verification": "deterministic generator, two-run byte comparison, schema and executable checks",
+        "containsPrivateUserData": false,
+        "benchmarkExcluded": true,
+        "integratedBy": "6a63aef9f101972b60febd704075cb3c423dd233"
+      }
+    ],
     "sourceMerges": [
       "c70207b3fe4575a125dd3c6c2ddd43d9202a4d03",
-      "5c7de5888e0c9b11ba41985b2a45f6969c13f3c0"
+      "5c7de5888e0c9b11ba41985b2a45f6969c13f3c0",
+      "f17f6db9c0955a1cb511fa0278fbb22e77b8cabe",
+      "6a63aef9f101972b60febd704075cb3c423dd233"
     ]
   },
   "benchmark": {
@@ -67,5 +81,5 @@
     "frozenDataModelTokenizerHashesReady": false,
     "trainingAuthorized": false
   },
-  "singleNextBlocker": "produce and integrate 7400 additional verified examples before allocating paid distributed training compute"
+  "singleNextBlocker": "produce and integrate 6200 additional verified examples before allocating paid distributed training compute"
 }
