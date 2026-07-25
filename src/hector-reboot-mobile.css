@@ -1,5 +1,11 @@
 /* Mobile behavior is intentionally colocated with the main design system.
    This file remains as a stable import for older service-worker caches. */
+.hxHeader{padding-right:max(14px,env(safe-area-inset-right))}
+
+@media(max-width:760px){
+  .hxHeader{padding-right:max(8px,env(safe-area-inset-right))}
+}
+
 @media(max-height:620px) and (max-width:760px){
   .hxEmpty{padding-top:24px}
   .hxEmptyMark{display:none}
