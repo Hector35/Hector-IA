@@ -25,9 +25,14 @@ async function executeJavaScript(code,write){
     error:(...args)=>write(`ERROR ${args.map(serialize).join(' ')}`)
   };
   const blocked=()=>{throw new Error('Función bloqueada dentro del laboratorio aislado')};
-  const AsyncFunction=Object.getPrototypeOf(async function(){}).constructor;
-  const fn=new AsyncFunction('console','fetch','XMLHttpRequest','WebSocket','EventSource','importScripts','postMessage','indexedDB','caches',`"use strict";\n${code}`);
-  return await fn(consoleProxy,safeFetch,blocked,blocked,blocked,blocked,blocked,undefined,undefined);
+  const source=`export default async function(console,fetch,XMLHttpRequest,WebSocket,EventSource,importScripts,postMessage,indexedDB,caches){\n"use strict";\n${code}\n}\n//# sourceURL=hector-bridge-user-code.js`;
+  const moduleUrl=URL.createObjectURL(new Blob([source],{type:'text/javascript'}));
+  try{
+    const module=await import(moduleUrl);
+    return await module.default(consoleProxy,safeFetch,blocked,blocked,blocked,blocked,blocked,undefined,undefined);
+  }finally{
+    URL.revokeObjectURL(moduleUrl);
+  }
 }
 
 async function getPyodide(write){
