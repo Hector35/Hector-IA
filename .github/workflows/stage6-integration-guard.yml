@@ -23,7 +23,7 @@ jobs:
           python-version: '3.11'
       - name: Rebuild deterministic V41 failure taxonomy
         run: python model/hector-asi/evals/benchmark_v2/build-v41-failure-taxonomy-20260725.py
-      - name: Verify integrated state and feedback lineage policy
+      - name: Verify integrated state, corpus lineage and feedback policy
         run: |
           python - <<'PY'
           import json
@@ -37,26 +37,40 @@ jobs:
           assert plan['operatingMode']['ownChampion']=='hector-asi-qwen15-v41'
           assert plan['feedbackPolicy']['directD1TrainingForbidden'] is True
           assert plan['feedbackPolicy']['requiredPwaStatus']=='human_approved'
+          assert plan['feedbackPolicy']['requiredUserAccepted'] is True
+          assert plan['feedbackPolicy']['requiresCycle1Validation'] is True
+          assert plan['feedbackPolicy']['requiresVersionedDataset'] is True
           assert plan['feedbackPolicy']['pendingAndRejectedForbidden'] is True
           assert state['champion']['id']=='hector-asi-qwen15-v41'
           assert state['candidate'] is None
           assert state['promotionDecision']=='retain-v41'
-          assert state['data']['verifiedExamples']==2600
-          assert state['data']['remainingExamples']==7400
+          assert state['data']['verifiedExamples']==3800
+          assert state['data']['remainingExamples']==6200
+          assert next(x for x in plan['pipeline'] if x['id']=='data')['current']==3800
+          assert state['data']['sourceMerges']==[
+            'c70207b3fe4575a125dd3c6c2ddd43d9202a4d03',
+            '5c7de5888e0c9b11ba41985b2a45f6969c13f3c0',
+            'f17f6db9c0955a1cb511fa0278fbb22e77b8cabe'
+          ]
           assert state['data']['pwaExamplesInVersionedDatasets']==0
+          assert state['data']['feedbackLineage']['traceableExamples']==0
           assert state['data']['directD1TrainingAllowed'] is False
           assert state['benchmark']['hiddenSha256']==bench['hiddenSha256']==taxonomy['benchmarkSha256']
           assert state['benchmark']['v41PredictionsSha256']==bench['predictionsSha256']==taxonomy['predictionsSha256']
           assert state['benchmark']['v41TrainableFailures']==bench['trainableFailureCount']==449
+          assert state['benchmark']['impliedFailuresFromScore']==512-state['benchmark']['impliedCorrectFromScore']
+          assert state['benchmark']['publishedFailureCount']!=state['benchmark']['impliedFailuresFromScore']
+          assert state['benchmark']['aggregateConsistencyVerified'] is False
           assert state['compute']['actualCostMxn']==0
           assert state['compute']['real397BWeightsCheckpointResumeVerified'] is False
           assert state['compute']['distributedGpuAllocationVerified'] is False
+          assert state['gates']['benchmarkAggregateConsistencyReady'] is False
           assert state['gates']['trainingAuthorized'] is False
           assert state['gates']['stagePlanAligned'] is True
           assert taxonomy['promotionContract']['minimumAbsoluteGainPoints']==3.0
           assert taxonomy['promotionContract']['requiresConfirmatoryReplica'] is True
           PY
-      - name: Verify admission remains fail closed
+      - name: Verify admission remains fail closed for explicit reasons
         shell: bash
         run: |
           set +e
@@ -67,11 +81,17 @@ jobs:
           import json
           m=json.load(open('/tmp/admission.json'))
           assert m['stagePlanDrift']['detected'] is False
+          assert m['corpusEvidence']['current']==3800
+          assert m['corpusEvidence']['canonicalTraceablePwaExamples']==0
+          assert m['gates']['benchmarkHash']['open'] is True
+          assert m['gates']['benchmarkAggregateConsistency']['open'] is False
           assert m['trainingAuthorized'] is False
           assert m['decision']=='do-not-train'
           assert m['artifact'] is None
           assert m['replicasCompleted']==0
           assert m['actualCostMxn']==0
+          assert 'benchmarkAggregateConsistency' in m['blockingReasons']
+          assert 'corpus' in m['blockingReasons']
           PY
       - name: Publish integration evidence
         uses: actions/upload-artifact@v4
