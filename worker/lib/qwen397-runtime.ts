@@ -59,7 +59,7 @@ function chatEndpoint(baseUrl:string){
 }
 
 export function normalizeQwen397Model(value:unknown){return String(value||'').trim().toLowerCase().split(':')[0].replace(/_/g,'-');}
-export function verifyEffectiveQwen397Model(effective:unknown,requested=QWEN_397_OPERATIONAL.repository){
+export function verifyEffectiveQwen397Model(effective:unknown,requested:string=QWEN_397_OPERATIONAL.repository){
   if(!effective)throw new Error('El proveedor no reportó el modelo efectivo de Qwen 397B');
   if(normalizeQwen397Model(effective)!==normalizeQwen397Model(requested))throw new Error(`Modelo efectivo inesperado: solicitado=${requested}; recibido=${String(effective)}`);
   return String(effective);
