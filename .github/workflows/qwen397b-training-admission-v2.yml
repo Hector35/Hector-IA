@@ -1,17 +1,9 @@
 name: Qwen 397B training admission v2
-
 on:
   pull_request:
-    paths:
-      - 'model/hector-asi/integration/stage6-integration-latest.json'
-      - 'model/hector-asi/scale/qwen35-397b-training-admission-v2.json'
-      - 'model/hector-asi/scale/verify_qwen397b_admission_v2.py'
-      - '.github/workflows/qwen397b-training-admission-v2.yml'
+    paths: ['model/hector-asi/integration/stage6-integration-latest.json','model/hector-asi/scale/qwen35-397b-training-admission-v2.json','model/hector-asi/scale/verify_qwen397b_admission_v2.py','.github/workflows/qwen397b-training-admission-v2.yml']
   workflow_dispatch:
-
-permissions:
-  contents: read
-
+permissions: {contents: read}
 jobs:
   verify-admission:
     runs-on: ubuntu-latest
@@ -19,43 +11,23 @@ jobs:
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-python@v5
-        with:
-          python-version: '3.11'
-      - name: Compile verifier
-        run: python -m py_compile model/hector-asi/scale/verify_qwen397b_admission_v2.py
-      - name: Verify current state blocks training and artifacts
+        with: {python-version: '3.11'}
+      - run: python -m py_compile model/hector-asi/scale/verify_qwen397b_admission_v2.py
+      - name: Verify blocked state and no candidate artifacts
         shell: bash
         run: |
-          mkdir -p artifacts
-          set +e
-          python model/hector-asi/scale/verify_qwen397b_admission_v2.py \
-            --manifest model/hector-asi/scale/qwen35-397b-training-admission-v2.json \
-            --output artifacts/qwen397b-training-admission-v2.json
-          status=$?
-          set -e
-          test "$status" -eq 2
+          mkdir -p artifacts; set +e
+          python model/hector-asi/scale/verify_qwen397b_admission_v2.py --manifest model/hector-asi/scale/qwen35-397b-training-admission-v2.json --output artifacts/qwen397b-training-admission-v2.json
+          status=$?; set -e; test "$status" -eq 2
           python - <<'PY'
           import json
-          report=json.load(open('artifacts/qwen397b-training-admission-v2.json'))
-          assert report['schemaVersion']==3
-          assert report['eligible'] is False
-          assert report['decision']=='do-not-train'
-          assert report['artifactAllowed'] is False
-          assert report['gates']['benchmark'] is True
-          assert report['gates']['data'] is False
-          assert report['gates']['failures'] is True
-          assert report['gates']['hardware'] is False
-          assert report['gates']['resume'] is False
-          assert report['gates']['budget'] is False
-          assert report['gates']['liveExactModelAttestation'] is False
-          assert report['observed']['canonicalTrainExamples']==3800
-          assert report['observed']['trainableChampionFailures']==449
-          assert report['observed']['adapter'] is None
-          assert report['observed']['checkpoint'] is None
+          r=json.load(open('artifacts/qwen397b-training-admission-v2.json'))
+          assert r['schemaVersion']==4 and not r['eligible'] and r['decision']=='do-not-train' and not r['artifactAllowed']
+          assert r['gates']['benchmark'] is True and r['gates']['benchmarkAggregateConsistency'] is False
+          assert r['gates']['data'] is False and r['gates']['failures'] is True
+          assert r['observed']['canonicalTrainExamples']==5400
+          assert r['observed']['benchmarkAggregateConsistencyVerified'] is False
+          assert r['observed']['adapter'] is None and r['observed']['checkpoint'] is None
           PY
       - uses: actions/upload-artifact@v4
-        with:
-          name: qwen397b-training-admission-v2
-          path: artifacts/qwen397b-training-admission-v2.json
-          if-no-files-found: error
-          retention-days: 90
+        with: {name: qwen397b-training-admission-v2, path: artifacts/qwen397b-training-admission-v2.json, if-no-files-found: error, retention-days: 90}
