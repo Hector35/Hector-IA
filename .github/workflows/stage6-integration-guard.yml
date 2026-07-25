@@ -1,0 +1,85 @@
+name: Stage 6 integration guard
+on:
+  pull_request:
+    branches: [main]
+    paths:
+      - 'model/hector-asi/integration/stage6-integration-latest.json'
+      - 'model/hector-asi/stage-6-plan.json'
+      - 'model/hector-asi/training/verify_stage6_training_admission.py'
+      - 'model/hector-asi/evals/benchmark_v2/v41-benchmark-v2-latest.json'
+      - 'model/hector-asi/evals/benchmark_v2/build-v41-failure-taxonomy-20260725.py'
+      - '.github/workflows/stage6-integration-guard.yml'
+  workflow_dispatch:
+permissions:
+  contents: read
+jobs:
+  guard:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+      - name: Rebuild deterministic V41 failure taxonomy
+        run: python model/hector-asi/evals/benchmark_v2/build-v41-failure-taxonomy-20260725.py
+      - name: Verify integrated state and feedback lineage policy
+        run: |
+          python - <<'PY'
+          import json
+          from pathlib import Path
+          root=Path('.')
+          state=json.loads((root/'model/hector-asi/integration/stage6-integration-latest.json').read_text())
+          plan=json.loads((root/'model/hector-asi/stage-6-plan.json').read_text())
+          bench=json.loads((root/'model/hector-asi/evals/benchmark_v2/v41-benchmark-v2-latest.json').read_text())
+          taxonomy=json.loads((root/'model/hector-asi/evals/benchmark_v2/v41-failure-taxonomy-latest.json').read_text())
+          assert plan['operatingMode']['trainableFoundation']=='Qwen/Qwen3.5-397B-A17B'
+          assert plan['operatingMode']['ownChampion']=='hector-asi-qwen15-v41'
+          assert plan['feedbackPolicy']['directD1TrainingForbidden'] is True
+          assert plan['feedbackPolicy']['requiredPwaStatus']=='human_approved'
+          assert plan['feedbackPolicy']['pendingAndRejectedForbidden'] is True
+          assert state['champion']['id']=='hector-asi-qwen15-v41'
+          assert state['candidate'] is None
+          assert state['promotionDecision']=='retain-v41'
+          assert state['data']['verifiedExamples']==2600
+          assert state['data']['remainingExamples']==7400
+          assert state['data']['pwaExamplesInVersionedDatasets']==0
+          assert state['data']['directD1TrainingAllowed'] is False
+          assert state['benchmark']['hiddenSha256']==bench['hiddenSha256']==taxonomy['benchmarkSha256']
+          assert state['benchmark']['v41PredictionsSha256']==bench['predictionsSha256']==taxonomy['predictionsSha256']
+          assert state['benchmark']['v41TrainableFailures']==bench['trainableFailureCount']==449
+          assert state['compute']['actualCostMxn']==0
+          assert state['compute']['real397BWeightsCheckpointResumeVerified'] is False
+          assert state['compute']['distributedGpuAllocationVerified'] is False
+          assert state['gates']['trainingAuthorized'] is False
+          assert state['gates']['stagePlanAligned'] is True
+          assert taxonomy['promotionContract']['minimumAbsoluteGainPoints']==3.0
+          assert taxonomy['promotionContract']['requiresConfirmatoryReplica'] is True
+          PY
+      - name: Verify admission remains fail closed
+        shell: bash
+        run: |
+          set +e
+          python model/hector-asi/training/verify_stage6_training_admission.py --output /tmp/admission.json
+          status=$?
+          test "$status" -eq 2
+          python - <<'PY'
+          import json
+          m=json.load(open('/tmp/admission.json'))
+          assert m['stagePlanDrift']['detected'] is False
+          assert m['trainingAuthorized'] is False
+          assert m['decision']=='do-not-train'
+          assert m['artifact'] is None
+          assert m['replicasCompleted']==0
+          assert m['actualCostMxn']==0
+          PY
+      - name: Publish integration evidence
+        uses: actions/upload-artifact@v4
+        with:
+          name: stage6-integration-state-${{ github.run_id }}
+          path: |
+            model/hector-asi/integration/stage6-integration-latest.json
+            model/hector-asi/evals/benchmark_v2/v41-failure-taxonomy-latest.json
+            /tmp/admission.json
+          retention-days: 90
+          if-no-files-found: error
