@@ -23,6 +23,7 @@ def build():
     state=load(Path('model/hector-asi/integration/stage6-integration-latest.json'))
     corpus_current=int(state['data']['verifiedExamples'])
     corpus_required=int(state['data']['requiredExamples'])
+    benchmark_consistent=bool(state['benchmark'].get('aggregateConsistencyVerified'))
     budget=os.getenv('HECTOR_MAX_TRAINING_MXN','').strip()
     cluster_attestation=os.getenv('HECTOR_DISTRIBUTED_CLUSTER_ATTESTATION','').strip()
     remote_resume=os.getenv('HECTOR_REMOTE_RESUME_ATTESTATION','').strip()
@@ -34,7 +35,8 @@ def build():
 
     gates={
       'corpus':{'current':corpus_current,'required':corpus_required,'open':corpus_current>=corpus_required},
-      'benchmark':{'current':bench['gates']['benchmarkCases']['observed'],'required':500,'open':bench['gates']['benchmarkCases']['open']},
+      'benchmarkHash':{'current':bench['gates']['benchmarkCases']['observed'],'required':500,'open':bench['gates']['benchmarkCases']['open']},
+      'benchmarkAggregateConsistency':{'open':benchmark_consistent,'reason':state['benchmark'].get('aggregateConsistencyReason')},
       'trainableFailures':{'current':bench['trainableFailureCount'],'required':100,'open':bench['trainableFailureCount']>=100},
       'exactModelTarget':{'expected':TARGET,'open':state['compute']['targetModel']==TARGET},
       'explicitBudgetMxn':{'value':float(budget) if budget else None,'open':bool(budget) and float(budget)>0},
@@ -45,20 +47,23 @@ def build():
       'tokenizerHash':{'value':tokenizer_hash or None,'open':len(tokenizer_hash)==64},
       'licenseFixed':{'value':license_id or None,'open':bool(license_id)},
     }
+    declared_corpus=int(next(item for item in plan['pipeline'] if item['id']=='data')['current'])
     stage_plan_drift={
-      'detected':plan.get('operatingMode',{}).get('trainableFoundation')!=TARGET or state['compute']['targetModel']!=TARGET,
+      'detected':plan.get('operatingMode',{}).get('trainableFoundation')!=TARGET or state['compute']['targetModel']!=TARGET or declared_corpus!=corpus_current,
       'declaredTrainableFoundation':plan.get('operatingMode',{}).get('trainableFoundation'),
       'canonicalTargetModel':state['compute']['targetModel'],
       'requiredTrainableFoundation':TARGET,
+      'declaredCorpusCurrent':declared_corpus,
+      'canonicalCorpusCurrent':corpus_current,
       'blocking':True,
     }
     all_open=all(g['open'] for g in gates.values()) and not stage_plan_drift['detected']
     report={
-      'schemaVersion':2,
+      'schemaVersion':3,
       'targetModel':TARGET,
       'champion':state['champion']['id'],
-      'benchmark':{'scorePercent':bench['scorePercent'],'hiddenSha256':bench['hiddenSha256'],'predictionsSha256':bench['predictionsSha256']},
-      'corpusEvidence':{'current':corpus_current,'required':corpus_required,'remaining':corpus_required-corpus_current,'sourceMerges':state['data'].get('sourceMerges',[]),'verifiedDatasetManifests':state['data'].get('verifiedDatasetManifests',[]),'pwaVerifiedExamples':pwa_examples},
+      'benchmark':{'scorePercent':bench['scorePercent'],'hiddenSha256':bench['hiddenSha256'],'predictionsSha256':bench['predictionsSha256'],'aggregateConsistencyVerified':benchmark_consistent},
+      'corpusEvidence':{'current':corpus_current,'required':corpus_required,'remaining':corpus_required-corpus_current,'sourceMerges':state['data'].get('sourceMerges',[]),'verifiedDatasetManifests':state['data'].get('verifiedDatasetManifests',[]),'pwaVerifiedExamples':pwa_examples,'canonicalTraceablePwaExamples':state['data']['pwaExamplesInVersionedDatasets']},
       'stagePlanDrift':stage_plan_drift,
       'gates':gates,
       'trainingAuthorized':all_open,
