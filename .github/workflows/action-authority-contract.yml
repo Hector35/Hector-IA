@@ -1,0 +1,43 @@
+name: Action authority contract
+
+on:
+  pull_request:
+    branches: [main]
+    paths:
+      - 'model/hector-asi/action-authority-contract.json'
+      - 'worker/lib/action-authority.ts'
+      - 'worker/lib/action-authority.test.ts'
+      - 'worker/routes/action-authority.ts'
+      - 'worker/index.ts'
+      - '.github/workflows/action-authority-contract.yml'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  verify:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+      - run: npm ci
+      - name: Typecheck
+        run: npm run typecheck
+      - name: Verify authority policy
+        run: npx vitest run worker/lib/action-authority.test.ts
+      - name: Verify evidence stays fail closed
+        run: |
+          node - <<'NODE'
+          const fs=require('fs');
+          const m=JSON.parse(fs.readFileSync('model/hector-asi/action-authority-contract.json','utf8'));
+          if(m.defaultDecision!=='deny')throw new Error('defaultDecision must remain deny');
+          if(m.executorEnabled!==false)throw new Error('executor must remain disabled');
+          if(!Array.isArray(m.writeToolsEnabled)||m.writeToolsEnabled.length!==0)throw new Error('write tools must remain empty');
+          if(m.receipt.executionEnabled!==false||m.receipt.sideEffects!=='none')throw new Error('receipt must not execute');
+          if(!m.notImplemented.includes('persistent revocation ledger'))throw new Error('missing honest revocation gap');
+          NODE
