@@ -9,6 +9,7 @@ export function pricingForModel(model:string|undefined):ModelPricing{
  if(id==='gpt-5.6'||id.startsWith('gpt-5.6-sol'))return{family:'gpt-5.6-sol',inputPerMTok:5,cachedInputPerMTok:.5,outputPerMTok:30,...GPT_56_COMMON};
  if(id.startsWith('gpt-5.6-terra'))return{family:'gpt-5.6-terra',inputPerMTok:2.5,cachedInputPerMTok:.25,outputPerMTok:15,...GPT_56_COMMON};
  if(id.startsWith('gpt-5.6-luna'))return{family:'gpt-5.6-luna',inputPerMTok:1,cachedInputPerMTok:.1,outputPerMTok:6,...GPT_56_COMMON};
+ if(id.includes('qwen3.5-397b-a17b'))return{family:'qwen3.5-397b-a17b:cheapest',inputPerMTok:.45,cachedInputPerMTok:.45,outputPerMTok:3,cacheWriteMultiplier:1,longContextThreshold:262_144,known:true,source:'huggingface-inference-providers-2026-07-25'};
  return{...LEGACY_FALLBACK,family:id||'unknown'};
 }
 
