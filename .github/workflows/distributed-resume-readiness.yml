@@ -1,0 +1,64 @@
+name: Qwen 397B distributed resume readiness
+on:
+  pull_request:
+    branches: [main]
+    paths:
+      - 'model/hector-asi/scale/verify_distributed_resume.py'
+      - '.github/workflows/distributed-resume-readiness.yml'
+  workflow_dispatch:
+permissions:
+  contents: read
+jobs:
+  verify:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+      - name: Compile verifier
+        run: python -m py_compile model/hector-asi/scale/verify_distributed_resume.py
+      - name: Generate deterministic readiness manifest twice
+        run: |
+          python model/hector-asi/scale/verify_distributed_resume.py --output /tmp/readiness-a.json
+          python model/hector-asi/scale/verify_distributed_resume.py --output /tmp/readiness-b.json
+          cmp /tmp/readiness-a.json /tmp/readiness-b.json
+      - name: Verify gates, hardware estimates, attribution and resume proof
+        run: |
+          python - <<'PY'
+          import importlib.util,json
+          from pathlib import Path
+          p=Path('/tmp/readiness-a.json')
+          m=json.loads(p.read_text())
+          assert m['targetModel']=='Qwen/Qwen3.5-397B-A17B'
+          assert m['currentGates']['corpus']=={'current':2600,'required':10000,'open':False}
+          assert m['currentGates']['benchmark']['open'] is True
+          assert m['currentGates']['trainableV41Failures']['open'] is True
+          assert m['currentGates']['explicitBudgetMxn']['open'] is False
+          assert m['currentGates']['paidBillingEnabled'] is False
+          assert m['inference']['actualCostMxn']==0
+          assert m['resumeProof']['finalStateMatchesUninterrupted'] is True
+          assert m['resumeProof']['checkpointHashVerified'] is True
+          assert m['decision']=='do-not-train'
+          assert not any(x['verifiedAllocation'] for x in m['candidateHardware'])
+          spec=importlib.util.spec_from_file_location('r','model/hector-asi/scale/verify_distributed_resume.py')
+          r=importlib.util.module_from_spec(spec);spec.loader.exec_module(r)
+          try:
+            r.verify_endpoint_attestation({'requestedModel':r.TARGET_MODEL,'effectiveModel':'Qwen/Qwen3-8B','fallback':True})
+          except RuntimeError:
+            pass
+          else:
+            raise AssertionError('fallback was not rejected')
+          q=m['trainingMemoryEstimates']['qlora4bitTrainable0_2pct']
+          assert q['estimatedTotalGiB']>200
+          full=m['trainingMemoryEstimates']['full16bit']
+          assert full['estimatedTotalGiB']>4000
+          PY
+      - name: Publish auditable readiness manifest
+        uses: actions/upload-artifact@v4
+        with:
+          name: qwen397b-distributed-readiness-${{ github.run_id }}
+          path: /tmp/readiness-a.json
+          retention-days: 90
+          if-no-files-found: error
