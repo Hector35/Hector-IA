@@ -24,7 +24,7 @@ def main():
     admission = load('model/hector-asi/scale/qwen35-397b-training-admission-v2.json')
     wrangler = load('wrangler.jsonc')
 
-    require(integration['schemaVersion'] == 1, 'integration schemaVersion')
+    require(integration['schemaVersion'] == 2, 'integration schemaVersion')
     require(plan['stage'] == admission['stage'] == 6, 'stage mismatch')
 
     operational = integration['runtime']['primaryRequested']
@@ -46,17 +46,23 @@ def main():
     require(integration['benchmark']['hiddenSha256'] == benchmark['hiddenSha256'], 'benchmark hash mismatch')
     require(integration['benchmark']['v41PredictionsSha256'] == benchmark['predictionsSha256'], 'prediction hash mismatch')
     require(own['benchmarkScorePercent'] == benchmark['scorePercent'], 'benchmark score mismatch')
+    require(integration['benchmark']['publishedFailureCount'] == benchmark['failureCount'], 'published failure count mismatch')
+    require(integration['benchmark']['impliedCorrectFromScore'] == round(benchmark['scorePercent'] * integration['benchmark']['cases'] / 100), 'implied correct mismatch')
+    require(integration['benchmark']['impliedFailuresFromScore'] == integration['benchmark']['cases'] - integration['benchmark']['impliedCorrectFromScore'], 'implied failures mismatch')
+    require(integration['benchmark']['aggregateConsistencyVerified'] is False, 'benchmark inconsistency must remain fail closed')
 
     by_id = {item['id']: item for item in plan['pipeline']}
     require(by_id['data']['current'] == integration['data']['verifiedExamples'], 'plan corpus mismatch')
     require(by_id['data']['target'] == integration['data']['requiredExamples'], 'plan corpus target mismatch')
     require(by_id['benchmark']['current'] == integration['benchmark']['cases'], 'plan benchmark mismatch')
+    require(by_id['benchmark']['aggregateConsistencyVerified'] == integration['benchmark']['aggregateConsistencyVerified'], 'plan benchmark consistency mismatch')
     require(by_id['failures']['current'] == integration['benchmark']['v41TrainableFailures'], 'plan failures mismatch')
     require(by_id['pwaFeedback']['current'] == integration['data']['pwaHumanApprovedObserved'], 'plan PWA feedback mismatch')
 
     observed = admission['observed']
     require(observed['canonicalTrainExamples'] == integration['data']['verifiedExamples'], 'admission corpus mismatch')
     require(observed['hiddenBenchmarkCases'] == integration['benchmark']['cases'], 'admission benchmark mismatch')
+    require(observed['benchmarkAggregateConsistencyVerified'] == integration['benchmark']['aggregateConsistencyVerified'], 'admission benchmark consistency mismatch')
     require(observed['trainableChampionFailures'] == integration['benchmark']['v41TrainableFailures'], 'admission failures mismatch')
     require(observed['v41BenchmarkScorePercent'] == own['benchmarkScorePercent'], 'admission score mismatch')
     require(observed['distributedHardwareVerified'] == integration['compute']['distributedGpuAllocationVerified'], 'hardware mismatch')
@@ -67,6 +73,7 @@ def main():
     expected = {
         'data': integration['data']['verifiedExamples'] >= integration['data']['requiredExamples'],
         'benchmark': integration['benchmark']['cases'] >= benchmark['gates']['benchmarkCases']['required'],
+        'benchmarkAggregateConsistency': integration['benchmark']['aggregateConsistencyVerified'],
         'failures': integration['benchmark']['v41TrainableFailures'] >= benchmark['gates']['trainableFailures']['required'],
         'hardware': integration['compute']['distributedGpuAllocationVerified'],
         'resume': integration['compute']['real397BWeightsCheckpointResumeVerified'],
@@ -86,6 +93,7 @@ def main():
         'ownChampion': own['id'],
         'verifiedExamples': integration['data']['verifiedExamples'],
         'benchmarkCases': integration['benchmark']['cases'],
+        'benchmarkAggregateConsistencyVerified': integration['benchmark']['aggregateConsistencyVerified'],
         'trainableFailures': integration['benchmark']['v41TrainableFailures'],
         'liveExactModelAttested': integration['compute']['exactLiveEndpointAttested'],
         'trainingAllowed': all_required,
