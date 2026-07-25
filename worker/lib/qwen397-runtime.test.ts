@@ -1,6 +1,6 @@
 import {describe,expect,it} from 'vitest';
 import type {Bindings} from '../types';
-import {QWEN_397_OPERATIONAL,hasQwen397Endpoint,qwen397Status,resolveQwen397Endpoint,verifyEffectiveQwen397Model} from './qwen397-runtime';
+import {QWEN_397_OPERATIONAL,QWEN_397_PROBE_TOKEN,hasQwen397Endpoint,qwen397Status,resolveQwen397Endpoint,verifyEffectiveQwen397Model,verifyQwen397ProbeText} from './qwen397-runtime';
 const env=(values:Partial<Bindings>={}):Bindings=>values as Bindings;
 describe('Qwen 397B runtime',()=>{
  it('pins the intended open MoE architecture',()=>{expect(QWEN_397_OPERATIONAL.repository).toBe('Qwen/Qwen3.5-397B-A17B');expect(QWEN_397_OPERATIONAL.totalParameters).toBe('397B');expect(QWEN_397_OPERATIONAL.activeParameters).toBe('17B');expect(QWEN_397_OPERATIONAL.multimodal).toBe(true);});
@@ -8,4 +8,5 @@ describe('Qwen 397B runtime',()=>{
  it('prefers a dedicated endpoint when both dedicated credentials exist',()=>{const configured=env({QWEN_397B_ENABLED:'true',QWEN_397B_BASE_URL:'https://example.invalid/v1',QWEN_397B_TOKEN:'secret',HUGGINGFACE_TOKEN:'hf-secret'}),endpoint=resolveQwen397Endpoint(configured);expect(endpoint).toMatchObject({source:'dedicated',selectionPolicy:'exact',billingMode:'provider-account',requestModel:'Qwen/Qwen3.5-397B-A17B'});expect(qwen397Status(configured).mode).toBe('endpoint');});
  it('reuses the existing Hugging Face secret with cheapest provider selection',()=>{const configured=env({QWEN_397B_ENABLED:'true',HUGGINGFACE_TOKEN:'hf-secret',HECTOR_QWEN_BASE_URL:'https://router.huggingface.co/v1'}),endpoint=resolveQwen397Endpoint(configured);expect(endpoint).toMatchObject({source:'huggingface-router',selectionPolicy:'cheapest',billingMode:'huggingface-credits',requestModel:'Qwen/Qwen3.5-397B-A17B:cheapest'});expect(hasQwen397Endpoint(configured)).toBe(true);expect(qwen397Status(configured).endpointSource).toBe('huggingface-router');});
  it('rejects provider substitution while accepting policy suffixes',()=>{expect(verifyEffectiveQwen397Model('Qwen/Qwen3.5-397B-A17B:cheapest')).toBe('Qwen/Qwen3.5-397B-A17B:cheapest');expect(()=>verifyEffectiveQwen397Model('Qwen/Qwen3-235B-A22B-Instruct-2507')).toThrow(/Modelo efectivo inesperado/);});
+ it('accepts only the exact live attestation token',()=>{expect(verifyQwen397ProbeText(QWEN_397_PROBE_TOKEN)).toBe(QWEN_397_PROBE_TOKEN);expect(()=>verifyQwen397ProbeText(`${QWEN_397_PROBE_TOKEN}.`)).toThrow(/contenido inesperado/);expect(()=>verifyQwen397ProbeText('ok')).toThrow(/contenido inesperado/);});
 });
