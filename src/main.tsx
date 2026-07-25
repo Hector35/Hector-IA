@@ -1,18 +1,19 @@
-import React from 'react';
-import ReactDOM from 'react-dom/client';
-import {HectorASIEvolutionApp} from './HectorASIEvolutionApp';
-import {TrainingOverlay} from './TrainingOverlay';
-import './hector-asi-markdown.css';
-import './hector-reboot.css';
-import './hector-reboot-mobile.css';
-import './training-overlay.css';
+const root=document.getElementById('root');
 
-ReactDOM.createRoot(document.getElementById('root')!).render(
-  <React.StrictMode>
-    <HectorASIEvolutionApp/>
-    <TrainingOverlay/>
-  </React.StrictMode>
-);
+document.documentElement.style.background='#000';
+document.documentElement.style.colorScheme='dark';
+document.body.style.margin='0';
+document.body.style.minHeight='100dvh';
+document.body.style.background='#000';
+document.body.style.overflow='hidden';
+
+if(root){
+  root.setAttribute('aria-hidden','true');
+  root.style.position='fixed';
+  root.style.inset='0';
+  root.style.background='#000';
+  root.replaceChildren();
+}
 
 if('serviceWorker' in navigator){
   window.addEventListener('load',async()=>{
