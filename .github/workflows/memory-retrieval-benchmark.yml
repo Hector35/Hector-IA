@@ -25,8 +25,15 @@ jobs:
           node-version: 22
           cache: npm
       - run: npm ci
-      - name: Typecheck
-        run: npm run typecheck
+      - name: Typecheck with retained diagnostics
+        shell: bash
+        run: |
+          mkdir -p artifacts
+          set +e
+          npm run typecheck 2>&1 | tee artifacts/typecheck.log
+          status=${PIPESTATUS[0]}
+          echo "$status" > artifacts/typecheck-status.txt
+          exit "$status"
       - name: Measure retrieval
         env:
           MEMORY_REPORT_PATH: artifacts/memory-retrieval-v1.json
@@ -47,9 +54,11 @@ jobs:
           if(report.metrics.precisionAtK<benchmark.thresholds.precisionAtK)throw new Error('precision threshold failed');
           if(report.metrics.mrr<benchmark.thresholds.mrr)throw new Error('MRR threshold failed');
           NODE
-      - uses: actions/upload-artifact@v4
+      - name: Upload diagnostics and benchmark evidence
+        if: always()
+        uses: actions/upload-artifact@v4
         with:
           name: memory-retrieval-benchmark-v1-${{ github.run_id }}
-          path: artifacts/memory-retrieval-v1.json
+          path: artifacts/
           retention-days: 90
           if-no-files-found: error
