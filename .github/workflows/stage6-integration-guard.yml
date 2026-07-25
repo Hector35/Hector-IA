@@ -19,8 +19,7 @@ jobs:
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-python@v5
-        with:
-          python-version: '3.11'
+        with: {python-version: '3.11'}
       - name: Rebuild deterministic V41 failure taxonomy
         run: python model/hector-asi/evals/benchmark_v2/build-v41-failure-taxonomy-20260725.py
       - name: Verify integrated state and feedback lineage policy
@@ -28,57 +27,49 @@ jobs:
           python - <<'PY'
           import json
           from pathlib import Path
-          root=Path('.')
-          state=json.loads((root/'model/hector-asi/integration/stage6-integration-latest.json').read_text())
-          plan=json.loads((root/'model/hector-asi/stage-6-plan.json').read_text())
-          bench=json.loads((root/'model/hector-asi/evals/benchmark_v2/v41-benchmark-v2-latest.json').read_text())
-          taxonomy=json.loads((root/'model/hector-asi/evals/benchmark_v2/v41-failure-taxonomy-latest.json').read_text())
+          root=Path('.');state=json.loads((root/'model/hector-asi/integration/stage6-integration-latest.json').read_text());plan=json.loads((root/'model/hector-asi/stage-6-plan.json').read_text());bench=json.loads((root/'model/hector-asi/evals/benchmark_v2/v41-benchmark-v2-latest.json').read_text());taxonomy=json.loads((root/'model/hector-asi/evals/benchmark_v2/v41-failure-taxonomy-latest.json').read_text())
           assert plan['operatingMode']['trainableFoundation']=='Qwen/Qwen3.5-397B-A17B'
           assert plan['operatingMode']['ownChampion']=='hector-asi-qwen15-v41'
           assert plan['feedbackPolicy']['directD1TrainingForbidden'] is True
           assert plan['feedbackPolicy']['requiredPwaStatus']=='human_approved'
+          assert plan['feedbackPolicy']['requiredUserAccepted'] is True
+          assert plan['feedbackPolicy']['requiresCycle1Validation'] is True
+          assert plan['feedbackPolicy']['requiresVersionedDataset'] is True
           assert plan['feedbackPolicy']['pendingAndRejectedForbidden'] is True
-          assert state['champion']['id']=='hector-asi-qwen15-v41'
-          assert state['candidate'] is None
-          assert state['promotionDecision']=='retain-v41'
-          assert state['data']['verifiedExamples']==plan['pipeline'][0]['current']==3800
-          assert state['data']['requiredExamples']==plan['pipeline'][0]['target']==10000
-          assert state['data']['remainingExamples']==state['data']['requiredExamples']-state['data']['verifiedExamples']==6200
-          assert sum(int(x['count']) for x in state['data'].get('verifiedDatasetManifests',[]))<=state['data']['verifiedExamples']
-          assert any(x['name']=='cognitive-depth-20260725' and int(x['count'])==1200 for x in state['data'].get('verifiedDatasetManifests',[]))
-          assert state['data']['pwaExamplesInVersionedDatasets']==0
+          assert state['champion']['id']=='hector-asi-qwen15-v41' and state['candidate'] is None and state['promotionDecision']=='retain-v41'
+          assert state['data']['verifiedExamples']==next(x for x in plan['pipeline'] if x['id']=='data')['current']==5400
+          assert state['data']['requiredExamples']==10000 and state['data']['remainingExamples']==4600
+          manifests=state['data'].get('verifiedDatasetManifests',[])
+          assert any(x['name']=='cognitive-depth-20260725' and int(x['count'])==1200 for x in manifests)
+          assert any(x['name']=='v41-priority-depth-20260725' and int(x['count'])==1600 for x in manifests)
+          assert state['data']['pwaExamplesInVersionedDatasets']==state['data']['feedbackLineage']['traceableExamples']==0
           assert state['data']['directD1TrainingAllowed'] is False
           assert state['benchmark']['hiddenSha256']==bench['hiddenSha256']==taxonomy['benchmarkSha256']
           assert state['benchmark']['v41PredictionsSha256']==bench['predictionsSha256']==taxonomy['predictionsSha256']
           assert state['benchmark']['v41TrainableFailures']==bench['trainableFailureCount']==449
-          assert state['compute']['actualCostMxn']==0
-          assert state['compute']['real397BWeightsCheckpointResumeVerified'] is False
-          assert state['compute']['distributedGpuAllocationVerified'] is False
-          assert state['gates']['trainingAuthorized'] is False
-          assert state['gates']['stagePlanAligned'] is True
-          assert taxonomy['promotionContract']['minimumAbsoluteGainPoints']==3.0
-          assert taxonomy['promotionContract']['requiresConfirmatoryReplica'] is True
+          assert state['benchmark']['publishedFailureCount']==bench['failureCount']==483
+          assert state['benchmark']['impliedFailuresFromScore']==383
+          assert state['benchmark']['aggregateConsistencyVerified'] is False
+          assert state['gates']['benchmarkAggregateConsistencyReady'] is False
+          assert state['compute']['actualCostMxn']==0 and state['gates']['trainingAuthorized'] is False
+          assert taxonomy['promotionContract']['minimumAbsoluteGainPoints']==3.0 and taxonomy['promotionContract']['requiresConfirmatoryReplica'] is True
           PY
       - name: Verify admission remains fail closed
         shell: bash
         run: |
           set +e
           python model/hector-asi/training/verify_stage6_training_admission.py --output /tmp/admission.json
-          status=$?
-          test "$status" -eq 2
+          status=$?; test "$status" -eq 2
           python - <<'PY'
           import json
           m=json.load(open('/tmp/admission.json'))
-          assert m['schemaVersion']==2
-          assert m['stagePlanDrift']['detected'] is False
-          assert m['corpusEvidence']['current']==3800
-          assert m['corpusEvidence']['required']==10000
-          assert m['corpusEvidence']['remaining']==6200
-          assert m['trainingAuthorized'] is False
-          assert m['decision']=='do-not-train'
-          assert m['artifact'] is None
-          assert m['replicasCompleted']==0
-          assert m['actualCostMxn']==0
+          assert m['schemaVersion']==3 and m['stagePlanDrift']['detected'] is False
+          assert m['corpusEvidence']['current']==5400 and m['corpusEvidence']['remaining']==4600
+          assert m['gates']['benchmarkHash']['open'] is True
+          assert m['gates']['benchmarkAggregateConsistency']['open'] is False
+          assert m['corpusEvidence']['canonicalTraceablePwaExamples']==0
+          assert m['trainingAuthorized'] is False and m['decision']=='do-not-train'
+          assert m['artifact'] is None and m['replicasCompleted']==0 and m['actualCostMxn']==0
           PY
       - name: Publish integration evidence
         uses: actions/upload-artifact@v4
