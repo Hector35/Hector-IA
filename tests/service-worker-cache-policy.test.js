@@ -9,7 +9,7 @@ function worker(responseHeaders={}){
  const cache={addAll:vi.fn(async()=>{}),put:vi.fn(async()=>{})};
  const caches={
   open:vi.fn(async()=>cache),
-  keys:vi.fn(async()=>['hector-os-transparent-model-v5','hector-os-static-shell-v6','hector-asi-evolution-shell-v7','hector-asi-stage-6-shell-v8','hector-command-console-v1','hector-command-console-v2','hector-elegant-chat-v5']),
+  keys:vi.fn(async()=>['hector-os-transparent-model-v5','hector-os-static-shell-v6','hector-asi-evolution-shell-v7','hector-asi-stage-6-shell-v8','hector-command-console-v1','hector-command-console-v2','hector-elegant-chat-v5','hector-elegant-chat-v6']),
   delete:vi.fn(async()=>true),
   match:vi.fn(async()=>undefined)
  };
@@ -46,12 +46,20 @@ describe('service worker private cache policy',()=>{
   expect(fetch).not.toHaveBeenCalled();
  });
 
- it('caches only allowlisted static assets',async()=>{
+ it.each(['/assets/app.js','/bridge.html','/bridge.css','/bridge.js','/bridge-code-worker.mjs'])('caches allowlisted static asset %s',async path=>{
   const {listeners,cache}=worker({'Cache-Control':'public, max-age=31536000'});
-  const event=dispatchFetch(listeners.fetch,new Request('https://hector.test/assets/app.js'));
+  const event=dispatchFetch(listeners.fetch,new Request(`https://hector.test${path}`));
   expect((await event.response()).status).toBe(200);
   await event.settle();
   expect(cache.put).toHaveBeenCalledOnce();
+ });
+
+ it('pre-caches the complete Bridge local shell',async()=>{
+  const {listeners,cache}=worker();const waits=[];
+  listeners.install({waitUntil:value=>waits.push(Promise.resolve(value))});
+  await Promise.all(waits);
+  const shell=cache.addAll.mock.calls[0][0];
+  expect(shell).toEqual(expect.arrayContaining(['/bridge.html','/bridge.css','/bridge.js','/bridge-code-worker.mjs']));
  });
 
  it('does not cache private or no-store responses',async()=>{
@@ -70,7 +78,7 @@ describe('service worker private cache policy',()=>{
   expect(fetch).not.toHaveBeenCalled();
  });
 
- it('deletes every retired shell and keeps only elegant-chat v5',async()=>{
+ it('deletes every retired shell and keeps only elegant-chat v6',async()=>{
   const {listeners,caches}=worker();const waits=[];
   listeners.activate({waitUntil:value=>waits.push(Promise.resolve(value))});
   await Promise.all(waits);
@@ -80,7 +88,8 @@ describe('service worker private cache policy',()=>{
   expect(caches.delete).toHaveBeenCalledWith('hector-asi-stage-6-shell-v8');
   expect(caches.delete).toHaveBeenCalledWith('hector-command-console-v1');
   expect(caches.delete).toHaveBeenCalledWith('hector-command-console-v2');
-  expect(caches.delete).not.toHaveBeenCalledWith('hector-elegant-chat-v5');
+  expect(caches.delete).toHaveBeenCalledWith('hector-elegant-chat-v5');
+  expect(caches.delete).not.toHaveBeenCalledWith('hector-elegant-chat-v6');
  });
 
  it('accepts an explicit skip-waiting request from the refreshed client',()=>{
