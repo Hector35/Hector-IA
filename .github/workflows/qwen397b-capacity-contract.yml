@@ -1,0 +1,65 @@
+name: Qwen 397B capacity contract
+on:
+  pull_request:
+    branches: [main]
+    paths:
+      - 'model/hector-asi/scale/build_qwen397b_capacity_contract.py'
+      - 'model/hector-asi/integration/stage6-integration-latest.json'
+      - '.github/workflows/qwen397b-capacity-contract.yml'
+  workflow_dispatch:
+permissions:
+  contents: read
+jobs:
+  verify:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+      - name: Compile capacity contract
+        run: python -m py_compile model/hector-asi/scale/build_qwen397b_capacity_contract.py
+      - name: Generate deterministic manifests
+        run: |
+          python model/hector-asi/scale/build_qwen397b_capacity_contract.py --state model/hector-asi/integration/stage6-integration-latest.json --output /tmp/capacity-a.json
+          python model/hector-asi/scale/build_qwen397b_capacity_contract.py --state model/hector-asi/integration/stage6-integration-latest.json --output /tmp/capacity-b.json
+          cmp /tmp/capacity-a.json /tmp/capacity-b.json
+      - name: Verify memory, topology, storage and gates
+        run: |
+          python - <<'PY'
+          import json
+          r=json.load(open('/tmp/capacity-a.json'))
+          assert r['targetModel']=='Qwen/Qwen3.5-397B-A17B'
+          assert r['currentCorpus']==3800
+          assert r['requiredCorpus']==10000
+          assert r['trainingAuthorized'] is False
+          assert r['decision']=='do-not-train'
+          assert r['actualCostMxn']==0
+          assert r['billingActivated'] is False
+          assert r['gates']['benchmark'] is True
+          assert r['gates']['trainableFailures'] is True
+          assert r['gates']['corpus'] is False
+          assert r['gates']['exactLiveEndpoint'] is False
+          assert r['gates']['distributedAllocation'] is False
+          assert r['gates']['realWeightsResume'] is False
+          assert r['gates']['explicitBudget'] is False
+          assert r['gates']['frozenHashes'] is False
+          q=next(x for x in r['memoryProfiles'] if x['name']=='qlora4bit-0.2pct')
+          f=next(x for x in r['memoryProfiles'] if x['name']=='full16bit')
+          assert q['estimatedPeakGiB']>250
+          assert f['estimatedPeakGiB']>4900
+          assert r['storageContract']['minimumObjectStorageGiB']>14000
+          assert r['storageContract']['verifiedRemoteBucket'] is False
+          assert all(t['verifiedAllocation'] is False for t in r['candidateTopologies'])
+          assert r['endpointAttestationContract']['fallbackMustBe'] is False
+          assert r['endpointAttestationContract']['liveInferencePerformed'] is False
+          assert r['bandwidthPlanning']['measured'] is False
+          PY
+      - name: Publish auditable capacity contract
+        uses: actions/upload-artifact@v4
+        with:
+          name: qwen397b-capacity-contract-${{ github.run_id }}
+          path: /tmp/capacity-a.json
+          retention-days: 90
+          if-no-files-found: error
