@@ -7,7 +7,7 @@ on:
       - 'model/hector-asi/stage-6-plan.json'
       - 'model/hector-asi/training/verify_stage6_training_admission.py'
       - 'model/hector-asi/evals/benchmark_v2/v41-benchmark-v2-latest.json'
-      - 'model/hector-asi/evals/benchmark_v2/v41-failure-taxonomy-latest.json'
+      - 'model/hector-asi/evals/benchmark_v2/build-v41-failure-taxonomy-20260725.py'
       - '.github/workflows/stage6-integration-guard.yml'
   workflow_dispatch:
 permissions:
@@ -21,6 +21,8 @@ jobs:
       - uses: actions/setup-python@v5
         with:
           python-version: '3.11'
+      - name: Rebuild deterministic V41 failure taxonomy
+        run: python model/hector-asi/evals/benchmark_v2/build-v41-failure-taxonomy-20260725.py
       - name: Verify integrated state and feedback lineage policy
         run: |
           python - <<'PY'
@@ -77,6 +79,7 @@ jobs:
           name: stage6-integration-state-${{ github.run_id }}
           path: |
             model/hector-asi/integration/stage6-integration-latest.json
+            model/hector-asi/evals/benchmark_v2/v41-failure-taxonomy-latest.json
             /tmp/admission.json
           retention-days: 90
           if-no-files-found: error
