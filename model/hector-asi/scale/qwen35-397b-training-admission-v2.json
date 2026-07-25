@@ -1,5 +1,5 @@
 {
-  "schemaVersion": 3,
+  "schemaVersion": 4,
   "stage": 6,
   "canonicalState": "model/hector-asi/integration/stage6-integration-latest.json",
   "profile": "qwen35-397b-a17b-main",
@@ -10,6 +10,7 @@
   "requirements": {
     "canonicalTrainExamples": 10000,
     "hiddenBenchmarkCases": 500,
+    "benchmarkAggregateConsistencyRequired": true,
     "trainableChampionFailures": 100,
     "minimumAbsoluteBenchmarkGain": 0.03,
     "reproducibleRuns": 2,
@@ -20,8 +21,9 @@
     "liveExactModelAttestationRequired": true
   },
   "observed": {
-    "canonicalTrainExamples": 2600,
+    "canonicalTrainExamples": 3800,
     "hiddenBenchmarkCases": 512,
+    "benchmarkAggregateConsistencyVerified": false,
     "trainableChampionFailures": 449,
     "v41BenchmarkScorePercent": 25.195,
     "distributedHardwareVerified": false,
@@ -38,6 +40,7 @@
   "gates": {
     "data": false,
     "benchmark": true,
+    "benchmarkAggregateConsistency": false,
     "failures": true,
     "hardware": false,
     "resume": false,
@@ -47,7 +50,7 @@
   },
   "decision": {
     "action": "do-not-train",
-    "reason": "Hay 2,600 de 10,000 ejemplos y 449 fallos entrenables medidos. Faltan 7,400 ejemplos verificados, hardware distribuido asignado, reanudación remota real, atribución viva del modelo exacto y un presupuesto máximo explícito en MXN.",
-    "nextRequiredArtifact": "Manifiesto de integración con 10,000 ejemplos verificados y prueba real de endpoint, clúster y reanudación persistente."
+    "reason": "Hay 3,800 de 10,000 ejemplos y 449 fallos entrenables medidos, pero el agregado de Benchmark V2 no es internamente consistente. Faltan reconciliar el scorer, 6,200 ejemplos verificados, hardware distribuido asignado, reanudación remota real, atribución viva del modelo exacto y un presupuesto máximo explícito en MXN.",
+    "nextRequiredArtifact": "Reporte canónico de Benchmark V2 que derive score, correctos y fallos desde una sola salida sellada; después, manifiesto de integración con 10,000 ejemplos y prueba real de endpoint, clúster y reanudación persistente."
   }
 }
