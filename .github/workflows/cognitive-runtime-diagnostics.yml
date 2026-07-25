@@ -1,0 +1,46 @@
+name: Cognitive runtime diagnostics
+
+on:
+  pull_request:
+    branches: [main]
+    paths:
+      - 'worker/lib/cognitive-runtime.ts'
+      - 'worker/lib/cognitive-runtime.test.ts'
+      - 'worker/lib/planned-response.ts'
+      - 'worker/routes/intelligence.ts'
+      - 'worker/routes/response-traces.ts'
+      - '.github/workflows/cognitive-runtime-diagnostics.yml'
+
+permissions:
+  contents: read
+
+jobs:
+  diagnose-typecheck:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+      - run: npm ci
+      - name: Capture typecheck output
+        id: typecheck
+        shell: bash
+        run: |
+          set +e
+          npm run typecheck > typecheck.log 2>&1
+          code=$?
+          echo "exit_code=$code" >> "$GITHUB_OUTPUT"
+          cat typecheck.log
+          exit 0
+      - name: Upload typecheck diagnostics
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: cognitive-runtime-typecheck
+          path: typecheck.log
+          if-no-files-found: error
+      - name: Enforce typecheck
+        if: steps.typecheck.outputs.exit_code != '0'
+        run: exit 1
