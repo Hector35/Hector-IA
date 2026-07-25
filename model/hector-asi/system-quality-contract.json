@@ -1,0 +1,40 @@
+{
+  "schemaVersion": 1,
+  "name": "Héctor OS 10/10",
+  "maximumScore": 100,
+  "dimensionMaximum": 10,
+  "minimumEvidenceSamples": 30,
+  "dimensions": [
+    {"id":"operational-model","label":"Modelo operativo y atribución","critical":true},
+    {"id":"own-neural-weights","label":"Pesos neuronales propios","critical":true},
+    {"id":"reasoning-verification","label":"Razonamiento y verificación","critical":true},
+    {"id":"tools-agency","label":"Herramientas y agencia segura","critical":true},
+    {"id":"memory-learning","label":"Memoria y aprendizaje medido","critical":false},
+    {"id":"security-privacy","label":"Seguridad y privacidad","critical":true},
+    {"id":"reliability","label":"Confiabilidad y recuperación","critical":true},
+    {"id":"observability-cost","label":"Observabilidad y control de costos","critical":true},
+    {"id":"ux-accessibility","label":"Experiencia y accesibilidad","critical":false},
+    {"id":"training-readiness","label":"Preparación de entrenamiento 397B","critical":true}
+  ],
+  "tenOutOfTenRequirements": {
+    "everyDimensionAtLeast": 10,
+    "criticalBlockers": 0,
+    "minimumResponseSamples": 30,
+    "minimumAcceptedRate": 0.9,
+    "minimumAverageQuality": 90,
+    "maximumFallbackRate": 0.05,
+    "minimumWorkSuccessRate": 0.95,
+    "liveExactModelAttestation": true,
+    "ownWeightsProductionEnabled": true,
+    "ownWeightsMinimumBenchmarkPercent": 80,
+    "corpusExamples": 10000,
+    "distributedClusterVerified": true,
+    "realCheckpointResumeVerified": true,
+    "explicitTrainingBudgetMxn": true,
+    "externalSecurityReview": true,
+    "accessibilityAudit": true,
+    "measuredMemoryRetrieval": true,
+    "writeActionsRequirePreviewAndConsent": true
+  },
+  "principle": "El sistema nunca se autocalifica 10/10 por arquitectura, volumen de código o apariencia. Cada punto exige evidencia observable y los criterios críticos fallan de forma cerrada."
+}
