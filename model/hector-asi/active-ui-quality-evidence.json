@@ -1,0 +1,41 @@
+{
+  "schemaVersion": 1,
+  "generatedAt": "2026-07-25T18:58:00Z",
+  "entrypoint": "src/main.tsx",
+  "activeApplication": "src/HectorChatApp.tsx",
+  "qualityOverlay": "src/HectorQualityOverlay.tsx",
+  "chatFirst": {
+    "activeAppMounted": true,
+    "defaultSurface": "chat",
+    "qualityEndpoint": "/api/system/quality",
+    "qualityTriggerVisible": true,
+    "effectiveModelVisible": true
+  },
+  "accessibility": {
+    "skipLink": true,
+    "rootFocusTarget": true,
+    "politeStatusAnnouncements": true,
+    "modalDialogSemantics": true,
+    "escapeClosesDialog": true,
+    "focusReturnsToTrigger": true,
+    "progressbarSemantics": true,
+    "minimumTouchTargetPx": 48,
+    "reducedMotion": true,
+    "increasedContrast": true,
+    "forcedColors": true,
+    "automatedContractAudit": true,
+    "manualWcagAudit": false
+  },
+  "visualAudit": {
+    "activeComposerSelector": ".hcComposer textarea",
+    "iphoneSe": true,
+    "iphone13Pro": true,
+    "overflowChecks": true,
+    "keyboardFocusChecks": true
+  },
+  "privacy": {
+    "thirdPartyFontRequestFound": false,
+    "qualityEndpointAuthenticated": true
+  },
+  "principle": "Sólo se acredita la interfaz montada por main.tsx. El cockpit no sustituye una auditoría WCAG manual y la puntuación 10/10 permanece bloqueada hasta completar toda la evidencia crítica."
+}
