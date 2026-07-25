@@ -1,4 +1,5 @@
 import contract from '../../model/hector-asi/system-quality-contract.json';
+import uiEvidence from '../../model/hector-asi/ui-quality-evidence.json';
 import {cognitiveRuntimeManifest} from '../lib/cognitive-runtime';
 import {readOnlyToolManifest} from '../lib/bounded-read-tools';
 import {INTELLIGENCE_STATE} from './intelligence-state';
@@ -118,13 +119,14 @@ export function buildSystemQualityReport(metrics:QualityMetrics):SystemQualityRe
   check('training-budget','Presupuesto explícito de entrenamiento en MXN',2,state.pipeline.explicitBudgetMxn.open,String(state.pipeline.explicitBudgetMxn.value),true)
  ]);
  const ux=dimension('ux-accessibility',[
-  check('pwa','PWA instalable',2,true,'service worker y assets'),
+  check('pwa','PWA instalable',1,true,'service worker y assets'),
   check('iphone','Diseño específico para iPhone y safe areas',1,true,'CSS móvil y viewport'),
-  check('offline','Shell sin conexión',1,true,'service worker'),
-  check('chat-first','Superficie única de chat premium',2,false,'El rediseño de chat único aún no está integrado'),
+  check('offline','Shell y tipografía sin dependencia externa',1,uiEvidence.accessibility.externalFontRequests===false,'Fuentes de sistema; sin solicitudes a Google Fonts'),
+  check('chat-first','Chat como superficie primaria con auditoría integrada',2,uiEvidence.chatFirst.defaultView==='chat'&&uiEvidence.chatFirst.allPrimaryActionsReachableFromChat,`${uiEvidence.chatFirst.defaultView}; ${uiEvidence.chatFirst.qualityAuditCommand}`),
   check('visual-ci','Auditoría visual automatizada',1,true,'iPhone Visual Audit'),
   check('honest-telemetry','Telemetría no inventada',1,true,'estados nulos cuando falta evidencia'),
-  check('accessibility','Auditoría WCAG automatizada y manual',2,false,'Falta evidencia WCAG completa',false)
+  check('automated-accessibility','Contrato automatizado de accesibilidad',2,uiEvidence.accessibility.automatedContractAudit&&uiEvidence.accessibility.skipLink&&uiEvidence.accessibility.minimumTouchTargetPx>=44,'skip link, aria-current, live regions, 44px, reduced motion, contrast'),
+  check('manual-accessibility','Auditoría WCAG manual',1,uiEvidence.accessibility.manualWcagAudit,'Revisión manual pendiente')
  ]);
  const training=dimension('training-readiness',[
   check('corpus','Corpus verificado 10,000/10,000',4,state.pipeline.corpus.open,`${state.pipeline.corpus.observed}/${state.pipeline.corpus.required}`,true),
