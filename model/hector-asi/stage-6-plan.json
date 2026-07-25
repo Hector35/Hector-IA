@@ -25,7 +25,7 @@
     "teacher": "GPT-5.6 de razonamiento para generación, crítica, verificación y corrección de datos"
   },
   "pipeline": [
-    {"id":"data","label":"Corpus verificable","current":2600,"target":10000,"unit":"ejemplos"},
+    {"id":"data","label":"Corpus verificable","current":3800,"target":10000,"unit":"ejemplos"},
     {"id":"benchmark","label":"Benchmark V2","current":512,"target":500,"stretchTarget":1000,"unit":"casos ocultos"},
     {"id":"failures","label":"Fallos entrenables de V41","current":449,"target":100,"unit":"casos"},
     {"id":"pwaFeedback","label":"Ejemplos PWA humanos verificados","current":0,"target":1,"unit":"ejemplos"},
