@@ -10,7 +10,7 @@ responseTraces.use('*',requireAuth);
 
 export type TraceTier='fast'|'balanced'|'deep';
 export type TraceProvider='cloudflare'|'huggingface'|'openai';
-export type TraceContext={memories:number;recentMessages:number;hasSummary:boolean;priorSummaries?:number;projectState?:number;contractApplied?:boolean;contractReasons?:string[];cognitiveMode?:string;deliberationPasses?:number;deliberationReason?:string;feedbackAdaptation?:Record<string,unknown>;cognitiveRuntime?:CognitiveRuntimeTelemetry};
+export type TraceContext={memories:number;recentMessages:number;hasSummary:boolean;priorSummaries?:number;projectState?:number;contractApplied?:boolean;contractReasons?:string[];cognitiveMode?:string;deliberationPasses?:number;deliberationReason?:string;feedbackAdaptation?:Record<string,unknown>;cognitiveRuntime?:CognitiveRuntimeTelemetry;toolRuntime?:unknown};
 export type PersistResponseTraceInput={
  userId:string;conversationId:string;messageId:string;requestedProvider:TraceProvider;actualProvider:TraceProvider;model:string;routeTier:TraceTier;task:string;modelReason:string;providerReason:string;searchedWeb:boolean;fallback:boolean;qualityScore:number;qualityAccepted:boolean;latencyMs:number;estimatedCostUsd:number;memories:string[];context:TraceContext;
 };
