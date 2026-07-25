@@ -1,0 +1,176 @@
+name: Qwen 397B zero-spend remote readiness
+on:
+  pull_request:
+    branches: [main]
+    paths:
+      - 'model/hector-asi/scale/audit_qwen397b_zero_spend.py'
+      - 'model/hector-asi/scale/remote_checkpoint_protocol.py'
+      - '.github/workflows/qwen397b-zero-spend-remote-readiness.yml'
+  workflow_dispatch:
+permissions:
+  contents: read
+jobs:
+  public-model-audit:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+      - name: Compile zero-spend audit
+        run: python -m py_compile model/hector-asi/scale/audit_qwen397b_zero_spend.py
+      - name: Audit exact public model and Qwen3-8B smoke metadata
+        run: |
+          python model/hector-asi/scale/audit_qwen397b_zero_spend.py \
+            --output /tmp/qwen397b-public-metadata.json
+      - name: Verify model identity, immutable revision and zero spend
+        run: |
+          python - <<'PY'
+          import json,re
+          manifest=json.load(open('/tmp/qwen397b-public-metadata.json'))
+          assert manifest['decision']=='do-not-train'
+          target=manifest['target']
+          assert target['requestedModel']=='Qwen/Qwen3.5-397B-A17B'
+          assert target['effectiveModel']=='Qwen/Qwen3.5-397B-A17B'
+          assert re.fullmatch(r'[0-9a-f]{40}',target['revisionSha'])
+          assert target['immutableRevisionPinned'] is True
+          assert target['private'] is False
+          assert target['gated'] is False
+          assert target['license']=='apache-2.0'
+          assert target['modelType']=='qwen3_5_moe'
+          assert 'Qwen3_5MoeForConditionalGeneration' in target['architectures']
+          assert target['weightShardCount']>=1
+          smoke=manifest['smoke']
+          assert smoke['effectiveModel']=='Qwen/Qwen3-8B'
+          assert smoke['weightsPresent'] is True
+          assert manifest['providerCatalog']['liveInferenceCallPerformed'] is False
+          assert manifest['providerCatalog']['exactEndpointResponseAttested'] is False
+          assert manifest['spend']=={
+            'actualMxn':0,
+            'billingActivated':False,
+            'checkoutReached':False,
+            'explicitMaximumMxn':None,
+          }
+          assert manifest['secrets']['valuesReadOrRecorded'] is False
+          assert manifest['gates']['corpus']=={'current':2600,'required':10000,'open':False}
+          PY
+      - name: Publish public metadata attestation
+        uses: actions/upload-artifact@v4
+        with:
+          name: qwen397b-public-metadata-${{ github.run_id }}
+          path: /tmp/qwen397b-public-metadata.json
+          retention-days: 90
+          if-no-files-found: error
+
+  seed-checkpoint:
+    needs: public-model-audit
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+      - name: Download immutable model attestation
+        uses: actions/download-artifact@v4
+        with:
+          name: qwen397b-public-metadata-${{ github.run_id }}
+          path: /tmp/qwen397b-metadata
+      - name: Compile checkpoint protocol
+        run: python -m py_compile model/hector-asi/scale/remote_checkpoint_protocol.py
+      - name: Interrupt and persist an eight-shard checkpoint
+        run: |
+          revision=$(python -c "import json;print(json.load(open('/tmp/qwen397b-metadata/qwen397b-public-metadata.json'))['target']['revisionSha'])")
+          python model/hector-asi/scale/remote_checkpoint_protocol.py seed \
+            --root /tmp/qwen397b-remote-checkpoint \
+            --model-revision "$revision" \
+            --target-steps 20 \
+            --interrupt-step 9 \
+            --shards 8 \
+            --run-id "$GITHUB_RUN_ID" \
+            --source-job seed-checkpoint
+      - name: Verify interrupted checkpoint before upload
+        run: |
+          python - <<'PY'
+          import json
+          from pathlib import Path
+          root=Path('/tmp/qwen397b-remote-checkpoint')
+          seed=json.load(open(root/'seed-attestation.json'))
+          latest=json.load(open(root/'latest.json'))
+          assert seed['targetModel']=='Qwen/Qwen3.5-397B-A17B'
+          assert seed['interruptedAtStep']==9
+          assert seed['targetSteps']==20
+          assert seed['shardCount']==8
+          assert seed['actualCostMxn']==0
+          assert latest['checkpointStep']==9
+          checkpoint=root/latest['checkpoint']
+          manifest=json.load(open(checkpoint/'manifest.json'))
+          assert manifest['shardCount']==8
+          assert len(manifest['shards'])==8
+          PY
+      - name: Persist checkpoint outside the source machine
+        uses: actions/upload-artifact@v4
+        with:
+          name: qwen397b-remote-checkpoint-${{ github.run_id }}
+          path: /tmp/qwen397b-remote-checkpoint
+          retention-days: 90
+          if-no-files-found: error
+
+  resume-checkpoint:
+    needs: seed-checkpoint
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+      - name: Restore checkpoint on a distinct job machine
+        uses: actions/download-artifact@v4
+        with:
+          name: qwen397b-remote-checkpoint-${{ github.run_id }}
+          path: /tmp/qwen397b-remote-checkpoint
+      - name: Resume to the uninterrupted final state
+        run: |
+          python model/hector-asi/scale/remote_checkpoint_protocol.py resume \
+            --root /tmp/qwen397b-remote-checkpoint \
+            --output /tmp/qwen397b-resume-attestation.json \
+            --run-id "$GITHUB_RUN_ID" \
+            --source-job seed-checkpoint \
+            --resume-job resume-checkpoint
+      - name: Prove corrupted remote shards fail closed
+        run: |
+          python model/hector-asi/scale/remote_checkpoint_protocol.py corrupt-test \
+            --root /tmp/qwen397b-remote-checkpoint \
+            --output /tmp/qwen397b-corruption-attestation.json
+      - name: Verify cross-job resume and corruption rejection
+        run: |
+          python - <<'PY'
+          import json
+          resume=json.load(open('/tmp/qwen397b-resume-attestation.json'))
+          corruption=json.load(open('/tmp/qwen397b-corruption-attestation.json'))
+          assert resume['targetModel']=='Qwen/Qwen3.5-397B-A17B'
+          assert resume['sourceJob']=='seed-checkpoint'
+          assert resume['resumeJob']=='resume-checkpoint'
+          assert resume['crossJobArtifactPersistence'] is True
+          assert resume['resumedFromStep']==9
+          assert resume['completedAtStep']==20
+          assert resume['checkpointManifestVerified'] is True
+          assert resume['allShardHashesVerified'] is True
+          assert resume['finalStateMatchesUninterrupted'] is True
+          assert resume['actualCostMxn']==0
+          assert corruption['corruptionRejected'] is True
+          assert corruption['actualCostMxn']==0
+          PY
+      - name: Publish remote resume proof
+        uses: actions/upload-artifact@v4
+        with:
+          name: qwen397b-cross-job-resume-${{ github.run_id }}
+          path: |
+            /tmp/qwen397b-resume-attestation.json
+            /tmp/qwen397b-corruption-attestation.json
+            /tmp/qwen397b-remote-checkpoint/seed-attestation.json
+            /tmp/qwen397b-remote-checkpoint/latest.json
+          retention-days: 90
+          if-no-files-found: error
