@@ -7,6 +7,7 @@ on:
       - 'model/hector-asi/integration/stage6-integration-latest.json'
       - 'model/hector-asi/stage-6-plan.json'
       - 'model/hector-asi/system-quality-contract.json'
+      - 'model/hector-asi/ui-quality-evidence.json'
       - 'model/hector-asi/data/stage6/generate-cognitive-depth-20260725.py'
       - 'model/hector-asi/registry/chat-champion.json'
       - 'model/hector-asi/evals/benchmark_v2/v41-benchmark-v2-latest.json'
@@ -19,6 +20,9 @@ on:
       - 'worker/routes/system.ts'
       - 'src/api.ts'
       - 'src/api.test.ts'
+      - 'src/HectorASIEvolutionApp.tsx'
+      - 'src/hector-reboot.css'
+      - 'tests/accessibility-shell-contract.test.ts'
       - 'wrangler.jsonc'
       - '.github/workflows/intelligence-state-consistency.yml'
   workflow_dispatch:
@@ -48,4 +52,4 @@ jobs:
       - name: Typecheck
         run: npm run typecheck
       - name: Focused tests
-        run: npx vitest run worker/lib/cognitive-runtime.test.ts worker/lib/qwen397-runtime.test.ts worker/intelligence/system-quality.test.ts src/api.test.ts
+        run: npx vitest run worker/lib/cognitive-runtime.test.ts worker/lib/qwen397-runtime.test.ts worker/intelligence/system-quality.test.ts src/api.test.ts tests/accessibility-shell-contract.test.ts
