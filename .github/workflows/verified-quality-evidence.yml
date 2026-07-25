@@ -1,0 +1,46 @@
+name: Verified quality evidence
+
+on:
+  pull_request:
+    branches: [main]
+    paths:
+      - 'model/hector-asi/action-authority-contract.json'
+      - 'model/hector-asi/evals/memory-retrieval/benchmark-v1-latest.json'
+      - 'model/hector-asi/active-ui-quality-evidence.json'
+      - 'model/hector-asi/api-security-boundary.json'
+      - 'worker/intelligence/verified-quality-evidence.ts'
+      - 'worker/intelligence/verified-quality-evidence.test.ts'
+      - 'worker/routes/system.ts'
+      - '.github/workflows/verified-quality-evidence.yml'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  verify:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+      - run: npm ci
+      - name: Typecheck
+        run: npm run typecheck
+      - name: Verify evidence refresh
+        run: npx vitest run worker/intelligence/system-quality.test.ts worker/intelligence/verified-quality-evidence.test.ts
+      - name: Prove unresolved gates remain closed
+        run: |
+          node - <<'NODE'
+          const fs=require('fs');
+          const action=JSON.parse(fs.readFileSync('model/hector-asi/action-authority-contract.json','utf8'));
+          const memory=JSON.parse(fs.readFileSync('model/hector-asi/evals/memory-retrieval/benchmark-v1-latest.json','utf8'));
+          const ui=JSON.parse(fs.readFileSync('model/hector-asi/active-ui-quality-evidence.json','utf8'));
+          if(action.executorEnabled!==false)throw new Error('write executor must remain disabled');
+          if(!action.notImplemented.includes('persistent revocation ledger'))throw new Error('revocation gap must remain explicit');
+          if(memory.passed!==true||memory.containsPrivateUserData!==false)throw new Error('memory evidence invalid');
+          if(ui.accessibility.manualWcagAudit!==false)throw new Error('manual WCAG review must not be fabricated');
+          NODE
