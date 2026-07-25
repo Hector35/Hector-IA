@@ -3,13 +3,14 @@ import {z} from 'zod';
 import type {Bindings,Variables} from '../types';
 import {requireAuth} from '../lib/auth';
 import {loadFeedbackRoutingProfile} from '../lib/feedback-routing';
+import type {CognitiveRuntimeTelemetry} from '../lib/cognitive-runtime';
 
 export const responseTraces=new Hono<{Bindings:Bindings;Variables:Variables}>();
 responseTraces.use('*',requireAuth);
 
 export type TraceTier='fast'|'balanced'|'deep';
-export type TraceProvider='cloudflare'|'openai';
-export type TraceContext={memories:number;recentMessages:number;hasSummary:boolean;priorSummaries?:number;projectState?:number;contractApplied?:boolean;contractReasons?:string[];cognitiveMode?:string;deliberationPasses?:number;deliberationReason?:string;feedbackAdaptation?:Record<string,unknown>};
+export type TraceProvider='cloudflare'|'huggingface'|'openai';
+export type TraceContext={memories:number;recentMessages:number;hasSummary:boolean;priorSummaries?:number;projectState?:number;contractApplied?:boolean;contractReasons?:string[];cognitiveMode?:string;deliberationPasses?:number;deliberationReason?:string;feedbackAdaptation?:Record<string,unknown>;cognitiveRuntime?:CognitiveRuntimeTelemetry};
 export type PersistResponseTraceInput={
  userId:string;conversationId:string;messageId:string;requestedProvider:TraceProvider;actualProvider:TraceProvider;model:string;routeTier:TraceTier;task:string;modelReason:string;providerReason:string;searchedWeb:boolean;fallback:boolean;qualityScore:number;qualityAccepted:boolean;latencyMs:number;estimatedCostUsd:number;memories:string[];context:TraceContext;
 };

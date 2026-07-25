@@ -7,16 +7,18 @@ import {aggregateUsage,candidateInstructions,judgeInput,judgeInstructions,type C
 import {estimateModelCost} from './model-pricing';
 import type {ExecutionPlan} from './execution-plan';
 import type {FeedbackRoutingProfile} from './feedback-routing';
+import {buildCognitiveRepairPrompt,createCognitiveRuntimePlan,createCognitiveRuntimeTelemetry,renderCognitiveContract,verifyCognitiveResponse,type CognitiveAttemptTelemetry,type CognitiveRuntimePlan,type CognitiveRuntimeTelemetry,type CognitiveVerification} from './cognitive-runtime';
 
 export type PlannedAIUsage={input_tokens?:number;output_tokens?:number;input_tokens_details?:{cached_tokens?:number;cache_write_tokens?:number}};
 export type PlannedChatTurn={role:'user'|'assistant';content:string};
 export type PlannedExecutionMetadata={feedback:FeedbackRoutingProfile;budgetDecision:unknown;runtimeId?:HectorRuntimeId};
 type CoreResult={id:string;text:string;usage?:PlannedAIUsage;searchedWeb:boolean;model:string;provider:ProviderName;requestedProvider:ProviderName;providerReason:string;fallback:boolean;qualityScore:number;qualityAccepted:boolean;cognitiveMode:'single'|'ensemble'|'ensemble-degraded';deliberationPasses:number;deliberationReason:string};
-type DecoratedResult=CoreResult&{modelTier:ExecutionPlan['route']['tier'];modelReason:string;task:string;feedbackAdaptation:{sampleCount:number;preferDeep:boolean;avoidCloudflare:boolean;guidanceApplied:number;reason:string};budgetDecision:unknown;runtimeId?:HectorRuntimeId};
+type DecoratedResult=CoreResult&{modelTier:ExecutionPlan['route']['tier'];modelReason:string;task:string;feedbackAdaptation:{sampleCount:number;preferDeep:boolean;avoidCloudflare:boolean;guidanceApplied:number;reason:string};budgetDecision:unknown;runtimeId?:HectorRuntimeId;cognitiveRuntime:CognitiveRuntimeTelemetry};
 type OpenCandidate={role:CandidateRole;out:Awaited<ReturnType<typeof callCloudflare>>};
+type RepairOutput={id:string;text:string;model:string;usage?:PlannedAIUsage};
 
 function sensitive(task:string){return /salud|riesgo|finanzas|legal|seguridad/i.test(task);}
-function instructions(plan:ExecutionPlan,renderedContext:string,guidance:string[]){return `${renderBootstrap()}
+function instructions(plan:ExecutionPlan,renderedContext:string,guidance:string[],runtimePlan:CognitiveRuntimePlan){return `${renderBootstrap()}
 
 RUNTIME CONVERSACIONAL AUTORIZADO
 - Identidad: Hector ASI / Héctor Base
@@ -41,11 +43,11 @@ CORRECCIONES DEL PROPIETARIO
 ${guidance.map(item=>`- ${item}`).join('\n')}
 `:''}
 CONTEXTO DINÁMICO
-${renderedContext}`;}
+${renderedContext}${renderCognitiveContract(runtimePlan)}`;}
 function conversation(history:PlannedChatTurn[],input:string){const recent=history.slice(-16),last=recent[recent.length-1],items=last?.role==='user'&&last.content===input?recent:[...recent,{role:'user' as const,content:input}];return items.map(item=>`${item.role==='user'?'Usuario':'Héctor'}: ${item.content}`).join('\n');}
 function turns(history:PlannedChatTurn[],input:string){const recent=history.slice(-16),last=recent[recent.length-1];return last?.role==='user'&&last.content===input?recent:[...recent,{role:'user' as const,content:input}];}
 async function quality(env:Bindings,plan:ExecutionPlan,started:number,requested:ProviderName,actual:ProviderName,model:string,fallback:boolean,assessment:ProviderQualityAssessment,reasons:string[]=[]){try{await recordProviderQuality(env.DB,{requestedProvider:requested,actualProvider:actual,model,routeTier:plan.route.tier,task:plan.task,accepted:assessment.accepted,score:assessment.score,fallback,latencyMs:Date.now()-started,reasons:[plan.hash.slice(0,12),'chat-open-model-only',...reasons,...assessment.reasons]});}catch{}}
-function decorate(result:CoreResult,plan:ExecutionPlan,metadata:PlannedExecutionMetadata):DecoratedResult{return{...result,modelTier:plan.route.tier,modelReason:`${plan.policySummary} Runtime: ${metadata.runtimeId||'auto'}. Chat abierto únicamente; OpenAI reservado para entrenamiento y evaluación.`,task:plan.task,feedbackAdaptation:{sampleCount:metadata.feedback.sampleCount,preferDeep:metadata.feedback.preferDeep,avoidCloudflare:metadata.feedback.avoidCloudflare,guidanceApplied:metadata.feedback.guidance.length,reason:metadata.feedback.reason},budgetDecision:metadata.budgetDecision,runtimeId:metadata.runtimeId||'auto'};}
+function decorate(result:CoreResult,plan:ExecutionPlan,metadata:PlannedExecutionMetadata,cognitiveRuntime:CognitiveRuntimeTelemetry):DecoratedResult{return{...result,modelTier:plan.route.tier,modelReason:`${plan.policySummary} Runtime: ${metadata.runtimeId||'auto'}. Chat abierto únicamente; OpenAI reservado para entrenamiento y evaluación.`,task:plan.task,feedbackAdaptation:{sampleCount:metadata.feedback.sampleCount,preferDeep:metadata.feedback.preferDeep,avoidCloudflare:metadata.feedback.avoidCloudflare,guidanceApplied:metadata.feedback.guidance.length,reason:metadata.feedback.reason},budgetDecision:metadata.budgetDecision,runtimeId:metadata.runtimeId||'auto',cognitiveRuntime};}
 function best(input:string,candidates:OpenCandidate[]){return candidates.map(candidate=>({candidate,assessment:assessProviderResponse(input,candidate.out.text)})).sort((a,b)=>b.assessment.score-a.assessment.score)[0];}
 function requestedFallback(plan:ExecutionPlan,actual:ProviderName){return plan.provider.requested!==actual;}
 
@@ -67,8 +69,19 @@ async function cloudflareEnsemble(env:Bindings,input:string,system:string,plan:E
  }catch(error){await quality(env,plan,started,plan.provider.requested,'cloudflare',fallbackCandidate.candidate.out.model,true,fallbackCandidate.assessment,[`juez abierto no disponible: ${error instanceof Error?error.message:'error'}`]);return{id:fallbackCandidate.candidate.out.id,text:fallbackCandidate.candidate.out.text,usage:aggregateUsage(candidateUsage) as PlannedAIUsage,searchedWeb:false,model:fallbackCandidate.candidate.out.model,provider:'cloudflare',requestedProvider:plan.provider.requested,providerReason:`${plan.provider.reason}; juez abierto no disponible`,fallback:true,qualityScore:fallbackCandidate.assessment.score,qualityAccepted:fallbackCandidate.assessment.accepted,cognitiveMode:'ensemble-degraded',deliberationPasses:2,deliberationReason:plan.cognition.reason};}
 }
 
+async function repairResult(env:Bindings,input:string,system:string,plan:ExecutionPlan,metadata:PlannedExecutionMetadata,result:CoreResult,verification:CognitiveVerification,started:number):Promise<CoreResult>{
+ const prompt=buildCognitiveRepairPrompt({prompt:input,draft:result.text,verification,plan:createCognitiveRuntimePlan({prompt:input,tier:plan.route.tier,mode:plan.cognition.mode,reasoning:plan.route.reasoning})}),repairSystem=`${system}\n\nMODO DE REPARACIÓN\nCorrige únicamente los criterios observables fallidos. No expongas razonamiento privado ni menciones este ciclo.`;
+ let out:RepairOutput;
+ if(metadata.runtimeId==='hector-experimental')out=await callHectorExperimental(env,repairSystem,[{role:'user',content:prompt}]);
+ else if(result.provider==='huggingface')out=await callHuggingFaceQwen(env,repairSystem,prompt);
+ else out=await callCloudflare(env,repairSystem,prompt);
+ const assessment=assessProviderResponse(input,out.text);
+ await quality(env,plan,started,result.requestedProvider,result.provider,out.model,result.fallback,assessment,['reparación cognitiva ejecutada']);
+ return{...result,id:out.id,text:out.text,usage:aggregateUsage([result.usage,out.usage]) as PlannedAIUsage,model:out.model,providerReason:`${result.providerReason}; reparación cognitiva aplicada`,qualityScore:assessment.score,qualityAccepted:assessment.accepted};
+}
+
 export async function executePlannedContextual(env:Bindings,input:string,history:PlannedChatTurn[],renderedContext:string,plan:ExecutionPlan,metadata:PlannedExecutionMetadata):Promise<DecoratedResult>{
- const started=Date.now(),historyText=conversation(history,input),system=`${instructions(plan,renderedContext,metadata.feedback.guidance)}\n\nHISTORIAL RECIENTE\n${historyText}`;
+ const started=Date.now(),runtimePlan=createCognitiveRuntimePlan({prompt:input,tier:plan.route.tier,mode:plan.cognition.mode,reasoning:plan.route.reasoning}),historyText=conversation(history,input),system=`${instructions(plan,renderedContext,metadata.feedback.guidance,runtimePlan)}\n\nHISTORIAL RECIENTE\n${historyText}`;
  let result:CoreResult;
  if(metadata.runtimeId==='hector-experimental'){
   const out=await callHectorExperimental(env,system,turns(history,input)),assessment=assessProviderResponse(input,out.text);
@@ -81,6 +94,17 @@ export async function executePlannedContextual(env:Bindings,input:string,history
    result={id:out.id,text:out.text,usage:out.usage,searchedWeb:false,model:out.model,provider:'huggingface',requestedProvider:'huggingface',providerReason:plan.provider.reason,fallback:false,qualityScore:assessment.score,qualityAccepted:assessment.accepted,cognitiveMode:'single',deliberationPasses:1,deliberationReason:plan.cognition.reason};
   }catch(error){result=await cloudflareSingle(env,input,system,plan,started,`Héctor Qwen no disponible: ${error instanceof Error?error.message:'error'}; fallback abierto a Workers AI`);}
  }else result=plan.cognition.mode==='ensemble'?await cloudflareEnsemble(env,input,system,plan,started):await cloudflareSingle(env,input,system,plan,started);
- return decorate(result,plan,metadata);
+ const attempts:CognitiveAttemptTelemetry[]=[];
+ let verification=verifyCognitiveResponse({prompt:input,text:result.text,plan:runtimePlan,searchedWeb:result.searchedWeb});
+ attempts.push({attempt:1,phase:'solve',provider:result.provider,model:result.model,verification});
+ if(!verification.accepted&&runtimePlan.maxAttempts>1){
+  try{
+   result=await repairResult(env,input,system,plan,metadata,result,verification,started);
+   verification=verifyCognitiveResponse({prompt:input,text:result.text,plan:runtimePlan,searchedWeb:result.searchedWeb});
+   attempts.push({attempt:2,phase:'repair',provider:result.provider,model:result.model,verification});
+  }catch(error){result={...result,providerReason:`${result.providerReason}; reparación no disponible: ${error instanceof Error?error.message:'error'}`};}
+ }
+ result={...result,qualityScore:verification.score,qualityAccepted:verification.accepted};
+ return decorate(result,plan,metadata,createCognitiveRuntimeTelemetry(runtimePlan,attempts));
 }
 export function estimatePlannedCost(usage?:PlannedAIUsage,model?:string){return estimateModelCost(usage,model);}
