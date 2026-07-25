@@ -1,5 +1,5 @@
 {
-  "schemaVersion": 4,
+  "schemaVersion": 5,
   "stage": 6,
   "name": "Inteligencia neuronal verificable",
   "status": "active",
@@ -25,8 +25,8 @@
     "teacher": "GPT-5.6 de razonamiento para generación, crítica, verificación y corrección de datos"
   },
   "pipeline": [
-    {"id":"data","label":"Corpus verificable","current":2600,"target":10000,"unit":"ejemplos"},
-    {"id":"benchmark","label":"Benchmark V2","current":512,"target":500,"stretchTarget":1000,"unit":"casos ocultos"},
+    {"id":"data","label":"Corpus verificable","current":3800,"target":10000,"unit":"ejemplos"},
+    {"id":"benchmark","label":"Benchmark V2","current":512,"target":500,"stretchTarget":1000,"unit":"casos ocultos","aggregateConsistencyVerified":false},
     {"id":"failures","label":"Fallos entrenables de V41","current":449,"target":100,"unit":"casos"},
     {"id":"pwaFeedback","label":"Ejemplos PWA humanos verificados","current":0,"target":1,"unit":"ejemplos"},
     {"id":"autonomy","label":"Autonomía propia final","target":90,"unit":"porcentaje"}
@@ -51,7 +51,8 @@
     "requiresNoFallback": true,
     "requiresTwoConfirmatoryReplicas": true,
     "requiresReproducibility": true,
-    "requiresRollback": true
+    "requiresRollback": true,
+    "requiresCanonicalScorerConsistency": true
   },
   "feedbackPolicy": {
     "directD1TrainingForbidden": true,
@@ -61,5 +62,5 @@
     "requiresVersionedDataset": true,
     "pendingAndRejectedForbidden": true
   },
-  "principle": "V41 permanece campeón hasta que un candidato neuronal real supere Benchmark V2 bajo atribución exacta, dos réplicas, mejora multicapacidad, cero regresiones severas y rollback verificable."
+  "principle": "V41 permanece campeón hasta que un candidato neuronal real supere Benchmark V2 bajo atribución exacta, dos réplicas, mejora multicapacidad, cero regresiones severas, scorer canónico consistente y rollback verificable."
 }
