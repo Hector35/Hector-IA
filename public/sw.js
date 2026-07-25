@@ -1,4 +1,4 @@
-const CACHE='hector-command-console-v2';
+const CACHE='hector-chat-shell-v3';
 const SHELL=['/','/manifest.webmanifest','/icons/icon-192.png','/icons/icon-512.png'];
 const PRIVATE_PREFIXES=['/api/','/control/','/generated/','/runner/','/evidence/','/self-improve/'];
 
