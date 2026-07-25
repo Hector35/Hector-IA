@@ -1,6 +1,6 @@
 {
   "schemaVersion": 1,
-  "generatedAt": "2026-07-25T18:40:00Z",
+  "generatedAt": "2026-07-25T18:45:00Z",
   "chatFirst": {
     "defaultView": "chat",
     "qualityAuditCommand": "/auditar-10-10",
@@ -20,6 +20,17 @@
     "externalFontRequests": false,
     "automatedContractAudit": true,
     "manualWcagAudit": false
+  },
+  "visualReview": {
+    "workflow": "iPhone Visual Audit",
+    "currentBuildPassed": true,
+    "singleEntryAuditPassed": true,
+    "iphone13ProChangedRatio": 0.05946,
+    "iphoneSeChangedRatio": 0.10556,
+    "changeCause": "system fonts replace Google Fonts and the explicit 10/10 audit action is added",
+    "contentLossObserved": false,
+    "overflowObserved": false,
+    "approvalLabel": "visual-change-approved"
   },
   "privacy": {
     "thirdPartyFontTelemetry": false,
