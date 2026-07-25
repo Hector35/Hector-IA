@@ -1,0 +1,54 @@
+name: Hector failure-driven intelligence cycle
+
+on:
+  push:
+    paths:
+      - 'model/hector-asi/cycles/**'
+      - 'model/hector-asi/evals/benchmark_v2/v41-benchmark-v2-latest.json'
+      - '.github/workflows/hector-failure-curriculum.yml'
+  pull_request:
+    branches: [main]
+    paths:
+      - 'model/hector-asi/cycles/**'
+      - 'model/hector-asi/evals/benchmark_v2/v41-benchmark-v2-latest.json'
+      - '.github/workflows/hector-failure-curriculum.yml'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  build-curriculum:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+      - name: Run deterministic tests
+        run: python -m unittest model/hector-asi/cycles/test_build_failure_curriculum.py
+      - name: Build next 640-example curriculum
+        run: |
+          python model/hector-asi/cycles/build_failure_curriculum.py \
+            --gates model/hector-asi/evals/benchmark_v2/v41-benchmark-v2-latest.json \
+            --output artifacts/intelligence-cycle/failure-curriculum.json \
+            --examples 640
+      - name: Verify fail-closed artifact
+        run: |
+          python - <<'PY'
+          import json
+          from pathlib import Path
+          payload=json.loads(Path('artifacts/intelligence-cycle/failure-curriculum.json').read_text())
+          assert payload['totalTargetExamples']==640
+          assert sum(row['target_examples'] for row in payload['allocation'])==640
+          assert payload['trainingAuthorized'] is False
+          assert payload['priorityCapabilities'][:2]==['calibration','planning']
+          print(json.dumps(payload,indent=2,sort_keys=True))
+          PY
+      - uses: actions/upload-artifact@v4
+        with:
+          name: hector-failure-curriculum-${{ github.run_id }}
+          path: artifacts/intelligence-cycle/failure-curriculum.json
+          if-no-files-found: error
+          retention-days: 90
