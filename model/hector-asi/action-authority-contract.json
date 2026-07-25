@@ -1,0 +1,49 @@
+{
+  "schemaVersion": 1,
+  "name": "Héctor Action Authority",
+  "version": "1.0.0",
+  "defaultDecision": "deny",
+  "executorEnabled": false,
+  "writeToolsEnabled": [],
+  "preview": {
+    "ownerBound": true,
+    "exactAction": true,
+    "exactTarget": true,
+    "fieldDiff": true,
+    "riskDeclared": true,
+    "reversibleStateRequired": true,
+    "rollbackRequiredWhenReversible": true,
+    "highRiskIrreversibleDenied": true,
+    "costCeilingRequired": true,
+    "defaultCurrency": "MXN",
+    "requestLimitRequired": true,
+    "expirationRequired": true,
+    "maximumLifetimeSeconds": 900,
+    "maximumRequests": 10,
+    "sha256Integrity": true
+  },
+  "approval": {
+    "exactPhraseRequired": true,
+    "phraseFormat": "APROBAR <8 caracteres del SHA-256>",
+    "partialOrCaseChangedPhraseRejected": true,
+    "expiredPreviewRejected": true,
+    "ownerMismatchRejected": true,
+    "tamperedPreviewRejected": true
+  },
+  "receipt": {
+    "status": "approved-not-executed",
+    "sideEffects": "none",
+    "executionEnabled": false,
+    "containsPreviewDigest": true,
+    "containsLimits": true,
+    "containsRollback": true
+  },
+  "notImplemented": [
+    "persistent revocation ledger",
+    "single-use consumption ledger",
+    "write executor",
+    "post-execution receipt",
+    "automatic standing authority"
+  ],
+  "principle": "Aprobar una vista previa no ejecuta la acción. La escritura sólo podrá existir en un ejecutor separado, inicialmente ausente, que valide propietario, digest, expiración, límites, revocación y consumo antes de cada efecto."
+}
