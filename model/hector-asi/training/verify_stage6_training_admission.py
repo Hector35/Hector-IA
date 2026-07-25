@@ -61,7 +61,7 @@ def build():
       'targetModel':TARGET,
       'champion':'hector-asi-qwen15-v41',
       'benchmark':{'scorePercent':bench['scorePercent'],'hiddenSha256':bench['hiddenSha256'],'predictionsSha256':bench['predictionsSha256'],'aggregateConsistencyVerified':benchmark_consistent},
-      'corpusEvidence':{'current':corpus_current,'sourceMerges':state['data']['sourceMerges'],'pwaVerifiedExamples':pwa_examples,'canonicalTraceablePwaExamples':state['data']['pwaExamplesInVersionedDatasets']},
+      'corpusEvidence':{'current':corpus_current,'required':corpus_required,'remaining':max(0,corpus_required-corpus_current),'sourceMerges':state['data']['sourceMerges'],'pwaVerifiedExamples':pwa_examples,'canonicalTraceablePwaExamples':state['data']['pwaExamplesInVersionedDatasets']},
       'stagePlanDrift':stage_plan_drift,
       'gates':gates,
       'trainingAuthorized':all_open,
