@@ -1,43 +1,50 @@
 {
-  "schemaVersion": 2,
+  "schemaVersion": 3,
   "stage": 6,
-  "name": "Inteligencia híbrida autoevolutiva",
+  "name": "Inteligencia híbrida verificable",
   "status": "active",
-  "experienceGoal": "Usar el mejor cerebro abierto disponible en la PWA mientras el modelo propio aumenta su autonomía con pesos entrenables",
+  "canonicalState": "model/hector-asi/intelligence-state.json",
+  "experienceGoal": "Usar el mejor cerebro abierto disponible sin confundirlo con los pesos propios y aumentar la autonomía sólo mediante evidencia reproducible",
   "operatingMode": {
     "defaultReasoning": "high",
     "defaultDeliberation": "force",
     "teacher": "OPENAI_MODEL_REASONING",
-    "operationalOpenRuntime": "moonshotai/Kimi-K2.5",
-    "trainableFoundation": "moonshotai/Kimi-K2-Base",
+    "operationalOpenRuntime": "Qwen/Qwen3.5-397B-A17B",
+    "firstFallbackRuntime": "moonshotai/Kimi-K2.5",
+    "lastFallbackRuntime": "@cf/qwen/qwen3-30b-a3b-fp8",
     "transitionRuntime": "Qwen/Qwen3-8B",
     "ownChampion": "hector-asi-qwen15-v41"
   },
   "modelRoles": {
-    "operational": "Kimi K2.5 para chat, visión, código, agentes y uso de herramientas",
-    "trainable": "Kimi K2 Base como fundamento final de pesos propios cuando exista infraestructura multi-GPU",
-    "transition": "Qwen3-8B para validar datos, evaluación y QLoRA sin confundirlo con el campeón final",
-    "teacher": "GPT-5.6 de razonamiento para generación de datos, verificación y respaldo"
+    "operational": "Qwen 397B para chat y visión cuando el proveedor acredita el modelo exacto",
+    "fallback": "Kimi K2.5 como primer respaldo identificado",
+    "lastFallback": "Workers AI como último respaldo identificado",
+    "transition": "Qwen3-8B para validar el pipeline económico sin confundirlo con el objetivo final",
+    "ownChampion": "V41 como adaptador propio reproducible, desactivado en producción hasta superar Benchmark V2",
+    "teacher": "GPT-5.6 de razonamiento para crítica, generación de datos y evaluación, no como identidad oculta del chat"
   },
   "pipeline": [
-    {"id":"data","label":"Corpus verificable","target":10000,"unit":"ejemplos"},
-    {"id":"benchmark","label":"Benchmark V2","target":500,"stretchTarget":1000,"unit":"casos ocultos"},
-    {"id":"failures","label":"Fallos entrenables de V41","target":100,"unit":"casos"},
-    {"id":"autonomy","label":"Autonomía propia final","target":90,"unit":"porcentaje"}
+    {"id":"data","label":"Corpus verificable","observed":2600,"target":10000,"unit":"ejemplos","open":false},
+    {"id":"benchmark","label":"Benchmark V2","observed":512,"target":500,"stretchTarget":1000,"unit":"casos ocultos","open":true},
+    {"id":"failures","label":"Fallos entrenables de V41","observed":449,"target":100,"unit":"casos","open":true},
+    {"id":"autonomy","label":"Autonomía propia final","observed":0,"target":90,"unit":"porcentaje","open":false}
   ],
   "compute": {
-    "statusManifest": "model/hector-asi/scale/compute-status.json",
-    "targetProfile": "qwen3-8b-main",
-    "minimumFreeVramMiB": 16384,
+    "statusManifest": "model/hector-asi/scale/qwen35-397b-training-admission-v2.json",
+    "targetProfile": "qwen35-397b-a17b-main",
+    "minimumUsableClusterVramGiB": 230,
+    "minimumGpuCount": 8,
+    "distributedRequired": true,
     "persistentResumeRequired": true,
     "cpuTrainingForbidden": true,
-    "workflow": ".github/workflows/hector-main-qlora.yml"
+    "admissionWorkflow": ".github/workflows/qwen397b-training-admission-v2.yml"
   },
   "promotion": {
     "minimumAbsoluteBenchmarkGain": 0.03,
     "requiresMultipleCapabilityGains": true,
-    "requiresReproducibility": true,
-    "requiresRollback": true
+    "requiresReproducibleRuns": 2,
+    "requiresRollback": true,
+    "rejectFallbackAttribution": true
   },
-  "principle": "Kimi K2.5 mejora la experiencia de la PWA desde ahora; Kimi K2 Base permanece separado como objetivo de entrenamiento propio. La PWA nunca declara activo un modelo cuyo endpoint no haya respondido."
+  "principle": "La PWA acredita el modelo efectivo observado. Ningún peso propio se promueve por apariencia, volumen de datos o una sola corrida."
 }
