@@ -3,6 +3,7 @@ name: Qwen 397B training admission v2
 on:
   pull_request:
     paths:
+      - 'model/hector-asi/intelligence-state.json'
       - 'model/hector-asi/scale/qwen35-397b-training-admission-v2.json'
       - 'model/hector-asi/scale/verify_qwen397b_admission_v2.py'
       - '.github/workflows/qwen397b-training-admission-v2.yml'
@@ -36,12 +37,19 @@ jobs:
           python - <<'PY'
           import json
           report=json.load(open('artifacts/qwen397b-training-admission-v2.json'))
+          assert report['schemaVersion']==3
           assert report['eligible'] is False
           assert report['decision']=='do-not-train'
           assert report['artifactAllowed'] is False
           assert report['gates']['benchmark'] is True
           assert report['gates']['data'] is False
-          assert report['gates']['failures'] is False
+          assert report['gates']['failures'] is True
+          assert report['gates']['hardware'] is False
+          assert report['gates']['resume'] is False
+          assert report['gates']['budget'] is False
+          assert report['gates']['liveExactModelAttestation'] is False
+          assert report['observed']['canonicalTrainExamples']==2600
+          assert report['observed']['trainableChampionFailures']==449
           assert report['observed']['adapter'] is None
           assert report['observed']['checkpoint'] is None
           PY
