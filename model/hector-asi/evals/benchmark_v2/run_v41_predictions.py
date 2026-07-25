@@ -85,6 +85,7 @@ def main() -> None:
             for row in group
         ]
         encoded = tokenizer(rendered, return_tensors="pt", padding=True, truncation=True, max_length=1536)
+        input_width = encoded["input_ids"].shape[1]
         with torch.inference_mode():
             generated = model.generate(
                 **encoded,
@@ -95,9 +96,10 @@ def main() -> None:
                 pad_token_id=tokenizer.pad_token_id,
                 eos_token_id=tokenizer.eos_token_id,
             )
-        prompt_lengths = encoded["attention_mask"].sum(dim=1).tolist()
-        for row, sequence, prompt_length in zip(group, generated, prompt_lengths):
-            answer = tokenizer.decode(sequence[int(prompt_length):], skip_special_tokens=True).strip()
+        for row, sequence in zip(group, generated):
+            # generate() returns the complete padded input followed by new tokens.
+            # With left padding, attention-mask sums are not valid slice offsets.
+            answer = tokenizer.decode(sequence[input_width:], skip_special_tokens=True).strip()
             predictions.append({
                 "id": row["id"],
                 "answer": answer,
