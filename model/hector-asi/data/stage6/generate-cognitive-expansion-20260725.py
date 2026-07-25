@@ -24,7 +24,6 @@ def add_pref(cap,fam,i,prompt,chosen,rejected,criteria):
  row={'id':f'ce25-pref-{cap}-{i+1:03d}','format':'preference','capability':cap,'difficulty':difficulty(i),'prompt':[{'role':'system','content':SYSTEM},{'role':'user','content':prompt}],'chosen':chosen,'rejected':rejected,'verification':{'type':'rubric','criteria':criteria,'verified':True},'provenance':{'kind':'project-authored-deterministic-synthetic','generator':Path(__file__).name,'containsPrivateUserData':False,'pwaFeedbackId':None,'license':'CC0-1.0'},'benchmark_excluded':True,'semantic_key':f'{cap}:{fam}:{digest(norm(prompt))[:20]}'}
  row['sha256']=digest(row);pref.append(row)
 
-# 200 SFT + 50 preference: metacognition
 for i in range(200):
  evidence=2+(i*7)%19; conflicts=i%6; unknowns=(i*5)%9; cost=1+(i*13)%100
  confidence='alta' if evidence>=14 and conflicts==0 and unknowns<=1 else 'media' if evidence>=7 and conflicts<=2 else 'baja'
@@ -33,10 +32,9 @@ for i in range(200):
  prompt=f'Autoevalúa una decisión con {evidence} evidencias, {conflicts} conflictos, {unknowns} incógnitas y costo de error {cost}/100. Devuelve JSON con confianza, acción, condición de revisión y límite.'
  add_sft('metacognition',f'self-check:{evidence}:{conflicts}:{unknowns}:{cost}',i,prompt,json.dumps(obj,ensure_ascii=False,sort_keys=True),{'type':'json-structure','required':list(obj),'expected':obj,'verified':True})
 for i in range(50):
- prompt=f'Has producido una respuesta con {i%5} fuentes independientes y {i%4} contradicciones. ¿Debes presentarla como definitiva?'
+ prompt=f'Caso metacognitivo {i+1}: has producido una respuesta con {i%5} fuentes independientes, {i%4} contradicciones y costo de error {10+(i*17)%91}/100. ¿Debes presentarla como definitiva?'
  add_pref('metacognition','anti-certainty',i,prompt,'No. Separa hechos, inferencias e incógnitas; calibra confianza y especifica qué evidencia cambiaría la conclusión.','Sí. Si la explicación suena coherente puede presentarse como definitiva.',['calibra confianza','declara incógnitas','condición de revisión'])
 
-# 200 SFT + 50 preference: tool use
 TOOLS=['sql','http','python','filesystem','calculator','calendar','search','git','queue','json-schema']
 for i in range(200):
  tool=TOOLS[i%len(TOOLS)]; retries=1+i%4; timeout=500+(i*137)%4501; destructive=i%7==0
@@ -44,11 +42,10 @@ for i in range(200):
  prompt=f'Diseña una ejecución verificable con herramienta {tool}, timeout {timeout} ms, {retries} reintentos y operación {"destructiva" if destructive else "no destructiva"}. Devuelve JSON.'
  add_sft('tool_use',f'{tool}:{destructive}:{timeout}:{retries}',i,prompt,json.dumps(plan,ensure_ascii=False,sort_keys=True),{'type':'json-structure','required':list(plan),'expected':plan,'verified':True})
 for i in range(50):
- tool=TOOLS[(i*3)%len(TOOLS)]
- prompt=f'Para una operación con {tool}, el primer intento devuelve un resultado parcial y no verificable. ¿Qué haces?'
+ tool=TOOLS[(i*3)%len(TOOLS)]; latency=100+(i*73)%1901
+ prompt=f'Caso de herramienta {i+1}: una operación con {tool} devuelve un resultado parcial no verificable tras {latency} ms. ¿Qué haces?'
  add_pref('tool_use','verify-before-claim',i,prompt,'No afirmo éxito. Valido esquema y efecto observado, registro evidencia y reintento sólo si la operación es idempotente o existe rollback.','Asumo éxito porque hubo una respuesta parcial y continúo.',['no afirma éxito','verifica efecto','considera idempotencia o rollback'])
 
-# 200 SFT + 50 preference: causal reasoning
 CAUSES=['latencia','temperatura','carga','sesgo de selección','pérdida de paquetes','cambio de versión','fatiga','presión','humedad','orden de eventos']
 OUTCOMES=['errores','fallos','rendimiento','precisión','abandono','consumo','inestabilidad','recuperación','variabilidad','degradación']
 for i in range(200):
@@ -57,18 +54,13 @@ for i in range(200):
  prompt=f'Evalúa si {cause} causa {outcome} con muestra {sample}. Diseña intervención, control, confusores, criterio y falsación en JSON.'
  add_sft('causal_reasoning',f'{cause}:{outcome}:{sample}',i,prompt,json.dumps(obj,ensure_ascii=False,sort_keys=True),{'type':'json-structure','required':list(obj),'expected':obj,'verified':True})
 for i in range(50):
- cause=CAUSES[i%10];outcome=OUTCOMES[(i+3)%10]
- prompt=f'Una correlación fuerte entre {cause} y {outcome} aparece después de filtrar sólo casos exitosos. ¿Conclusión?'
+ cause=CAUSES[i%10];outcome=OUTCOMES[(i+3)%10]; retained=20+(i*11)%79
+ prompt=f'Caso causal {i+1}: una correlación fuerte entre {cause} y {outcome} aparece después de conservar sólo {retained}% de los casos exitosos. ¿Conclusión?'
  add_pref('causal_reasoning','selection-bias',i,prompt,'No concluyo causalidad. El filtro puede inducir sesgo de selección; necesito un control, una intervención o un diseño cuasiexperimental y análisis de sensibilidad.','La correlación fuerte confirma que la causa produce el resultado.',['rechaza causalidad directa','identifica sesgo de selección','propone control o intervención'])
 
-# 200 SFT + 50 preference: multi-file code
 for i in range(200):
  module=f'pkg{i+1:03d}'; limit=2+(i%8); value=(i*17)%101
- files={
-  f'{module}/core.py':f"def clamp(value, low=0, high={limit*10}):\n    if low > high: raise ValueError('bounds')\n    return max(low, min(high, value))\n",
-  f'{module}/service.py':f"from .core import clamp\n\ndef normalize(value):\n    return clamp(int(value), 0, {limit*10})\n",
-  f'tests/test_{module}.py':f"from {module}.service import normalize\n\ndef test_bounds():\n    assert normalize(-1)==0\n    assert normalize({limit*20})=={limit*10}\n    assert normalize({value})=={min(value,limit*10)}\n"
- }
+ files={f'{module}/core.py':f"def clamp(value, low=0, high={limit*10}):\n    if low > high: raise ValueError('bounds')\n    return max(low, min(high, value))\n",f'{module}/service.py':f"from .core import clamp\n\ndef normalize(value):\n    return clamp(int(value), 0, {limit*10})\n",f'tests/test_{module}.py':f"from {module}.service import normalize\n\ndef test_bounds():\n    assert normalize(-1)==0\n    assert normalize({limit*20})=={limit*10}\n    assert normalize({value})=={min(value,limit*10)}\n"}
  answer=json.dumps({'files':files,'commands':['python -m pytest -q'],'expected':'3 assertions pass','rollback':'revertir los tres archivos juntos'},ensure_ascii=False,sort_keys=True)
  prompt=f'Implementa un cambio multiarchivo en paquete {module}: función clamp, servicio normalize y prueba de límites. Máximo {limit*10}. Devuelve JSON con files, commands, expected y rollback.'
  add_sft('multi_file_code',f'{module}:{limit}:{value}',i,prompt,answer,{'type':'python-multifile','files':files,'assertions':3,'verified':True})
