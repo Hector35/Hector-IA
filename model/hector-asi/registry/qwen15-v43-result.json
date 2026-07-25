@@ -1,0 +1,37 @@
+{
+  "schemaVersion": 1,
+  "experiment": "hector-asi-qwen15-v43",
+  "decision": "specialist-candidate-pending-generative-evaluation",
+  "baseModel": "Qwen/Qwen2.5-1.5B-Instruct",
+  "baseRevision": "989aa7980e4cf806f80c7fef2b1adb7bc71aa306",
+  "method": "memory-bounded-exact-pairwise-preference-LoRA",
+  "sourceRunId": 29998358762,
+  "artifactId": 8560121445,
+  "artifactArchiveDigest": "sha256:78c302248868837cd2f806992fefb12f76f7b926c229cb12dc25345e3d5b3c7c",
+  "artifactExpiresAt": "2026-10-21T10:11:35Z",
+  "adapterSha256": "8f57d2b7b658cb66aa7618af9829f9bee4624f7b40d3bd5fe9a8152c97e0265e",
+  "adapterBytes": 36981072,
+  "replicasByteIdentical": true,
+  "trainRows": 12,
+  "testRows": 6,
+  "seed": 35,
+  "rank": 8,
+  "alpha": 16,
+  "beta": 0.1,
+  "learningRate": 0.00002,
+  "before": {
+    "accuracy": 0.6666666666666666,
+    "meanMargin": 0.36084113518397015
+  },
+  "after": {
+    "accuracy": 0.8333333333333334,
+    "meanMargin": 0.4119979540506999
+  },
+  "rollback": "hector-asi-qwen15-v15",
+  "promotionBlockedBy": [
+    "generative behavioral evaluation",
+    "critical safety adversarials",
+    "calibration and transfer evaluation",
+    "latency and cost comparison"
+  ]
+}
