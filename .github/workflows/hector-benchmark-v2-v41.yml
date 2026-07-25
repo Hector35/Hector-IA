@@ -20,7 +20,7 @@ permissions:
   contents: read
 
 concurrency:
-  group: hector-v41-benchmark-v2-${{ github.event.pull_request.number || github.ref }}
+  group: hector-v41-benchmark-v2-${{ github.sha }}
   cancel-in-progress: false
 
 jobs:
