@@ -1,0 +1,45 @@
+{
+  "benchmarkGatesOpen": true,
+  "benchmarkVersion": "2.1.0",
+  "byCapability": {
+    "calibration": 0.050781,
+    "causality": 0.570312,
+    "code": 0.1875,
+    "mathematics": 0.265625,
+    "metacognition": 0.28125,
+    "planning": 0.054688,
+    "tool_use": 0.449219,
+    "transfer": 0.15625
+  },
+  "failureCount": 483,
+  "gates": {
+    "benchmarkCases": {
+      "observed": 512,
+      "open": true,
+      "required": 500
+    },
+    "modelAttribution": {
+      "observed": true,
+      "open": true,
+      "required": true
+    },
+    "trainableFailures": {
+      "observed": 449,
+      "open": true,
+      "required": 100
+    },
+    "v41Below85Percent": {
+      "observed": true,
+      "open": true,
+      "required": true
+    }
+  },
+  "hiddenSha256": "b8b774d21e2210482fdb417bd4c74eedea90e28c35b2fe1f58dc1fa4b65cc094",
+  "model": "hector-asi-qwen15-v41",
+  "predictionsSha256": "025bcf6451b0ef68ce8df9836fe617e5f3299a3ad4b029d8ac7392827be59ba0",
+  "schemaVersion": 2,
+  "scorePercent": 25.195,
+  "trainableFailureCount": 449,
+  "trainingAuthorizationReason": "Benchmark gates are open, but corpus, compute, resume and budget gates remain external and mandatory.",
+  "trainingAuthorized": false
+}
