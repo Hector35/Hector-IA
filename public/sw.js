@@ -1,12 +1,13 @@
-const CACHE='hector-elegant-chat-v5';
-const SHELL=['/','/manifest.webmanifest','/icons/icon-192.png','/icons/icon-512.png'];
+const CACHE='hector-elegant-chat-v6';
+const BRIDGE_ASSETS=['/bridge.html','/bridge.css','/bridge.js','/bridge-code-worker.mjs'];
+const SHELL=['/','/manifest.webmanifest','/icons/icon-192.png','/icons/icon-512.png',...BRIDGE_ASSETS];
 const PRIVATE_PREFIXES=['/api/','/control/','/generated/','/runner/','/evidence/','/self-improve/'];
 
 function isPrivateRequest(request,url){
   return request.headers.has('Authorization')||PRIVATE_PREFIXES.some(prefix=>url.pathname.startsWith(prefix));
 }
 function isStaticAsset(url){
-  return url.pathname==='/manifest.webmanifest'||url.pathname.startsWith('/assets/')||url.pathname.startsWith('/icons/');
+  return url.pathname==='/manifest.webmanifest'||BRIDGE_ASSETS.includes(url.pathname)||url.pathname.startsWith('/assets/')||url.pathname.startsWith('/icons/');
 }
 function isCacheable(response){
   const policy=(response.headers.get('Cache-Control')||'').toLowerCase();
@@ -20,7 +21,8 @@ self.addEventListener('fetch',event=>{
   const request=event.request,url=new URL(request.url);
   if(request.method!=='GET'||url.origin!==self.location.origin||isPrivateRequest(request,url))return;
   if(request.mode==='navigate'){
-    event.respondWith(fetch(request,{cache:'no-store'}).catch(()=>caches.match('/')));
+    const fallback=url.pathname==='/bridge.html'?'/bridge.html':'/';
+    event.respondWith(fetch(request,{cache:'no-store'}).catch(()=>caches.match(fallback)));
     return;
   }
   if(!isStaticAsset(url))return;
