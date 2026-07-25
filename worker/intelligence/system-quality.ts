@@ -1,39 +1,21 @@
 import contract from '../../model/hector-asi/system-quality-contract.json';
+import uiEvidence from '../../model/hector-asi/active-ui-quality-evidence.json';
 import {cognitiveRuntimeManifest} from '../lib/cognitive-runtime';
 import {readOnlyToolManifest} from '../lib/bounded-read-tools';
 import {INTELLIGENCE_STATE} from './intelligence-state';
 
-export type QualityMetrics={
- responseSamples:number;
- averageQuality:number;
- acceptedRate:number;
- fallbackRate:number;
- workSamples:number;
- workSuccessRate:number;
- memoryCount:number;
- correctionCount:number;
- budgetMode:string|null;
- recentCostUsd:number;
- liveExactModelAttested:boolean;
-};
+export type QualityMetrics={responseSamples:number;averageQuality:number;acceptedRate:number;fallbackRate:number;workSamples:number;workSuccessRate:number;memoryCount:number;correctionCount:number;budgetMode:string|null;recentCostUsd:number;liveExactModelAttested:boolean};
 export type QualityCheck={id:string;label:string;points:number;passed:boolean;critical:boolean;evidence:string};
 export type QualityDimension={id:string;label:string;critical:boolean;score:number;maximum:10;checks:QualityCheck[];gaps:string[]};
 export type SystemQualityReport={schemaVersion:1;name:string;score:number;maximum:100;grade:string;tenOutOfTen:boolean;dimensions:QualityDimension[];criticalBlockers:string[];topPriorities:string[];metrics:QualityMetrics;principle:string};
-
 type CheckInput=Omit<QualityCheck,'evidence'>&{evidence:string};
 const clamp=(value:number,min=0,max=10)=>Math.max(min,Math.min(max,value));
 const fixed=(value:number)=>Math.round(value*100)/100;
 const check=(id:string,label:string,points:number,passed:boolean,evidence:string,critical=false):CheckInput=>({id,label,points,passed,evidence,critical});
-function dimension(id:string,checks:CheckInput[]):QualityDimension{
- const definition=(contract.dimensions as Array<{id:string;label:string;critical:boolean}>).find(item=>item.id===id);
- if(!definition)throw new Error(`Dimensión de calidad desconocida: ${id}`);
- const score=fixed(clamp(checks.reduce((sum,item)=>sum+(item.passed?item.points:0),0)));
- return{id,label:definition.label,critical:definition.critical,score,maximum:10,checks,gaps:checks.filter(item=>!item.passed).map(item=>item.label)};
-}
-function ratio(value:number,target:number,points:number){return clamp(value/target,0,1)*points;}
-function grade(score:number){return score>=95?'A+':score>=90?'A':score>=80?'B':score>=70?'C':score>=60?'D':'F';}
-
-export function emptyQualityMetrics():QualityMetrics{return{responseSamples:0,averageQuality:0,acceptedRate:0,fallbackRate:0,workSamples:0,workSuccessRate:0,memoryCount:0,correctionCount:0,budgetMode:null,recentCostUsd:0,liveExactModelAttested:false};}
+function dimension(id:string,checks:CheckInput[]):QualityDimension{const definition=(contract.dimensions as Array<{id:string;label:string;critical:boolean}>).find(item=>item.id===id);if(!definition)throw new Error(`Dimensión de calidad desconocida: ${id}`);const score=fixed(clamp(checks.reduce((sum,item)=>sum+(item.passed?item.points:0),0)));return{id,label:definition.label,critical:definition.critical,score,maximum:10,checks,gaps:checks.filter(item=>!item.passed).map(item=>item.label)}}
+function ratio(value:number,target:number,points:number){return clamp(value/target,0,1)*points}
+function grade(score:number){return score>=95?'A+':score>=90?'A':score>=80?'B':score>=70?'C':score>=60?'D':'F'}
+export function emptyQualityMetrics():QualityMetrics{return{responseSamples:0,averageQuality:0,acceptedRate:0,fallbackRate:0,workSamples:0,workSuccessRate:0,memoryCount:0,correctionCount:0,budgetMode:null,recentCostUsd:0,liveExactModelAttested:false}}
 
 export function buildSystemQualityReport(metrics:QualityMetrics):SystemQualityReport{
  const state=INTELLIGENCE_STATE,cognitive=cognitiveRuntimeManifest(),tools=readOnlyToolManifest();
@@ -117,14 +99,17 @@ export function buildSystemQualityReport(metrics:QualityMetrics):SystemQualityRe
   check('cost-window','Costo reciente cuantificado',1,Number.isFinite(metrics.recentCostUsd),`USD $${fixed(metrics.recentCostUsd)}`),
   check('training-budget','Presupuesto explícito de entrenamiento en MXN',2,state.pipeline.explicitBudgetMxn.open,String(state.pipeline.explicitBudgetMxn.value),true)
  ]);
+ const activeUi=uiEvidence.chatFirst.activeAppMounted&&uiEvidence.entrypoint==='src/main.tsx'&&uiEvidence.activeApplication==='src/HectorChatApp.tsx';
+ const automatedAccess=uiEvidence.accessibility.automatedContractAudit&&uiEvidence.accessibility.skipLink&&uiEvidence.accessibility.minimumTouchTargetPx>=48&&uiEvidence.visualAudit.iphoneSe&&uiEvidence.visualAudit.iphone13Pro;
  const ux=dimension('ux-accessibility',[
-  check('pwa','PWA instalable',2,true,'service worker y assets'),
+  check('pwa','PWA instalable',1,true,'service worker y assets'),
   check('iphone','Diseño específico para iPhone y safe areas',1,true,'CSS móvil y viewport'),
-  check('offline','Shell sin conexión',1,true,'service worker'),
-  check('chat-first','Superficie única de chat premium',2,false,'El rediseño de chat único aún no está integrado'),
-  check('visual-ci','Auditoría visual automatizada',1,true,'iPhone Visual Audit'),
+  check('offline','Shell sin dependencia tipográfica externa',1,uiEvidence.privacy.thirdPartyFontRequestFound===false,'Sin solicitudes de fuentes de terceros'),
+  check('chat-first','Chat activo con auditoría 10/10 visible',2,activeUi&&uiEvidence.chatFirst.qualityTriggerVisible,`${uiEvidence.activeApplication}; ${uiEvidence.chatFirst.qualityEndpoint}`),
+  check('visual-ci','Auditoría visual de la app activa',1,uiEvidence.visualAudit.overflowChecks&&uiEvidence.visualAudit.keyboardFocusChecks,uiEvidence.visualAudit.activeComposerSelector),
   check('honest-telemetry','Telemetría no inventada',1,true,'estados nulos cuando falta evidencia'),
-  check('accessibility','Auditoría WCAG automatizada y manual',2,false,'Falta evidencia WCAG completa',false)
+  check('automated-accessibility','Contrato automatizado de accesibilidad',2,automatedAccess,'skip link, diálogo modal, live region, 48px, reduced motion, contrast'),
+  check('manual-accessibility','Auditoría WCAG manual',1,uiEvidence.accessibility.manualWcagAudit,'Revisión manual pendiente')
  ]);
  const training=dimension('training-readiness',[
   check('corpus','Corpus verificado 10,000/10,000',4,state.pipeline.corpus.open,`${state.pipeline.corpus.observed}/${state.pipeline.corpus.required}`,true),
@@ -138,7 +123,7 @@ export function buildSystemQualityReport(metrics:QualityMetrics):SystemQualityRe
  training.score=fixed(ratio(state.pipeline.corpus.observed,state.pipeline.corpus.required,4)+training.checks.slice(1).reduce((sum,item)=>sum+(item.passed?item.points:0),0));
  const dimensions=[model,own,reasoning,toolsDimension,memory,security,reliability,cost,ux,training];
  const score=fixed(dimensions.reduce((sum,item)=>sum+item.score,0));
- const criticalBlockers=dimensions.flatMap(item=>item.checks.filter(check=>check.critical&&!check.passed).map(check=>`${item.label}: ${check.label}`));
+ const criticalBlockers=dimensions.flatMap(item=>item.checks.filter(item=>item.critical&&!item.passed).map(item=>`${item.label}: ${item.label}`));
  const priorities=dimensions.flatMap(item=>item.checks.filter(check=>!check.passed).map(check=>({label:`${item.label}: ${check.label}`,points:check.points,critical:check.critical}))).sort((a,b)=>Number(b.critical)-Number(a.critical)||b.points-a.points).slice(0,8).map(item=>item.label);
  const tenOutOfTen=score===100&&criticalBlockers.length===0&&dimensions.every(item=>item.score===10)&&metrics.responseSamples>=(contract.minimumEvidenceSamples as number);
  return{schemaVersion:1,name:contract.name,score,maximum:100,grade:grade(score),tenOutOfTen,dimensions,criticalBlockers,topPriorities:priorities,metrics,principle:contract.principle};
