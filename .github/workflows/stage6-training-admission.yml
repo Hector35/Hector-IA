@@ -4,6 +4,7 @@ on:
     branches: [main]
     paths:
       - 'model/hector-asi/training/verify_stage6_training_admission.py'
+      - 'model/hector-asi/integration/stage6-integration-latest.json'
       - 'model/hector-asi/stage-6-plan.json'
       - 'model/hector-asi/evals/benchmark_v2/v41-benchmark-v2-latest.json'
       - '.github/workflows/stage6-training-admission.yml'
@@ -31,9 +32,12 @@ jobs:
           python - <<'PY'
           import json
           m=json.load(open('/tmp/admission.json'))
+          assert m['schemaVersion']==2
           assert m['targetModel']=='Qwen/Qwen3.5-397B-A17B'
-          assert m['gates']['corpus']=={'current':2600,'required':10000,'open':False}
-          assert m['gates']['benchmark']['open'] is True
+          assert m['gates']['corpus']=={'current':3800,'required':10000,'open':False}
+          assert m['corpusEvidence']['remaining']==6200
+          assert m['gates']['benchmarkHash']['open'] is True
+          assert m['gates']['benchmarkAggregateConsistency']['open'] is False
           assert m['gates']['trainableFailures']['open'] is True
           assert m['gates']['explicitBudgetMxn']['open'] is False
           assert m['gates']['distributedCluster']['open'] is False
@@ -44,6 +48,7 @@ jobs:
           assert m['actualCostMxn']==0
           assert m['replicasCompleted']==0
           assert 'stagePlanDrift' not in m['blockingReasons']
+          assert 'benchmarkAggregateConsistency' in m['blockingReasons']
           PY
       - name: Prove partial environment still cannot bypass remaining gates
         shell: bash
@@ -68,7 +73,7 @@ jobs:
           assert m['gates']['persistentRemoteResume']['open'] is True
           assert m['stagePlanDrift']['detected'] is False
           assert m['trainingAuthorized'] is False
-          assert m['blockingReasons']==['corpus']
+          assert m['blockingReasons']==['corpus','benchmarkAggregateConsistency']
           PY
       - name: Publish admission evidence
         uses: actions/upload-artifact@v4
