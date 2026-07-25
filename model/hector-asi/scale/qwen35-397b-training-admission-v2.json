@@ -1,6 +1,7 @@
 {
-  "schemaVersion": 2,
+  "schemaVersion": 3,
   "stage": 6,
+  "canonicalState": "model/hector-asi/intelligence-state.json",
   "profile": "qwen35-397b-a17b-main",
   "baseModel": "Qwen/Qwen3.5-397B-A17B",
   "champion": "hector-asi-qwen15-v41",
@@ -15,14 +16,17 @@
     "rollbackRequired": true,
     "cpuTrainingForbidden": true,
     "distributedCheckpointResumeRequired": true,
-    "explicitBudgetMxnRequired": true
+    "explicitBudgetMxnRequired": true,
+    "liveExactModelAttestationRequired": true
   },
   "observed": {
-    "canonicalTrainExamples": 640,
+    "canonicalTrainExamples": 2600,
     "hiddenBenchmarkCases": 512,
-    "trainableChampionFailures": 0,
+    "trainableChampionFailures": 449,
+    "v41BenchmarkScorePercent": 25.195,
     "distributedHardwareVerified": false,
     "resumeRoundTripVerified": false,
+    "liveExactModelAttested": false,
     "budgetMaximumMxn": null,
     "estimatedMaximumCostMxn": null,
     "provider": null,
@@ -34,15 +38,16 @@
   "gates": {
     "data": false,
     "benchmark": true,
-    "failures": false,
+    "failures": true,
     "hardware": false,
     "resume": false,
     "budget": false,
-    "costWithinBudget": false
+    "costWithinBudget": false,
+    "liveExactModelAttestation": false
   },
   "decision": {
     "action": "do-not-train",
-    "reason": "Sólo la puerta del benchmark está abierta. Faltan 9,360 ejemplos, 100 fallos entrenables de V41, hardware distribuido con resume y un presupuesto máximo explícito.",
-    "nextRequiredArtifact": "Predicciones selladas de V41 sobre Benchmark V2 y manifiesto de al menos 100 fallos entrenables."
+    "reason": "Hay 2,600 de 10,000 ejemplos y 449 fallos entrenables medidos. Faltan 7,400 ejemplos verificados, hardware distribuido asignado, reanudación remota real, atribución viva del modelo exacto y un presupuesto máximo explícito en MXN.",
+    "nextRequiredArtifact": "Manifiesto canónico con 10,000 ejemplos verificados y prueba real de endpoint, clúster y reanudación persistente."
   }
 }
