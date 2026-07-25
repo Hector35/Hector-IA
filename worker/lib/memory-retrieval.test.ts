@@ -1,12 +1,10 @@
-import {mkdirSync,readFileSync,writeFileSync} from 'node:fs';
-import {dirname} from 'node:path';
 import {describe,expect,it} from 'vitest';
+import benchmark from '../../model/hector-asi/evals/memory-retrieval/benchmark-v1.json';
 import {memoryRetrievalManifest,memoryRetrievalMetrics,memorySearchTerms,normalizeMemoryText,rankMemoryCandidates} from './memory-retrieval';
 
-const benchmark=JSON.parse(readFileSync(new URL('../../model/hector-asi/evals/memory-retrieval/benchmark-v1.json',import.meta.url),'utf8'));
 const measured=memoryRetrievalMetrics(benchmark.cases,benchmark.candidates,benchmark.k);
 const report={schemaVersion:1,benchmark:benchmark.name,containsPrivateUserData:benchmark.containsPrivateUserData,benchmarkExcludedFromTraining:benchmark.benchmarkExcludedFromTraining,thresholds:benchmark.thresholds,metrics:{cases:measured.cases,k:measured.k,recallAtK:measured.recallAtK,precisionAtK:measured.precisionAtK,mrr:measured.mrr},passed:measured.recallAtK>=benchmark.thresholds.recallAtK&&measured.precisionAtK>=benchmark.thresholds.precisionAtK&&measured.mrr>=benchmark.thresholds.mrr,manifest:memoryRetrievalManifest(),results:measured.results};
-if(process.env.MEMORY_REPORT_PATH){mkdirSync(dirname(process.env.MEMORY_REPORT_PATH),{recursive:true});writeFileSync(process.env.MEMORY_REPORT_PATH,JSON.stringify(report,null,2)+'\n')}
+console.log(`MEMORY_RETRIEVAL_REPORT=${JSON.stringify(report)}`);
 
 describe('memory retrieval v1',()=>{
  it('normalizes accents, expands useful synonyms and ranks direct evidence first',()=>{
