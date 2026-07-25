@@ -1,6 +1,6 @@
 {
-  "schemaVersion": 1,
-  "generatedAt": "2026-07-25T17:18:00Z",
+  "schemaVersion": 2,
+  "generatedAt": "2026-07-25T18:19:00Z",
   "champion": {
     "id": "hector-asi-qwen15-v41",
     "base": "Qwen/Qwen2.5-1.5B-Instruct",
@@ -11,27 +11,43 @@
   "candidate": null,
   "promotionDecision": "retain-v41",
   "promotionReasons": [
-    "no new neural candidate with a real adapter or checkpoint",
-    "no sealed Benchmark V2 comparison against V41",
+    "no new neural candidate with a real adapter or checkpoint evaluated on Benchmark V2",
+    "no sealed paired comparison against V41",
     "no two confirmatory replicas",
+    "benchmark aggregate consistency requires reconciliation",
     "training admission remains closed"
   ],
   "data": {
-    "verifiedExamples": 2600,
+    "verifiedExamples": 3800,
     "requiredExamples": 10000,
-    "remainingExamples": 7400,
+    "remainingExamples": 6200,
     "pwaHumanApprovedObserved": 0,
     "pwaExamplesInVersionedDatasets": 0,
     "directD1TrainingAllowed": false,
+    "feedbackLineage": {
+      "requiredStatus": "human_approved",
+      "requiredUserAccepted": true,
+      "cycle1ValidationRequired": true,
+      "versionedDatasetRequired": true,
+      "pendingAndRejectedForbidden": true,
+      "traceableExamples": 0
+    },
     "sourceMerges": [
       "c70207b3fe4575a125dd3c6c2ddd43d9202a4d03",
-      "5c7de5888e0c9b11ba41985b2a45f6969c13f3c0"
+      "5c7de5888e0c9b11ba41985b2a45f6969c13f3c0",
+      "f17f6db9c0955a1cb511fa0278fbb22e77b8cabe"
     ]
   },
   "benchmark": {
     "cases": 512,
     "hiddenSha256": "b8b774d21e2210482fdb417bd4c74eedea90e28c35b2fe1f58dc1fa4b65cc094",
     "v41PredictionsSha256": "025bcf6451b0ef68ce8df9836fe617e5f3299a3ad4b029d8ac7392827be59ba0",
+    "publishedScorePercent": 25.195,
+    "publishedFailureCount": 483,
+    "impliedCorrectFromScore": 129,
+    "impliedFailuresFromScore": 383,
+    "aggregateConsistencyVerified": false,
+    "aggregateConsistencyReason": "scorePercent implies 129/512 correct and 383 failures, while failureCount is 483; promotion statistics must remain fail-closed until the scorer defines or reconciles these fields",
     "v41TrainableFailures": 449,
     "promotionGateIntegratedBy": "65d40fe7bffeac991ad8c11ba9834599ffa1918d"
   },
@@ -58,7 +74,8 @@
   },
   "gates": {
     "stagePlanAligned": true,
-    "benchmarkReady": true,
+    "benchmarkHashReady": true,
+    "benchmarkAggregateConsistencyReady": false,
     "trainableFailuresReady": true,
     "corpusReady": false,
     "budgetReady": false,
@@ -67,5 +84,5 @@
     "frozenDataModelTokenizerHashesReady": false,
     "trainingAuthorized": false
   },
-  "singleNextBlocker": "produce and integrate 7400 additional verified examples before allocating paid distributed training compute"
+  "singleNextBlocker": "reconcile Benchmark V2 aggregate semantics so scorePercent, correct/failure counts and promotion thresholds are derived from one canonical scorer; then continue the remaining 6200 verified examples"
 }
