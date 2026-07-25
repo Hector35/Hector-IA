@@ -15,7 +15,6 @@ def sha(value):
     return hashlib.sha256(raw).hexdigest()
 
 def norm(s): return re.sub(r'[^a-z0-9]+',' ',s.lower()).strip()
-
 def difficulty(i): return ('media','difícil','experto')[i%3]
 
 sft=[]; pref=[]
@@ -26,9 +25,8 @@ def add_pref(cap,fam,i,prompt,chosen,rejected,criteria):
     row={'id':f'fd25-pref-{cap}-{i+1:03d}','format':'preference','capability':cap,'difficulty':difficulty(i),'prompt':[{'role':'system','content':SYSTEM},{'role':'user','content':prompt}],'chosen':chosen,'rejected':rejected,'verification':{'type':'rubric','criteria':criteria,'verified':True},'provenance':{'kind':'project-authored-deterministic-synthetic','generator':'generate-failure-driven-20260725.py','sourceBenchmark':'v41-benchmark-v2-latest.json','containsPrivateUserData':False,'license':'CC0-1.0'},'benchmark_excluded':True,'semantic_key':f'{cap}:{fam}:{sha(norm(prompt))[:20]}'}
     row['sha256']=sha(row);pref.append(row)
 
-# 200 SFT + 40 preference per priority capability.
 for i in range(200):
-    n=20+(i*13)%980; successes=(i*17)% (n+1); independent=35+(i*11)%66; conflicts=i%5
+    n=20+(i*13)%980; successes=(i*17)%(n+1); independent=35+(i*11)%66; conflicts=i%5
     posterior=round((successes+1)/(n+2),4); width=round(min(.45,1.96*((posterior*(1-posterior)/max(1,n))**.5)),4)
     level='alta' if posterior-width>=.8 and independent>=75 and conflicts==0 else 'media' if posterior-width>=.55 and conflicts<=2 else 'baja'
     prompt=f'Calibra una decisión con {successes}/{n} éxitos, independencia {independent}%, {conflicts} evidencias contradictorias. Entrega JSON con confianza, estimación, intervalo aproximado, decisión y condición de escalamiento.'
@@ -36,9 +34,7 @@ for i in range(200):
     add_sft('calibration',f'binomial:{independent}:{conflicts}',i,prompt,json.dumps(obj,ensure_ascii=False,sort_keys=True),{'type':'json-structure','required':['confianza','estimacion','intervalo_aproximado','decision','condicion_escalamiento'],'expected':obj,'verified':True})
 for i in range(40):
     n=40+i*7; good=(i*19)%n; prompt=f'Con {good}/{n} aciertos y sin réplica independiente, decide si afirmar certeza alta.'
-    chosen='No. Reporta estimación e intervalo, declara incertidumbre y exige una réplica independiente antes de certeza alta.'
-    rejected='Sí. La mayoría de los casos basta para afirmar certeza alta.'
-    add_pref('calibration','anti-overconfidence',i,prompt,chosen,rejected,['no afirma certeza alta','declara incertidumbre','exige réplica'])
+    add_pref('calibration','anti-overconfidence',i,prompt,'No. Reporta estimación e intervalo, declara incertidumbre y exige una réplica independiente antes de certeza alta.','Sí. La mayoría de los casos basta para afirmar certeza alta.',['no afirma certeza alta','declara incertidumbre','exige réplica'])
 
 contexts=['migración D1','rotación de secretos','cambio de proveedor','despliegue PWA','actualización de modelo','reindexación','cambio de esquema','reparación de cola','cambio de caché','restauración R2']
 for i in range(200):
@@ -48,23 +44,21 @@ for i in range(200):
     prompt=f'Diseña un plan ejecutable para {ctx}, riesgo {risk}, ventana {window} minutos y {checks} verificaciones. Responde JSON.'
     add_sft('planning',f'{ctx}:{risk}',i,prompt,json.dumps(obj,ensure_ascii=False,sort_keys=True),{'type':'json-structure','required':['objetivo','riesgo','ventana_minutos','pasos','rollback_trigger','evidencia'],'expected':obj,'verified':True})
 for i in range(40):
-    ctx=contexts[(i*3)%len(contexts)]; prompt=f'Planifica {ctx} en producción sin interrupción y con reversión segura.'
-    chosen='Baseline → canary → verificaciones independientes → criterio de aborto → rollback probado → evidencia y cierre.'
-    rejected='Aplica el cambio completo, observa si funciona y corrige después.'
-    add_pref('planning','rollback-first',i,prompt,chosen,rejected,['baseline','canary','verificación','rollback','evidencia'])
+    ctx=contexts[(i*3)%len(contexts)]; window=30+(i*11)%121
+    prompt=f'Planifica {ctx} en producción sin interrupción, con reversión segura y ventana máxima de {window} minutos.'
+    add_pref('planning','rollback-first',i,prompt,'Baseline → canary → verificaciones independientes → criterio de aborto → rollback probado → evidencia y cierre.','Aplica el cambio completo, observa si funciona y corrige después.',['baseline','canary','verificación','rollback','evidencia'])
 
 source_domains=['baterías','colas distribuidas','ensayos clínicos','inventarios','sensores biomédicos','modelos de lenguaje','redes eléctricas','finanzas','control térmico','bases de datos']
 target_domains=['cachés','tráfico urbano','triaje','logística','detección de fraude','compiladores','microservicios','calidad industrial','telemetría','sistemas de respaldo']
 for i in range(200):
-    src=source_domains[i%10]; dst=target_domains[(i*7)%10]; invariant=['conservación de flujo','retroalimentación negativa','sesgo de selección','cuello de botella','degradación acumulativa'][i%5]
-    obj={'origen':src,'destino':dst,'invariante':invariant,'mapeo':[f'identificar variables equivalentes en {src} y {dst}','separar mecanismo de vocabulario','probar contra un caso adversarial'],'limite':'la analogía se rechaza si no conserva relaciones causales','prueba':f'construir un ejemplo control y uno contraejemplo en {dst}'}
-    prompt=f'Transfiere una solución de {src} a {dst} usando el invariante “{invariant}”. Explica mapeo, límite y prueba en JSON.'
-    add_sft('transfer',f'{src}:{dst}:{invariant}',i,prompt,json.dumps(obj,ensure_ascii=False,sort_keys=True),{'type':'json-structure','required':['origen','destino','invariante','mapeo','limite','prueba'],'expected':obj,'verified':True})
+    src=source_domains[i%10]; dst=target_domains[(i*7)%10]; invariant=['conservación de flujo','retroalimentación negativa','sesgo de selección','cuello de botella','degradación acumulativa'][i%5]; tolerance=1+(i*3)%17; horizon=2+(i*5)%23
+    obj={'origen':src,'destino':dst,'invariante':invariant,'tolerancia_error_pct':tolerance,'horizonte':horizon,'mapeo':[f'identificar variables equivalentes en {src} y {dst}','separar mecanismo de vocabulario','probar contra un caso adversarial'],'limite':'la analogía se rechaza si no conserva relaciones causales','prueba':f'construir un control y un contraejemplo en {dst}, con error <= {tolerance}% durante {horizon} ciclos'}
+    prompt=f'Transfiere una solución de {src} a {dst} usando “{invariant}”, tolerancia {tolerance}% y horizonte {horizon} ciclos. Explica mapeo, límite y prueba en JSON.'
+    add_sft('transfer',f'{src}:{dst}:{invariant}:{tolerance}:{horizon}',i,prompt,json.dumps(obj,ensure_ascii=False,sort_keys=True),{'type':'json-structure','required':['origen','destino','invariante','tolerancia_error_pct','horizonte','mapeo','limite','prueba'],'expected':obj,'verified':True})
 for i in range(40):
-    src=source_domains[i%10];dst=target_domains[(i+4)%10];prompt=f'¿Cómo usarías una analogía de {src} en {dst} sin sobreextenderla?'
-    chosen='Mapea relaciones causales, declara qué no se conserva y valida con un caso control y un contraejemplo en el dominio destino.'
-    rejected='Usa los mismos pasos porque ambos sistemas se parecen conceptualmente.'
-    add_pref('transfer','bounded-analogy',i,prompt,chosen,rejected,['mapea relaciones','declara límites','incluye contraejemplo'])
+    src=source_domains[i%10];dst=target_domains[(i+4)%10]; tolerance=1+(i*7)%19
+    prompt=f'¿Cómo usarías una analogía de {src} en {dst} sin sobreextenderla y con tolerancia máxima de error {tolerance}%?'
+    add_pref('transfer','bounded-analogy',i,prompt,'Mapea relaciones causales, declara qué no se conserva y valida con un caso control y un contraejemplo en el dominio destino.','Usa los mismos pasos porque ambos sistemas se parecen conceptualmente.',['mapea relaciones','declara límites','incluye contraejemplo'])
 
 code_families=[
  ('retry',lambda n:f"def {n}(fn, attempts):\n    if attempts < 1: raise ValueError('attempts')\n    last=None\n    for _ in range(attempts):\n        try: return fn()\n        except Exception as e: last=e\n    raise last",lambda n:f"c=[0]\ndef f():\n c[0]+=1\n if c[0]<3: raise RuntimeError('x')\n return 7\nassert {n}(f,3)==7"),
@@ -74,11 +68,10 @@ code_families=[
  ('chunks',lambda n:f"def {n}(xs,size):\n    if size<=0: raise ValueError('size')\n    return [xs[i:i+size] for i in range(0,len(xs),size)]",lambda n:f"assert {n}([1,2,3,4,5],2)==[[1,2],[3,4],[5]]")]
 for i in range(200):
     fam,body,test=code_families[i%len(code_families)];name=f'{fam}_{i+1:03d}';code=body(name);tests=test(name)
-    prompt=f'Implementa `{name}` en Python con manejo explícito de casos límite y sin dependencias externas.'
-    add_sft('code',fam,i,prompt,f'```python\n{code}\n```',{'type':'python-tests','code':code,'test':tests,'verified':True})
+    add_sft('code',fam,i,f'Implementa `{name}` en Python con manejo explícito de casos límite y sin dependencias externas.',f'```python\n{code}\n```',{'type':'python-tests','code':code,'test':tests,'verified':True})
 for i in range(40):
-    fam,body,test=code_families[i%len(code_families)];name=f'{fam}_pref_{i+1:03d}';chosen=f"```python\n{body(name)}\n```";rejected=f"```python\ndef {name}(*args):\n    return None\n```"
-    add_pref('code',fam,i,f'Implementa `{name}` y cubre errores y casos límite.',chosen,rejected,['implementación funcional','manejo de errores','casos límite','tests ejecutables'])
+    fam,body,test=code_families[i%len(code_families)];name=f'{fam}_pref_{i+1:03d}'
+    add_pref('code',fam,i,f'Implementa `{name}` y cubre errores y casos límite.',f"```python\n{body(name)}\n```",f"```python\ndef {name}(*args):\n    return None\n```",['implementación funcional','manejo de errores','casos límite','tests ejecutables'])
 
 OUT.mkdir(parents=True,exist_ok=True)
 SFT.write_text('\n'.join(json.dumps(x,ensure_ascii=False,sort_keys=True) for x in sft)+'\n',encoding='utf-8')
