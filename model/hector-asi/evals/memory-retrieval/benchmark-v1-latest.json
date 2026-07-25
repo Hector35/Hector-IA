@@ -1,0 +1,32 @@
+{
+  "schemaVersion": 1,
+  "benchmark": "Héctor memory retrieval benchmark v1",
+  "measuredAt": "2026-07-25T19:27:04Z",
+  "workflowRunId": 30171605424,
+  "artifactDigest": "sha256:f2896c2ff89d6678a3438c70ea8a18a38ce6594ccddeb64deea83e831e5227e6",
+  "containsPrivateUserData": false,
+  "benchmarkExcludedFromTraining": true,
+  "method": "deterministic lexical-concept ranking",
+  "ownerFilterRequired": true,
+  "candidateLimit": 80,
+  "thresholds": {
+    "recallAtK": 0.95,
+    "precisionAtK": 0.32,
+    "mrr": 0.9
+  },
+  "metrics": {
+    "cases": 23,
+    "k": 3,
+    "recallAtK": 1.0,
+    "precisionAtK": 0.36231884057971003,
+    "mrr": 1.0
+  },
+  "passed": true,
+  "rankingSignals": [
+    "exact phrase",
+    "direct terms",
+    "concept/stem breadth",
+    "query coverage",
+    "importance"
+  ]
+}
