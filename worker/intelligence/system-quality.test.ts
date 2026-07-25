@@ -15,4 +15,8 @@ describe('system quality contract',()=>{
   const report=buildSystemQualityReport(emptyQualityMetrics());const training=report.dimensions.find(item=>item.id==='training-readiness');
   expect(training?.checks.find(item=>item.id==='corpus')?.evidence).toBe('5400/10000');expect(training?.score).toBeGreaterThan(4);expect(training?.score).toBeLessThan(5);
  });
+ it('awards the mounted chat quality surface but preserves manual WCAG review',()=>{
+  const report=buildSystemQualityReport(emptyQualityMetrics());const ux=report.dimensions.find(item=>item.id==='ux-accessibility');
+  expect(ux?.score).toBe(9);expect(ux?.checks.find(item=>item.id==='chat-first')?.passed).toBe(true);expect(ux?.checks.find(item=>item.id==='automated-accessibility')?.passed).toBe(true);expect(ux?.checks.find(item=>item.id==='manual-accessibility')?.passed).toBe(false);expect(ux?.gaps).toContain('Auditoría WCAG manual');
+ });
 });
