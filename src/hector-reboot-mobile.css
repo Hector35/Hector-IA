@@ -1,30 +1,14 @@
-@media(max-width:900px){
-  .hxThread{overflow-x:hidden}
-  .hxEmpty{
-    min-height:0;
-    justify-content:flex-start;
-    padding:clamp(24px,7vh,58px) 0 34px;
-  }
-  .hxEmpty h1{
-    max-width:100%;
-    font-size:clamp(52px,18vw,82px);
-    line-height:.82;
-    letter-spacing:-.075em;
-  }
+/* Mobile behavior is intentionally colocated with the main design system.
+   This file remains as a stable import for older service-worker caches. */
+.hxHeader{padding-right:max(14px,env(safe-area-inset-right))}
+
+@media(max-width:760px){
+  .hxHeader{padding-right:max(8px,env(safe-area-inset-right))}
 }
 
-@media(max-width:620px){
-  .hxHeader>div:first-child{gap:3px}
-  .hxHeader>div:first-child span{
-    display:block;
-    font-size:7px;
-    letter-spacing:.13em;
-  }
-  .hxHeader>div:first-child strong{font-size:12px}
-}
-
-@media(max-width:350px){
-  .hxHeader{grid-template-columns:minmax(82px,1fr) minmax(0,160px);padding:0 10px}
-  .hxRuntime{max-width:160px}
-  .hxRuntime b{font-size:7.5px}
+@media(max-height:620px) and (max-width:760px){
+  .hxEmpty{padding-top:24px}
+  .hxEmptyMark{display:none}
+  .hxEmpty h1{margin-top:0;font-size:48px}
+  .hxEmpty>p{margin:14px 6px 18px}
 }
