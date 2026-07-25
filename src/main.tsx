@@ -1,16 +1,12 @@
 import React from 'react';
 import ReactDOM from 'react-dom/client';
-import {HectorASIEvolutionApp} from './HectorASIEvolutionApp';
-import {TrainingOverlay} from './TrainingOverlay';
-import './hector-asi-markdown.css';
-import './hector-reboot.css';
-import './hector-reboot-mobile.css';
-import './training-overlay.css';
+import {HectorChatApp} from './HectorChatApp';
+import './hector-chat.css';
+import './hector-chat-mobile-refinement.css';
 
 ReactDOM.createRoot(document.getElementById('root')!).render(
   <React.StrictMode>
-    <HectorASIEvolutionApp/>
-    <TrainingOverlay/>
+    <HectorChatApp/>
   </React.StrictMode>
 );
 

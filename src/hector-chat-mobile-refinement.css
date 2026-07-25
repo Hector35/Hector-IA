@@ -1,0 +1,83 @@
+/* Final mobile fidelity pass for the approved Héctor OS chat concept. */
+html,body,#root,.hcApp{width:100%;max-width:100vw;min-width:0;overflow-x:hidden}
+.hcApp{contain:inline-size}
+.hcHeader,.hcMain,.hcComposerArea,.hcHero,.hcQuickActions,.hcComposer,.hcComposeRow{min-width:0;max-width:100%}
+.hcAdd,.hcMic,.hcSend{width:44px;height:44px}
+
+@media(max-width:900px){
+  .hcHeader{
+    width:100%;
+    grid-template-columns:auto minmax(0,1fr) auto;
+    gap:8px;
+  }
+  .hcBrand{
+    min-width:0;
+    gap:8px;
+  }
+  .hcBrand>span{
+    width:34px;
+    height:34px;
+    flex:0 0 auto;
+  }
+  .hcBrand>b{
+    display:block;
+    overflow:hidden;
+    text-overflow:ellipsis;
+    white-space:nowrap;
+    font-size:10px;
+    letter-spacing:.12em;
+  }
+  .hcTitle{display:none}
+  .hcHeaderRight{min-width:0;gap:3px}
+  .hcRuntime{
+    max-width:126px;
+    height:32px;
+    padding:0 9px;
+  }
+  .hcRuntime span{
+    max-width:92px;
+    font-size:8px;
+  }
+  .hcIconButton{
+    width:38px;
+    height:38px;
+  }
+  .hcAdd,.hcMic,.hcSend{
+    width:44px;
+    height:44px;
+  }
+}
+
+@media(max-width:350px){
+  .hcHeader{
+    grid-template-columns:minmax(0,1fr) auto;
+    gap:4px;
+    padding-inline:10px;
+  }
+  .hcBrand{gap:6px;overflow:hidden}
+  .hcBrand>b{font-size:9px;letter-spacing:.08em}
+  .hcRuntime{display:none}
+  .hcIconButton{width:36px;height:36px}
+  .hcMain.empty{padding-inline:14px}
+  .hcHero{width:100%}
+  .hcQuickActions{
+    display:grid;
+    grid-template-columns:minmax(0,1fr) minmax(0,1fr);
+    width:100%;
+  }
+  .hcQuickActions button{
+    min-width:0;
+    width:100%;
+    padding-inline:7px;
+  }
+  .hcQuickActions span{
+    min-width:0;
+    overflow:hidden;
+    text-overflow:ellipsis;
+    white-space:nowrap;
+    font-size:10px;
+  }
+  .hcComposerArea{width:100vw;padding-inline:8px}
+  .hcComposer{width:100%}
+  .hcComposeRow textarea{min-width:0}
+}

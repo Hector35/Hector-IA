@@ -7,8 +7,9 @@ const devices=[
  {id:'iphone-se',label:'iPhone SE',viewport:{width:320,height:568}},
  {id:'iphone-13-pro',label:'iPhone 13 Pro',viewport:{width:390,height:844}}
 ];
-const composerSelector='.hxComposer textarea, .haComposer textarea';
-const messagesSelector='.hxThread, .haMessages';
+const composerSelector='.hcComposer textarea, .hxComposer textarea, .haComposer textarea';
+const sendSelector='.hcSend, .hxSend, .haSend';
+const messagesSelector='.hcThread, .hxThread, .haMessages';
 
 function json(body,status=200){return{status,contentType:'application/json',body:JSON.stringify(body)};}
 function responseFor(url,method){
@@ -40,6 +41,12 @@ async function waitForChat(page){
  await page.getByText(/Hector ASI|Héctor OS/i).last().waitFor({state:'visible',timeout:15000});
 }
 
+async function submitFromIPhone(page,textarea){
+ const send=page.locator(sendSelector).first();
+ await send.waitFor({state:'visible',timeout:10000});
+ await send.click();
+}
+
 async function runScheduleFlow(page){
  const textarea=page.locator(composerSelector).first(),handle=await textarea.elementHandle();
  if(!handle)throw new Error('No se encontró la entrada única para Programaciones');
@@ -47,7 +54,7 @@ async function runScheduleFlow(page){
  await textarea.fill(command);
  const [request]=await Promise.all([
   page.waitForRequest(req=>new URL(req.url()).pathname==='/api/schedules'&&req.method()==='POST'),
-  textarea.press('Enter')
+  submitFromIPhone(page,textarea)
  ]);
  const payload=request.postDataJSON();
  if(payload.cadence!=='custom_minutes'||payload.intervalMinutes!==15||payload.reasoningLevel!=='high'||payload.autonomyMode!=='continuous')throw new Error(`Payload de Programaciones incorrecto: ${JSON.stringify(payload)}`);
@@ -56,7 +63,7 @@ async function runScheduleFlow(page){
  const cleared=await handle.evaluate(node=>node.value);
  if(cleared!=='')throw new Error('La entrada no se limpió después de crear la programación');
  await page.locator(messagesSelector).first().waitFor({state:'visible',timeout:10000});
- return{command,payload,receiptVisible:true,inputCleared:true,sameChat:true};
+ return{command,payload,receiptVisible:true,inputCleared:true,sameChat:true,explicitSend:true};
 }
 
 async function runWorkFlow(page){
@@ -67,7 +74,7 @@ async function runWorkFlow(page){
  await textarea.fill(command);
  const [request]=await Promise.all([
   page.waitForRequest(req=>new URL(req.url()).pathname==='/api/work-mode'&&req.method()==='POST'),
-  textarea.press('Enter')
+  submitFromIPhone(page,textarea)
  ]);
  const payload=request.postDataJSON();
  if(payload.goal!==command)throw new Error(`Objetivo de Trabajo incorrecto: ${JSON.stringify(payload)}`);
@@ -76,7 +83,7 @@ async function runWorkFlow(page){
  const cleared=await handle.evaluate(node=>node.value);
  if(cleared!=='')throw new Error('La entrada no se limpió después de activar Trabajo');
  await page.locator(messagesSelector).first().waitFor({state:'visible',timeout:10000});
- return{command,payload,receiptVisible:true,inputCleared:true,sameChat:true};
+ return{command,payload,receiptVisible:true,inputCleared:true,sameChat:true,explicitSend:true};
 }
 
 await mkdir(outputDir,{recursive:true});

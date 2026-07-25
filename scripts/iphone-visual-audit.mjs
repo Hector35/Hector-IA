@@ -9,7 +9,7 @@ const devices=[
  {id:'iphone-13-pro',label:'iPhone 13 Pro',viewport:{width:390,height:844}}
 ];
 const views=[{label:'Chat único'}];
-const composerSelector='.hxComposer textarea, .haComposer textarea, .cxComposer textarea';
+const composerSelector='.hcComposer textarea, .hxComposer textarea, .haComposer textarea, .cxComposer textarea';
 
 function json(body,status=200){return{status,contentType:'application/json',body:JSON.stringify(body)};}
 function responseFor(url,method){
