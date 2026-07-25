@@ -50,8 +50,10 @@ describe('interfaz elegante de Héctor OS',()=>{
     expect(app).not.toContain('GPT-5.6 • RAZONANDO');
   });
 
-  it('retira el shell PWA anterior',()=>{
-    expect(sw).toContain("const CACHE='hector-elegant-chat-v5'");
+  it('mantiene el shell actual y añade Bridge sin restaurar shells retirados',()=>{
+    expect(sw).toContain("const CACHE='hector-elegant-chat-v6'");
+    expect(sw).toContain("const BRIDGE_ASSETS=['/bridge.html','/bridge.css','/bridge.js','/bridge-code-worker.mjs']");
     expect(sw).toContain("fetch(request,{cache:'no-store'})");
+    expect(sw).not.toContain("const CACHE='hector-command-console-v2'");
   });
 });
