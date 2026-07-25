@@ -1,0 +1,71 @@
+{
+  "schemaVersion": 1,
+  "generatedAt": "2026-07-25T17:18:00Z",
+  "champion": {
+    "id": "hector-asi-qwen15-v41",
+    "base": "Qwen/Qwen2.5-1.5B-Instruct",
+    "adapterSha256": "31bead5f59982d8e321517fd235b81f992f83d2e3792a55690c2a841ff0e28f8",
+    "benchmarkScorePercent": 25.195,
+    "status": "retained"
+  },
+  "candidate": null,
+  "promotionDecision": "retain-v41",
+  "promotionReasons": [
+    "no new neural candidate with a real adapter or checkpoint",
+    "no sealed Benchmark V2 comparison against V41",
+    "no two confirmatory replicas",
+    "training admission remains closed"
+  ],
+  "data": {
+    "verifiedExamples": 2600,
+    "requiredExamples": 10000,
+    "remainingExamples": 7400,
+    "pwaHumanApprovedObserved": 0,
+    "pwaExamplesInVersionedDatasets": 0,
+    "directD1TrainingAllowed": false,
+    "sourceMerges": [
+      "c70207b3fe4575a125dd3c6c2ddd43d9202a4d03",
+      "5c7de5888e0c9b11ba41985b2a45f6969c13f3c0"
+    ]
+  },
+  "benchmark": {
+    "cases": 512,
+    "hiddenSha256": "b8b774d21e2210482fdb417bd4c74eedea90e28c35b2fe1f58dc1fa4b65cc094",
+    "v41PredictionsSha256": "025bcf6451b0ef68ce8df9836fe617e5f3299a3ad4b029d8ac7392827be59ba0",
+    "v41TrainableFailures": 449,
+    "promotionGateIntegratedBy": "65d40fe7bffeac991ad8c11ba9834599ffa1918d"
+  },
+  "compute": {
+    "targetModel": "Qwen/Qwen3.5-397B-A17B",
+    "publicModelIdentityPinned": true,
+    "crossJobCheckpointProtocolVerified": true,
+    "real397BWeightsCheckpointResumeVerified": false,
+    "distributedGpuAllocationVerified": false,
+    "exactLiveEndpointAttested": false,
+    "explicitBudgetMxn": null,
+    "actualCostMxn": 0,
+    "remoteResumeArtifactSha256": "a408286057a2f6daca79165428df1202f719d23f3570c78d6a595a62b753ad72",
+    "publicMetadataArtifactSha256": "9b53b7f15e52e80beb589b7a9b05cc0dfe4411b1e5bb4b0b1058cb12a34a5ad7"
+  },
+  "runtime": {
+    "primaryRequested": "Qwen/Qwen3.5-397B-A17B",
+    "fallbackOrder": [
+      "moonshotai/Kimi-K2.5",
+      "Cloudflare Workers AI"
+    ],
+    "requiresExactEffectiveModel": true,
+    "fallbackMayBePromoted": false
+  },
+  "gates": {
+    "stagePlanAligned": true,
+    "benchmarkReady": true,
+    "trainableFailuresReady": true,
+    "corpusReady": false,
+    "budgetReady": false,
+    "distributedClusterReady": false,
+    "realCheckpointResumeReady": false,
+    "frozenDataModelTokenizerHashesReady": false,
+    "trainingAuthorized": false
+  },
+  "singleNextBlocker": "produce and integrate 7400 additional verified examples before allocating paid distributed training compute"
+}
