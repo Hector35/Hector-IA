@@ -7,6 +7,12 @@ on:
     paths:
       - 'model/hector-asi/evals/benchmark_v2/run_v41_predictions.py'
       - '.github/workflows/hector-benchmark-v2-v41.yml'
+  pull_request:
+    branches:
+      - main
+    paths:
+      - 'model/hector-asi/evals/benchmark_v2/run_v41_predictions.py'
+      - '.github/workflows/hector-benchmark-v2-v41.yml'
   workflow_dispatch:
 
 permissions:
@@ -14,7 +20,7 @@ permissions:
   contents: read
 
 concurrency:
-  group: hector-v41-benchmark-v2
+  group: hector-v41-benchmark-v2-${{ github.event.pull_request.number || github.ref }}
   cancel-in-progress: false
 
 jobs:
