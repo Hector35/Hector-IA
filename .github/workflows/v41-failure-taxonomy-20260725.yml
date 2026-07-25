@@ -1,0 +1,51 @@
+name: V41 failure taxonomy
+on:
+  pull_request:
+    branches: [main]
+    paths:
+      - 'model/hector-asi/evals/benchmark_v2/build-v41-failure-taxonomy-20260725.py'
+      - 'model/hector-asi/evals/benchmark_v2/compare-candidate-to-v41-20260725.py'
+      - '.github/workflows/v41-failure-taxonomy-20260725.yml'
+  workflow_dispatch:
+permissions:
+  contents: read
+jobs:
+  validate:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with: {python-version: '3.11'}
+      - name: Build deterministic taxonomy twice
+        run: |
+          python model/hector-asi/evals/benchmark_v2/build-v41-failure-taxonomy-20260725.py
+          cp model/hector-asi/evals/benchmark_v2/v41-failure-taxonomy-latest.json /tmp/a.json
+          python model/hector-asi/evals/benchmark_v2/build-v41-failure-taxonomy-20260725.py
+          cmp /tmp/a.json model/hector-asi/evals/benchmark_v2/v41-failure-taxonomy-latest.json
+      - name: Assert priorities and sealed hashes
+        run: |
+          python - <<'PY'
+          import json
+          p='model/hector-asi/evals/benchmark_v2/v41-failure-taxonomy-latest.json'
+          d=json.load(open(p))
+          assert d['priorityOrder'][:4]==['calibration','planning','transfer','code']
+          assert d['benchmarkSha256']=='b8b774d21e2210482fdb417bd4c74eedea90e28c35b2fe1f58dc1fa4b65cc094'
+          assert d['predictionsSha256']=='025bcf6451b0ef68ce8df9836fe617e5f3299a3ad4b029d8ac7392827be59ba0'
+          assert d['promotionContract']['requiresConfirmatoryReplica'] is True
+          PY
+      - name: Reject fake candidate and accept valid fixture
+        run: |
+          python - <<'PY'
+          import json
+          b=json.load(open('model/hector-asi/evals/benchmark_v2/v41-benchmark-v2-latest.json'))
+          bad={'requestedModel':'candidate','effectiveModel':'fallback','fallback':True,'benchmarkSha256':b['hiddenSha256'],'scorePercent':50,'byCapability':b['byCapability'],'replicas':[]}
+          open('/tmp/bad.json','w').write(json.dumps(bad))
+          good={'requestedModel':'candidate','effectiveModel':'candidate','fallback':False,'benchmarkSha256':b['hiddenSha256'],'scorePercent':29.0,'byCapability':{k:min(1,v+.04) for k,v in b['byCapability'].items()},'replicas':[{'confirmed':True},{'confirmed':True}]}
+          open('/tmp/good.json','w').write(json.dumps(good))
+          PY
+          ! python model/hector-asi/evals/benchmark_v2/compare-candidate-to-v41-20260725.py --baseline model/hector-asi/evals/benchmark_v2/v41-benchmark-v2-latest.json --candidate /tmp/bad.json --out /tmp/bad-out.json
+          python model/hector-asi/evals/benchmark_v2/compare-candidate-to-v41-20260725.py --baseline model/hector-asi/evals/benchmark_v2/v41-benchmark-v2-latest.json --candidate /tmp/good.json --out /tmp/good-out.json
+      - uses: actions/upload-artifact@v4
+        with:
+          name: v41-failure-taxonomy-${{ github.run_id }}
+          path: model/hector-asi/evals/benchmark_v2/v41-failure-taxonomy-latest.json
