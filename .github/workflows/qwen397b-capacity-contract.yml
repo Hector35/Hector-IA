@@ -5,7 +5,6 @@ on:
     paths:
       - 'model/hector-asi/scale/build_qwen397b_capacity_contract.py'
       - 'model/hector-asi/integration/stage6-integration-latest.json'
-      - 'model/hector-asi/data/stage6/generate-cognitive-depth-20260725.py'
       - '.github/workflows/qwen397b-capacity-contract.yml'
   workflow_dispatch:
 permissions:
@@ -19,30 +18,32 @@ jobs:
       - uses: actions/setup-python@v5
         with:
           python-version: '3.11'
-      - name: Compile capacity contract and dataset generator
-        run: python -m py_compile model/hector-asi/scale/build_qwen397b_capacity_contract.py model/hector-asi/data/stage6/generate-cognitive-depth-20260725.py
-      - name: Rebuild verified manifest and generate deterministic contracts
+      - name: Compile capacity contract
+        run: python -m py_compile model/hector-asi/scale/build_qwen397b_capacity_contract.py
+      - name: Generate deterministic contracts from canonical state
         run: |
-          python model/hector-asi/data/stage6/generate-cognitive-depth-20260725.py >/tmp/cognitive-depth-generation.json
-          args="--state model/hector-asi/integration/stage6-integration-latest.json --extra-manifest model/hector-asi/data/stage6/cognitive-depth-20260725.json"
+          args="--state model/hector-asi/integration/stage6-integration-latest.json"
           python model/hector-asi/scale/build_qwen397b_capacity_contract.py $args --output /tmp/capacity-a.json
           python model/hector-asi/scale/build_qwen397b_capacity_contract.py $args --output /tmp/capacity-b.json
           cmp /tmp/capacity-a.json /tmp/capacity-b.json
-      - name: Verify memory, topology, storage, drift and gates
+      - name: Verify memory, topology, storage and fail-closed gates
         run: |
           python - <<'PY'
           import json
           r=json.load(open('/tmp/capacity-a.json'))
           assert r['targetModel']=='Qwen/Qwen3.5-397B-A17B'
-          assert r['corpus']['canonical']==2600
-          assert r['corpus']['verifiedManifestDelta']==1200
+          assert r['corpus']['canonical']==3800
+          assert r['corpus']['verifiedManifestDelta']==0
           assert r['corpus']['effectiveVerified']==3800
           assert r['corpus']['required']==10000
-          assert r['corpus']['canonicalStateDriftDetected'] is True
+          assert r['corpus']['canonicalStateDriftDetected'] is False
           assert r['trainingAuthorized'] is False and r['decision']=='do-not-train'
           assert r['actualCostMxn']==0 and r['billingActivated'] is False
-          assert r['gates']['benchmark'] is True and r['gates']['trainableFailures'] is True
-          assert r['gates']['corpus'] is False and r['gates']['canonicalStateSynchronized'] is False
+          assert r['gates']['benchmarkHash'] is True
+          assert r['gates']['benchmarkAggregateConsistency'] is False
+          assert r['gates']['trainableFailures'] is True
+          assert r['gates']['corpus'] is False
+          assert r['gates']['canonicalStateSynchronized'] is True
           for gate in ('exactLiveEndpoint','distributedAllocation','realWeightsResume','explicitBudget','frozenHashes'):
               assert r['gates'][gate] is False
           q=next(x for x in r['memoryProfiles'] if x['name']=='qlora4bit-0.2pct')
