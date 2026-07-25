@@ -1,8 +1,9 @@
 {
-  "schemaVersion": 3,
+  "schemaVersion": 4,
   "stage": 6,
   "name": "Inteligencia neuronal verificable",
   "status": "active",
+  "canonicalState": "model/hector-asi/integration/stage6-integration-latest.json",
   "experienceGoal": "Servir el mejor cerebro verificable disponible mientras Héctor acumula datos, checkpoints y evaluaciones para producir pesos propios reproducibles",
   "operatingMode": {
     "defaultReasoning": "high",
@@ -10,6 +11,7 @@
     "teacher": "OPENAI_MODEL_REASONING",
     "primaryRuntime": "Qwen/Qwen3.5-397B-A17B",
     "operationalFallback": "moonshotai/Kimi-K2.5",
+    "lastFallback": "Cloudflare Workers AI",
     "trainableFoundation": "Qwen/Qwen3.5-397B-A17B",
     "transitionRuntime": "Qwen/Qwen3-8B",
     "ownChampion": "hector-asi-qwen15-v41"
@@ -17,6 +19,7 @@
   "modelRoles": {
     "primary": "Qwen3.5-397B-A17B para chat, visión, herramientas e inferencia principal sólo cuando el modelo efectivo sea verificable y no exista fallback",
     "fallback": "Kimi K2.5 como respaldo operativo identificado, nunca atribuido a Qwen 397B",
+    "lastFallback": "Workers AI como último respaldo operativo identificado",
     "trainable": "Qwen3.5-397B-A17B como fundamento final de adaptadores o postentrenamiento propios cuando todas las puertas estén abiertas",
     "transition": "Qwen3-8B únicamente para smoke tests de formatos, scripts y reanudación; nunca como candidato final",
     "teacher": "GPT-5.6 de razonamiento para generación, crítica, verificación y corrección de datos"
@@ -34,6 +37,8 @@
     "crossJobResumeProtocolVerified": true,
     "realModelCheckpointResumeVerified": false,
     "distributedGpuAllocationVerified": false,
+    "exactLiveEndpointAttested": false,
+    "explicitBudgetMxn": null,
     "cpuTrainingForbidden": true,
     "billingEnabled": false,
     "actualCostMxn": 0
