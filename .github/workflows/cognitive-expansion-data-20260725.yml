@@ -1,0 +1,44 @@
+name: Cognitive expansion Stage 6 data
+on:
+  pull_request:
+    branches: [main]
+    paths:
+      - 'model/hector-asi/data/stage6/generate-cognitive-expansion-20260725.py'
+      - 'model/hector-asi/data/stage6/verify-cognitive-expansion-20260725.py'
+      - '.github/workflows/cognitive-expansion-data-20260725.yml'
+  workflow_dispatch:
+permissions:
+  contents: read
+jobs:
+  validate:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+      - name: Install verifier dependency
+        run: python -m pip install pytest
+      - name: Generate deterministic batch twice
+        run: |
+          python model/hector-asi/data/stage6/generate-cognitive-expansion-20260725.py
+          cp model/hector-asi/data/stage6/cognitive-expansion-20260725.json /tmp/manifest-a.json
+          cp model/hector-asi/data/stage6/generated/cognitive-expansion-sft-20260725.jsonl /tmp/sft-a.jsonl
+          cp model/hector-asi/data/stage6/generated/cognitive-expansion-preference-20260725.jsonl /tmp/pref-a.jsonl
+          python model/hector-asi/data/stage6/generate-cognitive-expansion-20260725.py
+          cmp /tmp/manifest-a.json model/hector-asi/data/stage6/cognitive-expansion-20260725.json
+          cmp /tmp/sft-a.jsonl model/hector-asi/data/stage6/generated/cognitive-expansion-sft-20260725.jsonl
+          cmp /tmp/pref-a.jsonl model/hector-asi/data/stage6/generated/cognitive-expansion-preference-20260725.jsonl
+      - name: Verify structure, hashes, leakage and executable code
+        run: python model/hector-asi/data/stage6/verify-cognitive-expansion-20260725.py
+      - name: Publish auditable batch
+        uses: actions/upload-artifact@v4
+        with:
+          name: cognitive-expansion-stage6-${{ github.run_id }}
+          path: |
+            model/hector-asi/data/stage6/generated/cognitive-expansion-sft-20260725.jsonl
+            model/hector-asi/data/stage6/generated/cognitive-expansion-preference-20260725.jsonl
+            model/hector-asi/data/stage6/cognitive-expansion-20260725.json
+          retention-days: 90
+          if-no-files-found: error
