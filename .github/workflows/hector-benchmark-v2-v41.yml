@@ -1,0 +1,127 @@
+name: Hector V41 Benchmark V2 evaluation
+
+on:
+  push:
+    branches:
+      - stage6-benchmark/20260724-v41-v2
+    paths:
+      - 'model/hector-asi/evals/benchmark_v2/run_v41_predictions.py'
+      - 'model/hector-asi/evals/benchmark_v2/v41-benchmark-v2-latest.json'
+      - '.github/workflows/hector-benchmark-v2-v41.yml'
+  pull_request:
+    branches:
+      - main
+    paths:
+      - 'model/hector-asi/evals/benchmark_v2/run_v41_predictions.py'
+      - 'model/hector-asi/evals/benchmark_v2/v41-benchmark-v2-latest.json'
+      - '.github/workflows/hector-benchmark-v2-v41.yml'
+  workflow_dispatch:
+
+permissions:
+  actions: read
+  contents: read
+
+concurrency:
+  group: hector-v41-benchmark-v2-${{ github.sha }}
+  cancel-in-progress: false
+
+jobs:
+  verify-v41-result:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    env:
+      EVALUATION_ARTIFACT_ID: '8615305086'
+      V41_ADAPTER_SHA256: '31bead5f59982d8e321517fd235b81f992f83d2e3792a55690c2a841ff0e28f8'
+      HIDDEN_SHA256: 'b8b774d21e2210482fdb417bd4c74eedea90e28c35b2fe1f58dc1fa4b65cc094'
+      PREDICTIONS_SHA256: '025bcf6451b0ef68ce8df9836fe617e5f3299a3ad4b029d8ac7392827be59ba0'
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+      - name: Build sealed Benchmark V2
+        run: |
+          mkdir -p artifacts/benchmark-v2 artifacts/evaluation
+          python model/hector-asi/evals/benchmark_v2/build_benchmark_v2.py --out artifacts/benchmark-v2
+          test "$(wc -l < artifacts/benchmark-v2/hidden.jsonl)" -eq 512
+          echo "$HIDDEN_SHA256  artifacts/benchmark-v2/hidden.jsonl" | sha256sum --check --strict
+      - name: Download completed immutable V41 evaluation
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          curl --fail --location --retry 4 \
+            -H "Authorization: Bearer $GH_TOKEN" \
+            -H 'Accept: application/vnd.github+json' \
+            -H 'X-GitHub-Api-Version: 2022-11-28' \
+            "${{ github.api_url }}/repos/${{ github.repository }}/actions/artifacts/$EVALUATION_ARTIFACT_ID/zip" \
+            --output artifacts/evaluation.zip
+          unzip -q artifacts/evaluation.zip -d artifacts/evaluation
+          test -f artifacts/evaluation/v41-predictions.jsonl
+          test -f artifacts/evaluation/v41-benchmark-v2-report.json
+          test -f artifacts/evaluation/v41-run-manifest.json
+      - name: Verify attribution, hashes and all 512 predictions
+        run: |
+          echo "$PREDICTIONS_SHA256  artifacts/evaluation/v41-predictions.jsonl" | sha256sum --check --strict
+          python - <<'PY'
+          import json, os
+          from pathlib import Path
+          root=Path('artifacts/evaluation')
+          report=json.loads((root/'v41-benchmark-v2-report.json').read_text())
+          run=json.loads((root/'v41-run-manifest.json').read_text())
+          predictions=[json.loads(line) for line in (root/'v41-predictions.jsonl').read_text().splitlines() if line.strip()]
+          assert len(predictions)==512, len(predictions)
+          assert len({row['id'] for row in predictions})==512
+          assert report['hiddenCases']==512
+          assert report['hiddenSha256']==os.environ['HIDDEN_SHA256']
+          assert report['predictionsSha256']==os.environ['PREDICTIONS_SHA256']
+          assert report['expectedModel']=='hector-asi-qwen15-v41'
+          assert report['effectiveModelAttributionPassed'] is True
+          assert report['attributionFailureCount']==0
+          assert run['model']=='hector-asi-qwen15-v41'
+          assert run['fallback'] is False
+          assert run['adapterSha256']==os.environ['V41_ADAPTER_SHA256']
+          assert run['predictionsSha256']==os.environ['PREDICTIONS_SHA256']
+          assert run['hiddenSha256']==os.environ['HIDDEN_SHA256']
+          PY
+      - name: Publish fail-closed benchmark gates
+        run: |
+          python - <<'PY'
+          import json
+          from pathlib import Path
+          report=json.loads(Path('artifacts/evaluation/v41-benchmark-v2-report.json').read_text())
+          gates={
+            'benchmarkCases': {'required':500,'observed':report['hiddenCases'],'open':report['hiddenCases']>=500},
+            'v41Below85Percent': {'required':True,'observed':report['scorePercent']<85,'open':report['scorePercent']<85},
+            'trainableFailures': {'required':100,'observed':report['trainableFailureCount'],'open':report['trainableFailureCount']>=100},
+            'modelAttribution': {'required':True,'observed':report['effectiveModelAttributionPassed'],'open':report['effectiveModelAttributionPassed']},
+          }
+          payload={
+            'schemaVersion':2,
+            'benchmarkVersion':report['benchmarkVersion'],
+            'model':'hector-asi-qwen15-v41',
+            'scorePercent':report['scorePercent'],
+            'byCapability':report['perCategory'],
+            'failureCount':report['failureCount'],
+            'trainableFailureCount':report['trainableFailureCount'],
+            'hiddenSha256':report['hiddenSha256'],
+            'predictionsSha256':report['predictionsSha256'],
+            'gates':gates,
+            'benchmarkGatesOpen':all(value['open'] for value in gates.values()),
+            'trainingAuthorized':False,
+            'trainingAuthorizationReason':'Benchmark gates are open, but corpus, compute, resume and budget gates remain external and mandatory.'
+          }
+          Path('artifacts/v41-training-gates.json').write_text(json.dumps(payload,indent=2,sort_keys=True)+'\n')
+          checked=json.loads(Path('model/hector-asi/evals/benchmark_v2/v41-benchmark-v2-latest.json').read_text())
+          assert checked==payload
+          print(json.dumps(payload,indent=2,sort_keys=True))
+          PY
+      - uses: actions/upload-artifact@v4
+        with:
+          name: hector-v41-benchmark-v2-verified-${{ github.run_id }}
+          path: |
+            artifacts/evaluation/v41-run-manifest.json
+            artifacts/evaluation/v41-predictions.jsonl
+            artifacts/evaluation/v41-benchmark-v2-report.json
+            artifacts/v41-training-gates.json
+          if-no-files-found: error
+          retention-days: 90
