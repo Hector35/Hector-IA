@@ -6,6 +6,12 @@ on:
       - 'model/hector-asi/scale/audit_qwen397b_zero_spend.py'
       - 'model/hector-asi/scale/remote_checkpoint_protocol.py'
       - '.github/workflows/qwen397b-zero-spend-remote-readiness.yml'
+  push:
+    branches: [main]
+    paths:
+      - 'model/hector-asi/scale/audit_qwen397b_zero_spend.py'
+      - 'model/hector-asi/scale/remote_checkpoint_protocol.py'
+      - '.github/workflows/qwen397b-zero-spend-remote-readiness.yml'
   workflow_dispatch:
 permissions:
   contents: read
@@ -173,4 +179,89 @@ jobs:
             /tmp/qwen397b-remote-checkpoint/seed-attestation.json
             /tmp/qwen397b-remote-checkpoint/latest.json
           retention-days: 90
+          if-no-files-found: error
+
+  main-secret-presence-audit:
+    if: github.event_name == 'push' || github.event_name == 'workflow_dispatch'
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    env:
+      VALUE_HF_TOKEN: ${{ secrets.HF_TOKEN }}
+      VALUE_HUGGINGFACE_TOKEN: ${{ secrets.HUGGINGFACE_TOKEN }}
+      VALUE_QWEN_BASE_URL: ${{ secrets.QWEN_397B_BASE_URL }}
+      VALUE_QWEN_TOKEN: ${{ secrets.QWEN_397B_TOKEN }}
+      VALUE_QWEN_MODEL: ${{ secrets.QWEN_397B_MODEL }}
+      VALUE_R2_ACCESS_KEY_ID: ${{ secrets.R2_ACCESS_KEY_ID }}
+      VALUE_R2_SECRET_ACCESS_KEY: ${{ secrets.R2_SECRET_ACCESS_KEY }}
+      VALUE_R2_ENDPOINT: ${{ secrets.R2_ENDPOINT }}
+      VALUE_R2_BUCKET: ${{ secrets.R2_BUCKET }}
+      VALUE_R2_BUCKET_NAME: ${{ secrets.R2_BUCKET_NAME }}
+      VALUE_AWS_ACCESS_KEY_ID: ${{ secrets.AWS_ACCESS_KEY_ID }}
+      VALUE_AWS_SECRET_ACCESS_KEY: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+      VALUE_AWS_ENDPOINT_URL: ${{ secrets.AWS_ENDPOINT_URL }}
+      VALUE_CHECKPOINT_BUCKET: ${{ secrets.CHECKPOINT_BUCKET }}
+      VALUE_CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+      VALUE_CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+    steps:
+      - name: Record presence only without printing secret values
+        run: |
+          python - <<'PY'
+          import hashlib,json,os
+          from pathlib import Path
+          aliases={
+            'HF_TOKEN':'VALUE_HF_TOKEN',
+            'HUGGINGFACE_TOKEN':'VALUE_HUGGINGFACE_TOKEN',
+            'QWEN_397B_BASE_URL':'VALUE_QWEN_BASE_URL',
+            'QWEN_397B_TOKEN':'VALUE_QWEN_TOKEN',
+            'QWEN_397B_MODEL':'VALUE_QWEN_MODEL',
+            'R2_ACCESS_KEY_ID':'VALUE_R2_ACCESS_KEY_ID',
+            'R2_SECRET_ACCESS_KEY':'VALUE_R2_SECRET_ACCESS_KEY',
+            'R2_ENDPOINT':'VALUE_R2_ENDPOINT',
+            'R2_BUCKET':'VALUE_R2_BUCKET',
+            'R2_BUCKET_NAME':'VALUE_R2_BUCKET_NAME',
+            'AWS_ACCESS_KEY_ID':'VALUE_AWS_ACCESS_KEY_ID',
+            'AWS_SECRET_ACCESS_KEY':'VALUE_AWS_SECRET_ACCESS_KEY',
+            'AWS_ENDPOINT_URL':'VALUE_AWS_ENDPOINT_URL',
+            'CHECKPOINT_BUCKET':'VALUE_CHECKPOINT_BUCKET',
+            'CLOUDFLARE_API_TOKEN':'VALUE_CLOUDFLARE_API_TOKEN',
+            'CLOUDFLARE_ACCOUNT_ID':'VALUE_CLOUDFLARE_ACCOUNT_ID',
+          }
+          presence={name:bool(os.environ.get(alias,'').strip()) for name,alias in aliases.items()}
+          provider_auth=presence['HF_TOKEN'] or presence['HUGGINGFACE_TOKEN'] or presence['QWEN_397B_TOKEN']
+          dedicated_endpoint=presence['QWEN_397B_BASE_URL'] and presence['QWEN_397B_TOKEN'] and presence['QWEN_397B_MODEL']
+          r2_bucket=presence['R2_BUCKET'] or presence['R2_BUCKET_NAME']
+          r2_storage=presence['R2_ACCESS_KEY_ID'] and presence['R2_SECRET_ACCESS_KEY'] and presence['R2_ENDPOINT'] and r2_bucket
+          s3_storage=presence['AWS_ACCESS_KEY_ID'] and presence['AWS_SECRET_ACCESS_KEY'] and presence['AWS_ENDPOINT_URL'] and presence['CHECKPOINT_BUCKET']
+          cloudflare_admin=presence['CLOUDFLARE_API_TOKEN'] and presence['CLOUDFLARE_ACCOUNT_ID']
+          report={
+            'schemaVersion':1,
+            'event':'main-secret-presence-audit',
+            'presenceOnly':presence,
+            'valuesReadOrRecorded':False,
+            'readiness':{
+              'providerAuthenticationPresent':provider_auth,
+              'dedicatedExactEndpointTuplePresent':dedicated_endpoint,
+              'checkpointObjectStorageTuplePresent':r2_storage or s3_storage,
+              'r2CheckpointTuplePresent':r2_storage,
+              's3CheckpointTuplePresent':s3_storage,
+              'cloudflareAdministrationTuplePresent':cloudflare_admin,
+            },
+            'providerCallPerformed':False,
+            'storageWritePerformed':False,
+            'billingActivated':False,
+            'actualCostMxn':0,
+            'decision':'presence-audited; remain fail-closed until authenticated zero-spend policy and live verification',
+          }
+          canonical=json.dumps(report,sort_keys=True,separators=(',',':')).encode()
+          report['sha256']=hashlib.sha256(canonical).hexdigest()
+          path=Path('/tmp/qwen397b-main-secret-presence.json')
+          path.write_text(json.dumps(report,indent=2,sort_keys=True)+'\n')
+          print(json.dumps({'readiness':report['readiness'],'actualCostMxn':0},sort_keys=True))
+          PY
+      - name: Publish presence-only attestation
+        uses: actions/upload-artifact@v4
+        with:
+          name: qwen397b-main-secret-presence-${{ github.run_id }}
+          path: /tmp/qwen397b-main-secret-presence.json
+          retention-days: 30
           if-no-files-found: error
