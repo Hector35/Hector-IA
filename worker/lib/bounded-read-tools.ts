@@ -1,5 +1,6 @@
 import type {Bindings} from '../types';
 import {intelligenceStateSnapshot} from '../intelligence/intelligence-state';
+import {memorySearchTerms,rankMemoryCandidates} from './memory-retrieval';
 
 export const READ_ONLY_TOOL_NAMES=['calculator','system_state','memory_search','recent_work'] as const;
 export type ReadOnlyToolName=typeof READ_ONLY_TOOL_NAMES[number];
@@ -61,7 +62,6 @@ export function calculateExpression(expression:string){
  return{expression:input,value:normalized,verified:true,engine:'hector-arithmetic-v1'};
 }
 
-function words(query:string){return[...new Set(query.toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g,'').match(/[a-z0-9]{2,}/g)||[])].slice(0,6);}
 function compact(value:unknown,max=8000){const text=JSON.stringify(value);return text.length<=max?text:`${text.slice(0,max-24)}…[resultado truncado]`;}
 
 export async function executeReadOnlyTool(env:Bindings,userId:string,call:ReadOnlyToolCall):Promise<ReadOnlyToolExecution>{
@@ -73,10 +73,12 @@ export async function executeReadOnlyTool(env:Bindings,userId:string,call:ReadOn
    const state=intelligenceStateSnapshot();
    result={stage:state.stage,name:state.name,status:state.status,models:state.models,pipeline:state.pipeline,training:state.training,evidence:state.evidence};
   }else if(call.name==='memory_search'){
-   const terms=words(call.arguments.query);if(!terms.length)throw new Error('consulta de memoria sin términos útiles');
-   const where=terms.map(()=>"lower(content) LIKE ?").join(' AND '),bindings=[userId,...terms.map(term=>`%${term}%`),call.arguments.limit];
-   const rows=await env.DB.prepare(`SELECT id,content,importance,updated_at FROM memories WHERE user_id=? AND ${where} ORDER BY importance DESC,updated_at DESC LIMIT ?`).bind(...bindings).all<any>();
-   result={query:call.arguments.query,count:rows.results.length,items:rows.results.map((row:any)=>({id:String(row.id),content:String(row.content).slice(0,1000),importance:Number(row.importance||0),updatedAt:row.updated_at||null}))};
+   const terms=memorySearchTerms(call.arguments.query);if(!terms.length)throw new Error('consulta de memoria sin términos útiles');
+   const sqlTerms=terms.slice(0,8),where=sqlTerms.map(()=>"lower(content) LIKE ?").join(' OR '),bindings=[userId,...sqlTerms.map(term=>`%${term}%`)];
+   const rows=await env.DB.prepare(`SELECT id,content,importance,updated_at FROM memories WHERE user_id=? AND (${where}) ORDER BY importance DESC,updated_at DESC LIMIT 80`).bind(...bindings).all<any>();
+   const candidates=rows.results.map((row:any)=>({id:String(row.id),content:String(row.content).slice(0,1000),importance:Number(row.importance||0),updatedAt:row.updated_at||null}));
+   const ranked=rankMemoryCandidates(call.arguments.query,candidates,call.arguments.limit);
+   result={query:call.arguments.query,count:ranked.length,candidateCount:candidates.length,method:'deterministic lexical ranking v1',items:ranked};
   }else{
    const rows=await env.DB.prepare('SELECT id,kind,status,progress,result,updated_at FROM work_jobs WHERE user_id=? ORDER BY updated_at DESC LIMIT ?').bind(userId,call.arguments.limit).all<any>();
    result={count:rows.results.length,items:rows.results.map((row:any)=>({id:String(row.id),kind:String(row.kind||''),status:String(row.status||''),progress:Number(row.progress||0),result:row.result?String(row.result).slice(0,1200):null,updatedAt:row.updated_at||null}))};
@@ -89,4 +91,4 @@ export function renderReadOnlyToolProtocol(){return`\n\nHERRAMIENTAS VERIFICABLE
 
 export function renderReadOnlyToolResult(execution:ReadOnlyToolExecution,index:number,max:number){return`RESULTADO VERIFICADO DE HERRAMIENTA ${index}/${max}\n${compact(execution)}\n\nUsa este resultado como evidencia. No afirmes más de lo observado. Si todavía necesitas otra herramienta distinta, solicita una con el formato exacto; de lo contrario entrega la respuesta final sin etiquetas <tool_call>.`;}
 
-export function readOnlyToolManifest(){return{version:'1.0.0',tools:[...READ_ONLY_TOOL_NAMES],sideEffects:'none',maximumCallsPerResponse:2,ownershipEnforced:true,parser:'strict tagged JSON',calculator:'no eval; bounded recursive descent'};}
+export function readOnlyToolManifest(){return{version:'1.1.0',tools:[...READ_ONLY_TOOL_NAMES],sideEffects:'none',maximumCallsPerResponse:2,ownershipEnforced:true,parser:'strict tagged JSON',calculator:'no eval; bounded recursive descent',memoryRetrieval:'owner-filtered candidate retrieval plus deterministic lexical ranking'};}
