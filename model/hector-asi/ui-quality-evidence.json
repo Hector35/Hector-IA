@@ -1,0 +1,29 @@
+{
+  "schemaVersion": 1,
+  "generatedAt": "2026-07-25T18:40:00Z",
+  "chatFirst": {
+    "defaultView": "chat",
+    "qualityAuditCommand": "/auditar-10-10",
+    "qualityCockpitVisibleInSystem": true,
+    "effectiveModelVisibleInHeader": true,
+    "allPrimaryActionsReachableFromChat": true
+  },
+  "accessibility": {
+    "skipLink": true,
+    "mainFocusTarget": true,
+    "ariaCurrentNavigation": true,
+    "politeStatusAnnouncements": true,
+    "minimumTouchTargetPx": 44,
+    "reducedMotion": true,
+    "increasedContrast": true,
+    "forcedColors": true,
+    "externalFontRequests": false,
+    "automatedContractAudit": true,
+    "manualWcagAudit": false
+  },
+  "privacy": {
+    "thirdPartyFontTelemetry": false,
+    "qualityEndpointAuthenticated": true
+  },
+  "principle": "La interfaz prioriza el chat, conserva procedencia del modelo y ofrece alternativas perceptibles por teclado, lector de pantalla, alto contraste y movimiento reducido. La revisión WCAG manual permanece pendiente."
+}
