@@ -1,8 +1,12 @@
-import {readFileSync} from 'node:fs';
+import {mkdirSync,readFileSync,writeFileSync} from 'node:fs';
+import {dirname} from 'node:path';
 import {describe,expect,it} from 'vitest';
 import {memoryRetrievalManifest,memoryRetrievalMetrics,memorySearchTerms,normalizeMemoryText,rankMemoryCandidates} from './memory-retrieval';
 
 const benchmark=JSON.parse(readFileSync(new URL('../../model/hector-asi/evals/memory-retrieval/benchmark-v1.json',import.meta.url),'utf8'));
+const measured=memoryRetrievalMetrics(benchmark.cases,benchmark.candidates,benchmark.k);
+const report={schemaVersion:1,benchmark:benchmark.name,containsPrivateUserData:benchmark.containsPrivateUserData,benchmarkExcludedFromTraining:benchmark.benchmarkExcludedFromTraining,thresholds:benchmark.thresholds,metrics:{cases:measured.cases,k:measured.k,recallAtK:measured.recallAtK,precisionAtK:measured.precisionAtK,mrr:measured.mrr},passed:measured.recallAtK>=benchmark.thresholds.recallAtK&&measured.precisionAtK>=benchmark.thresholds.precisionAtK&&measured.mrr>=benchmark.thresholds.mrr,manifest:memoryRetrievalManifest(),results:measured.results};
+if(process.env.MEMORY_REPORT_PATH){mkdirSync(dirname(process.env.MEMORY_REPORT_PATH),{recursive:true});writeFileSync(process.env.MEMORY_REPORT_PATH,JSON.stringify(report,null,2)+'\n')}
 
 describe('memory retrieval v1',()=>{
  it('normalizes accents, expands useful synonyms and ranks direct evidence first',()=>{
@@ -12,18 +16,8 @@ describe('memory retrieval v1',()=>{
   expect(ranked[0].id).toBe('m11');
   expect(ranked[0].score).toBeGreaterThan(ranked[1].score);
  });
-
  it('meets the sealed synthetic benchmark thresholds without private data',()=>{
-  expect(benchmark.containsPrivateUserData).toBe(false);
-  expect(benchmark.benchmarkExcludedFromTraining).toBe(true);
-  const metrics=memoryRetrievalMetrics(benchmark.cases,benchmark.candidates,benchmark.k);
-  expect(metrics.cases).toBeGreaterThanOrEqual(20);
-  expect(metrics.recallAtK).toBeGreaterThanOrEqual(benchmark.thresholds.recallAtK);
-  expect(metrics.precisionAtK).toBeGreaterThanOrEqual(benchmark.thresholds.precisionAtK);
-  expect(metrics.mrr).toBeGreaterThanOrEqual(benchmark.thresholds.mrr);
+  expect(benchmark.containsPrivateUserData).toBe(false);expect(benchmark.benchmarkExcludedFromTraining).toBe(true);expect(measured.cases).toBeGreaterThanOrEqual(20);expect(measured.recallAtK).toBeGreaterThanOrEqual(benchmark.thresholds.recallAtK);expect(measured.precisionAtK).toBeGreaterThanOrEqual(benchmark.thresholds.precisionAtK);expect(measured.mrr).toBeGreaterThanOrEqual(benchmark.thresholds.mrr);expect(report.passed).toBe(true);
  });
-
- it('publishes an owner-filter requirement and bounded candidate contract',()=>{
-  expect(memoryRetrievalManifest()).toMatchObject({ownerFilterRequired:true,candidateLimit:80,privateDataRequired:false});
- });
+ it('publishes an owner-filter requirement and bounded candidate contract',()=>{expect(memoryRetrievalManifest()).toMatchObject({ownerFilterRequired:true,candidateLimit:80,privateDataRequired:false})});
 });
