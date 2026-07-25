@@ -26,6 +26,18 @@ def main():
 
     require(integration['schemaVersion'] == 1, 'integration schemaVersion')
     require(plan['stage'] == admission['stage'] == 6, 'stage mismatch')
+    require(integration['data']['remainingExamples'] == integration['data']['requiredExamples'] - integration['data']['verifiedExamples'], 'remaining corpus mismatch')
+    require(integration['data']['verifiedExamples'] >= 0, 'negative corpus')
+
+    declared_manifests = {item['path']: item for item in integration['data'].get('verifiedDatasetManifests', [])}
+    for path, declared in declared_manifests.items():
+        manifest_path = ROOT / path
+        if manifest_path.exists():
+            generated = json.loads(manifest_path.read_text(encoding='utf-8'))
+            require(int(declared['count']) == int(generated['counts']['total']), f'manifest count mismatch: {path}')
+            require(generated.get('containsPrivateUserData') is False, f'private data forbidden: {path}')
+            require(generated.get('benchmarkExcluded') is True, f'benchmark exclusion missing: {path}')
+    require(sum(int(item['count']) for item in declared_manifests.values()) <= integration['data']['verifiedExamples'], 'declared manifests exceed canonical corpus')
 
     operational = integration['runtime']['primaryRequested']
     own = integration['champion']
@@ -85,6 +97,8 @@ def main():
         'operationalModel': operational,
         'ownChampion': own['id'],
         'verifiedExamples': integration['data']['verifiedExamples'],
+        'remainingExamples': integration['data']['remainingExamples'],
+        'integratedManifests': len(declared_manifests),
         'benchmarkCases': integration['benchmark']['cases'],
         'trainableFailures': integration['benchmark']['v41TrainableFailures'],
         'liveExactModelAttested': integration['compute']['exactLiveEndpointAttested'],
