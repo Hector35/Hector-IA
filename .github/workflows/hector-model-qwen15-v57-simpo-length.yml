@@ -1,0 +1,101 @@
+name: Hector model Qwen15 v57 SimPO length training
+on:
+  pull_request:
+    branches: [main]
+    paths:
+      - '.github/workflows/hector-model-qwen15-v57-simpo-length.yml'
+      - 'model/hector-asi/training/train_qwen15_v57_simpo_length.py'
+      - 'model/hector-asi/data/qwen15-v57-simpo-length-train.jsonl'
+      - 'model/hector-asi/evals/qwen15-v57-simpo-length-validation.jsonl'
+  workflow_dispatch:
+permissions:
+  contents: read
+  actions: read
+concurrency:
+  group: hector-qwen15-v57-${{ github.ref }}
+  cancel-in-progress: false
+jobs:
+  train-qwen15-v57:
+    runs-on: ubuntu-latest
+    timeout-minutes: 120
+    env:
+      SOURCE_ARTIFACT_ID: '8560331055'
+      SOURCE_ADAPTER_SHA256: '31bead5f59982d8e321517fd235b81f992f83d2e3792a55690c2a841ff0e28f8'
+      SOURCE_ADAPTER_BYTES: '73911112'
+      SOURCE_DIR: /tmp/hector-v41/adapter
+      TRAIN: model/hector-asi/data/qwen15-v57-simpo-length-train.jsonl
+      VALIDATION: model/hector-asi/evals/qwen15-v57-simpo-length-validation.jsonl
+      HIDDEN: model/hector-asi/evals/qwen15-v51-hidden.jsonl
+      OUT_A: artifacts/hector-asi-qwen15-v57-a
+      OUT_B: artifacts/hector-asi-qwen15-v57-b
+      TOKENIZERS_PARALLELISM: 'false'
+      HF_HOME: /home/runner/.cache/huggingface
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+          cache: pip
+      - name: Validate data and trainer
+        run: |
+          set -euo pipefail
+          python -m py_compile model/hector-asi/training/train_qwen15_v57_simpo_length.py
+          python - <<'PY'
+          import json,unicodedata
+          from pathlib import Path
+          specs=[('model/hector-asi/data/qwen15-v57-simpo-length-train.jsonl',8),('model/hector-asi/evals/qwen15-v57-simpo-length-validation.jsonl',4),('model/hector-asi/evals/qwen15-v51-hidden.jsonl',18)]
+          groups=[]
+          norm=lambda s:' '.join(''.join(c for c in unicodedata.normalize('NFKD',s.lower()) if not unicodedata.combining(c)).split())
+          for p,n in specs:
+            rows=[json.loads(x) for x in Path(p).read_text().splitlines() if x.strip()]; assert len(rows)==n and len({r['id'] for r in rows})==n
+            prompts={norm(r['prompt']) for r in rows}; assert len(prompts)==n; groups.append(prompts)
+          assert not groups[0]&groups[1] and not groups[0]&groups[2] and not groups[1]&groups[2]
+          train=[json.loads(x) for x in Path(specs[0][0]).read_text().splitlines() if x.strip()]
+          val=[json.loads(x) for x in Path(specs[1][0]).read_text().splitlines() if x.strip()]
+          assert all(r['verified'] is True and r['provenance']=='author-generated' and r['license']=='Apache-2.0-compatible' for r in train+val)
+          print('train=8 validation=4 hidden=18 contamination=0 privateData=false')
+          PY
+      - name: Download and verify champion V41
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          set -euo pipefail
+          mkdir -p /tmp/v41-zip /tmp/hector-v41
+          curl --fail --location --retry 4 -H "Authorization: Bearer $GH_TOKEN" -H "Accept: application/vnd.github+json" "https://api.github.com/repos/${GITHUB_REPOSITORY}/actions/artifacts/${SOURCE_ARTIFACT_ID}/zip" -o /tmp/v41.zip
+          unzip -q /tmp/v41.zip -d /tmp/v41-zip
+          F="$(find /tmp/v41-zip -type f -path '*/adapter/adapter_model.safetensors' -print -quit)"
+          test -n "$F"; test "$(sha256sum "$F"|awk '{print $1}')" = "$SOURCE_ADAPTER_SHA256"; test "$(stat -c%s "$F")" -eq "$SOURCE_ADAPTER_BYTES"
+          cp -a "$(dirname "$F")" "$SOURCE_DIR"
+      - name: Install pinned CPU stack
+        run: |
+          python -m pip install --disable-pip-version-check --index-url https://download.pytorch.org/whl/cpu torch==2.7.1
+          python -m pip install --disable-pip-version-check accelerate==1.8.1 huggingface_hub==0.34.4 peft==0.16.0 safetensors==0.5.3 transformers==4.53.2
+      - name: Train two deterministic SimPO continuations
+        run: |
+          set -o pipefail
+          mkdir -p artifacts/logs
+          /usr/bin/time -v python model/hector-asi/training/train_qwen15_v57_simpo_length.py --source-adapter "$SOURCE_DIR" --pairs "$TRAIN" --validation "$VALIDATION" --hidden "$HIDDEN" --out "$OUT_A" --seed 3057 --epochs 2 --lr 2e-6 --beta 2.0 --gamma 0.5 --anchor 0.03 2>&1 | tee artifacts/logs/v57-a.log
+          /usr/bin/time -v python model/hector-asi/training/train_qwen15_v57_simpo_length.py --source-adapter "$SOURCE_DIR" --pairs "$TRAIN" --validation "$VALIDATION" --hidden "$HIDDEN" --out "$OUT_B" --seed 3057 --epochs 2 --lr 2e-6 --beta 2.0 --gamma 0.5 --anchor 0.03 2>&1 | tee artifacts/logs/v57-b.log
+      - name: Verify real weights and reproducibility
+        run: |
+          set -euo pipefail
+          A="$OUT_A/adapter/adapter_model.safetensors"; B="$OUT_B/adapter/adapter_model.safetensors"
+          test -f "$A" -a -f "$B"; cmp "$A" "$B"; test "$(stat -c%s "$A")" -gt 50000000
+          python - <<'PY'
+          import json
+          from pathlib import Path
+          a=json.loads(Path('artifacts/hector-asi-qwen15-v57-a/metrics.json').read_text()); b=json.loads(Path('artifacts/hector-asi-qwen15-v57-b/metrics.json').read_text())
+          assert a['candidate']['adapterSha256']==b['candidate']['adapterSha256'] and a['candidate']['adapterBytes']==b['candidate']['adapterBytes']
+          print(json.dumps({'sha256':a['candidate']['adapterSha256'],'bytes':a['candidate']['adapterBytes'],'before':a['baseline']['behavioral']['passed'],'after':a['candidate']['behavioral']['passed'],'critical':a['candidate']['behavioral']['criticalPassed'],'eligible':a['gates']['eligibleForPromotion']},sort_keys=True))
+          PY
+      - name: Upload weights, metrics and logs
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: hector-asi-qwen15-v57-simpo-${{ github.run_id }}
+          path: |
+            artifacts/hector-asi-qwen15-v57-a
+            artifacts/hector-asi-qwen15-v57-b
+            artifacts/logs
+          if-no-files-found: warn
+          retention-days: 90
