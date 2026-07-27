@@ -1,0 +1,103 @@
+name: Hector model Qwen15 v55 IPO
+on:
+  pull_request:
+    branches: [main]
+    paths:
+      - '.github/workflows/hector-model-qwen15-v55-ipo.yml'
+      - 'model/hector-asi/training/train_qwen15_v55_ipo.py'
+      - 'model/hector-asi/data/qwen15-v55-ipo-train.jsonl'
+      - 'model/hector-asi/evals/qwen15-v55-ipo-validation.jsonl'
+  workflow_dispatch:
+permissions:
+  contents: read
+  actions: read
+concurrency:
+  group: hector-qwen15-v55-${{ github.ref }}
+  cancel-in-progress: false
+jobs:
+  train-qwen15-v55:
+    runs-on: ubuntu-latest
+    timeout-minutes: 120
+    env:
+      SOURCE_ARTIFACT_ID: '8560331055'
+      SOURCE_ADAPTER_SHA256: '31bead5f59982d8e321517fd235b81f992f83d2e3792a55690c2a841ff0e28f8'
+      SOURCE_ADAPTER_BYTES: '73911112'
+      SOURCE_DIR: /tmp/hector-v41/adapter
+      TRAIN_BASE: model/hector-asi/data/qwen15-v51-unlikelihood-train.jsonl
+      TRAIN_NEW: model/hector-asi/data/qwen15-v55-ipo-train.jsonl
+      VALIDATION: model/hector-asi/evals/qwen15-v55-ipo-validation.jsonl
+      HIDDEN: model/hector-asi/evals/qwen15-v51-hidden.jsonl
+      OUT_A: artifacts/hector-asi-qwen15-v55-a
+      OUT_B: artifacts/hector-asi-qwen15-v55-b
+      TOKENIZERS_PARALLELISM: 'false'
+      HF_HOME: /home/runner/.cache/huggingface
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+          cache: pip
+      - name: Validate licensed data, strict splits and trainer
+        run: |
+          set -euo pipefail
+          python -m py_compile model/hector-asi/training/train_qwen15_v55_ipo.py
+          python - <<'PY'
+          import json,os,unicodedata
+          from pathlib import Path
+          files=[(os.environ['TRAIN_BASE'],16),(os.environ['TRAIN_NEW'],8),(os.environ['VALIDATION'],4),(os.environ['HIDDEN'],18)]
+          groups=[]; norm=lambda s:' '.join(''.join(c for c in unicodedata.normalize('NFKD',s.lower()) if not unicodedata.combining(c)).split())
+          for path,count in files:
+            rows=[json.loads(x) for x in Path(path).read_text().splitlines() if x.strip()]
+            assert len(rows)==count,(path,len(rows));assert len({r['id'] for r in rows})==count;assert len({norm(r['prompt']) for r in rows})==count;groups.append(rows)
+          train=groups[0]+groups[1];val=groups[2];hidden=groups[3]
+          for rows in (groups[0],groups[1],val): assert all(r['verified'] is True and r['provenance']=='author-generated' and r['license']=='Apache-2.0-compatible' for r in rows)
+          sig=lambda rows:({r['id'] for r in rows},{norm(r['prompt']) for r in rows})
+          ts,vs,hs=sig(train),sig(val),sig(hidden)
+          assert not ts[0]&vs[0] and not ts[0]&hs[0] and not vs[0]&hs[0]
+          assert not ts[1]&vs[1] and not ts[1]&hs[1] and not vs[1]&hs[1]
+          print('train=24 validation=4 hidden=18 contamination=0 privateData=false')
+          PY
+      - name: Download and verify immutable champion v41
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          set -euo pipefail
+          mkdir -p /tmp/hector-v41-zip /tmp/hector-v41
+          curl --fail --location --retry 4 -H "Authorization: Bearer $GH_TOKEN" -H "Accept: application/vnd.github+json" "https://api.github.com/repos/${GITHUB_REPOSITORY}/actions/artifacts/${SOURCE_ARTIFACT_ID}/zip" -o /tmp/hector-v41.zip
+          unzip -q /tmp/hector-v41.zip -d /tmp/hector-v41-zip
+          F="$(find /tmp/hector-v41-zip -type f -path '*/adapter/adapter_model.safetensors' -print -quit)"
+          test -n "$F"; test "$(sha256sum "$F" | awk '{print $1}')" = "$SOURCE_ADAPTER_SHA256"; test "$(stat -c%s "$F")" -eq "$SOURCE_ADAPTER_BYTES"
+          cp -a "$(dirname "$F")" "$SOURCE_DIR"
+      - name: Install pinned CPU stack
+        run: |
+          python -m pip install --disable-pip-version-check --index-url https://download.pytorch.org/whl/cpu torch==2.7.1
+          python -m pip install --disable-pip-version-check accelerate==1.8.1 huggingface_hub==0.34.4 peft==0.16.0 safetensors==0.5.3 transformers==4.53.2
+      - name: Train two deterministic IPO continuations
+        run: |
+          set -o pipefail
+          mkdir -p artifacts/logs
+          /usr/bin/time -v python model/hector-asi/training/train_qwen15_v55_ipo.py --source-adapter "$SOURCE_DIR" --train "$TRAIN_BASE" "$TRAIN_NEW" --validation "$VALIDATION" --hidden "$HIDDEN" --out "$OUT_A" --seed 3055 --epochs 2 --lr 2e-6 --beta .20 --anchor .03 2>&1 | tee artifacts/logs/v55-a.log
+          /usr/bin/time -v python model/hector-asi/training/train_qwen15_v55_ipo.py --source-adapter "$SOURCE_DIR" --train "$TRAIN_BASE" "$TRAIN_NEW" --validation "$VALIDATION" --hidden "$HIDDEN" --out "$OUT_B" --seed 3055 --epochs 2 --lr 2e-6 --beta .20 --anchor .03 2>&1 | tee artifacts/logs/v55-b.log
+      - name: Verify real weights and reproducibility
+        run: |
+          set -euo pipefail
+          A="$OUT_A/adapter/adapter_model.safetensors"; B="$OUT_B/adapter/adapter_model.safetensors"
+          test -f "$A" -a -f "$B"; cmp "$A" "$B"; test "$(stat -c%s "$A")" -gt 50000000
+          python - <<'PY'
+          import json
+          from pathlib import Path
+          a=json.loads(Path('artifacts/hector-asi-qwen15-v55-a/metrics.json').read_text());b=json.loads(Path('artifacts/hector-asi-qwen15-v55-b/metrics.json').read_text())
+          assert a['candidate']['adapterSha256']==b['candidate']['adapterSha256'];assert a['candidate']['adapterBytes']==b['candidate']['adapterBytes']
+          print(json.dumps({'sha256':a['candidate']['adapterSha256'],'bytes':a['candidate']['adapterBytes'],'before':a['baseline']['behavioral']['passed'],'after':a['candidate']['behavioral']['passed'],'critical':a['candidate']['behavioral']['criticalPassed'],'eligible':a['gates']['eligibleForPromotion']},sort_keys=True))
+          PY
+      - name: Upload weights, metrics and logs
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: hector-asi-qwen15-v55-ipo-${{ github.run_id }}
+          path: |
+            artifacts/hector-asi-qwen15-v55-a
+            artifacts/hector-asi-qwen15-v55-b
+            artifacts/logs
+          if-no-files-found: warn
+          retention-days: 90
