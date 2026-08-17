@@ -6,6 +6,7 @@ on:
     paths:
       - 'public/turno-rx/**'
       - 'worker/routes/qwen397-vision.ts'
+      - 'tests/turno-rx-pwa.test.ts'
       - '.github/workflows/verify-turno-rx.yml'
   workflow_dispatch:
 

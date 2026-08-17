@@ -6,25 +6,45 @@ const app=read('public/turno-rx/app.js');
 const sw=read('public/turno-rx/sw.js');
 const manifest=JSON.parse(read('public/turno-rx/manifest.webmanifest'));
 
-describe('Turno RX PWA independiente',()=>{
+describe('Pendientes PWA independiente',()=>{
   it('mantiene una PWA instalable con alcance propio',()=>{
     expect(manifest.start_url).toBe('/turno-rx/');
     expect(manifest.scope).toBe('/turno-rx/');
     expect(manifest.display).toBe('standalone');
+    expect(manifest.short_name).toBe('Pendientes');
   });
 
-  it('usa el backend de visión existente sin exponer nuevas keys',()=>{
-    expect(app).toContain("fetch('/api/vision'");
+  it('usa la ruta directa de visión de Pendientes sin exponer keys',()=>{
+    expect(app).toContain("fetch('/api/turno-rx/vision'");
+    expect(app).toContain("'X-Turno-RX': '1'");
     expect(app).not.toMatch(/sk-[A-Za-z0-9_-]+/);
     expect(app).not.toContain('OPENAI_API_KEY');
     expect(app).not.toContain('CLOUDFLARE_API_TOKEN');
+  });
+
+  it('expone las tres formas de captura solicitadas',()=>{
+    expect(app).toContain("id=\"cameraCapture\"");
+    expect(app).toContain("id=\"galleryCapture\"");
+    expect(app).toContain("id=\"manualCapture\"");
+    expect(app).toContain('capture="environment"');
+    expect(app).toContain('multiple hidden');
+  });
+
+  it('muestra edad, motivo de traslado y oxígeno cuando corresponde',()=>{
+    expect(app).toContain('Nombre / edad');
+    expect(app).toContain('Traslado / motivo');
+    expect(app).toContain('<span>Edad</span>');
+    expect(app).toContain('<span>Motivo</span>');
+    expect(app).toContain('row.oxygenProbable ?');
+    expect(app).toContain('oxygenReason');
   });
 
   it('protege reglas operativas de CE, UP, oxígeno y traslado',()=>{
     expect(app).toContain('CE significa Corta Estancia');
     expect(app).toContain('UP significa Urgencias Pediátricas');
     expect(app).toContain('oxygenProbable=true SOLO');
-    expect(app).toContain('Silla/Camilla es una estimación operativa, no una orden');
+    expect(app).toContain('ESTIMACIÓN OPERATIVA, no una orden médica');
+    expect(app).toContain('transportReason');
   });
 
   it('no cachea respuestas clínicas de API en el service worker',()=>{
