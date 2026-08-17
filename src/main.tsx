@@ -2,6 +2,7 @@ import React from 'react';
 import ReactDOM from 'react-dom/client';
 import {PatientShiftApp} from './PatientShiftApp';
 import './patient-shift.css';
+import './patient-shift-accessibility.css';
 
 ReactDOM.createRoot(document.getElementById('root')!).render(
   <React.StrictMode>
