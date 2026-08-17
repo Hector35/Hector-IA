@@ -22,21 +22,25 @@ jobs:
           set -euo pipefail
           BASE='https://hector-os.hectorhdzr035.workers.dev/turno-rx'
           for attempt in $(seq 1 30); do
-            if curl -fsS "$BASE/" | grep -q '<title>Turno RX</title>'; then
+            if curl -fsS "$BASE/" | grep -q '/turno-rx/gallery-fix.js'; then
               exit 0
             fi
             sleep 4
           done
-          echo 'Turno RX no apareció en producción dentro del tiempo esperado.'
+          echo 'Turno RX actualizado no apareció en producción dentro del tiempo esperado.'
           exit 1
-      - name: Verificar shell, manifest y service worker
+      - name: Verificar shell, galería, manifest y service worker
         shell: bash
         run: |
           set -euo pipefail
           BASE='https://hector-os.hectorhdzr035.workers.dev/turno-rx'
           curl -fsS "$BASE/" | grep -q '/turno-rx/app.js'
+          curl -fsS "$BASE/" | grep -q '/turno-rx/gallery-fix.js'
+          curl -fsS "$BASE/gallery-fix.js" | grep -q "removeAttribute('capture')"
+          curl -fsS "$BASE/gallery-fix.js" | grep -q 'Foto o galería'
           curl -fsS "$BASE/manifest.webmanifest" | grep -q '"short_name": "Turno RX"'
-          curl -fsS "$BASE/sw.js" | grep -q "url.pathname.startsWith('/api/')"
+          curl -fsS "$BASE/sw.js" | grep -q "turno-rx-shell-v2"
+          curl -fsS "$BASE/sw.js" | grep -q '/turno-rx/gallery-fix.js'
           curl -fsS "$BASE/app.js" | grep -q "fetch('/api/vision'"
       - name: Verificar que el backend de sesión existe
         shell: bash
