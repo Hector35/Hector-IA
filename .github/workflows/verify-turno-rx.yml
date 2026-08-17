@@ -29,7 +29,7 @@ jobs:
           done
           echo 'Turno RX actualizado no apareció en producción dentro del tiempo esperado.'
           exit 1
-      - name: Verificar shell, galería, manifest y service worker
+      - name: Verificar shell, selección múltiple, manifest y service worker
         shell: bash
         run: |
           set -euo pipefail
@@ -37,9 +37,12 @@ jobs:
           curl -fsS "$BASE/" | grep -q '/turno-rx/app.js'
           curl -fsS "$BASE/" | grep -q '/turno-rx/gallery-fix.js'
           curl -fsS "$BASE/gallery-fix.js" | grep -q "removeAttribute('capture')"
-          curl -fsS "$BASE/gallery-fix.js" | grep -q 'Foto o galería'
+          curl -fsS "$BASE/gallery-fix.js" | grep -q "setAttribute('multiple'"
+          curl -fsS "$BASE/gallery-fix.js" | grep -q 'Seleccionar fotos'
+          curl -fsS "$BASE/gallery-fix.js" | grep -q 'importMany'
+          curl -fsS "$BASE/gallery-fix.js" | grep -q 'files.length <= 1'
           curl -fsS "$BASE/manifest.webmanifest" | grep -q '"short_name": "Turno RX"'
-          curl -fsS "$BASE/sw.js" | grep -q "turno-rx-shell-v2"
+          curl -fsS "$BASE/sw.js" | grep -q "turno-rx-shell-v3"
           curl -fsS "$BASE/sw.js" | grep -q '/turno-rx/gallery-fix.js'
           curl -fsS "$BASE/app.js" | grep -q "fetch('/api/vision'"
       - name: Verificar que el backend de sesión existe
