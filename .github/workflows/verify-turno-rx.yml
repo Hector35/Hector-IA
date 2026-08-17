@@ -22,7 +22,7 @@ jobs:
           set -euo pipefail
           BASE='https://hector-os.hectorhdzr035.workers.dev/turno-rx'
           for attempt in $(seq 1 30); do
-            if curl -fsS "$BASE/" | grep -q '/turno-rx/gallery-fix.js'; then
+            if curl -fsS "$BASE/" -o /tmp/turno-rx-index.html && grep -q '/turno-rx/gallery-fix.js' /tmp/turno-rx-index.html; then
               exit 0
             fi
             sleep 4
@@ -34,17 +34,22 @@ jobs:
         run: |
           set -euo pipefail
           BASE='https://hector-os.hectorhdzr035.workers.dev/turno-rx'
-          curl -fsS "$BASE/" | grep -q '/turno-rx/app.js'
-          curl -fsS "$BASE/" | grep -q '/turno-rx/gallery-fix.js'
-          curl -fsS "$BASE/gallery-fix.js" | grep -q "removeAttribute('capture')"
-          curl -fsS "$BASE/gallery-fix.js" | grep -q "setAttribute('multiple'"
-          curl -fsS "$BASE/gallery-fix.js" | grep -q 'Seleccionar fotos'
-          curl -fsS "$BASE/gallery-fix.js" | grep -q 'importMany'
-          curl -fsS "$BASE/gallery-fix.js" | grep -q 'files.length <= 1'
-          curl -fsS "$BASE/manifest.webmanifest" | grep -q '"short_name": "Turno RX"'
-          curl -fsS "$BASE/sw.js" | grep -q "turno-rx-shell-v3"
-          curl -fsS "$BASE/sw.js" | grep -q '/turno-rx/gallery-fix.js'
-          curl -fsS "$BASE/app.js" | grep -q "fetch('/api/vision'"
+          curl -fsS "$BASE/" -o /tmp/index.html
+          curl -fsS "$BASE/gallery-fix.js" -o /tmp/gallery-fix.js
+          curl -fsS "$BASE/manifest.webmanifest" -o /tmp/manifest.webmanifest
+          curl -fsS "$BASE/sw.js" -o /tmp/sw.js
+          curl -fsS "$BASE/app.js" -o /tmp/app.js
+          grep -q '/turno-rx/app.js' /tmp/index.html
+          grep -q '/turno-rx/gallery-fix.js' /tmp/index.html
+          grep -q "removeAttribute('capture')" /tmp/gallery-fix.js
+          grep -q "setAttribute('multiple'" /tmp/gallery-fix.js
+          grep -q 'Seleccionar fotos' /tmp/gallery-fix.js
+          grep -q 'importMany' /tmp/gallery-fix.js
+          grep -q 'files.length <= 1' /tmp/gallery-fix.js
+          grep -q '"short_name": "Turno RX"' /tmp/manifest.webmanifest
+          grep -q "turno-rx-shell-v3" /tmp/sw.js
+          grep -q '/turno-rx/gallery-fix.js' /tmp/sw.js
+          grep -q "fetch('/api/vision'" /tmp/app.js
       - name: Verificar que el backend de sesión existe
         shell: bash
         run: |
