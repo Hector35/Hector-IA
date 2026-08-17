@@ -3,57 +3,55 @@ import {describe,expect,it} from 'vitest';
 
 const read=(path:string)=>readFileSync(new URL(`../${path}`,import.meta.url),'utf8');
 const main=read('src/main.tsx');
-const app=read('src/HectorChatApp.tsx');
-const css=read('src/hector-chat.css');
-const sw=read('public/sw.js');
+const app=read('src/PatientShiftApp.tsx');
+const css=read('src/patient-shift.css');
 
-describe('interfaz elegante de Héctor OS',()=>{
-  it('monta únicamente la nueva experiencia de chat',()=>{
-    expect(main).toContain("import {HectorChatApp} from './HectorChatApp'");
-    expect(main).toContain('<HectorChatApp/>');
-    expect(main).not.toContain('HectorASIEvolutionApp');
-    expect(main).not.toContain('TrainingOverlay');
+describe('control de pacientes por turno',()=>{
+  it('monta la experiencia operativa nueva como pantalla principal',()=>{
+    expect(main).toContain("import {PatientShiftApp} from './PatientShiftApp'");
+    expect(main).toContain('<PatientShiftApp/>');
+    expect(main).toContain("import './patient-shift.css'");
+    expect(main).not.toContain('<HectorChatApp/>');
+    expect(main).not.toContain('<HectorQualityOverlay/>');
   });
 
-  it('mantiene la composición visual aprobada',()=>{
-    expect(app).toContain('¿Qué quieres crear hoy?');
-    expect(app).toContain('Crear imagen');
-    expect(app).toContain('Investigar');
-    expect(app).toContain('Escribir');
-    expect(app).toContain('Resolver');
-    expect(app).toContain('Pregunta lo que quieras…');
-    expect(css).toContain('.hcRuntime');
-    expect(css).toContain('.hcQuickActions');
-    expect(css).toContain('.hcComposer');
+  it('separa Rayos X y pacientes a piso',()=>{
+    expect(app).toContain("type Tab = 'rayos' | 'piso'");
+    expect(app).toContain('Rayos X');
+    expect(app).toContain('Pacientes a piso');
+    expect(app).toContain('Cama / área');
+    expect(app).toContain('Destino');
   });
 
-  it('conserva inteligencia y funciones reales',()=>{
-    expect(app).toContain('api.chat(requestText,conversationId');
-    expect(app).toContain('api.vision(selected.file,userContent)');
-    expect(app).toContain('api.upload(selected.file)');
-    expect(app).toContain('api.conversationMessages(id)');
-    expect(app).toContain("reasoning==='high'?'force':'auto'");
-    expect(app).toContain('SpeechRecognition');
+  it('usa visión para leer solicitudes y obliga a revisar antes de guardar',()=>{
+    expect(app).toContain('api.vision(file, prompt)');
+    expect(app).toContain('Extrae únicamente datos visibles en la imagen');
+    expect(app).toContain('No inventes nombres, diagnósticos, camas, estudios ni valores clínicos');
+    expect(app).toContain('Confirma la solicitud');
+    expect(app).toContain('Agregar a Rayos X');
   });
 
-  it('protege la escritura y las zonas seguras en iPhone',()=>{
-    expect(app).toContain("window.matchMedia('(min-width: 901px) and (pointer: fine)').matches");
-    expect(app).toContain("element.style.height='auto'");
-    expect(css).toContain('env(safe-area-inset-top)');
-    expect(css).toContain('env(safe-area-inset-bottom)');
-    expect(css).toContain('100dvh');
+  it('mantiene las reglas operativas de silla, camilla y oxígeno',()=>{
+    expect(app).toContain("type Transport = 'Silla' | 'Camilla' | 'Por definir'");
+    expect(app).toContain('transport no es una orden médica');
+    expect(app).toContain('oxygenProbable=true SOLO');
+    expect(app).toContain('No lo marques solo por edad, dolor torácico, trauma');
+    expect(app).toContain('O₂ probable');
   });
 
-  it('muestra atribución real y no una marca fija de modelo',()=>{
-    expect(app).toContain("message?.model||message?.provider||'Héctor'");
-    expect(app).toContain("busy?'HÉCTOR • RAZONANDO'");
-    expect(app).not.toContain('GPT-5.6 • RAZONANDO');
+  it('permite corregir, cambiar estado, borrar y copiar el corte',()=>{
+    expect(app).toContain("type Status = 'Pendiente' | 'En traslado' | 'Realizado'");
+    expect(app).toContain('editXRay(patient)');
+    expect(app).toContain('removeXRay(patient.id)');
+    expect(app).toContain('copyCurrentCut');
+    expect(app).toContain('navigator.clipboard.writeText');
   });
 
-  it('mantiene el shell actual y añade Bridge sin restaurar shells retirados',()=>{
-    expect(sw).toContain("const CACHE='hector-elegant-chat-v6'");
-    expect(sw).toContain("const BRIDGE_ASSETS=['/bridge.html','/bridge.css','/bridge.js','/bridge-code-worker.mjs']");
-    expect(sw).toContain("fetch(request,{cache:'no-store'})");
-    expect(sw).not.toContain("const CACHE='hector-command-console-v2'");
+  it('persiste el turno localmente y conserva una interfaz móvil',()=>{
+    expect(app).toContain("const XRAY_KEY = 'turno-imss-rayos-v1'");
+    expect(app).toContain("const FLOOR_KEY = 'turno-imss-piso-v1'");
+    expect(app).toContain('localStorage.setItem');
+    expect(css).toContain('@media(max-width:700px)');
+    expect(css).toContain('.patient-table');
   });
 });
