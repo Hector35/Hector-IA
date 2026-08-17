@@ -81,6 +81,15 @@ function ageFromBirthDate(value: string | null | undefined) {
   return age >= 0 && age < 130 ? age : null;
 }
 
+export function ageFromVision(data: any): number | null {
+  const rawAge = data?.age;
+  if (rawAge !== null && rawAge !== undefined && rawAge !== '') {
+    const numeric = Number(rawAge);
+    if (Number.isFinite(numeric) && numeric >= 0 && numeric < 130) return numeric;
+  }
+  return ageFromBirthDate(data?.birthDate);
+}
+
 function normalizeTransport(value: unknown): Transport {
   const text = String(value ?? '').toLowerCase();
   if (text.includes('camilla')) return 'Camilla';
@@ -163,20 +172,31 @@ export function PatientShiftApp() {
     localStorage.setItem(FLOOR_KEY, JSON.stringify(next));
   }
 
-  const xraySummary = useMemo(() => ({
-    total: xrayPatients.length,
-    pending: xrayPatients.filter((p) => p.status === 'Pendiente').length,
-    moving: xrayPatients.filter((p) => p.status === 'En traslado').length,
-    done: xrayPatients.filter((p) => p.status === 'Realizado').length,
-    oxygen: xrayPatients.filter((p) => p.oxygenProbable && p.status !== 'Realizado').length,
-  }), [xrayPatients]);
+  const xraySummary = useMemo(() => {
+    let pending = 0;
+    let moving = 0;
+    let done = 0;
+    let oxygen = 0;
+    for (const patient of xrayPatients) {
+      if (patient.status === 'Pendiente') pending += 1;
+      else if (patient.status === 'En traslado') moving += 1;
+      else done += 1;
+      if (patient.oxygenProbable && patient.status !== 'Realizado') oxygen += 1;
+    }
+    return {total: xrayPatients.length, pending, moving, done, oxygen};
+  }, [xrayPatients]);
 
-  const floorSummary = useMemo(() => ({
-    total: floorPatients.length,
-    pending: floorPatients.filter((p) => p.status === 'Pendiente').length,
-    moving: floorPatients.filter((p) => p.status === 'En traslado').length,
-    done: floorPatients.filter((p) => p.status === 'Realizado').length,
-  }), [floorPatients]);
+  const floorSummary = useMemo(() => {
+    let pending = 0;
+    let moving = 0;
+    let done = 0;
+    for (const patient of floorPatients) {
+      if (patient.status === 'Pendiente') pending += 1;
+      else if (patient.status === 'En traslado') moving += 1;
+      else done += 1;
+    }
+    return {total: floorPatients.length, pending, moving, done};
+  }, [floorPatients]);
 
   function flash(message: string) {
     setToast(message);
@@ -196,7 +216,7 @@ Formato exacto:
   "bed": "cama o área tal como aparece, por ejemplo C#15, CE1, UA16, UP; no confundas CE con cama",
   "name": "nombre completo visible",
   "birthDate": "YYYY-MM-DD o null",
-  "age": 0,
+  "age": null,
   "study": "estudio o estudios solicitados",
   "transport": "Silla|Camilla|Por definir",
   "transportReason": "razón breve basada SOLO en datos visibles de la solicitud",
@@ -211,11 +231,10 @@ Reglas para la estimación operativa:
 - Si hay fecha de nacimiento pero no edad, calcula la edad a la fecha actual. Si no puede calcularse, age=null.`;
       const result = await api.vision(file, prompt);
       const data = parseVisionJson(extractVisionText(result));
-      const parsedAge = Number.isFinite(Number(data.age)) ? Number(data.age) : ageFromBirthDate(data.birthDate);
       setXrayDraft({
         bed: String(data.bed ?? '').trim(),
         name: String(data.name ?? '').trim(),
-        age: parsedAge !== null && parsedAge >= 0 && parsedAge < 130 ? parsedAge : null,
+        age: ageFromVision(data),
         study: String(data.study ?? '').trim(),
         transport: normalizeTransport(data.transport),
         transportReason: String(data.transportReason ?? '').trim(),
@@ -263,7 +282,9 @@ Reglas para la estimación operativa:
 
   function editXRay(patient: XRayPatient) {
     const {id, createdAt, status, ...draft} = patient;
-    void id; void createdAt; void status;
+    void id;
+    void createdAt;
+    void status;
     setXrayDraft(draft);
     setEditingXRay(patient.id);
     setShowXRayForm(true);
@@ -282,7 +303,7 @@ Reglas para la estimación operativa:
   function saveFloor(event: FormEvent) {
     event.preventDefault();
     if (!floorDraft.bed.trim() || !floorDraft.destination.trim()) return;
-    const clean = {
+    const clean: FloorDraft = {
       ...floorDraft,
       bed: floorDraft.bed.trim(),
       name: floorDraft.name.trim(),
@@ -302,7 +323,9 @@ Reglas para la estimación operativa:
 
   function editFloor(patient: FloorPatient) {
     const {id, createdAt, status, ...draft} = patient;
-    void id; void createdAt; void status;
+    void id;
+    void createdAt;
+    void status;
     setFloorDraft(draft);
     setEditingFloor(patient.id);
     setShowFloorForm(true);
@@ -329,11 +352,11 @@ Reglas para la estimación operativa:
   }
 
   async function copyCurrentCut() {
-    const xrayLines = xrayPatients.map((p) => {
-      const oxygen = p.oxygenProbable ? ` · O2 probable: ${p.oxygenReason || 'sí'}` : '';
-      return `${p.bed || 'Sin cama'} · ${p.name || 'Sin nombre'} · ${p.age ?? 'edad ?'} · ${p.study || 'estudio ?'} · ${p.transport}${oxygen} · ${p.status}`;
+    const xrayLines = xrayPatients.map((patient) => {
+      const oxygen = patient.oxygenProbable ? ` · O2 probable: ${patient.oxygenReason || 'sí'}` : '';
+      return `${patient.bed || 'Sin cama'} · ${patient.name || 'Sin nombre'} · ${patient.age ?? 'edad ?'} · ${patient.study || 'estudio ?'} · ${patient.transport}${oxygen} · ${patient.status}`;
     });
-    const floorLines = floorPatients.map((p) => `${p.bed} · ${p.name || 'Sin nombre'} · ${p.destination} · ${p.transport} · ${p.status}`);
+    const floorLines = floorPatients.map((patient) => `${patient.bed} · ${patient.name || 'Sin nombre'} · ${patient.destination} · ${patient.transport} · ${patient.status}`);
     const text = `CORTE DEL TURNO\n${todayLabel()}\n\nRAYOS X (${xrayPatients.length})\n${xrayLines.join('\n') || 'Sin pacientes'}\n\nA PISO (${floorPatients.length})\n${floorLines.join('\n') || 'Sin pacientes'}`;
     try {
       await navigator.clipboard.writeText(text);
@@ -345,7 +368,7 @@ Reglas para la estimación operativa:
 
   return (
     <div className="shift-app">
-      {toast && <div className="toast" role="status">{toast}</div>}
+      {toast ? <div className="toast" role="status">{toast}</div> : null}
       <header className="topbar">
         <div>
           <div className="eyebrow">Control operativo · turno actual</div>
@@ -377,7 +400,7 @@ Reglas para la estimación operativa:
             <div className="summary-card"><span>Pendientes</span><strong>{xraySummary.pending}</strong></div>
             <div className="summary-card"><span>En traslado</span><strong>{xraySummary.moving}</strong></div>
             <div className="summary-card"><span>Realizados</span><strong>{xraySummary.done}</strong></div>
-            {xraySummary.oxygen > 0 && <div className="summary-card oxygen"><span>O₂ probable</span><strong>{xraySummary.oxygen}</strong></div>}
+            {xraySummary.oxygen > 0 ? <div className="summary-card oxygen"><span>O₂ probable</span><strong>{xraySummary.oxygen}</strong></div> : null}
           </section>
 
           <section className="capture-panel">
@@ -402,37 +425,49 @@ Reglas para la estimación operativa:
               <label className={`button primary ${analyzing ? 'disabled' : ''}`} htmlFor="xray-photo">
                 {analyzing ? 'Analizando…' : 'Tomar / subir foto'}
               </label>
-              <button className="button secondary" onClick={() => {setXrayDraft(emptyXRay); setEditingXRay(null); setShowXRayForm(true);}}>Agregar manual</button>
+              <button className="button secondary" onClick={() => {
+                setXrayDraft(emptyXRay);
+                setEditingXRay(null);
+                setShowXRayForm(true);
+              }}>Agregar manual</button>
             </div>
           </section>
 
-          {uploadError && <div className="error-banner">{uploadError}</div>}
+          {uploadError ? <div className="error-banner">{uploadError}</div> : null}
 
-          {showXRayForm && (
+          {showXRayForm ? (
             <form className="editor" onSubmit={saveXRay}>
               <div className="editor-head">
                 <div>
                   <div className="eyebrow">{editingXRay ? 'Corrección' : 'Revisión antes de guardar'}</div>
                   <h2>{editingXRay ? 'Editar paciente' : 'Confirma la solicitud'}</h2>
                 </div>
-                <button type="button" className="icon-button" aria-label="Cerrar" onClick={() => {setShowXRayForm(false); setEditingXRay(null); setXrayDraft(emptyXRay);}}>×</button>
+                <button type="button" className="icon-button" aria-label="Cerrar" onClick={() => {
+                  setShowXRayForm(false);
+                  setEditingXRay(null);
+                  setXrayDraft(emptyXRay);
+                }}>×</button>
               </div>
               <div className="form-grid">
-                <label>Cama / área<input value={xrayDraft.bed} onChange={(e) => setXrayDraft({...xrayDraft, bed: e.target.value})} placeholder="C#15, CE1, UA16…" /></label>
-                <label>Nombre<input value={xrayDraft.name} onChange={(e) => setXrayDraft({...xrayDraft, name: e.target.value})} placeholder="Nombre del paciente" /></label>
-                <label>Edad<input type="number" min="0" max="129" value={xrayDraft.age ?? ''} onChange={(e) => setXrayDraft({...xrayDraft, age: e.target.value === '' ? null : Number(e.target.value)})} placeholder="Edad" /></label>
-                <label className="span-2">Estudio<textarea value={xrayDraft.study} onChange={(e) => setXrayDraft({...xrayDraft, study: e.target.value})} placeholder="Estudio solicitado" rows={2} /></label>
-                <label>Traslado probable<select value={xrayDraft.transport} onChange={(e) => setXrayDraft({...xrayDraft, transport: e.target.value as Transport})}><option>Silla</option><option>Camilla</option><option>Por definir</option></select></label>
-                <label className="span-2">Por qué<textarea value={xrayDraft.transportReason} onChange={(e) => setXrayDraft({...xrayDraft, transportReason: e.target.value})} placeholder="Razón basada en los datos visibles" rows={2} /></label>
-                <label className="check-row"><input type="checkbox" checked={xrayDraft.oxygenProbable} onChange={(e) => setXrayDraft({...xrayDraft, oxygenProbable: e.target.checked, oxygenReason: e.target.checked ? xrayDraft.oxygenReason : ''})} />Oxígeno probablemente necesario</label>
-                {xrayDraft.oxygenProbable && <label className="span-2">Por qué O₂<textarea value={xrayDraft.oxygenReason} onChange={(e) => setXrayDraft({...xrayDraft, oxygenReason: e.target.value})} placeholder="Dato visible que lo hace probable" rows={2} /></label>}
+                <label>Cama / área<input value={xrayDraft.bed} onChange={(event) => setXrayDraft({...xrayDraft, bed: event.target.value})} placeholder="C#15, CE1, UA16…" /></label>
+                <label>Nombre<input value={xrayDraft.name} onChange={(event) => setXrayDraft({...xrayDraft, name: event.target.value})} placeholder="Nombre del paciente" /></label>
+                <label>Edad<input type="number" min="0" max="129" value={xrayDraft.age ?? ''} onChange={(event) => setXrayDraft({...xrayDraft, age: event.target.value === '' ? null : Number(event.target.value)})} placeholder="Edad" /></label>
+                <label className="span-2">Estudio<textarea value={xrayDraft.study} onChange={(event) => setXrayDraft({...xrayDraft, study: event.target.value})} placeholder="Estudio solicitado" rows={2} /></label>
+                <label>Traslado probable<select value={xrayDraft.transport} onChange={(event) => setXrayDraft({...xrayDraft, transport: event.target.value as Transport})}><option>Silla</option><option>Camilla</option><option>Por definir</option></select></label>
+                <label className="span-2">Por qué<textarea value={xrayDraft.transportReason} onChange={(event) => setXrayDraft({...xrayDraft, transportReason: event.target.value})} placeholder="Razón basada en los datos visibles" rows={2} /></label>
+                <label className="check-row"><input type="checkbox" checked={xrayDraft.oxygenProbable} onChange={(event) => setXrayDraft({...xrayDraft, oxygenProbable: event.target.checked, oxygenReason: event.target.checked ? xrayDraft.oxygenReason : ''})} />Oxígeno probablemente necesario</label>
+                {xrayDraft.oxygenProbable ? <label className="span-2">Por qué O₂<textarea value={xrayDraft.oxygenReason} onChange={(event) => setXrayDraft({...xrayDraft, oxygenReason: event.target.value})} placeholder="Dato visible que lo hace probable" rows={2} /></label> : null}
               </div>
               <div className="editor-actions">
-                <button type="button" className="button ghost" onClick={() => {setShowXRayForm(false); setEditingXRay(null); setXrayDraft(emptyXRay);}}>Cancelar</button>
+                <button type="button" className="button ghost" onClick={() => {
+                  setShowXRayForm(false);
+                  setEditingXRay(null);
+                  setXrayDraft(emptyXRay);
+                }}>Cancelar</button>
                 <button className="button primary" type="submit">{editingXRay ? 'Guardar cambios' : 'Agregar a Rayos X'}</button>
               </div>
             </form>
-          )}
+          ) : null}
 
           <section className="list-section">
             <div className="section-head">
@@ -451,10 +486,10 @@ Reglas para la estimación operativa:
                         <td data-label="Cama"><strong className="bed-chip">{patient.bed || '—'}</strong></td>
                         <td data-label="Paciente"><div className="patient-name">{patient.name || 'Sin nombre'}</div><div className="subtle">{patient.age !== null ? `${patient.age} años` : 'Edad no disponible'} · {formatTime(patient.createdAt)}</div></td>
                         <td data-label="Estudio"><div className="study-text">{patient.study || 'Sin estudio capturado'}</div></td>
-                        <td data-label="Traslado"><strong>{patient.transport}</strong>{patient.transportReason && <div className="reason">{patient.transportReason}</div>}</td>
+                        <td data-label="Traslado"><strong>{patient.transport}</strong>{patient.transportReason ? <div className="reason">{patient.transportReason}</div> : null}</td>
                         <td data-label="Oxígeno">{patient.oxygenProbable ? <div className="oxygen-flag"><strong>O₂ probable</strong><span>{patient.oxygenReason}</span></div> : null}</td>
                         <td data-label="Estado">
-                          <select className={statusClass(patient.status)} value={patient.status} onChange={(e) => setXRayStatus(patient.id, e.target.value as Status)}>
+                          <select className={statusClass(patient.status)} value={patient.status} onChange={(event) => setXRayStatus(patient.id, event.target.value as Status)}>
                             <option>Pendiente</option><option>En traslado</option><option>Realizado</option>
                           </select>
                         </td>
@@ -477,38 +512,49 @@ Reglas para la estimación operativa:
 
           <section className="capture-panel compact">
             <div><div className="eyebrow">Piso</div><h2>Agregar traslado</h2><p>Registra cama/área y destino. El nombre puede quedar vacío si todavía no te lo dieron.</p></div>
-            <button className="button primary" onClick={() => {setFloorDraft(emptyFloor); setEditingFloor(null); setShowFloorForm(true);}}>Agregar paciente</button>
+            <button className="button primary" onClick={() => {
+              setFloorDraft(emptyFloor);
+              setEditingFloor(null);
+              setShowFloorForm(true);
+            }}>Agregar paciente</button>
           </section>
 
-          {showFloorForm && (
+          {showFloorForm ? (
             <form className="editor" onSubmit={saveFloor}>
-              <div className="editor-head"><div><div className="eyebrow">{editingFloor ? 'Corrección' : 'Nuevo traslado'}</div><h2>{editingFloor ? 'Editar paciente a piso' : 'Paciente a piso'}</h2></div><button type="button" className="icon-button" aria-label="Cerrar" onClick={() => setShowFloorForm(false)}>×</button></div>
+              <div className="editor-head">
+                <div><div className="eyebrow">{editingFloor ? 'Corrección' : 'Nuevo traslado'}</div><h2>{editingFloor ? 'Editar paciente a piso' : 'Paciente a piso'}</h2></div>
+                <button type="button" className="icon-button" aria-label="Cerrar" onClick={() => setShowFloorForm(false)}>×</button>
+              </div>
               <div className="form-grid floor-grid">
-                <label>Cama / área<input required value={floorDraft.bed} onChange={(e) => setFloorDraft({...floorDraft, bed: e.target.value})} placeholder="C#11, CE1, UP…" /></label>
-                <label>Nombre <span className="optional">opcional</span><input value={floorDraft.name} onChange={(e) => setFloorDraft({...floorDraft, name: e.target.value})} placeholder="Si te lo proporcionan" /></label>
-                <label>Destino<input required value={floorDraft.destination} onChange={(e) => setFloorDraft({...floorDraft, destination: e.target.value})} placeholder="Nefro, Gastro, MI…" /></label>
-                <label>Traslado<select value={floorDraft.transport} onChange={(e) => setFloorDraft({...floorDraft, transport: e.target.value as Transport})}><option>Por definir</option><option>Silla</option><option>Camilla</option></select></label>
+                <label>Cama / área<input required value={floorDraft.bed} onChange={(event) => setFloorDraft({...floorDraft, bed: event.target.value})} placeholder="C#11, CE1, UP…" /></label>
+                <label>Nombre <span className="optional">opcional</span><input value={floorDraft.name} onChange={(event) => setFloorDraft({...floorDraft, name: event.target.value})} placeholder="Si te lo proporcionan" /></label>
+                <label>Destino<input required value={floorDraft.destination} onChange={(event) => setFloorDraft({...floorDraft, destination: event.target.value})} placeholder="Nefro, Gastro, MI…" /></label>
+                <label>Traslado<select value={floorDraft.transport} onChange={(event) => setFloorDraft({...floorDraft, transport: event.target.value as Transport})}><option>Por definir</option><option>Silla</option><option>Camilla</option></select></label>
               </div>
               <div className="editor-actions"><button type="button" className="button ghost" onClick={() => setShowFloorForm(false)}>Cancelar</button><button className="button primary" type="submit">{editingFloor ? 'Guardar cambios' : 'Agregar a piso'}</button></div>
             </form>
-          )}
+          ) : null}
 
           <section className="list-section">
             <div className="section-head"><div><div className="eyebrow">Seguimiento</div><h2>Pacientes a piso</h2></div><span className="muted">{floorPatients.length} en el turno</span></div>
-            {floorPatients.length === 0 ? <div className="empty-state"><strong>Sin pacientes a piso</strong><span>Agrega el primero cuando te den el destino.</span></div> : (
+            {floorPatients.length === 0 ? (
+              <div className="empty-state"><strong>Sin pacientes a piso</strong><span>Agrega el primero cuando te den el destino.</span></div>
+            ) : (
               <div className="table-wrap">
                 <table className="patient-table floor-table">
                   <thead><tr><th>Cama / área</th><th>Paciente</th><th>Destino</th><th>Traslado</th><th>Estado</th><th></th></tr></thead>
-                  <tbody>{floorPatients.map((patient) => (
-                    <tr key={patient.id} className={patient.status === 'Realizado' ? 'row-done' : ''}>
-                      <td data-label="Cama"><strong className="bed-chip">{patient.bed}</strong></td>
-                      <td data-label="Paciente"><div className="patient-name">{patient.name || 'Nombre no proporcionado'}</div><div className="subtle">{formatTime(patient.createdAt)}</div></td>
-                      <td data-label="Destino"><strong>{patient.destination}</strong></td>
-                      <td data-label="Traslado">{patient.transport}</td>
-                      <td data-label="Estado"><select className={statusClass(patient.status)} value={patient.status} onChange={(e) => setFloorStatus(patient.id, e.target.value as Status)}><option>Pendiente</option><option>En traslado</option><option>Realizado</option></select></td>
-                      <td className="row-actions"><button onClick={() => editFloor(patient)}>Editar</button><button className="danger-text" onClick={() => removeFloor(patient.id)}>Eliminar</button></td>
-                    </tr>
-                  ))}</tbody>
+                  <tbody>
+                    {floorPatients.map((patient) => (
+                      <tr key={patient.id} className={patient.status === 'Realizado' ? 'row-done' : ''}>
+                        <td data-label="Cama"><strong className="bed-chip">{patient.bed}</strong></td>
+                        <td data-label="Paciente"><div className="patient-name">{patient.name || 'Nombre no proporcionado'}</div><div className="subtle">{formatTime(patient.createdAt)}</div></td>
+                        <td data-label="Destino"><strong>{patient.destination}</strong></td>
+                        <td data-label="Traslado">{patient.transport}</td>
+                        <td data-label="Estado"><select className={statusClass(patient.status)} value={patient.status} onChange={(event) => setFloorStatus(patient.id, event.target.value as Status)}><option>Pendiente</option><option>En traslado</option><option>Realizado</option></select></td>
+                        <td className="row-actions"><button onClick={() => editFloor(patient)}>Editar</button><button className="danger-text" onClick={() => removeFloor(patient.id)}>Eliminar</button></td>
+                      </tr>
+                    ))}
+                  </tbody>
                 </table>
               </div>
             )}
