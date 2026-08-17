@@ -1,0 +1,151 @@
+.capture-actions {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex: 0 0 auto;
+}
+
+.capture-icon-btn {
+  width: 46px;
+  height: 46px;
+  display: grid;
+  place-items: center;
+  padding: 0;
+  border: 1px solid rgba(109, 204, 239, .22);
+  border-radius: 15px;
+  background: linear-gradient(180deg, rgba(27, 56, 72, .96), rgba(17, 39, 51, .96));
+  color: #86defb;
+  box-shadow: 0 8px 22px rgba(0,0,0,.18), inset 0 1px 0 rgba(255,255,255,.05);
+  cursor: pointer;
+}
+
+.capture-icon-btn.manual {
+  background: linear-gradient(180deg, #72d8f8, #50c4ed);
+  color: #041117;
+  border-color: transparent;
+}
+
+.capture-icon-btn:active {
+  transform: translateY(1px) scale(.97);
+}
+
+.capture-icon-btn svg {
+  width: 23px;
+  height: 23px;
+  fill: none;
+  stroke: currentColor;
+  stroke-width: 1.9;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+}
+
+.capture-status {
+  margin: -2px 3px 9px;
+  padding: 9px 12px;
+  border: 1px solid rgba(102, 208, 244, .16);
+  border-radius: 12px;
+  background: rgba(102, 208, 244, .07);
+  color: #aee8fb;
+  font-size: 12px;
+  font-weight: 800;
+}
+
+.capture-status[data-state='success'] {
+  border-color: rgba(93, 213, 154, .18);
+  background: rgba(93, 213, 154, .08);
+  color: #b8f1d2;
+}
+
+.capture-status[data-state='error'] {
+  border-color: rgba(255, 114, 114, .2);
+  background: rgba(255, 114, 114, .08);
+  color: #ffc1c1;
+}
+
+.patient-name {
+  color: #f5f8fa;
+  font-weight: 830;
+}
+
+.age-line {
+  display: flex;
+  align-items: baseline;
+  gap: 4px;
+  margin-top: 6px;
+  color: #a9bbc5;
+  font-size: 10.5px;
+  font-weight: 700;
+  line-height: 1.2;
+}
+
+.age-line span,
+.transport-reason span {
+  color: #65808f;
+  font-size: 8.5px;
+  font-weight: 900;
+  text-transform: uppercase;
+  letter-spacing: .07em;
+}
+
+.transport-reason {
+  display: grid;
+  gap: 2px;
+}
+
+.transport-reason.is-empty {
+  color: #667d8a;
+}
+
+.oxygen-chip {
+  max-width: 100%;
+  white-space: normal;
+}
+
+@media (max-width: 430px) {
+  .topbar {
+    gap: 8px;
+  }
+
+  .brand {
+    gap: 7px;
+  }
+
+  .capture-actions {
+    gap: 6px;
+  }
+
+  .capture-icon-btn {
+    width: 42px;
+    height: 42px;
+    border-radius: 13px;
+  }
+
+  .capture-icon-btn svg {
+    width: 21px;
+    height: 21px;
+  }
+
+  .age-line {
+    font-size: 9.6px;
+  }
+
+  .age-line span,
+  .transport-reason span {
+    font-size: 7.8px;
+  }
+}
+
+@media (max-width: 370px) {
+  .capture-actions {
+    gap: 4px;
+  }
+
+  .capture-icon-btn {
+    width: 38px;
+    height: 38px;
+  }
+
+  .brand-dot {
+    display: none;
+  }
+}

@@ -5,6 +5,18 @@ const LEGACY_FLOOR_KEY = 'turno-rx-floor-v1';
 const root = document.getElementById('app');
 let rows = loadRows();
 let editingId = null;
+let processingPhotos = false;
+
+const ICONS = {
+  camera: '<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M9 5.5 10.2 4h3.6L15 5.5h2.5A2.5 2.5 0 0 1 20 8v8.5a2.5 2.5 0 0 1-2.5 2.5h-11A2.5 2.5 0 0 1 4 16.5V8a2.5 2.5 0 0 1 2.5-2.5H9Z"/><circle cx="12" cy="12.5" r="3.2"/></svg>',
+  photo: '<svg viewBox="0 0 24 24" aria-hidden="true"><rect x="3.5" y="4" width="17" height="16" rx="2.5"/><circle cx="9" cy="9" r="1.7"/><path d="m5.5 17 4.2-4.3 3.1 3.1 2.1-2.2 3.6 3.4"/></svg>',
+  pencil: '<svg viewBox="0 0 24 24" aria-hidden="true"><path d="m5 16.5-1 3.5 3.5-1L18.7 7.8a2.1 2.1 0 0 0 0-3l-.5-.5a2.1 2.1 0 0 0-3 0L5 14.5v2Z"/><path d="m13.8 5.7 4.5 4.5"/></svg>'
+};
+
+const VISION_PROMPT = `Analiza esta foto de una solicitud, boleta o pizarrón hospitalario para crear pendientes operativos de traslado. Devuelve SOLO JSON válido, sin markdown, con este formato exacto: {"patients":[{"bed":"","name":"","birthDate":null,"age":null,"target":"","transport":"Silla|Camilla|Por definir","transportReason":"","oxygenProbable":false,"oxygenReason":""}]}.
+Extrae únicamente datos visibles; no inventes nombres, edades, estudios, destinos ni hechos clínicos. bed debe conservar exactamente cama/área; CE significa Corta Estancia y no debe convertirse en cama numérica; UP significa Urgencias Pediátricas. target es el destino/piso o el estudio solicitado, según lo visible. Si hay fecha de nacimiento visible, colócala como YYYY-MM-DD en birthDate; si la edad está explícita, úsala en age.
+transport es una ESTIMACIÓN OPERATIVA, no una orden médica. Elige Silla cuando la información visible sugiera que el paciente está estable, ambulante o puede ir sentado; Camilla cuando haya inmovilidad, trauma importante, déficit neurológico, condición delicada, necesidad evidente de ir acostado o información equivalente. Puedes usar la ubicación visible como pista operativa, pero no inventes condiciones clínicas. Si no hay base suficiente, usa Por definir. transportReason debe explicar brevemente la pista visible o decir que no hay datos suficientes.
+oxygenProbable=true SOLO si hay evidencia visible de oxígeno ya indicado/usado, soporte respiratorio, hipoxemia/SpO2 baja o dificultad respiratoria significativa. Si es false, oxygenReason debe ser vacío. Si es true, oxygenReason debe explicar brevemente la evidencia visible. Si hay varios pacientes en la foto, devuelve todos en patients.`;
 
 function read(key, fallback) {
   try {
@@ -33,18 +45,35 @@ function esc(value) {
   }[char]));
 }
 
+function clean(value) {
+  return String(value ?? '').trim();
+}
+
 function normalizeTransport(value) {
-  const text = String(value || '').toLowerCase();
+  const text = clean(value).toLowerCase();
   if (text.includes('camilla')) return 'Camilla';
   if (text.includes('silla')) return 'Silla';
+  if (text.includes('definir') || text.includes('pendiente')) return 'Por definir';
   return '';
 }
 
 function normalizeAge(value) {
-  const text = String(value ?? '').trim();
+  const text = clean(value);
   if (!text) return null;
   const age = Number.parseInt(text, 10);
   return Number.isFinite(age) && age >= 0 && age <= 130 ? age : null;
+}
+
+function ageFromBirthDate(value) {
+  const text = clean(value);
+  if (!/^\d{4}-\d{2}-\d{2}$/.test(text)) return null;
+  const birth = new Date(`${text}T12:00:00`);
+  if (Number.isNaN(birth.getTime())) return null;
+  const today = new Date();
+  let age = today.getFullYear() - birth.getFullYear();
+  const month = today.getMonth() - birth.getMonth();
+  if (month < 0 || (month === 0 && today.getDate() < birth.getDate())) age -= 1;
+  return age >= 0 && age <= 130 ? age : null;
 }
 
 function loadRows() {
@@ -89,12 +118,13 @@ function loadRows() {
 }
 
 function renderTransport(row) {
-  const type = row.transport || '';
+  const type = normalizeTransport(row.transport) || 'Por definir';
   const icon = type === 'Camilla' ? '🛏️' : type === 'Silla' ? '♿' : '•';
   const klass = type === 'Camilla' ? 'camilla' : type === 'Silla' ? 'silla' : 'unset';
+  const reason = clean(row.transportReason);
   return `
-    <div class="transport-main ${klass}"><span>${icon}</span><b>${esc(type || '—')}</b></div>
-    ${row.transportReason ? `<div class="transport-reason">${esc(row.transportReason)}</div>` : ''}
+    <div class="transport-main ${klass}"><span>${icon}</span><b>${esc(type)}</b></div>
+    <div class="transport-reason ${reason ? '' : 'is-empty'}"><span>Motivo</span>${esc(reason || '—')}</div>
     ${row.oxygenProbable ? `<div class="oxygen-chip">O₂${row.oxygenReason ? ` · ${esc(row.oxygenReason)}` : ''}</div>` : ''}
   `;
 }
@@ -107,8 +137,16 @@ function render() {
           <span class="brand-dot"></span>
           <h1>Pendientes</h1>
         </div>
-        <button class="add-btn" id="addPatient"><span>＋</span> Capturar</button>
+        <div class="capture-actions" aria-label="Opciones de captura">
+          <button class="capture-icon-btn" id="cameraCapture" type="button" aria-label="Tomar foto">${ICONS.camera}</button>
+          <button class="capture-icon-btn" id="galleryCapture" type="button" aria-label="Elegir foto">${ICONS.photo}</button>
+          <button class="capture-icon-btn manual" id="manualCapture" type="button" aria-label="Captura manual">${ICONS.pencil}</button>
+        </div>
+        <input id="cameraInput" type="file" accept="image/*" capture="environment" hidden />
+        <input id="galleryInput" type="file" accept="image/*" multiple hidden />
       </header>
+
+      <div class="capture-status" id="captureStatus" hidden></div>
 
       <section class="table-wrap" aria-label="Pacientes pendientes">
         <table class="patient-table">
@@ -122,9 +160,9 @@ function render() {
           <thead>
             <tr>
               <th>Cama</th>
-              <th>Nombre</th>
+              <th>Nombre / edad</th>
               <th>Destino / estudio</th>
-              <th>Traslado</th>
+              <th>Traslado / motivo</th>
               <th></th>
             </tr>
           </thead>
@@ -135,7 +173,7 @@ function render() {
                   <div class="empty-state">
                     <div class="empty-icon">＋</div>
                     <b>Sin pendientes</b>
-                    <span>Toca Capturar para agregar el primero.</span>
+                    <span>Usa cámara, foto o lápiz para capturar.</span>
                   </div>
                 </td>
               </tr>
@@ -180,7 +218,7 @@ function render() {
           <label>
             <span>Traslado más probable</span>
             <select id="transport" name="transport">
-              <option value="">—</option>
+              <option value="Por definir">Por definir</option>
               <option value="Silla">Silla</option>
               <option value="Camilla">Camilla</option>
             </select>
@@ -217,8 +255,8 @@ function renderRow(row) {
     <tr class="patient-row" data-id="${esc(row.id)}" title="Toca para editar">
       <td class="bed-cell"><span>${esc(row.bed || '—')}</span></td>
       <td class="name-cell">
-        ${esc(row.name || '—')}
-        ${age !== null ? `<div class="transport-reason">${age} años</div>` : ''}
+        <div class="patient-name">${esc(row.name || '—')}</div>
+        <div class="age-line"><span>Edad</span>${age !== null ? `${age} años` : '—'}</div>
       </td>
       <td class="target-cell">${esc(row.target || '—')}</td>
       <td class="transport-cell">${renderTransport(row)}</td>
@@ -230,7 +268,11 @@ function renderRow(row) {
 }
 
 function bind() {
-  document.getElementById('addPatient')?.addEventListener('click', () => openSheet());
+  document.getElementById('cameraCapture')?.addEventListener('click', () => document.getElementById('cameraInput')?.click());
+  document.getElementById('galleryCapture')?.addEventListener('click', () => document.getElementById('galleryInput')?.click());
+  document.getElementById('manualCapture')?.addEventListener('click', () => openSheet());
+  document.getElementById('cameraInput')?.addEventListener('change', handlePhotoInput);
+  document.getElementById('galleryInput')?.addEventListener('change', handlePhotoInput);
   document.getElementById('closeSheet')?.addEventListener('click', closeSheet);
   document.getElementById('sheetBackdrop')?.addEventListener('click', (event) => {
     if (event.target.id === 'sheetBackdrop') closeSheet();
@@ -251,6 +293,139 @@ function bind() {
   document.getElementById('oxygenProbable')?.addEventListener('change', syncOxygenField);
 }
 
+function setCaptureStatus(message, state = 'busy') {
+  const status = document.getElementById('captureStatus');
+  if (!status) return;
+  if (!message) {
+    status.hidden = true;
+    status.textContent = '';
+    status.dataset.state = '';
+    return;
+  }
+  status.hidden = false;
+  status.dataset.state = state;
+  status.textContent = message;
+}
+
+function parseVisionJSON(value) {
+  if (value && typeof value === 'object') return value;
+  const raw = clean(value);
+  if (!raw) throw new Error('La IA no devolvió datos.');
+  const fenced = raw.match(/```(?:json)?\s*([\s\S]*?)```/i)?.[1]?.trim();
+  const source = fenced || raw;
+  try {
+    return JSON.parse(source);
+  } catch {
+    const start = source.indexOf('{');
+    const end = source.lastIndexOf('}');
+    if (start >= 0 && end > start) return JSON.parse(source.slice(start, end + 1));
+    throw new Error('No pude interpretar los datos de la foto.');
+  }
+}
+
+function normalizeVisionRow(patient) {
+  const age = normalizeAge(patient?.age) ?? ageFromBirthDate(patient?.birthDate);
+  const oxygenProbable = Boolean(patient?.oxygenProbable);
+  return {
+    id: uid(),
+    bed: clean(patient?.bed),
+    name: clean(patient?.name),
+    age,
+    target: clean(patient?.target || patient?.study || patient?.destination),
+    transport: normalizeTransport(patient?.transport) || 'Por definir',
+    transportReason: clean(patient?.transportReason),
+    oxygenProbable,
+    oxygenReason: oxygenProbable ? clean(patient?.oxygenReason) : '',
+    createdAt: new Date().toISOString()
+  };
+}
+
+async function analyzePhoto(file) {
+  if (!(file instanceof File) || !file.type.startsWith('image/')) throw new Error('Selecciona una imagen.');
+  if (file.size > 8 * 1024 * 1024) throw new Error(`${file.name || 'La foto'} pesa más de 8 MB.`);
+
+  const form = new FormData();
+  form.append('image', file);
+  form.append('prompt', VISION_PROMPT);
+
+  const response = await fetch('/api/turno-rx/vision', {
+    method: 'POST',
+    headers: {'X-Turno-RX': '1'},
+    body: form,
+    credentials: 'same-origin'
+  });
+  const data = await response.json().catch(() => ({}));
+  if (!response.ok) throw new Error(data.error || `No se pudo analizar la foto (${response.status}).`);
+
+  const parsed = parseVisionJSON(data.text || data.answer || data.output_text || data);
+  const patients = Array.isArray(parsed?.patients) ? parsed.patients : [parsed];
+  return patients.map(normalizeVisionRow).filter((row) => row.bed || row.name || row.target);
+}
+
+function rowKey(row) {
+  return [row.bed, row.name, row.target].map((value) => clean(value).toLowerCase()).join('|');
+}
+
+function mergeRow(existing, incoming) {
+  const incomingTransport = normalizeTransport(incoming.transport);
+  const existingTransport = normalizeTransport(existing.transport);
+  return {
+    ...existing,
+    bed: incoming.bed || existing.bed || '',
+    name: incoming.name || existing.name || '',
+    age: incoming.age ?? normalizeAge(existing.age),
+    target: incoming.target || existing.target || '',
+    transport: incomingTransport && incomingTransport !== 'Por definir' ? incomingTransport : (existingTransport || incomingTransport || 'Por definir'),
+    transportReason: incoming.transportReason || existing.transportReason || '',
+    oxygenProbable: Boolean(existing.oxygenProbable || incoming.oxygenProbable),
+    oxygenReason: incoming.oxygenReason || existing.oxygenReason || ''
+  };
+}
+
+function addAnalyzedRows(incomingRows) {
+  const next = [...rows];
+  for (const incoming of incomingRows) {
+    const key = rowKey(incoming);
+    const index = key !== '||' ? next.findIndex((row) => rowKey(row) === key) : -1;
+    if (index >= 0) next[index] = mergeRow(next[index], incoming);
+    else next.unshift(incoming);
+  }
+  rows = next;
+  save();
+}
+
+async function handlePhotoInput(event) {
+  const input = event.currentTarget;
+  const files = [...(input.files || [])];
+  input.value = '';
+  if (!files.length || processingPhotos) return;
+
+  processingPhotos = true;
+  const imported = [];
+  const errors = [];
+  try {
+    for (let index = 0; index < files.length; index += 1) {
+      setCaptureStatus(files.length > 1 ? `Leyendo foto ${index + 1} de ${files.length}…` : 'Leyendo foto…');
+      try {
+        imported.push(...await analyzePhoto(files[index]));
+      } catch (error) {
+        errors.push(error instanceof Error ? error.message : 'No pude leer una foto.');
+      }
+    }
+
+    if (imported.length) {
+      addAnalyzedRows(imported);
+      render();
+      setCaptureStatus(`${imported.length} ${imported.length === 1 ? 'paciente agregado' : 'pacientes agregados'}.`, 'success');
+      window.setTimeout(() => setCaptureStatus(''), 2600);
+    } else {
+      setCaptureStatus(errors[0] || 'No encontré pacientes en la foto.', 'error');
+    }
+  } finally {
+    processingPhotos = false;
+  }
+}
+
 function syncOxygenField() {
   const checked = document.getElementById('oxygenProbable')?.checked;
   const wrap = document.getElementById('oxygenReasonWrap');
@@ -267,7 +442,7 @@ function openSheet(id = null) {
   document.getElementById('age').value = normalizeAge(row?.age) ?? '';
   document.getElementById('name').value = row?.name || '';
   document.getElementById('target').value = row?.target || '';
-  document.getElementById('transport').value = row?.transport || '';
+  document.getElementById('transport').value = normalizeTransport(row?.transport) || 'Por definir';
   document.getElementById('transportReason').value = row?.transportReason || '';
   document.getElementById('oxygenProbable').checked = Boolean(row?.oxygenProbable);
   document.getElementById('oxygenReason').value = row?.oxygenReason || '';
@@ -289,14 +464,14 @@ function submitForm(event) {
   const form = new FormData(event.currentTarget);
   const oxygenProbable = document.getElementById('oxygenProbable')?.checked || false;
   const next = {
-    bed: String(form.get('bed') || '').trim(),
-    name: String(form.get('name') || '').trim(),
+    bed: clean(form.get('bed')),
+    name: clean(form.get('name')),
     age: normalizeAge(form.get('age')),
-    target: String(form.get('target') || '').trim(),
-    transport: normalizeTransport(form.get('transport')),
-    transportReason: String(form.get('transportReason') || '').trim(),
+    target: clean(form.get('target')),
+    transport: normalizeTransport(form.get('transport')) || 'Por definir',
+    transportReason: clean(form.get('transportReason')),
     oxygenProbable,
-    oxygenReason: oxygenProbable ? String(form.get('oxygenReason') || '').trim() : ''
+    oxygenReason: oxygenProbable ? clean(form.get('oxygenReason')) : ''
   };
 
   if (!next.bed && !next.name && !next.target) {

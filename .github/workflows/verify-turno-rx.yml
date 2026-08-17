@@ -17,41 +17,45 @@ jobs:
     runs-on: ubuntu-latest
     timeout-minutes: 5
     steps:
-      - name: Esperar publicación de la PWA
+      - name: Esperar publicación de Pendientes
         shell: bash
         run: |
           set -euo pipefail
           BASE='https://hector-os.hectorhdzr035.workers.dev/turno-rx'
           for attempt in $(seq 1 30); do
-            if curl -fsS "$BASE/" -o /tmp/turno-rx-index.html && grep -q '/turno-rx/direct-vision.js' /tmp/turno-rx-index.html; then
+            if curl -fsS "$BASE/" -o /tmp/index.html && grep -q 'app.js?v=9' /tmp/index.html && grep -q 'capture-enhancements.css?v=1' /tmp/index.html; then
               exit 0
             fi
             sleep 4
           done
-          echo 'Turno RX actualizado no apareció en producción dentro del tiempo esperado.'
+          echo 'Pendientes actualizado no apareció en producción dentro del tiempo esperado.'
           exit 1
-      - name: Verificar selección directa, manifest y service worker
+
+      - name: Verificar captura y datos operativos
         shell: bash
         run: |
           set -euo pipefail
           BASE='https://hector-os.hectorhdzr035.workers.dev/turno-rx'
           curl -fsS "$BASE/" -o /tmp/index.html
-          curl -fsS "$BASE/direct-vision.js" -o /tmp/direct-vision.js
-          curl -fsS "$BASE/gallery-fix.js" -o /tmp/gallery-fix.js
+          curl -fsS "$BASE/app.js?v=9" -o /tmp/app.js
+          curl -fsS "$BASE/capture-enhancements.css?v=1" -o /tmp/capture.css
           curl -fsS "$BASE/manifest.webmanifest" -o /tmp/manifest.webmanifest
           curl -fsS "$BASE/sw.js" -o /tmp/sw.js
-          grep -q '/turno-rx/direct-vision.js' /tmp/index.html
-          grep -q '/api/turno-rx/vision' /tmp/direct-vision.js
-          grep -q 'X-Turno-RX' /tmp/direct-vision.js
-          grep -q 'removeSessionNotice' /tmp/direct-vision.js
-          grep -q "removeAttribute('capture')" /tmp/gallery-fix.js
-          grep -q "setAttribute('multiple'" /tmp/gallery-fix.js
-          grep -q 'Seleccionar fotos' /tmp/gallery-fix.js
-          grep -q 'importMany' /tmp/gallery-fix.js
-          grep -q '"short_name": "Turno RX"' /tmp/manifest.webmanifest
-          grep -q "turno-rx-shell-v4" /tmp/sw.js
-          grep -q '/turno-rx/direct-vision.js' /tmp/sw.js
-      - name: Verificar visión de Turno RX sin login
+          grep -q 'cameraCapture' /tmp/app.js
+          grep -q 'galleryCapture' /tmp/app.js
+          grep -q 'manualCapture' /tmp/app.js
+          grep -q '/api/turno-rx/vision' /tmp/app.js
+          grep -q 'X-Turno-RX' /tmp/app.js
+          grep -q 'Nombre / edad' /tmp/app.js
+          grep -q 'Traslado / motivo' /tmp/app.js
+          grep -q 'oxygenProbable' /tmp/app.js
+          grep -q 'capture-icon-btn' /tmp/capture.css
+          grep -q '"short_name": "Pendientes"' /tmp/manifest.webmanifest
+          grep -q "turno-rx-shell-v8" /tmp/sw.js
+          grep -q 'capture-enhancements.css?v=1' /tmp/sw.js
+          grep -q 'app.js?v=9' /tmp/sw.js
+
+      - name: Verificar visión sin login
         shell: bash
         run: |
           set -euo pipefail

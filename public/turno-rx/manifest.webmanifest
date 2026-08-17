@@ -1,12 +1,12 @@
 {
-  "name": "Turno RX · Control de pacientes",
-  "short_name": "Turno RX",
-  "description": "Control local de Rayos X y pacientes a piso durante el turno.",
+  "name": "Pendientes",
+  "short_name": "Pendientes",
+  "description": "Captura rápida de pacientes pendientes, destino o estudio y traslado operativo.",
   "start_url": "/turno-rx/",
   "scope": "/turno-rx/",
   "display": "standalone",
-  "background_color": "#0b1117",
-  "theme_color": "#0b1117",
+  "background_color": "#071017",
+  "theme_color": "#071017",
   "orientation": "portrait-primary",
   "icons": [
     {"src":"/turno-rx/icon.svg","sizes":"any","type":"image/svg+xml","purpose":"any maskable"}
