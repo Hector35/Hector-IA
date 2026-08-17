@@ -1,8 +1,9 @@
-const CACHE = 'turno-rx-shell-v3';
+const CACHE = 'turno-rx-shell-v4';
 const SHELL = [
   '/turno-rx/',
   '/turno-rx/index.html',
   '/turno-rx/styles.css',
+  '/turno-rx/direct-vision.js',
   '/turno-rx/app.js',
   '/turno-rx/gallery-fix.js',
   '/turno-rx/manifest.webmanifest',
