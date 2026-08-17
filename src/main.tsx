@@ -1,15 +1,11 @@
 import React from 'react';
 import ReactDOM from 'react-dom/client';
-import {HectorChatApp} from './HectorChatApp';
-import {HectorQualityOverlay} from './HectorQualityOverlay';
-import './hector-chat.css';
-import './hector-chat-mobile-refinement.css';
-import './hector-quality-overlay.css';
+import {PatientShiftApp} from './PatientShiftApp';
+import './patient-shift.css';
 
 ReactDOM.createRoot(document.getElementById('root')!).render(
   <React.StrictMode>
-    <HectorChatApp/>
-    <HectorQualityOverlay/>
+    <PatientShiftApp/>
   </React.StrictMode>
 );
 
