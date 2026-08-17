@@ -40,6 +40,13 @@ function normalizeTransport(value) {
   return '';
 }
 
+function normalizeAge(value) {
+  const text = String(value ?? '').trim();
+  if (!text) return null;
+  const age = Number.parseInt(text, 10);
+  return Number.isFinite(age) && age >= 0 && age <= 130 ? age : null;
+}
+
 function loadRows() {
   const current = read(STORAGE_KEY, null);
   if (Array.isArray(current)) return current;
@@ -53,6 +60,7 @@ function loadRows() {
         id: p.id || uid(),
         bed: p.bed || '',
         name: p.name || '',
+        age: normalizeAge(p.age),
         target: p.study || '',
         transport: normalizeTransport(p.transport),
         transportReason: p.transportReason || '',
@@ -66,6 +74,7 @@ function loadRows() {
         id: p.id || uid(),
         bed: p.bed || '',
         name: p.name || '',
+        age: normalizeAge(p.age),
         target: p.destination || '',
         transport: normalizeTransport(p.transport),
         transportReason: p.transportReason || '',
@@ -154,6 +163,11 @@ function render() {
           </label>
 
           <label>
+            <span>Edad</span>
+            <input id="age" name="age" type="number" inputmode="numeric" min="0" max="130" autocomplete="off" placeholder="Años" />
+          </label>
+
+          <label class="full">
             <span>Nombre</span>
             <input id="name" name="name" autocomplete="off" placeholder="Nombre del paciente" />
           </label>
@@ -198,10 +212,14 @@ function render() {
 }
 
 function renderRow(row) {
+  const age = normalizeAge(row.age);
   return `
     <tr class="patient-row" data-id="${esc(row.id)}" title="Toca para editar">
       <td class="bed-cell"><span>${esc(row.bed || '—')}</span></td>
-      <td class="name-cell">${esc(row.name || '—')}</td>
+      <td class="name-cell">
+        ${esc(row.name || '—')}
+        ${age !== null ? `<div class="transport-reason">${age} años</div>` : ''}
+      </td>
       <td class="target-cell">${esc(row.target || '—')}</td>
       <td class="transport-cell">${renderTransport(row)}</td>
       <td class="action-cell">
@@ -246,6 +264,7 @@ function openSheet(id = null) {
 
   document.getElementById('sheetTitle').textContent = row ? 'Editar paciente' : 'Capturar paciente';
   document.getElementById('bed').value = row?.bed || '';
+  document.getElementById('age').value = normalizeAge(row?.age) ?? '';
   document.getElementById('name').value = row?.name || '';
   document.getElementById('target').value = row?.target || '';
   document.getElementById('transport').value = row?.transport || '';
@@ -272,6 +291,7 @@ function submitForm(event) {
   const next = {
     bed: String(form.get('bed') || '').trim(),
     name: String(form.get('name') || '').trim(),
+    age: normalizeAge(form.get('age')),
     target: String(form.get('target') || '').trim(),
     transport: normalizeTransport(form.get('transport')),
     transportReason: String(form.get('transportReason') || '').trim(),
