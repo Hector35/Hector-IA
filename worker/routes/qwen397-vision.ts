@@ -7,11 +7,36 @@ import {inspectImage,estimateCost} from '../lib/openai';
 export const qwen397Vision=new Hono<{Bindings:Bindings;Variables:Variables}>();
 qwen397Vision.use('/vision',requireAuth);
 
+async function imagePayload(file:File){
+ const bytes=new Uint8Array(await file.arrayBuffer());let binary='';for(let i=0;i<bytes.length;i+=32768)binary+=String.fromCharCode(...bytes.subarray(i,i+32768));
+ return `data:${file.type};base64,${btoa(binary)}`;
+}
+
+qwen397Vision.post('/turno-rx/vision',async c=>{
+ const marker=c.req.header('X-Turno-RX'),origin=c.req.header('Origin'),site=String(c.req.header('Sec-Fetch-Site')||'').toLowerCase(),targetOrigin=new URL(c.req.url).origin;
+ if(marker!=='1'||site==='cross-site'||(origin&&origin!==targetOrigin))return c.json({error:'Solicitud de Turno RX inválida'},403);
+ const form=await c.req.formData(),file=form.get('image'),prompt=String(form.get('prompt')||'Analiza la imagen y devuelve únicamente los datos solicitados.');
+ if(!(file instanceof File)||!file.type.startsWith('image/')||file.size>8*1024*1024)return c.json({error:'Imagen inválida o mayor a 8 MB'},400);
+ const dataUrl=await imagePayload(file),configured=hasQwen397Endpoint(c.env),status=qwen397Status(c.env);
+ try{
+  if(configured){
+   try{
+    const out=await callQwen397Vision(c.env,prompt,dataUrl);
+    return c.json({text:out.text,model:out.model,requestedModel:status.model,provider:'Qwen 397B endpoint',fallback:false});
+   }catch(error){
+    const reason=error instanceof Error?error.message:'Qwen 397B no respondió',out=await inspectImage(c.env,prompt,dataUrl);
+    return c.json({text:out.text,model:out.model,requestedModel:status.model,provider:'OpenAI',fallback:true,fallbackReason:reason});
+   }
+  }
+  const out=await inspectImage(c.env,prompt,dataUrl);
+  return c.json({text:out.text,model:out.model,requestedModel:status.model,provider:'OpenAI',fallback:true,fallbackReason:'Qwen 397B no disponible'});
+ }catch(error){return c.json({error:error instanceof Error?error.message:'Error de visión'},502);}
+});
+
 qwen397Vision.post('/vision',async c=>{
  const form=await c.req.formData(),file=form.get('image'),prompt=String(form.get('prompt')||'¿Qué ves y qué debería saber o hacer?');
  if(!(file instanceof File)||!file.type.startsWith('image/')||file.size>8*1024*1024)return c.json({error:'Imagen inválida o mayor a 8 MB'},400);
- const bytes=new Uint8Array(await file.arrayBuffer());let binary='';for(let i=0;i<bytes.length;i+=32768)binary+=String.fromCharCode(...bytes.subarray(i,i+32768));
- const dataUrl=`data:${file.type};base64,${btoa(binary)}`,configured=hasQwen397Endpoint(c.env),status=qwen397Status(c.env);
+ const dataUrl=await imagePayload(file),configured=hasQwen397Endpoint(c.env),status=qwen397Status(c.env);
  try{
   if(configured){
    try{
