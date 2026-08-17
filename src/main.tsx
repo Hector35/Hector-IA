@@ -4,6 +4,7 @@ import {PatientShiftApp} from './PatientShiftApp';
 import './patient-shift.css';
 import './patient-shift-accessibility.css';
 
+// Active PWA surface: patient shift control.
 ReactDOM.createRoot(document.getElementById('root')!).render(
   <React.StrictMode>
     <PatientShiftApp/>
