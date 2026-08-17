@@ -1,0 +1,8 @@
+.shift-app{padding-bottom:calc(60px + env(safe-area-inset-bottom));padding-left:max(28px,env(safe-area-inset-left));padding-right:max(28px,env(safe-area-inset-right))}
+.button,.tab,.icon-button,.row-actions button,.status{min-height:48px}
+.button,.tab,.icon-button,.row-actions button{-webkit-tap-highlight-color:transparent}
+.button:focus-visible,.tab:focus-visible,.icon-button:focus-visible,.row-actions button:focus-visible,.status:focus-visible,input:focus-visible,textarea:focus-visible,select:focus-visible{outline:3px solid #69a6f5;outline-offset:2px}
+@media(max-width:700px){.shift-app{padding-top:calc(16px + env(safe-area-inset-top));padding-left:max(12px,env(safe-area-inset-left));padding-right:max(12px,env(safe-area-inset-right));padding-bottom:calc(42px + env(safe-area-inset-bottom))}.button{min-height:50px}.tab{min-height:50px}.status{min-height:44px}}
+@media(prefers-reduced-motion:reduce){*,*::before,*::after{scroll-behavior:auto!important;animation-duration:.01ms!important;animation-iteration-count:1!important;transition-duration:.01ms!important}}
+@media(prefers-contrast:more){.button,.summary-card,.editor,.list-section,.capture-panel,.privacy-note,.patient-table th,.patient-table td{border-width:2px}.subtle,.reason,.muted{color:currentColor}.bed-chip,.status,.oxygen-flag{border-width:2px}}
+@media(forced-colors:active){.button,.tab,.summary-card,.editor,.list-section,.capture-panel,.privacy-note,.bed-chip,.status,.oxygen-flag{forced-color-adjust:auto;border:1px solid CanvasText}.tab.active{outline:2px solid Highlight}.row-done{opacity:1}}
