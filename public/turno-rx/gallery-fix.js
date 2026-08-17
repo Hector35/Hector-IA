@@ -16,8 +16,8 @@ const patchPhotoInputs = () => {
 
   const rxButton = document.getElementById('rxPhoto');
   const floorButton = document.getElementById('floorPhoto');
-  if (rxButton) rxButton.textContent = '📷 Seleccionar fotos';
-  if (floorButton) floorButton.textContent = '📷 Seleccionar fotos';
+  if (rxButton && rxButton.textContent !== '📷 Seleccionar fotos') rxButton.textContent = '📷 Seleccionar fotos';
+  if (floorButton && floorButton.textContent !== '📷 Seleccionar fotos') floorButton.textContent = '📷 Seleccionar fotos';
 };
 
 function readList(key) {
