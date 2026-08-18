@@ -1,0 +1,96 @@
+/* Pendientes v24 — cada paciente ocupa un solo renglón en la vista compacta */
+.imaging-table col:nth-child(1) { width: 10% !important; }
+.imaging-table col:nth-child(2) { width: 38% !important; }
+.imaging-table col:nth-child(3) { width: 25% !important; }
+.imaging-table col:nth-child(4) { width: 27% !important; }
+
+.imaging-table .imaging-row td:nth-child(-n+4) {
+  vertical-align: middle !important;
+  white-space: nowrap !important;
+  overflow: hidden !important;
+  text-overflow: ellipsis !important;
+  padding-top: 9px !important;
+  padding-bottom: 9px !important;
+}
+
+.imaging-table .bed-cell,
+.imaging-table .bed-cell span,
+.imaging-table .patient-name,
+.imaging-table .study-cell {
+  white-space: nowrap !important;
+  overflow: hidden !important;
+  text-overflow: ellipsis !important;
+  word-break: normal !important;
+  overflow-wrap: normal !important;
+}
+
+/* Edad y sexo siguen disponibles en el detalle al tocar, pero no ocupan una segunda línea. */
+.imaging-table .age-line {
+  display: none !important;
+}
+
+.imaging-table .patient-name {
+  display: block !important;
+  max-width: 100% !important;
+  font-size: 11.5px !important;
+  line-height: 1.15 !important;
+}
+
+.imaging-table .study-cell {
+  max-width: 0 !important;
+  font-size: 11px !important;
+  line-height: 1.15 !important;
+}
+
+.imaging-table .transport-cell {
+  overflow: hidden !important;
+  white-space: nowrap !important;
+}
+
+.imaging-table .transport-main {
+  display: inline-flex !important;
+  align-items: center !important;
+  max-width: 100% !important;
+  min-height: 24px !important;
+  padding: 2px 4px !important;
+  gap: 2px !important;
+  font-size: 9.5px !important;
+  line-height: 1 !important;
+  white-space: nowrap !important;
+  overflow: hidden !important;
+}
+
+.imaging-table .transport-main span {
+  flex: 0 0 auto !important;
+  font-size: 11px !important;
+}
+
+.imaging-table .transport-main b {
+  min-width: 0 !important;
+  overflow: hidden !important;
+  text-overflow: ellipsis !important;
+  white-space: nowrap !important;
+}
+
+.imaging-table th:nth-child(-n+4) {
+  white-space: nowrap !important;
+  overflow: hidden !important;
+  text-overflow: clip !important;
+}
+
+@media (max-width: 430px) {
+  .imaging-table col:nth-child(1) { width: 10% !important; }
+  .imaging-table col:nth-child(2) { width: 38% !important; }
+  .imaging-table col:nth-child(3) { width: 25% !important; }
+  .imaging-table col:nth-child(4) { width: 27% !important; }
+
+  .imaging-table .imaging-row td:nth-child(-n+4) {
+    padding-left: 4px !important;
+    padding-right: 4px !important;
+  }
+
+  .imaging-table .patient-name { font-size: 11px !important; }
+  .imaging-table .study-cell { font-size: 10.5px !important; }
+  .imaging-table .transport-main { font-size: 9px !important; padding: 2px 3px !important; }
+  .imaging-table th { font-size: 8px !important; padding-left: 4px !important; padding-right: 4px !important; }
+}
