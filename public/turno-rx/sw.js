@@ -1,4 +1,4 @@
-const CACHE = 'turno-rx-shell-v47-progressive-floor-selector';
+const CACHE = 'turno-rx-shell-v48-progressive-floor-selector-night-theme';
 const SHELL = [
   '/turno-rx/',
   '/turno-rx/index.html',

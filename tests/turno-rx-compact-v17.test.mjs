@@ -111,8 +111,8 @@ describe('Pendientes vista compacta',()=>{
     expect(redesign).toContain('.compact-detail-close{');
   });
 
-  it('aplica el tema premium solicitado sin quitar el tema claro base',()=>{
-    expect(index).toContain('<meta name="theme-color" content="#F1F5F9"');
+  it('aplica el tema azul noche sin quitar las capas base',()=>{
+    expect(index).toContain('<meta name="theme-color" content="#0B1220"');
     expect(light).toContain('--v34-bg:#edf3f7');
     expect(light).toContain('color-scheme:light');
     expect(premium).toContain('--p37-blue:#2563EB');

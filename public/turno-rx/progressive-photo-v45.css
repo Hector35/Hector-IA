@@ -1,7 +1,7 @@
-.photo-queue{margin:8px 12px 12px;padding:10px 12px;border:1px solid #c7d2fe;border-radius:14px;background:#eef2ff;color:#0f172a;box-shadow:0 5px 18px rgba(37,99,235,.08)}
+.photo-queue{margin:8px 12px 12px;padding:10px 12px;border:1px solid #314563;border-radius:14px;background:#162337;color:#f1f5f9;box-shadow:0 5px 18px rgba(2,8,23,.22)}
 .photo-queue-head,.photo-job{display:flex;align-items:center;justify-content:space-between;gap:10px}
-.photo-queue-head strong{font-size:13px}.photo-queue-summary{margin-top:3px;font-size:11px;color:#475569}
-.photo-queue-actions{display:flex;gap:6px}.photo-queue button{border:0;border-radius:9px;padding:6px 9px;background:#dbeafe;color:#1d4ed8;font-size:11px;font-weight:750}
-.photo-jobs{display:grid;gap:5px;margin-top:8px}.photo-job{padding-top:5px;border-top:1px solid rgba(99,102,241,.14);font-size:11px}
-.photo-job-name{min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;color:#334155}.photo-job-state{flex:none;font-weight:750;color:#475569}.photo-job[data-state="Analizando"] .photo-job-state{color:#2563eb}.photo-job[data-state="Terminada"] .photo-job-state{color:#15803d}.photo-job[data-state="Requiere revisión"] .photo-job-state,.photo-job[data-state="Error"] .photo-job-state{color:#b45309}
+.photo-queue-head strong{font-size:13px}.photo-queue-summary{margin-top:3px;font-size:11px;color:#afc0d4}
+.photo-queue-actions{display:flex;gap:6px}.photo-queue button{border:1px solid #314563;border-radius:9px;padding:6px 9px;background:#223451;color:#60a5fa;font-size:11px;font-weight:750}
+.photo-jobs{display:grid;gap:5px;margin-top:8px}.photo-job{padding-top:5px;border-top:1px solid #314563;font-size:11px}
+.photo-job-name{min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;color:#d9e3ef}.photo-job-state{flex:none;font-weight:750;color:#afc0d4}.photo-job[data-state="Analizando"] .photo-job-state{color:#60a5fa}.photo-job[data-state="Terminada"] .photo-job-state{color:#6ee7b7}.photo-job[data-state="Requiere revisión"] .photo-job-state,.photo-job[data-state="Error"] .photo-job-state{color:#fbbf24}
 @media(max-width:480px){.photo-queue{margin-inline:8px}.photo-jobs{max-height:124px;overflow:auto}}

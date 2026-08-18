@@ -71,9 +71,9 @@ describe('Pendientes PWA v16',()=>{
     expect(premiumCss).toContain('.v37-drawer{');
   });
 
-  it('aplica la paleta premium solicitada a la interfaz',()=>{
-    expect(index).toContain('<meta name="theme-color" content="#F1F5F9"');
-    expect(index).toContain('apple-mobile-web-app-status-bar-style" content="default"');
+  it('aplica la paleta azul noche solicitada a la interfaz',()=>{
+    expect(index).toContain('<meta name="theme-color" content="#0B1220"');
+    expect(index).toContain('apple-mobile-web-app-status-bar-style" content="black-translucent"');
     expect(lightCss).toContain('--v34-bg:#edf3f7');
     expect(lightCss).toContain('.compact-detail-sheet,');
     expect(lightCss).toContain('.capture-sheet{');
