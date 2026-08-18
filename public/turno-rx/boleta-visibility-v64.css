@@ -1,0 +1,15 @@
+/* Pendientes v64 — la tabla principal muestra solo información operativa.
+   Los datos adicionales de la boleta permanecen disponibles en el detalle del paciente. */
+.imaging-table col.col-diagnosis,
+.imaging-table col.col-meaning,
+.imaging-table .diagnosis-cell,
+.imaging-table .meaning-cell,
+.imaging-table thead th:nth-child(5),
+.imaging-table thead th:nth-child(6) {
+  display: none !important;
+  width: 0 !important;
+  min-width: 0 !important;
+  max-width: 0 !important;
+  padding: 0 !important;
+  border: 0 !important;
+}
