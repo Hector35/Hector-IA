@@ -1,4 +1,4 @@
-const CACHE = 'turno-rx-shell-v57-tac-functional-microinteractions';
+const CACHE = 'turno-rx-shell-v58-tac-live-interaction-hotfix';
 const SHELL = [
   '/turno-rx/',
   '/turno-rx/index.html',
@@ -26,12 +26,12 @@ const SHELL = [
   '/turno-rx/floor-rx-night-fix-v50.css?v=50',
   '/turno-rx/clinical-intelligence-v52.css?v=53',
   '/turno-rx/art-direction-v56.css?v=56',
-  '/turno-rx/microinteractions-v57.css?v=57',
+  '/turno-rx/interaction-hotfix-v58.css?v=58',
   '/turno-rx/quick-transport-v37.js?v=2',
   '/turno-rx/patient-detail-v39.js?v=4',
-  '/turno-rx/app-v16.js?v=9',
+  '/turno-rx/app-v16.js?v=58',
   '/turno-rx/progressive-photo-queue-v45.js',
-  '/turno-rx/floor-workflow-v42.js?v=1',
+  '/turno-rx/floor-workflow-v42.js?v=58',
   '/turno-rx/compact-v17.js?v=2',
   '/turno-rx/transport-v20.js?v=3',
   '/turno-rx/name-format-v23.js?v=1',
@@ -41,8 +41,7 @@ const SHELL = [
   '/turno-rx/full-redesign-v33.js?v=1',
   '/turno-rx/premium-v37.js?v=4',
   '/turno-rx/manual-quick-v38.js?v=1',
-  '/turno-rx/tac-flow-v42.js?v=1',
-  '/turno-rx/microinteractions-v57.js?v=1',
+  '/turno-rx/tac-flow-v42.js?v=58',
   '/turno-rx/manifest.webmanifest',
   '/turno-rx/icon.svg'
 ];

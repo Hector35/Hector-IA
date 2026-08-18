@@ -1,0 +1,23 @@
+/* Pendientes v58 — neutraliza movimiento mientras se valida la interacción inmediata. */
+html.pendientes-v37 *,
+html.pendientes-v37 *::before,
+html.pendientes-v37 *::after {
+  animation: none !important;
+  transition: none !important;
+  transition-delay: 0s !important;
+}
+
+html.pendientes-v37 [hidden] {
+  display: none !important;
+  visibility: hidden !important;
+  pointer-events: none !important;
+}
+
+html.pendientes-v37 body::before,
+html.pendientes-v37 #category-panel::before,
+html.pendientes-v37 .category-tab::before,
+html.pendientes-v37 .photo-queue::before,
+html.pendientes-v37 .photo-queue::after,
+html.pendientes-v37 [data-quick-transport="1"]::after {
+  pointer-events: none !important;
+}

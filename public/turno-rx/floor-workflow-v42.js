@@ -23,7 +23,7 @@
     });
     if (!changed) return;
     localStorage.setItem(STORAGE_KEY, JSON.stringify(next));
-    location.reload();
+    document.dispatchEvent(new CustomEvent('pendientes:status-changed', {detail:{id:String(id),status:'Realizado',source:'Piso'}}));
   }
 
   function floorRow(target) {

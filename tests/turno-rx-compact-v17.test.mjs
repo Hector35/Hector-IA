@@ -26,7 +26,7 @@ const sw=read('public/turno-rx/sw.js');
 
 describe('Pendientes vista compacta',()=>{
   it('carga la capa compacta sin quitar la app principal',()=>{
-    expect(index).toContain('/turno-rx/app-v16.js?v=9');
+    expect(index).toContain('/turno-rx/app-v16.js?v=58');
     expect(index).toContain('/turno-rx/compact-v17.js?v=2');
     expect(index).toContain('/turno-rx/compact-v17.css?v=4');
     expect(index).toContain('/turno-rx/one-line-v24.css?v=1');
@@ -217,7 +217,7 @@ describe('Pendientes vista compacta',()=>{
     expect(sw).toContain('/turno-rx/premium-v37.js?v=4');
     expect(sw).toContain('/turno-rx/manual-quick-v38.js?v=1');
     expect(sw).toContain('/turno-rx/transport-v20.js?v=3');
-    expect(sw).toContain('/turno-rx/floor-workflow-v42.js?v=1');
+    expect(sw).toContain('/turno-rx/floor-workflow-v42.js?v=58');
     expect(sw).toContain("url.pathname.startsWith('/api/')");
   });
 });

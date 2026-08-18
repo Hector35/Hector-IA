@@ -358,6 +358,20 @@ activeCategoryTab=preferredCategoryTab(rows);
 knownPendingIds=new Set(rows.filter(isPendingRow).map((row)=>String(row.id)));
 function save(){write(STORAGE_KEY,rows);write(SHIFT_KEY,shift);}
 
+function syncRowsFromStorageAndRender(){
+  const stored=read(STORAGE_KEY,null);
+  if(!Array.isArray(stored))return false;
+  rows=stored;
+  render();
+  return true;
+}
+
+function bindLiveStateSynchronization(){
+  document.addEventListener('pendientes:transport-changed',syncRowsFromStorageAndRender);
+  document.addEventListener('pendientes:status-changed',syncRowsFromStorageAndRender);
+  if(typeof window!=='undefined')window.addEventListener('storage',(event)=>{if(event.key===STORAGE_KEY)syncRowsFromStorageAndRender();});
+}
+
 function effectiveTransport(row){if(/port[áa]til/i.test(clean(row?.target)))return 'No trasladar';return normalizeTransport(row?.transport)||'Por definir';}
 function transportRank(row){const t=effectiveTransport(row);if(t==='Silla')return 0;if(t==='Camilla')return 1;if(t==='No trasladar')return 2;return 3;}
 function compareFloorRows(a,b){const transport=transportRank(a)-transportRank(b);return transport||compareOrigins(a,b);}
@@ -566,6 +580,6 @@ function removeRow(id){const index=rows.findIndex((row)=>row.id===id);if(index<0
 function undoRemove(){if(!undoState||undoState.expiresAt<=Date.now()){undoState=null;render();return;}const conflicts=findConflictsAgainstExisting(rows,[undoState.row]);if(conflicts.length){undoState=null;render();setCaptureStatus(`No se pudo deshacer: la cama ${conflicts[0]} ya está ocupada en la lista.`,'error');return;}rows.splice(Math.min(undoState.index,rows.length),0,undoState.row);undoState=null;if(undoTimer)clearTimeout(undoTimer);save();render();setCaptureStatus('Paciente restaurado.','success');setTimeout(()=>setCaptureStatus(''),1800);}
 function startNewShift(){if(typeof window==='undefined')return;if(rows.length&&!window.confirm(`Iniciar un turno nuevo archivará estos ${rows.length} pendientes y dejará la lista vacía. ¿Continuar?`))return;archiveShift(shift,rows);shift=newShiftMeta();rows=[];undoState=null;save();render();setCaptureStatus('Turno nuevo iniciado.','success');setTimeout(()=>setCaptureStatus(''),2200);}
 
-if(root){render();if('serviceWorker' in navigator)window.addEventListener('load',()=>navigator.serviceWorker.register('/turno-rx/sw.js',{updateViaCache:'none'}).then((registration)=>registration.update()).catch(()=>{}));}
+if(root){bindLiveStateSynchronization();render();if('serviceWorker' in navigator)window.addEventListener('load',()=>navigator.serviceWorker.register('/turno-rx/sw.js',{updateViaCache:'none'}).then((registration)=>registration.update()).catch(()=>{}));}
 
-export {displayOrigin,canonicalOrigin,compareOrigins,parseFloorTarget,floorGroupKey,rowFloorGroupKey,hasFloorTarget,isCompleteFloorRow,isIncompleteFloorRow,findDuplicateFloorOrigins,findConflictsAgainstExisting,rowKey,findMatchingRowIndex,normalizeAge,ageFromBirthDate,normalizeStudyDisplay,normalizeModality,normalizeCategory,normalizeFloorBoardSex,isRayXStudyText,reviewFields,patientDedupeKey,imageFingerprint,compareFloorRows,compareImagingRows,effectiveTransport,normalizeVisionRow,classifyVisionRows,mergeRow,mergeStudyTargets,commitPhotoResult,categoryTabForRow,rowsForCategoryTab,pendingCounts,preferredCategoryTab};
+export {displayOrigin,canonicalOrigin,compareOrigins,parseFloorTarget,floorGroupKey,rowFloorGroupKey,hasFloorTarget,isCompleteFloorRow,isIncompleteFloorRow,findDuplicateFloorOrigins,findConflictsAgainstExisting,rowKey,findMatchingRowIndex,normalizeAge,ageFromBirthDate,normalizeStudyDisplay,normalizeModality,normalizeCategory,normalizeFloorBoardSex,isRayXStudyText,reviewFields,patientDedupeKey,imageFingerprint,compareFloorRows,compareImagingRows,effectiveTransport,normalizeVisionRow,classifyVisionRows,mergeRow,mergeStudyTargets,commitPhotoResult,categoryTabForRow,rowsForCategoryTab,pendingCounts,preferredCategoryTab,selectCategoryTab,syncRowsFromStorageAndRender};

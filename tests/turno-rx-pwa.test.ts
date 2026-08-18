@@ -33,7 +33,7 @@ describe('Pendientes PWA v16',()=>{
     expect(manifest.scope).toBe('/turno-rx/');
     expect(manifest.display).toBe('standalone');
     expect(manifest.short_name).toBe('Pendientes');
-    expect(index).toContain('/turno-rx/app-v16.js?v=9');
+    expect(index).toContain('/turno-rx/app-v16.js?v=58');
     expect(index).toContain('/turno-rx/progressive-photo-v45.css?v=1');
     expect(index).toContain('/turno-rx/integrity-v16.css?v=2');
     expect(index).toContain('/turno-rx/name-format-v23.js?v=1');
@@ -53,8 +53,8 @@ describe('Pendientes PWA v16',()=>{
     expect(index).toContain('/turno-rx/premium-v37.css?v=1');
     expect(index).toContain('/turno-rx/premium-v37.js?v=4');
     expect(index).toContain('/turno-rx/art-direction-v56.css?v=56');
-    expect(index).toContain('/turno-rx/microinteractions-v57.css?v=57');
-    expect(index).toContain('/turno-rx/microinteractions-v57.js?v=1');
+    expect(index).toContain('/turno-rx/interaction-hotfix-v58.css?v=58');
+    expect(index).not.toContain('/turno-rx/microinteractions-v57');
     expect(index).toContain('/turno-rx/manual-quick-v38.js?v=1');
   });
 
@@ -198,7 +198,7 @@ describe('Pendientes PWA v16',()=>{
     expect(sw).toContain("url.pathname.startsWith('/api/')");
     expect(sw).toContain("const CACHE = 'turno-rx-shell-v");
     expect(sw).toContain('/turno-rx/palette-v39.css?v=1');
-    expect(sw).toContain('/turno-rx/app-v16.js?v=9');
+    expect(sw).toContain('/turno-rx/app-v16.js?v=58');
     expect(sw).toContain('/turno-rx/progressive-photo-queue-v45.js');
     expect(sw).toContain('/turno-rx/transport-v20.js?v=3');
     expect(sw).toContain('/turno-rx/elegant-v30.css?v=2');
@@ -209,8 +209,8 @@ describe('Pendientes PWA v16',()=>{
     expect(sw).toContain('/turno-rx/premium-v37.css?v=1');
     expect(sw).toContain('/turno-rx/premium-v37.js?v=4');
     expect(sw).toContain('/turno-rx/art-direction-v56.css?v=56');
-    expect(sw).toContain('/turno-rx/microinteractions-v57.css?v=57');
-    expect(sw).toContain('/turno-rx/microinteractions-v57.js?v=1');
+    expect(sw).toContain('/turno-rx/interaction-hotfix-v58.css?v=58');
+    expect(sw).not.toContain('/turno-rx/microinteractions-v57');
     expect(sw).toContain('/turno-rx/manual-quick-v38.js?v=1');
     expect(sw).toContain('/turno-rx/name-format-v23.js?v=1');
     expect(sw).toContain('/turno-rx/cama-label-v28.js?v=1');
