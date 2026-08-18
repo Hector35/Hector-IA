@@ -11,12 +11,15 @@ describe('Pendientes v17 vista compacta',()=>{
   it('carga la capa compacta sin quitar la app principal',()=>{
     expect(index).toContain('/turno-rx/app-v16.js?v=2');
     expect(index).toContain('/turno-rx/compact-v17.js?v=1');
-    expect(index).toContain('/turno-rx/compact-v17.css?v=1');
+    expect(index).toContain('/turno-rx/compact-v17.css?v=2');
   });
 
   it('deja visibles solo las cuatro columnas operativas en la lista',()=>{
-    expect(css).toContain('.imaging-table th:nth-child(n+5)');
+    expect(css).toContain('.imaging-table thead th:nth-child(n+5)');
+    expect(css).toContain('.imaging-table .imaging-row td:nth-child(n+5)');
     expect(css).toContain('display: none !important');
+    expect(css).toContain('min-width: 0 !important');
+    expect(css).toContain('overflow-x: hidden !important');
     expect(css).toContain('.imaging-table .transport-reason');
   });
 
@@ -30,8 +33,9 @@ describe('Pendientes v17 vista compacta',()=>{
     expect(js).toContain("['Oxígeno'");
   });
 
-  it('fuerza shell v17 y mantiene APIs fuera de caché',()=>{
-    expect(sw).toContain("turno-rx-shell-v17");
+  it('fuerza shell v18 y mantiene APIs fuera de caché',()=>{
+    expect(sw).toContain("turno-rx-shell-v18");
+    expect(sw).toContain('/turno-rx/compact-v17.css?v=2');
     expect(sw).toContain('/turno-rx/compact-v17.js?v=1');
     expect(sw).toContain("url.pathname.startsWith('/api/')");
   });
