@@ -24,7 +24,7 @@ jobs:
           set -euo pipefail
           BASE='https://hector-os.hectorhdzr035.workers.dev/turno-rx'
           for attempt in $(seq 1 30); do
-            if curl -fsS "$BASE/" -o /tmp/index.html && grep -q 'app.js?v=11' /tmp/index.html && grep -q 'capture-enhancements.css?v=1' /tmp/index.html; then
+            if curl -fsS "$BASE/" -o /tmp/index.html && grep -q 'app.js?v=12' /tmp/index.html && grep -q 'capture-enhancements.css?v=2' /tmp/index.html; then
               exit 0
             fi
             sleep 4
@@ -38,8 +38,8 @@ jobs:
           set -euo pipefail
           BASE='https://hector-os.hectorhdzr035.workers.dev/turno-rx'
           curl -fsS "$BASE/" -o /tmp/index.html
-          curl -fsS "$BASE/app.js?v=11" -o /tmp/app.js
-          curl -fsS "$BASE/capture-enhancements.css?v=1" -o /tmp/capture.css
+          curl -fsS "$BASE/app.js?v=12" -o /tmp/app.js
+          curl -fsS "$BASE/capture-enhancements.css?v=2" -o /tmp/capture.css
           curl -fsS "$BASE/manifest.webmanifest" -o /tmp/manifest.webmanifest
           curl -fsS "$BASE/sw.js" -o /tmp/sw.js
           grep -q 'galleryCapture' /tmp/app.js
@@ -53,11 +53,15 @@ jobs:
           grep -q 'handwrittenBed' /tmp/app.js
           grep -q 'formBed' /tmp/app.js
           grep -q 'Sala de espera.*NUNCA es una cama' /tmp/app.js
+          grep -q 'findDuplicateFloorOrigins' /tmp/app.js
+          grep -q 'Segundo de la otra unidad' /tmp/app.js
+          grep -q '<th>Origen</th><th>Destino</th>' /tmp/app.js
+          grep -q 'floor-group-title' /tmp/capture.css
           grep -q 'capture-icon-btn' /tmp/capture.css
           grep -q '"short_name": "Pendientes"' /tmp/manifest.webmanifest
-          grep -q "turno-rx-shell-v10" /tmp/sw.js
-          grep -q 'capture-enhancements.css?v=1' /tmp/sw.js
-          grep -q 'app.js?v=11' /tmp/sw.js
+          grep -q "turno-rx-shell-v11" /tmp/sw.js
+          grep -q 'capture-enhancements.css?v=2' /tmp/sw.js
+          grep -q 'app.js?v=12' /tmp/sw.js
 
       - name: Verificar visión sin login
         shell: bash
