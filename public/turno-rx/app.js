@@ -12,11 +12,25 @@ const ICONS = {
   pencil: '<svg viewBox="0 0 24 24" aria-hidden="true"><path d="m5 16.5-1 3.5 3.5-1L18.7 7.8a2.1 2.1 0 0 0 0-3l-.5-.5a2.1 2.1 0 0 0-3 0L5 14.5v2Z"/><path d="m13.8 5.7 4.5 4.5"/></svg>'
 };
 
+const FLOOR_GROUPS = [
+  {key: 'primero', label: 'Primero'},
+  {key: 'segundo', label: 'Segundo'},
+  {key: 'tercero', label: 'Tercero'},
+  {key: 'segundo-otra', label: 'Segundo de la otra unidad'},
+  {key: 'tercero-otra', label: 'Tercero de la otra unidad'},
+  {key: 'quinto-otra', label: 'Quinto de la otra unidad'},
+  {key: 'ueh', label: 'UEH'},
+  {key: 'por-ubicar', label: 'Destino por ubicar'}
+];
+
 const VISION_PROMPT = `Analiza esta foto de una solicitud, boleta o pizarrón hospitalario para crear pendientes operativos de traslado. Devuelve SOLO JSON válido, sin markdown, con este formato exacto: {"patients":[{"handwrittenBed":"","formBed":"","waitingRoomMarked":false,"bed":"","name":"","birthDate":null,"age":null,"target":"","transport":"Silla|Camilla|Por definir","transportReason":"","oxygenProbable":false,"oxygenReason":""}]}.
 Extrae únicamente datos visibles; no inventes nombres, edades, estudios, destinos ni hechos clínicos.
-REGLA CRÍTICA PARA CAMA: en estas solicitudes el número de cama puede estar escrito A MANO como un número grande y aislado en el margen o parte superior de la hoja (por ejemplo 10, 16, 28). Debes buscarlo de forma explícita aunque no esté dentro del recuadro impreso "CAMA NO.". Pon ese valor en handwrittenBed. Si el recuadro impreso "CAMA NO." contiene un código como UA16, CE1, C15 o UP, ponlo en formBed. waitingRoomMarked=true solo si está marcada la casilla "SALA DE ESPERA".
+REGLA CRÍTICA PARA CAMA: en estas solicitudes el número de cama puede estar escrito A MANO como un número grande y aislado en el margen o parte superior de la hoja (por ejemplo 10, 16, 28). Debes buscarlo de forma explícita aunque no esté dentro del recuadro impreso "CAMA NO.". Pon ese valor en handwrittenBed. Si el recuadro impreso "CAMA NO." contiene un código como UA16, CE1, C15, UI1 o UP1, ponlo en formBed. waitingRoomMarked=true solo si está marcada la casilla "SALA DE ESPERA".
 Para bed usa esta prioridad: 1) handwrittenBed si existe; 2) formBed si no hay handwrittenBed; 3) vacío si ninguno existe. "Sala de espera" NUNCA es una cama y NUNCA debe devolverse en bed, handwrittenBed ni formBed, aunque su casilla esté marcada. Una marca de sala de espera no invalida ni reemplaza un número manuscrito visible.
-CE significa Corta Estancia y no debe convertirse en cama numérica; UP significa Urgencias Pediátricas. target es el destino/piso o el estudio solicitado, según lo visible. Si hay fecha de nacimiento visible, colócala como YYYY-MM-DD en birthDate; si la edad está explícita, úsala en age.
+CE significa Corta Estancia y no debe convertirse en cama numérica; UP significa Urgencias Pediátricas; UI1/UI2 corresponde al área Stabyl. UA y C# son camas ordinarias de Urgencias y pueden conservarse en la extracción; la interfaz las mostrará solo como número.
+Si la foto es un pizarrón de pacientes que SUBEN A PISO, interpreta cada renglón como ORIGEN EN URGENCIAS -> CAMA DESTINO DE PISO. En ese caso bed es el origen de Urgencias y target debe ser SOLO la cama destino (por ejemplo 72, 110, 146) o el área especial visible (por ejemplo UEH). No confundas el número de origen con la cama de piso.
+En un mismo pizarrón no debe aparecer dos veces la misma cama de origen. Si una lectura parece duplicar un origen, revisa con especial cuidado números manuscritos parecidos como 13 y 15 antes de responder.
+target es el destino/piso o el estudio solicitado, según lo visible. Si hay fecha de nacimiento visible, colócala como YYYY-MM-DD en birthDate; si la edad está explícita, úsala en age.
 transport es una ESTIMACIÓN OPERATIVA, no una orden médica. Elige Silla cuando la información visible sugiera que el paciente está estable, ambulante o puede ir sentado; Camilla cuando haya inmovilidad, trauma importante, déficit neurológico, condición delicada, necesidad evidente de ir acostado o información equivalente. Puedes usar la ubicación visible como pista operativa, pero no inventes condiciones clínicas. Si no hay base suficiente, usa Por definir. transportReason debe explicar brevemente la pista visible o decir que no hay datos suficientes.
 oxygenProbable=true SOLO si hay evidencia visible de oxígeno ya indicado/usado, soporte respiratorio, hipoxemia/SpO2 baja o dificultad respiratoria significativa. Si es false, oxygenReason debe ser vacío. Si es true, oxygenReason debe explicar brevemente la evidencia visible. Si hay varios pacientes en la foto, devuelve todos en patients.`;
 
@@ -91,6 +105,87 @@ function ageFromBirthDate(value) {
   return age >= 0 && age <= 130 ? age : null;
 }
 
+function displayOrigin(value) {
+  const original = clean(value);
+  if (!original) return '—';
+  const compact = original.toUpperCase().replace(/\s+/g, '').replace(/#/g, '');
+  let match = compact.match(/^UI(\d+)$/);
+  if (match) return `UI${Number(match[1])} (Stabyl)`;
+  match = compact.match(/^CE(\d+)$/);
+  if (match) return `CE${Number(match[1])}`;
+  match = compact.match(/^UP(\d+)$/);
+  if (match) return `UP${Number(match[1])}`;
+  match = compact.match(/^UA0*(\d+)$/);
+  if (match) return String(Number(match[1]));
+  match = compact.match(/^C0*(\d+)$/);
+  if (match) return String(Number(match[1]));
+  match = compact.match(/^CAMA0*(\d+)$/);
+  if (match) return String(Number(match[1]));
+  if (/^\d+$/.test(compact)) return String(Number(compact));
+  if (compact === 'UI') return 'UI (Stabyl)';
+  return original;
+}
+
+function canonicalOrigin(value) {
+  const shown = displayOrigin(value).toUpperCase();
+  if (/^\d+$/.test(shown)) return `N:${Number(shown)}`;
+  const special = shown.match(/^(CE|UP|UI)(\d+)/);
+  if (special) return `${special[1]}:${Number(special[2])}`;
+  return shown === '—' ? '' : shown;
+}
+
+function compareOrigins(a, b) {
+  const left = displayOrigin(a.bed);
+  const right = displayOrigin(b.bed);
+  const leftNumber = /^\d+$/.test(left) ? Number(left) : null;
+  const rightNumber = /^\d+$/.test(right) ? Number(right) : null;
+  if (leftNumber !== null && rightNumber !== null) return leftNumber - rightNumber;
+  if (leftNumber !== null) return -1;
+  if (rightNumber !== null) return 1;
+  return left.localeCompare(right, 'es-MX', {numeric: true, sensitivity: 'base'});
+}
+
+function parseFloorTarget(value) {
+  const text = clean(value).toUpperCase().replace(/\s+/g, ' ');
+  if (!text) return null;
+  if (/^UEH\b/.test(text)) return {type: 'special', value: 'UEH', display: 'UEH'};
+  const match = text.match(/^(?:CAMA(?: DE PISO)?\s*)?#?\s*(\d{1,3})$/);
+  if (!match) return null;
+  const number = Number(match[1]);
+  if (!Number.isFinite(number) || number <= 0) return null;
+  return {type: 'bed', value: number, display: String(number)};
+}
+
+function floorGroupKey(target) {
+  const parsed = parseFloorTarget(target);
+  if (!parsed) return null;
+  if (parsed.type === 'special') return 'ueh';
+  const number = parsed.value;
+  if (number >= 1 && number <= 44) return 'primero';
+  if (number >= 45 && number <= 88) return 'segundo';
+  if (number >= 89 && number <= 132) return 'tercero';
+  if (number >= 133 && number <= 165) return 'segundo-otra';
+  if (number >= 166 && number <= 189) return 'tercero-otra';
+  if (number >= 190 && number <= 204) return 'quinto-otra';
+  return 'por-ubicar';
+}
+
+function isFloorRow(row) {
+  return floorGroupKey(row?.target) !== null;
+}
+
+function findDuplicateFloorOrigins(candidateRows) {
+  const seen = new Map();
+  const duplicates = new Set();
+  for (const row of candidateRows.filter(isFloorRow)) {
+    const key = canonicalOrigin(row.bed);
+    if (!key) continue;
+    if (seen.has(key)) duplicates.add(displayOrigin(row.bed));
+    else seen.set(key, row);
+  }
+  return [...duplicates].sort((a, b) => a.localeCompare(b, 'es-MX', {numeric: true}));
+}
+
 function loadRows() {
   const current = read(STORAGE_KEY, null);
   if (Array.isArray(current)) return current;
@@ -144,24 +239,73 @@ function renderTransport(row) {
   `;
 }
 
-function render() {
-  root.innerHTML = `
-    <main class="app-shell">
-      <header class="topbar">
-        <div class="brand">
-          <span class="brand-dot"></span>
-          <h1>Pendientes</h1>
+function renderFloorRow(row) {
+  const destination = parseFloorTarget(row.target)?.display || clean(row.target) || '—';
+  return `
+    <tr class="patient-row floor-patient-row" data-id="${esc(row.id)}" title="Toca para editar">
+      <td class="floor-origin"><strong>${esc(displayOrigin(row.bed))}</strong></td>
+      <td class="floor-destination">
+        <div class="floor-destination-line">
+          <strong>${esc(destination)}</strong>
+          <button class="remove-btn" type="button" data-remove="${esc(row.id)}" aria-label="Quitar paciente">×</button>
         </div>
-        <div class="capture-actions" aria-label="Opciones de captura">
-          <button class="capture-icon-btn" id="galleryCapture" type="button" aria-label="Elegir foto">${ICONS.photo}</button>
-          <button class="capture-icon-btn manual" id="manualCapture" type="button" aria-label="Captura manual">${ICONS.pencil}</button>
+      </td>
+    </tr>
+  `;
+}
+
+function renderFloorSections(floorRows) {
+  const groups = new Map(FLOOR_GROUPS.map((group) => [group.key, []]));
+  for (const row of floorRows) groups.get(floorGroupKey(row.target))?.push(row);
+  for (const list of groups.values()) list.sort(compareOrigins);
+
+  const sections = FLOOR_GROUPS
+    .map((group) => ({...group, rows: groups.get(group.key) || []}))
+    .filter((group) => group.rows.length)
+    .map((group) => `
+      <section class="floor-group">
+        <div class="floor-group-title">${esc(group.label)} — <strong>${group.rows.length} ${group.rows.length === 1 ? 'paciente' : 'pacientes'}</strong></div>
+        <div class="floor-table-wrap">
+          <table class="floor-group-table">
+            <thead><tr><th>Origen</th><th>Destino</th></tr></thead>
+            <tbody>${group.rows.map(renderFloorRow).join('')}</tbody>
+          </table>
         </div>
-        <input id="galleryInput" type="file" accept="image/*" multiple hidden />
-      </header>
+      </section>
+    `).join('');
 
-      <div class="capture-status" id="captureStatus" hidden></div>
+  return `
+    <section class="floor-board" aria-label="Pacientes a piso">
+      ${sections}
+      <div class="floor-total">Total: <strong>${floorRows.length} ${floorRows.length === 1 ? 'paciente' : 'pacientes'}</strong></div>
+    </section>
+  `;
+}
 
-      <section class="table-wrap" aria-label="Pacientes pendientes">
+function renderOtherRow(row) {
+  const age = normalizeAge(row.age);
+  return `
+    <tr class="patient-row" data-id="${esc(row.id)}" title="Toca para editar">
+      <td class="bed-cell"><span>${esc(displayOrigin(row.bed))}</span></td>
+      <td class="name-cell">
+        <div class="patient-name">${esc(row.name || '—')}</div>
+        <div class="age-line"><span>Edad</span>${age !== null ? `${age} años` : '—'}</div>
+      </td>
+      <td class="target-cell">${esc(row.target || '—')}</td>
+      <td class="transport-cell">${renderTransport(row)}</td>
+      <td class="action-cell">
+        <button class="remove-btn" type="button" data-remove="${esc(row.id)}" aria-label="Quitar paciente">×</button>
+      </td>
+    </tr>
+  `;
+}
+
+function renderOtherTable(otherRows) {
+  if (!otherRows.length) return '';
+  return `
+    <section class="other-pending-section" aria-label="Estudios y otros pendientes">
+      <div class="other-section-title">Estudios / otros — <strong>${otherRows.length}</strong></div>
+      <div class="table-wrap">
         <table class="patient-table">
           <colgroup>
             <col class="col-bed" />
@@ -179,21 +323,52 @@ function render() {
               <th></th>
             </tr>
           </thead>
-          <tbody>
-            ${rows.length ? rows.map(renderRow).join('') : `
-              <tr class="empty-row">
-                <td colspan="5">
-                  <div class="empty-state">
-                    <div class="empty-icon">＋</div>
-                    <b>Sin pendientes</b>
-                    <span>Usa foto o lápiz para capturar.</span>
-                  </div>
-                </td>
-              </tr>
-            `}
-          </tbody>
+          <tbody>${otherRows.map(renderOtherRow).join('')}</tbody>
         </table>
-      </section>
+      </div>
+    </section>
+  `;
+}
+
+function renderEmpty() {
+  return `
+    <section class="table-wrap" aria-label="Pacientes pendientes">
+      <table class="patient-table">
+        <tbody>
+          <tr class="empty-row">
+            <td colspan="5">
+              <div class="empty-state">
+                <div class="empty-icon">＋</div>
+                <b>Sin pendientes</b>
+                <span>Usa foto o lápiz para capturar.</span>
+              </div>
+            </td>
+          </tr>
+        </tbody>
+      </table>
+    </section>
+  `;
+}
+
+function render() {
+  const floorRows = rows.filter(isFloorRow);
+  const otherRows = rows.filter((row) => !isFloorRow(row));
+  root.innerHTML = `
+    <main class="app-shell">
+      <header class="topbar">
+        <div class="brand">
+          <span class="brand-dot"></span>
+          <h1>Pendientes</h1>
+        </div>
+        <div class="capture-actions" aria-label="Opciones de captura">
+          <button class="capture-icon-btn" id="galleryCapture" type="button" aria-label="Elegir foto">${ICONS.photo}</button>
+          <button class="capture-icon-btn manual" id="manualCapture" type="button" aria-label="Captura manual">${ICONS.pencil}</button>
+        </div>
+        <input id="galleryInput" type="file" accept="image/*" multiple hidden />
+      </header>
+
+      <div class="capture-status" id="captureStatus" hidden></div>
+      ${rows.length ? `${renderFloorSections(floorRows)}${renderOtherTable(otherRows)}` : renderEmpty()}
     </main>
 
     <div class="sheet-backdrop" id="sheetBackdrop" hidden>
@@ -210,7 +385,7 @@ function render() {
         <div class="form-grid">
           <label>
             <span>Cama / área</span>
-            <input id="bed" name="bed" autocomplete="off" placeholder="C15, CE2, UP…" />
+            <input id="bed" name="bed" autocomplete="off" placeholder="15, CE2, UP1, UI1…" />
           </label>
 
           <label>
@@ -225,7 +400,7 @@ function render() {
 
           <label class="full">
             <span>Destino / estudio</span>
-            <input id="target" name="target" autocomplete="off" placeholder="Piso 3, Tórax P.A.…" />
+            <input id="target" name="target" autocomplete="off" placeholder="72, UEH, Tórax PA, TAC…" />
           </label>
 
           <label>
@@ -260,24 +435,6 @@ function render() {
   `;
 
   bind();
-}
-
-function renderRow(row) {
-  const age = normalizeAge(row.age);
-  return `
-    <tr class="patient-row" data-id="${esc(row.id)}" title="Toca para editar">
-      <td class="bed-cell"><span>${esc(row.bed || '—')}</span></td>
-      <td class="name-cell">
-        <div class="patient-name">${esc(row.name || '—')}</div>
-        <div class="age-line"><span>Edad</span>${age !== null ? `${age} años` : '—'}</div>
-      </td>
-      <td class="target-cell">${esc(row.target || '—')}</td>
-      <td class="transport-cell">${renderTransport(row)}</td>
-      <td class="action-cell">
-        <button class="remove-btn" type="button" data-remove="${esc(row.id)}" aria-label="Quitar paciente">×</button>
-      </td>
-    </tr>
-  `;
 }
 
 function bind() {
@@ -434,7 +591,13 @@ async function handlePhotoInput(event) {
     for (let index = 0; index < files.length; index += 1) {
       setCaptureStatus(files.length > 1 ? `Leyendo foto ${index + 1} de ${files.length}…` : 'Leyendo foto…');
       try {
-        imported.push(...await analyzePhoto(files[index]));
+        const analyzed = await analyzePhoto(files[index]);
+        const duplicates = findDuplicateFloorOrigins(analyzed);
+        if (duplicates.length) {
+          errors.push(`⚠️ Revisa la lectura: ${duplicates.length === 1 ? `la cama ${duplicates[0]} aparece dos veces` : `las camas ${duplicates.join(', ')} aparecen repetidas`} en el mismo pizarrón. No agregué esa foto para evitar mezclar pacientes.`);
+          continue;
+        }
+        imported.push(...analyzed);
       } catch (error) {
         errors.push(error instanceof Error ? error.message : 'No pude leer una foto.');
       }
@@ -443,8 +606,12 @@ async function handlePhotoInput(event) {
     if (imported.length) {
       addAnalyzedRows(imported);
       render();
-      setCaptureStatus(`${imported.length} ${imported.length === 1 ? 'paciente agregado' : 'pacientes agregados'}.`, 'success');
-      window.setTimeout(() => setCaptureStatus(''), 2600);
+      if (errors.length) {
+        setCaptureStatus(`${imported.length} ${imported.length === 1 ? 'paciente agregado' : 'pacientes agregados'}. ${errors[0]}`, 'error');
+      } else {
+        setCaptureStatus(`${imported.length} ${imported.length === 1 ? 'paciente agregado' : 'pacientes agregados'}.`, 'success');
+        window.setTimeout(() => setCaptureStatus(''), 2600);
+      }
     } else {
       setCaptureStatus(errors[0] || 'No encontré pacientes en la foto.', 'error');
     }
