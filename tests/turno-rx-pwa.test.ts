@@ -22,12 +22,22 @@ describe('Pendientes PWA independiente',()=>{
     expect(app).not.toContain('CLOUDFLARE_API_TOKEN');
   });
 
-  it('expone las tres formas de captura solicitadas',()=>{
-    expect(app).toContain("id=\"cameraCapture\"");
+  it('expone foto y captura manual sin atajo de cámara',()=>{
     expect(app).toContain("id=\"galleryCapture\"");
     expect(app).toContain("id=\"manualCapture\"");
-    expect(app).toContain('capture="environment"');
     expect(app).toContain('multiple hidden');
+    expect(app).not.toContain("id=\"cameraCapture\"");
+    expect(app).not.toContain('capture="environment"');
+  });
+
+  it('prioriza el número de cama manuscrito y nunca usa sala de espera como cama',()=>{
+    expect(app).toContain('handwrittenBed');
+    expect(app).toContain('formBed');
+    expect(app).toContain('waitingRoomMarked');
+    expect(app).toContain('resolveVisionBed');
+    expect(app).toContain('normalizeBedCandidate');
+    expect(app).toContain('"Sala de espera" NUNCA es una cama');
+    expect(app).toContain('número de cama puede estar escrito A MANO');
   });
 
   it('muestra edad, motivo de traslado y oxígeno cuando corresponde',()=>{
