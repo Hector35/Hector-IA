@@ -1,4 +1,4 @@
-/* Pendientes v17.1 — lista compacta real; detalle completo al tocar */
+/* Pendientes v17.3 — encabezado único; detalle completo al tocar */
 .imaging-board { margin-top: 14px; }
 .modality-section { margin-top: 18px; }
 .modality-title {
@@ -20,10 +20,29 @@
   border-spacing: 0 !important;
   table-layout: fixed !important;
 }
-.imaging-table col:nth-child(1) { width: 13% !important; }
-.imaging-table col:nth-child(2) { width: 31% !important; }
-.imaging-table col:nth-child(3) { width: 25% !important; }
-.imaging-table col:nth-child(4) { width: 31% !important; }
+.imaging-table col:nth-child(1) { width: 14% !important; }
+.imaging-table col:nth-child(2) { width: 36% !important; }
+.imaging-table col:nth-child(3) { width: 22% !important; }
+.imaging-table col:nth-child(4) { width: 28% !important; }
+
+/* Un solo encabezado arriba, nunca etiquetas repetidas dentro de cada paciente. */
+.imaging-table thead {
+  display: table-header-group !important;
+}
+.imaging-table thead tr {
+  display: table-row !important;
+}
+.imaging-table thead th:nth-child(-n+4) {
+  display: table-cell !important;
+  white-space: nowrap !important;
+  overflow-wrap: normal !important;
+  word-break: keep-all !important;
+}
+.imaging-table .imaging-row td::before,
+.imaging-table .imaging-row td::after {
+  display: none !important;
+  content: none !important;
+}
 
 .imaging-table .imaging-row { display: table-row !important; filter: none !important; }
 .imaging-table .imaging-row td {
@@ -39,8 +58,6 @@
   overflow-wrap: anywhere;
 }
 
-/* IMPORTANTE: estas columnas solo existen en el detalle. Esta regla va después
-   de la regla genérica de td para que no pueda ser anulada por especificidad. */
 .imaging-table thead th:nth-child(n+5),
 .imaging-table .imaging-row td:nth-child(n+5) {
   display: none !important;
@@ -77,8 +94,8 @@
   font-size: 9px !important;
   color: #90a6b3 !important;
   letter-spacing: .055em !important;
-  overflow-wrap: normal;
-  word-break: normal;
+  overflow-wrap: normal !important;
+  word-break: keep-all !important;
 }
 
 .compact-detail-backdrop {
@@ -186,6 +203,10 @@
 @media (max-width: 430px) {
   .modality-title { font-size: 15px; }
   .imaging-table { width: 100% !important; min-width: 0 !important; }
+  .imaging-table col:nth-child(1) { width: 14% !important; }
+  .imaging-table col:nth-child(2) { width: 37% !important; }
+  .imaging-table col:nth-child(3) { width: 22% !important; }
+  .imaging-table col:nth-child(4) { width: 27% !important; }
   .imaging-table .imaging-row td { padding: 10px 5px !important; }
   .imaging-table .imaging-row td:nth-child(n+5) { display: none !important; padding: 0 !important; }
   .imaging-table .patient-name { font-size: 12.5px; }
