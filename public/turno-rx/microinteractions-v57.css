@@ -1,0 +1,32 @@
+/* Pendientes v57 — microinteracciones funcionales, breves y no bloqueantes. */
+.pendientes-v37 .patient-row,.pendientes-v37 .photo-job{animation:none!important}
+.pendientes-v37 .photo-queue{position:relative;isolation:isolate;overflow:hidden}
+.pendientes-v37 .photo-queue.v57-analysis-start::before{content:"";position:absolute;z-index:2;top:0;left:0;width:34%;height:1px;pointer-events:none;background:linear-gradient(90deg,transparent,rgba(96,165,250,.9),transparent);transform:translateX(-130%);animation:v57-scan-once 260ms ease-out 1}
+.pendientes-v37 .photo-job[data-state="Analizando"] .photo-job-state{color:#60A5FA!important;animation:none!important}
+.pendientes-v37 .photo-job[data-state="Analizando"] .photo-job-state::after{content:"•••";display:inline-block;margin-left:4px;color:#93C5FD;font-size:7px;letter-spacing:1px;vertical-align:middle;animation:v57-dots 900ms ease-in-out infinite}
+.pendientes-v37 .photo-job.v57-photo-done{animation:v57-photo-done 190ms ease-out 1!important}
+.pendientes-v37 .photo-job.v57-needs-review{animation:v57-review-in 210ms ease-out 1!important}
+.pendientes-v37 .photo-job.v57-error-once{animation:v57-error-shake 180ms ease-out 1!important}
+.pendientes-v37 .patient-row.v57-row-enter{animation:v57-row-enter 190ms cubic-bezier(.2,.75,.25,1) 1 both!important}
+.pendientes-v37 .category-count.v57-count-pulse{animation:v57-count-pulse 220ms ease-out 1!important;transform-origin:center}
+.pendientes-v37 #category-panel.v57-tab-enter{animation:v57-tab-enter 150ms ease-out 1!important}
+.pendientes-v37 .patient-row.v57-to-done>td{animation:v57-to-done 200ms ease-out 1!important}
+.pendientes-v37 .patient-row.v57-to-pending>td{animation:v57-to-pending 180ms ease-out 1!important}
+.pendientes-v37 .capture-status[data-state="error"].v57-error-once,.manual-quick-error.v57-error-once,.pendientes-v37 .form-error.v57-error-once{animation:v57-error-shake 180ms ease-out 1!important}
+.pendientes-v37 .v37-capture-btn,.pendientes-v37 .category-tab,.pendientes-v37 button.floor-transport,.quick-transport-option-v37,.manual-category-btn,.v39-transport-button{transition:transform 120ms ease,background-color 120ms ease,color 120ms ease!important;will-change:auto}
+.pendientes-v37 .v37-capture-btn:active,.pendientes-v37 .category-tab:active,.pendientes-v37 button.floor-transport:active,.quick-transport-option-v37:active,.manual-category-btn:active,.v39-transport-button:active{transform:scale(.98)!important}
+.v39-detail-backdrop{opacity:1;transition:opacity 170ms ease,display 170ms allow-discrete!important;transition-behavior:allow-discrete}
+.v39-detail-backdrop[hidden]{display:none!important;opacity:0}
+.v39-detail-sheet{transform:translateY(0);transition:transform 210ms cubic-bezier(.2,.78,.25,1),display 210ms allow-discrete!important;transition-behavior:allow-discrete}
+@starting-style{.v39-detail-backdrop:not([hidden]){opacity:0}.v39-detail-backdrop:not([hidden]) .v39-detail-sheet{transform:translateY(18px)}}
+@keyframes v57-scan-once{to{transform:translateX(390%)}}
+@keyframes v57-dots{0%,100%{opacity:.32;transform:translateY(1px)}50%{opacity:1;transform:translateY(0)}}
+@keyframes v57-row-enter{from{opacity:0;transform:translateY(8px)}to{opacity:1;transform:none}}
+@keyframes v57-count-pulse{0%{transform:scale(1)}45%{transform:scale(1.16);color:#C7D2FE}100%{transform:scale(1)}}
+@keyframes v57-photo-done{0%{opacity:.72;box-shadow:inset 2px 0 0 #3B82F6}100%{opacity:1;box-shadow:inset 2px 0 0 #34D399}}
+@keyframes v57-review-in{0%{opacity:.58;transform:translateY(2px)}55%{opacity:1;transform:none;box-shadow:inset 2px 0 0 #FBBF24}100%{box-shadow:inset 0 0 0 transparent}}
+@keyframes v57-tab-enter{from{opacity:.55;transform:translateX(5px)}to{opacity:1;transform:none}}
+@keyframes v57-to-done{0%{background-color:#17263B}100%{background-color:#102824}}
+@keyframes v57-to-pending{0%{background-color:#102824}100%{background-color:#17263B}}
+@keyframes v57-error-shake{0%,100%{transform:translateX(0)}30%{transform:translateX(-3px)}65%{transform:translateX(3px)}}
+@media(prefers-reduced-motion:reduce){.pendientes-v37 .photo-queue::before,.pendientes-v37 .photo-job,.pendientes-v37 .photo-job-state::after,.pendientes-v37 .patient-row,.pendientes-v37 .patient-row>td,.pendientes-v37 .category-count,.pendientes-v37 #category-panel,.pendientes-v37 .capture-status,.manual-quick-error,.pendientes-v37 .form-error{animation:none!important}.pendientes-v37 .v37-capture-btn,.pendientes-v37 .category-tab,.pendientes-v37 button.floor-transport,.quick-transport-option-v37,.manual-category-btn,.v39-transport-button{transition:background-color 60ms linear,color 60ms linear!important;transform:none!important}.v39-detail-backdrop,.v39-detail-sheet{transition:opacity 60ms linear,display 60ms allow-discrete!important;transform:none!important}}

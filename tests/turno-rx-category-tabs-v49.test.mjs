@@ -54,7 +54,7 @@ test('restaura pestaña y aplica prioridad Piso, RX, TAC, USG',()=>{
 
 test('integra pestañas debajo de captura y conserva cola progresiva y gestos',()=>{
   expect(index).toMatch(/category-tabs-v49\.css\?v=1/);expect(index).toMatch(/app-v16\.js\?v=9/);
-  expect(sw).toMatch(/turno-rx-shell-v56-tac-clinical-control-art-direction/);expect(sw).toMatch(/category-tabs-v49\.css\?v=1/);
+  expect(sw).toMatch(/turno-rx-shell-v57-tac-functional-microinteractions/);expect(sw).toMatch(/category-tabs-v49\.css\?v=1/);
   expect(source).toMatch(/unseenCategoryTabs/);expect(source).toMatch(/renderPhotoQueue\(\)/);
   expect(css).toMatch(/touch-action:pan-x/);expect(css).toMatch(/min-height:44px/);
   expect(readFileSync('public/turno-rx/floor-workflow-v42.js','utf8')).toMatch(/SWIPE_THRESHOLD/);

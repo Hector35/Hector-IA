@@ -53,6 +53,8 @@ describe('Pendientes PWA v16',()=>{
     expect(index).toContain('/turno-rx/premium-v37.css?v=1');
     expect(index).toContain('/turno-rx/premium-v37.js?v=4');
     expect(index).toContain('/turno-rx/art-direction-v56.css?v=56');
+    expect(index).toContain('/turno-rx/microinteractions-v57.css?v=57');
+    expect(index).toContain('/turno-rx/microinteractions-v57.js?v=1');
     expect(index).toContain('/turno-rx/manual-quick-v38.js?v=1');
   });
 
@@ -207,6 +209,8 @@ describe('Pendientes PWA v16',()=>{
     expect(sw).toContain('/turno-rx/premium-v37.css?v=1');
     expect(sw).toContain('/turno-rx/premium-v37.js?v=4');
     expect(sw).toContain('/turno-rx/art-direction-v56.css?v=56');
+    expect(sw).toContain('/turno-rx/microinteractions-v57.css?v=57');
+    expect(sw).toContain('/turno-rx/microinteractions-v57.js?v=1');
     expect(sw).toContain('/turno-rx/manual-quick-v38.js?v=1');
     expect(sw).toContain('/turno-rx/name-format-v23.js?v=1');
     expect(sw).toContain('/turno-rx/cama-label-v28.js?v=1');
