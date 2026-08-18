@@ -1,4 +1,4 @@
-/* Pendientes v17 — lista compacta; detalle completo al tocar */
+/* Pendientes v17.1 — lista compacta real; detalle completo al tocar */
 .imaging-board { margin-top: 14px; }
 .modality-section { margin-top: 18px; }
 .modality-title {
@@ -8,24 +8,27 @@
   color: #dfeaf0;
 }
 
-.imaging-table-wrap { overflow-x: auto; -webkit-overflow-scrolling: touch; }
+.imaging-table-wrap {
+  overflow-x: hidden !important;
+  -webkit-overflow-scrolling: touch;
+}
 .imaging-table {
-  min-width: 720px !important;
+  width: 100% !important;
+  min-width: 0 !important;
+  max-width: 100% !important;
   border-collapse: collapse !important;
   border-spacing: 0 !important;
   table-layout: fixed !important;
 }
-.imaging-table col:nth-child(1) { width: 15% !important; }
-.imaging-table col:nth-child(2) { width: 34% !important; }
-.imaging-table col:nth-child(3) { width: 21% !important; }
-.imaging-table col:nth-child(4) { width: 30% !important; }
-.imaging-table th:nth-child(n+5),
-.imaging-table td:nth-child(n+5) { display: none !important; }
+.imaging-table col:nth-child(1) { width: 13% !important; }
+.imaging-table col:nth-child(2) { width: 31% !important; }
+.imaging-table col:nth-child(3) { width: 25% !important; }
+.imaging-table col:nth-child(4) { width: 31% !important; }
 
 .imaging-table .imaging-row { display: table-row !important; filter: none !important; }
 .imaging-table .imaging-row td {
   display: table-cell !important;
-  padding: 12px 9px !important;
+  padding: 11px 6px !important;
   min-height: 0 !important;
   border: 0 !important;
   border-bottom: 1px solid rgba(127, 167, 189, .14) !important;
@@ -33,19 +36,49 @@
   background: transparent !important;
   vertical-align: top !important;
   text-align: left !important;
+  overflow-wrap: anywhere;
 }
-.imaging-table .imaging-row:active td { background: rgba(102,208,244,.045) !important; }
+
+/* IMPORTANTE: estas columnas solo existen en el detalle. Esta regla va después
+   de la regla genérica de td para que no pueda ser anulada por especificidad. */
+.imaging-table thead th:nth-child(n+5),
+.imaging-table .imaging-row td:nth-child(n+5) {
+  display: none !important;
+  width: 0 !important;
+  padding: 0 !important;
+  border: 0 !important;
+}
+
+.imaging-table .imaging-row:active td:nth-child(-n+4) { background: rgba(102,208,244,.045) !important; }
 .imaging-table .transport-reason,
 .imaging-table .oxygen-chip { display: none !important; }
-.imaging-table .patient-name { font-size: 14px; line-height: 1.28; }
-.imaging-table .age-line { margin-top: 4px; font-size: 11px; color: #8196a3; }
-.imaging-table .study-cell { font-size: 14px; line-height: 1.28; font-weight: 650; color: #e2eaf0; }
-.imaging-table .transport-main { font-size: 12.5px; }
+.imaging-table .patient-name {
+  font-size: 13px;
+  line-height: 1.24;
+  font-weight: 800;
+  overflow-wrap: anywhere;
+}
+.imaging-table .age-line { margin-top: 3px; font-size: 10px; color: #8196a3; }
+.imaging-table .study-cell {
+  font-size: 12.5px;
+  line-height: 1.26;
+  font-weight: 650;
+  color: #e2eaf0;
+  overflow-wrap: anywhere;
+}
+.imaging-table .transport-main {
+  font-size: 11.5px;
+  line-height: 1.2;
+  white-space: normal;
+}
+.imaging-table .transport-main b { white-space: normal; }
 .imaging-table th {
-  padding: 0 9px 8px !important;
-  font-size: 10px !important;
+  padding: 0 6px 8px !important;
+  font-size: 9px !important;
   color: #90a6b3 !important;
-  letter-spacing: .07em !important;
+  letter-spacing: .055em !important;
+  overflow-wrap: normal;
+  word-break: normal;
 }
 
 .compact-detail-backdrop {
@@ -152,8 +185,13 @@
 
 @media (max-width: 430px) {
   .modality-title { font-size: 15px; }
-  .imaging-table { min-width: 680px !important; }
-  .imaging-table .imaging-row td { padding: 11px 8px !important; }
+  .imaging-table { width: 100% !important; min-width: 0 !important; }
+  .imaging-table .imaging-row td { padding: 10px 5px !important; }
+  .imaging-table .imaging-row td:nth-child(n+5) { display: none !important; padding: 0 !important; }
+  .imaging-table .patient-name { font-size: 12.5px; }
+  .imaging-table .study-cell { font-size: 12px; }
+  .imaging-table .transport-main { font-size: 11px; }
+  .imaging-table th { padding: 0 5px 7px !important; font-size: 8.5px !important; }
   .compact-detail-item { grid-template-columns: 108px 1fr; gap: 10px; }
   .compact-detail-value { font-size: 13.5px; }
 }
