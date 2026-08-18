@@ -216,10 +216,12 @@
     const manual = storedRow.manualTransportOverride === true && ['Silla','Camilla','Por definir'].includes(transport);
 
     if (manual) {
+      const desiredClass = transport === 'Silla' ? 'silla' : transport === 'Camilla' ? 'camilla' : 'unset';
+      const desiredIcon = transport === 'Silla' ? '♿' : transport === 'Camilla' ? '🛏️' : '•';
       main.classList.remove('silla','camilla','no-transfer','unset');
-      main.classList.add(transport === 'Silla' ? 'silla' : transport === 'Camilla' ? 'camilla' : 'unset');
-      label.textContent = transport;
-      if (icon) icon.textContent = transport === 'Silla' ? '♿' : transport === 'Camilla' ? '🛏️' : '•';
+      main.classList.add(desiredClass);
+      if (label.textContent !== transport) label.textContent = transport;
+      if (icon && icon.textContent !== desiredIcon) icon.textContent = desiredIcon;
       main.dataset.manualTransport = '1';
       main.removeAttribute('data-inferred');
     } else {
@@ -438,7 +440,7 @@
         scheduleSync();
         if (activeAnchor && !document.contains(activeAnchor)) closePopover();
       });
-      observer.observe(target, {childList:true, subtree:true, characterData:true});
+      observer.observe(target, {childList:true, subtree:true});
     }
   }
 
