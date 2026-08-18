@@ -1,0 +1,753 @@
+/* Pendientes v33 — rediseño integral de la interfaz, no solo la tabla. */
+:root{
+  --v33-bg:#000;
+  --v33-surface:#070b0e;
+  --v33-surface-2:#0a1014;
+  --v33-surface-3:#0d151a;
+  --v33-line:rgba(148,193,214,.14);
+  --v33-line-soft:rgba(148,193,214,.075);
+  --v33-text:#f7fafc;
+  --v33-muted:#91a1ad;
+  --v33-muted-2:#6e818d;
+  --v33-accent:#5fd3ff;
+  --v33-accent-2:#22b8ef;
+  --v33-chair:#bcecff;
+  --v33-stretcher:#ffd59a;
+  --v33-danger:#ff9b9b;
+  --v33-radius:18px;
+  --v33-shadow:0 14px 34px rgba(0,0,0,.28);
+}
+
+html,body{
+  background:#000 !important;
+  background-image:none !important;
+  color:var(--v33-text) !important;
+}
+body{
+  min-height:100dvh;
+  font-family:-apple-system,BlinkMacSystemFont,"SF Pro Text","Segoe UI",sans-serif !important;
+}
+
+/* ===== App shell ===== */
+.app-shell{
+  width:100% !important;
+  max-width:720px !important;
+  margin:0 auto !important;
+  padding:max(14px,env(safe-area-inset-top)) 14px max(30px,env(safe-area-inset-bottom)) !important;
+  background:#000 !important;
+}
+
+/* ===== Encabezado completo ===== */
+.topbar{
+  display:flex !important;
+  align-items:center !important;
+  justify-content:space-between !important;
+  gap:14px !important;
+  margin:0 !important;
+  padding:8px 2px 20px !important;
+  border-bottom:1px solid rgba(255,255,255,.065) !important;
+  background:#000 !important;
+}
+.brand{
+  display:flex !important;
+  align-items:center !important;
+  gap:10px !important;
+  min-width:0 !important;
+}
+.brand-dot{
+  width:11px !important;
+  height:11px !important;
+  border-radius:50% !important;
+  background:var(--v33-accent) !important;
+  box-shadow:0 0 0 6px rgba(95,211,255,.10),0 0 22px rgba(95,211,255,.22) !important;
+}
+h1{
+  margin:0 !important;
+  color:#fff !important;
+  font-size:clamp(31px,8.3vw,40px) !important;
+  line-height:.98 !important;
+  font-weight:900 !important;
+  letter-spacing:-.047em !important;
+}
+.capture-actions{
+  display:flex !important;
+  align-items:center !important;
+  gap:8px !important;
+  flex:0 0 auto !important;
+}
+.shift-btn,
+.capture-icon-btn{
+  height:44px !important;
+  border-radius:14px !important;
+  transition:transform .14s ease,background .14s ease,border-color .14s ease !important;
+  box-shadow:none !important;
+}
+.shift-btn{
+  min-width:88px !important;
+  padding:0 14px !important;
+  border:1px solid rgba(127,172,194,.20) !important;
+  background:#05090c !important;
+  color:#9fb2bd !important;
+  font-size:13px !important;
+  font-weight:850 !important;
+  letter-spacing:-.01em !important;
+}
+.capture-icon-btn{
+  width:44px !important;
+  display:grid !important;
+  place-items:center !important;
+  padding:0 !important;
+  border:1px solid rgba(95,211,255,.22) !important;
+  background:#081116 !important;
+  color:#70d9ff !important;
+}
+.capture-icon-btn.manual{
+  border-color:transparent !important;
+  background:linear-gradient(180deg,#6dd8f8,#4bc5ee) !important;
+  color:#031116 !important;
+  box-shadow:0 10px 28px rgba(34,184,239,.17) !important;
+}
+.shift-btn:active,
+.capture-icon-btn:active{
+  transform:scale(.96) !important;
+}
+.capture-icon-btn svg{
+  width:22px !important;
+  height:22px !important;
+  stroke-width:1.95 !important;
+}
+
+.capture-status{
+  margin:12px 0 0 !important;
+  padding:11px 13px !important;
+  border-radius:14px !important;
+  border:1px solid rgba(95,211,255,.16) !important;
+  background:#071118 !important;
+  color:#b9ebff !important;
+  font-size:12px !important;
+  box-shadow:none !important;
+}
+.capture-status[data-state='success']{
+  background:#07120d !important;
+  border-color:rgba(93,213,154,.18) !important;
+  color:#b8f1d2 !important;
+}
+.capture-status[data-state='error']{
+  background:#15090a !important;
+  border-color:rgba(255,114,114,.20) !important;
+  color:#ffc1c1 !important;
+}
+
+/* ===== Secciones de imagenología ===== */
+.imaging-board{
+  margin-top:28px !important;
+  display:grid !important;
+  gap:30px !important;
+}
+.modality-section{
+  margin:0 !important;
+}
+.modality-title{
+  display:flex !important;
+  align-items:center !important;
+  gap:10px !important;
+  margin:0 3px 14px !important;
+  padding:0 !important;
+  color:#fff !important;
+  font-size:23px !important;
+  line-height:1 !important;
+  font-weight:900 !important;
+  letter-spacing:-.035em !important;
+}
+.modality-title .modality-name-v33{
+  display:inline-block;
+}
+.modality-title .modality-count-v33,
+.modality-title > strong{
+  display:inline-grid !important;
+  place-items:center !important;
+  min-width:34px !important;
+  height:34px !important;
+  padding:0 9px !important;
+  border-radius:999px !important;
+  background:rgba(95,211,255,.12) !important;
+  border:1px solid rgba(95,211,255,.14) !important;
+  color:var(--v33-accent) !important;
+  font-size:17px !important;
+  font-weight:900 !important;
+  letter-spacing:-.02em !important;
+}
+
+.imaging-table-wrap{
+  width:100% !important;
+  overflow:visible !important;
+  padding:0 !important;
+  background:transparent !important;
+}
+.imaging-table{
+  width:100% !important;
+  max-width:100% !important;
+  min-width:0 !important;
+  table-layout:fixed !important;
+  border-collapse:separate !important;
+  border-spacing:0 11px !important;
+  background:transparent !important;
+}
+.imaging-table colgroup{display:table-column-group !important;}
+.imaging-table col:nth-child(1){width:11% !important;}
+.imaging-table col:nth-child(2){width:40% !important;}
+.imaging-table col:nth-child(3){width:23% !important;}
+.imaging-table col:nth-child(4){width:26% !important;}
+.imaging-table col:nth-child(n+5){width:0 !important;visibility:collapse !important;}
+
+/* Header como banda propia */
+.imaging-table thead{display:table-header-group !important;}
+.imaging-table thead tr{display:table-row !important;}
+.imaging-table thead th:nth-child(-n+4){
+  display:table-cell !important;
+  padding:11px 10px !important;
+  background:#060a0d !important;
+  border-top:1px solid rgba(126,175,198,.15) !important;
+  border-bottom:1px solid rgba(126,175,198,.11) !important;
+  color:#8fa1ad !important;
+  font-size:10px !important;
+  line-height:1 !important;
+  font-weight:900 !important;
+  letter-spacing:.13em !important;
+  text-transform:uppercase !important;
+  white-space:nowrap !important;
+  overflow:visible !important;
+  word-break:normal !important;
+}
+.imaging-table thead th:first-child{
+  border-left:1px solid rgba(126,175,198,.15) !important;
+  border-radius:14px 0 0 14px !important;
+}
+.imaging-table thead th:nth-child(4){
+  border-right:1px solid rgba(126,175,198,.15) !important;
+  border-radius:0 14px 14px 0 !important;
+}
+.imaging-table thead th:nth-child(3){text-align:center !important;}
+.imaging-table thead th:nth-child(n+5){display:none !important;}
+
+/* Cada paciente sí se siente como una unidad visual */
+.imaging-table tbody{display:table-row-group !important;}
+.imaging-table .imaging-row{
+  display:table-row !important;
+  cursor:pointer !important;
+  filter:drop-shadow(0 10px 26px rgba(0,0,0,.16)) !important;
+}
+.imaging-table .imaging-row td:nth-child(-n+4){
+  display:table-cell !important;
+  padding:15px 10px !important;
+  vertical-align:middle !important;
+  background:linear-gradient(180deg,#090e12,#070b0e) !important;
+  border-top:1px solid rgba(127,180,204,.13) !important;
+  border-bottom:1px solid rgba(127,180,204,.085) !important;
+  border-radius:0 !important;
+  overflow:visible !important;
+  white-space:normal !important;
+  word-break:normal !important;
+  overflow-wrap:normal !important;
+}
+.imaging-table .imaging-row td:first-child{
+  border-left:1px solid rgba(127,180,204,.13) !important;
+  border-radius:18px 0 0 18px !important;
+  color:var(--v33-accent) !important;
+  font-size:20px !important;
+  line-height:1 !important;
+  font-weight:950 !important;
+  letter-spacing:-.035em !important;
+  text-align:center !important;
+}
+.imaging-table .imaging-row td:nth-child(2){
+  position:relative !important;
+  padding-left:14px !important;
+}
+.imaging-table .imaging-row td:nth-child(2)::before{
+  content:"" !important;
+  display:block !important;
+  position:absolute !important;
+  left:0 !important;
+  top:18% !important;
+  width:1px !important;
+  height:64% !important;
+  background:rgba(127,180,204,.14) !important;
+}
+.imaging-table .imaging-row td:nth-child(4){
+  border-right:1px solid rgba(127,180,204,.13) !important;
+  border-radius:0 18px 18px 0 !important;
+}
+.imaging-table .imaging-row td:nth-child(n+5){
+  display:none !important;
+  width:0 !important;
+  padding:0 !important;
+  border:0 !important;
+}
+.imaging-table .imaging-row:active td:nth-child(-n+4),
+.imaging-table .imaging-row.is-pressed-v32 td:nth-child(-n+4){
+  background:#0d171d !important;
+}
+
+/* Paciente */
+.imaging-table .patient-name{
+  display:block !important;
+  color:#fff !important;
+  font-size:15.8px !important;
+  line-height:1.06 !important;
+  font-weight:900 !important;
+  letter-spacing:-.018em !important;
+  white-space:normal !important;
+  overflow:visible !important;
+  text-overflow:clip !important;
+  word-break:normal !important;
+}
+.imaging-table .age-line{
+  display:block !important;
+  margin-top:6px !important;
+  color:var(--v33-muted) !important;
+  font-size:11.2px !important;
+  line-height:1.15 !important;
+  font-weight:750 !important;
+  white-space:nowrap !important;
+}
+.imaging-table .age-line span{display:none !important;}
+.imaging-table .imaging-row.adaptive-two-line-v26 .patient-name::before{
+  display:block !important;
+  color:#fff !important;
+  font-size:15.8px !important;
+  line-height:1.04 !important;
+  font-weight:900 !important;
+}
+.imaging-table .imaging-row.adaptive-two-line-v26 .patient-name::after{
+  display:block !important;
+  margin-top:3px !important;
+  color:#c5d0d6 !important;
+  font-size:14.4px !important;
+  line-height:1.04 !important;
+  font-weight:800 !important;
+}
+
+/* Traslado */
+.imaging-table .transport-cell{
+  text-align:center !important;
+  overflow:visible !important;
+  padding-left:6px !important;
+  padding-right:6px !important;
+}
+.imaging-table .transport-main{
+  display:inline-flex !important;
+  width:auto !important;
+  max-width:100% !important;
+  min-width:0 !important;
+  min-height:38px !important;
+  align-items:center !important;
+  justify-content:center !important;
+  gap:6px !important;
+  padding:6px 10px !important;
+  border-radius:13px !important;
+  white-space:nowrap !important;
+  box-shadow:none !important;
+}
+.imaging-table .transport-main span{
+  font-size:15px !important;
+  line-height:1 !important;
+}
+.imaging-table .transport-main b{
+  color:inherit !important;
+  font-size:12.4px !important;
+  line-height:1 !important;
+  font-weight:900 !important;
+  white-space:nowrap !important;
+}
+.imaging-table .transport-main.silla{
+  background:rgba(48,176,230,.105) !important;
+  border:1px solid rgba(76,201,250,.22) !important;
+  color:var(--v33-chair) !important;
+}
+.imaging-table .transport-main.camilla{
+  background:rgba(218,151,40,.10) !important;
+  border:1px solid rgba(239,172,61,.22) !important;
+  color:var(--v33-stretcher) !important;
+}
+.imaging-table .transport-main.no-transfer{
+  background:rgba(255,255,255,.045) !important;
+  border:1px solid rgba(255,255,255,.08) !important;
+  color:#d6dee3 !important;
+}
+.imaging-table .transport-main.unset{
+  background:rgba(255,255,255,.035) !important;
+  border:1px solid rgba(255,255,255,.06) !important;
+  color:#8b9aa4 !important;
+}
+.imaging-table .transport-reason,
+.imaging-table .oxygen-chip{display:none !important;}
+
+/* Estudio */
+.imaging-table .study-cell{
+  padding-left:12px !important;
+  color:#f4f7f9 !important;
+  font-size:14.3px !important;
+  line-height:1.14 !important;
+  font-weight:760 !important;
+  letter-spacing:-.008em !important;
+  white-space:normal !important;
+  overflow:visible !important;
+  text-overflow:clip !important;
+  overflow-wrap:normal !important;
+  word-break:normal !important;
+}
+.study-torax-v32{
+  color:#fff !important;
+  font-weight:950 !important;
+}
+
+/* ===== Pacientes a piso ===== */
+.floor-board{
+  display:grid !important;
+  gap:20px !important;
+  margin-top:28px !important;
+}
+.floor-group{
+  padding:0 !important;
+}
+.floor-group + .floor-group{
+  padding-top:2px !important;
+  border-top:0 !important;
+}
+.floor-group-title,
+.other-section-title{
+  margin:0 2px 10px !important;
+  color:#f7fafc !important;
+  font-size:18px !important;
+  line-height:1.1 !important;
+  font-weight:900 !important;
+  letter-spacing:-.02em !important;
+}
+.floor-group-title strong{color:var(--v33-accent) !important;}
+.floor-table-wrap{
+  overflow:hidden !important;
+  border:1px solid rgba(127,180,204,.12) !important;
+  border-radius:18px !important;
+  background:#070b0e !important;
+  box-shadow:var(--v33-shadow) !important;
+}
+.floor-group-table{
+  width:100% !important;
+  border-collapse:collapse !important;
+  background:transparent !important;
+}
+.floor-group-table th{
+  padding:11px 14px 9px !important;
+  background:#080d11 !important;
+  color:#8799a5 !important;
+  font-size:9.5px !important;
+  font-weight:900 !important;
+  letter-spacing:.11em !important;
+}
+.floor-group-table td{
+  padding:14px !important;
+  border:0 !important;
+  border-top:1px solid rgba(127,180,204,.075) !important;
+  background:#070b0e !important;
+  color:#eef4f7 !important;
+  font-size:15px !important;
+}
+.floor-origin strong,
+.floor-destination-line > strong{
+  color:#fff !important;
+  font-size:16px !important;
+  font-weight:900 !important;
+}
+.floor-origin strong{color:var(--v33-accent) !important;}
+.floor-total{
+  margin:2px 2px 0 !important;
+  padding-top:12px !important;
+  border-top:0 !important;
+  color:var(--v33-muted) !important;
+  font-size:12px !important;
+}
+.floor-total strong{color:#fff !important;}
+.other-pending-section{
+  margin-top:28px !important;
+  padding-top:0 !important;
+  border-top:0 !important;
+}
+
+/* ===== Empty state ===== */
+.empty-row td{
+  padding:54px 22px !important;
+  border:1px solid rgba(127,180,204,.12) !important;
+  border-radius:22px !important;
+  background:#070b0e !important;
+  box-shadow:var(--v33-shadow) !important;
+}
+.empty-state{gap:8px !important;}
+.empty-icon{
+  width:46px !important;
+  height:46px !important;
+  margin-bottom:4px !important;
+  border-radius:15px !important;
+  background:rgba(95,211,255,.10) !important;
+  color:var(--v33-accent) !important;
+}
+.empty-state b{
+  color:#fff !important;
+  font-size:17px !important;
+  font-weight:900 !important;
+}
+.empty-state span{
+  color:var(--v33-muted) !important;
+  font-size:12px !important;
+}
+
+/* ===== Hoja de captura / edición ===== */
+.sheet-backdrop,
+.compact-detail-backdrop{
+  background:rgba(0,0,0,.80) !important;
+  backdrop-filter:blur(14px) saturate(110%) !important;
+}
+.capture-sheet,
+.compact-detail-sheet{
+  width:min(100%,620px) !important;
+  border:1px solid rgba(127,180,204,.13) !important;
+  border-radius:26px !important;
+  background:#080c0f !important;
+  box-shadow:0 32px 96px rgba(0,0,0,.64) !important;
+}
+.sheet-handle,
+.compact-detail-handle{
+  width:40px !important;
+  height:4px !important;
+  border-radius:999px !important;
+  background:#2b3a43 !important;
+}
+.sheet-head,
+.compact-detail-head{
+  background:linear-gradient(180deg,#080c0f 0%,#080c0f 84%,rgba(8,12,15,.94) 100%) !important;
+  border-radius:18px !important;
+}
+.sheet-kicker,
+.compact-detail-kicker{
+  color:var(--v33-accent) !important;
+  font-size:9px !important;
+  font-weight:900 !important;
+  letter-spacing:.15em !important;
+}
+.sheet-head h2,
+.compact-detail-head h2{
+  color:#fff !important;
+  font-size:24px !important;
+  line-height:1.08 !important;
+  font-weight:900 !important;
+  letter-spacing:-.028em !important;
+}
+.close-btn,
+.compact-detail-close{
+  border:1px solid rgba(255,255,255,.08) !important;
+  border-radius:14px !important;
+  background:#0d1418 !important;
+  color:#dce6eb !important;
+}
+.form-grid{
+  gap:12px !important;
+}
+.capture-sheet label > span:not(.toggle-ui):not(.toggle-copy){
+  margin:0 0 7px 2px !important;
+  color:#92a3ae !important;
+  font-size:11px !important;
+  font-weight:850 !important;
+}
+input,select{
+  min-height:50px !important;
+  padding:0 14px !important;
+  border:1px solid #24323a !important;
+  border-radius:14px !important;
+  background:#020507 !important;
+  color:#f7fafc !important;
+  font-size:16px !important;
+  box-shadow:inset 0 1px 0 rgba(255,255,255,.015) !important;
+}
+input:focus,select:focus{
+  border-color:#4fcaf6 !important;
+  box-shadow:0 0 0 3px rgba(79,202,246,.10) !important;
+}
+.oxygen-toggle{
+  border:1px solid #22313a !important;
+  border-radius:15px !important;
+  background:#05090c !important;
+}
+.save-btn,
+.compact-detail-edit{
+  border:0 !important;
+  background:linear-gradient(180deg,#6ed8f8,#4fc5ee) !important;
+  color:#031116 !important;
+  box-shadow:0 12px 28px rgba(34,184,239,.14) !important;
+}
+
+/* ===== Detalle del paciente ===== */
+.compact-detail-list{
+  border-top:1px solid rgba(127,180,204,.09) !important;
+}
+.compact-detail-item{
+  display:block !important;
+  padding:14px 2px !important;
+  border-bottom:1px solid rgba(127,180,204,.075) !important;
+}
+.compact-detail-label{
+  display:block !important;
+  margin-bottom:5px !important;
+  color:#7f929e !important;
+  font-size:9.5px !important;
+  line-height:1.15 !important;
+  font-weight:900 !important;
+  letter-spacing:.11em !important;
+}
+.compact-detail-value{
+  color:#f1f5f7 !important;
+  font-size:15px !important;
+  line-height:1.38 !important;
+  overflow-wrap:anywhere !important;
+}
+.compact-detail-value.clinical{
+  color:#ffe4bd !important;
+  font-weight:800 !important;
+}
+.compact-detail-actions{
+  gap:10px !important;
+  margin-top:15px !important;
+}
+.compact-detail-actions button{
+  min-height:48px !important;
+  border-radius:14px !important;
+  font-size:15px !important;
+  font-weight:900 !important;
+}
+.compact-detail-remove{
+  border:1px solid rgba(255,114,114,.18) !important;
+  background:rgba(255,114,114,.07) !important;
+  color:#ffb6b6 !important;
+}
+
+/* ===== Undo ===== */
+.undo-bar{
+  left:50% !important;
+  right:auto !important;
+  bottom:max(18px,env(safe-area-inset-bottom)) !important;
+  transform:translateX(-50%) !important;
+  width:min(calc(100% - 28px),520px) !important;
+  padding:10px 12px !important;
+  border:1px solid rgba(127,180,204,.13) !important;
+  border-radius:16px !important;
+  background:#0a1014 !important;
+  color:#dce6eb !important;
+  box-shadow:0 18px 48px rgba(0,0,0,.45) !important;
+}
+.undo-bar button{
+  border:0 !important;
+  background:transparent !important;
+  color:var(--v33-accent) !important;
+  font-weight:900 !important;
+}
+
+@media(max-width:430px){
+  .app-shell{
+    padding-left:12px !important;
+    padding-right:12px !important;
+  }
+  .topbar{
+    gap:9px !important;
+    padding-bottom:18px !important;
+  }
+  .brand{gap:9px !important;}
+  .brand-dot{width:10px !important;height:10px !important;}
+  h1{font-size:31px !important;}
+  .capture-actions{gap:6px !important;}
+  .shift-btn{
+    min-width:82px !important;
+    height:42px !important;
+    padding:0 12px !important;
+    font-size:12.5px !important;
+  }
+  .capture-icon-btn{
+    width:42px !important;
+    height:42px !important;
+    border-radius:13px !important;
+  }
+  .imaging-board{margin-top:24px !important;gap:26px !important;}
+  .modality-title{
+    margin-left:2px !important;
+    margin-bottom:12px !important;
+    font-size:22px !important;
+  }
+  .modality-title .modality-count-v33,
+  .modality-title > strong{
+    min-width:31px !important;
+    height:31px !important;
+    font-size:16px !important;
+  }
+  .imaging-table{
+    border-spacing:0 9px !important;
+  }
+  .imaging-table col:nth-child(1){width:11% !important;}
+  .imaging-table col:nth-child(2){width:40% !important;}
+  .imaging-table col:nth-child(3){width:23% !important;}
+  .imaging-table col:nth-child(4){width:26% !important;}
+  .imaging-table thead th:nth-child(-n+4){
+    padding:10px 7px !important;
+    font-size:9px !important;
+    letter-spacing:.10em !important;
+  }
+  .imaging-table .imaging-row td:nth-child(-n+4){
+    padding:14px 7px !important;
+  }
+  .imaging-table .imaging-row td:first-child{
+    font-size:19px !important;
+  }
+  .imaging-table .imaging-row td:nth-child(2){
+    padding-left:11px !important;
+  }
+  .imaging-table .patient-name,
+  .imaging-table .imaging-row.adaptive-two-line-v26 .patient-name::before{
+    font-size:15px !important;
+  }
+  .imaging-table .imaging-row.adaptive-two-line-v26 .patient-name::after{
+    font-size:13.7px !important;
+  }
+  .imaging-table .age-line{
+    font-size:10.8px !important;
+  }
+  .imaging-table .transport-main{
+    min-height:36px !important;
+    gap:5px !important;
+    padding:5px 8px !important;
+    border-radius:12px !important;
+  }
+  .imaging-table .transport-main span{font-size:14px !important;}
+  .imaging-table .transport-main b{font-size:11.7px !important;}
+  .imaging-table .study-cell{
+    padding-left:9px !important;
+    font-size:13.6px !important;
+  }
+  .capture-sheet,
+  .compact-detail-sheet{
+    border-radius:24px !important;
+  }
+  .compact-detail-value{font-size:14.5px !important;}
+}
+
+@media(max-width:370px){
+  .app-shell{padding-left:9px !important;padding-right:9px !important;}
+  .topbar{gap:6px !important;}
+  h1{font-size:29px !important;}
+  .shift-btn{min-width:74px !important;padding:0 9px !important;font-size:12px !important;}
+  .capture-icon-btn{width:39px !important;height:39px !important;}
+  .imaging-table col:nth-child(1){width:11% !important;}
+  .imaging-table col:nth-child(2){width:39% !important;}
+  .imaging-table col:nth-child(3){width:24% !important;}
+  .imaging-table col:nth-child(4){width:26% !important;}
+}
+
+@media(prefers-reduced-motion:reduce){
+  .shift-btn,.capture-icon-btn,.imaging-row{transition:none !important;}
+}
