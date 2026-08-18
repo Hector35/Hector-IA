@@ -15,7 +15,7 @@ const localStorage={
   clear(){this.data.clear();}
 };
 globalThis.localStorage=localStorage;
-const app=await import(`../public/turno-rx/app-v16.js?tabs=${Date.now()}`);
+const app=await import('../public/turno-rx/app-v16.js');
 
 test('define cuatro pestañas accesibles y un único panel activo',()=>{
   expect(source).toContain("const CATEGORY_TABS=['Piso','RX','TAC','USG']");
