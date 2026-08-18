@@ -1,4 +1,4 @@
-const CACHE = 'turno-rx-shell-v38-manual-quick';
+const CACHE = 'turno-rx-shell-v34-v38-manual-quick';
 const SHELL = [
   '/turno-rx/',
   '/turno-rx/index.html',
