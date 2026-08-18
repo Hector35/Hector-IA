@@ -32,7 +32,7 @@ const FLOOR_GROUPS=[
 const MODALITY_ORDER=['Rayos X','TAC','Ultrasonido','Interconsulta','Apoyo para movimiento','Otro'];
 
 const VISION_PROMPT=`Analiza esta foto de una solicitud, boleta o pizarrón hospitalario para crear pendientes operativos de traslado. Devuelve SOLO JSON válido, sin markdown, con este formato exacto:
-{"patients":[{"category":"Rayos X|TAC|USG|Piso|Interconsulta|Apoyo para movimiento","handwrittenBed":"","formBed":"","waitingRoomMarked":false,"bed":"","name":"","birthDate":null,"age":null,"sex":"Mujer|Hombre|No visible","target":"","destination":"","destinationFloor":"","destinationBlock":"","modality":"Rayos X|TAC|Ultrasonido|Otro","diagnosis":"","diagnosisMeaning":"","transport":"Silla|Camilla|No trasladar|Por definir","transportReason":"","oxygenProbable":false,"oxygenReason":""}]}.
+{"patients":[{"category":"Rayos X|TAC|USG|Piso|Interconsulta|Apoyo para movimiento","handwrittenBed":"","formBed":"","waitingRoomMarked":false,"bed":"","name":"","birthDate":null,"age":null,"sex":"Mujer|Hombre|No visible","target":"","destination":"","destinationFloor":"","destinationBlock":"","modality":"Rayos X|TAC|Ultrasonido|Otro","region":"","withContrast":false,"requestingDoctor":"","diagnosis":"","diagnosisMeaning":"","transport":"Silla|Camilla|No trasladar|Por definir","transportReason":"","oxygenProbable":false,"oxygenReason":""}]}.
 
 Extrae únicamente datos VISIBLES. No inventes nombres, edades, estudios, diagnósticos, antecedentes, camas, destinos ni hechos clínicos. Si algo clínico no se alcanza a leer con seguridad, déjalo vacío; nunca lo completes por contexto.
 
@@ -51,7 +51,9 @@ PIZARRÓN A PISO:
 IMAGENOLOGÍA:
 - Usa category "Rayos X", "TAC" o "USG" según corresponda. Usa "Interconsulta" y "Apoyo para movimiento" únicamente cuando la solicitud visible sea realmente de ese tipo. Nunca clasifiques una boleta de imagen como Piso solo porque contenga números.
 - target debe contener el estudio solicitado tal como se entiende de la boleta.
-- modality SIEMPRE separada: TAC/tomografía -> TAC; USG/ultrasonido/ecografía -> Ultrasonido; radiografía/RX/tele de tórax/proyecciones AP-lateral-oblicua -> Rayos X. Nunca mezcles TAC ni USG dentro de Rayos X.
+- modality SIEMPRE separada: TAC/TC/tomografía/AngioTAC -> TAC; USG/ultrasonido/ecografía -> Ultrasonido; radiografía/RX/tele de tórax/proyecciones AP-lateral-oblicua -> Rayos X. Nunca mezcles TAC ni USG dentro de Rayos X.
+- TAC exige una modalidad explícita en el texto del estudio. “Cráneo”, “tórax”, “abdomen”, “pelvis”, “columna” o una extremidad SIN TAC, TC, tomografía o AngioTAC NO se clasifican como TAC: usa Otro si tampoco hay evidencia explícita de otra modalidad.
+- region contiene solo la región anatómica visible. withContrast=true únicamente cuando diga expresamente “con contraste” o equivalente inequívoco. requestingDoctor solo si el nombre es visible.
 - Si hay tórax junto con otro estudio, conserva ambos; la interfaz pondrá Tórax primero.
 
 DIAGNÓSTICO / DATO CLÍNICO — MUY IMPORTANTE:
@@ -117,12 +119,12 @@ function ageFromBirthDate(value){
 
 function normalizeModality(value,target=''){
   const explicit=clean(value).toLowerCase();
-  if(/tac|tomograf|\btc\b/.test(explicit))return 'TAC';
+  const text=clean(target).toLowerCase();
+  if(/\b(?:tac|tc)\b|angiotac|tomograf/.test(text))return 'TAC';
   if(/ultrason|usg|ecograf/.test(explicit))return 'Ultrasonido';
   if(/rayos|radiograf|\brx\b/.test(explicit))return 'Rayos X';
+  if(/tac|tomograf|\btc\b/.test(explicit))return 'Otro';
   if(explicit==='otro')return 'Otro';
-  const text=clean(target).toLowerCase();
-  if(/\b(tac|tc)\b|tomograf/.test(text))return 'TAC';
   if(/\busg\b|ultrason|ecograf/.test(text))return 'Ultrasonido';
   if(/radiograf|\brx\b|t[óo]rax|tele\s+de|\bap\b|lateral|oblicu|cr[áa]neo|abdomen|pelvis|cadera|pie|rodilla|hombro|columna|mano|muñeca|tobillo/.test(text))return 'Rayos X';
   return 'Otro';
@@ -133,7 +135,7 @@ function normalizeCategory(value,modality='',target=''){
   if(explicit==='piso'||/subir\s+a\s+piso|traslado\s+a\s+piso/.test(explicit))return 'Piso';
   if(/interconsulta/.test(explicit))return 'Interconsulta';
   if(/apoyo(?:\s+para)?\s+(?:el\s+)?movimiento|apoyo\s+movimiento/.test(explicit))return 'Apoyo para movimiento';
-  if(/tac|tomograf|^tc$/.test(explicit))return 'TAC';
+  if(/tac|tomograf|^tc$/.test(explicit))return normalizeModality('',target)==='TAC'?'TAC':'Otro';
   if(/usg|ultrason|ecograf/.test(explicit))return 'USG';
   if(/rayos|radiograf|^rx$/.test(explicit))return 'Rayos X';
   const normalized=normalizeModality(modality,target);
@@ -152,6 +154,11 @@ function normalizeStudyDisplay(value){
   text=text
     .replace(/\bprotocolo(?:\s+quir[uú]rgico)?\b/gi,'')
     .replace(/\bsimple\b/gi,'')
+    .replace(/\btomograf[ií]a\s+computari[sz]ada\s+de\b/gi,'TAC de')
+    .replace(/\btomograf[ií]a\s+de\b/gi,'TAC de')
+    .replace(/\bTC\s+de\b/gi,'TAC de')
+    .replace(/,\s*(?=[^,]+\s+y\s+)/g,' + ')
+    .replace(/\s+y\s+/gi,' + ')
     .replace(/\btele(?:radiograf[ií]a)?\s+de\s+t[óo]rax\b/gi,'Tórax')
     .replace(/\btele\s+t[óo]rax\b/gi,'Tórax')
     .replace(/\bt[óo]rax\b/gi,'Tórax')
@@ -232,7 +239,7 @@ function archiveShift(shiftMeta,shiftRows){if(!shiftRows.length||!hasStorage())r
 function upgradeRow(row,shiftId){
   const target=clean(row?.target||row?.study||row?.destination),legacyFloor=!clean(row?.category)&&Boolean(clean(row?.destination)||floorGroupKey(target)),category=legacyFloor?'Piso':normalizeCategory(row?.category,row?.modality,target);
   const portable=/port[áa]til/i.test(target);
-  return {...row,id:row?.id||uid(),shiftId:shiftId||row?.shiftId,bed:normalizeBedCandidate(row?.bed),name:clean(row?.name),age:normalizeAge(row?.age),sex:normalizeSex(row?.sex),target,destination:clean(row?.destination),destinationFloor:clean(row?.destinationFloor||row?.floor),destinationBlock:clean(row?.destinationBlock||row?.block),category,modality:normalizeModality(row?.modality,target),status:clean(row?.status)||'Pendiente',diagnosis:clean(row?.diagnosis),diagnosisMeaning:clean(row?.diagnosisMeaning),transport:portable?'No trasladar':(normalizeTransport(row?.transport)||'Por definir'),transportReason:clean(row?.transportReason),oxygenProbable:Boolean(row?.oxygenProbable),oxygenReason:row?.oxygenProbable?clean(row?.oxygenReason):'',createdAt:row?.createdAt||new Date().toISOString()};
+  return {...row,id:row?.id||uid(),shiftId:shiftId||row?.shiftId,bed:normalizeBedCandidate(row?.bed),name:clean(row?.name),age:normalizeAge(row?.age),sex:normalizeSex(row?.sex),target,destination:clean(row?.destination),destinationFloor:clean(row?.destinationFloor||row?.floor),destinationBlock:clean(row?.destinationBlock||row?.block),category,modality:normalizeModality(row?.modality,target),region:clean(row?.region),withContrast:Boolean(row?.withContrast),requestingDoctor:clean(row?.requestingDoctor),status:clean(row?.status)||'Pendiente',diagnosis:clean(row?.diagnosis),diagnosisMeaning:clean(row?.diagnosisMeaning),transport:portable?'No trasladar':(normalizeTransport(row?.transport)||'Por definir'),transportReason:clean(row?.transportReason),oxygenProbable:Boolean(row?.oxygenProbable),oxygenReason:row?.oxygenProbable?clean(row?.oxygenReason):'',createdAt:row?.createdAt||new Date().toISOString()};
 }
 function bootstrapState(){
   let shift=read(SHIFT_KEY,null),current=read(STORAGE_KEY,null);if(!Array.isArray(current))current=read(LEGACY_STORAGE_KEY,null);
@@ -251,10 +258,12 @@ function effectiveTransport(row){if(/port[áa]til/i.test(clean(row?.target)))ret
 function transportRank(row){const t=effectiveTransport(row);if(t==='Silla')return 0;if(t==='Camilla')return 1;if(t==='No trasladar')return 2;return 3;}
 function compareFloorRows(a,b){const transport=transportRank(a)-transportRank(b);return transport||compareOrigins(a,b);}
 function compareImagingRows(a,b){
+  const urgency=(row)=>row?.clinicalUrgencyConfirmed===true||/\burgente\b/i.test(clean(row?.urgency))?0:1;
+  const ur=urgency(a)-urgency(b);if(ur)return ur;
   const tr=transportRank(a)-transportRank(b);if(tr)return tr;
+  const aa=normalizeAge(a.age),ba=normalizeAge(b.age);if(aa!==null&&ba!==null&&aa!==ba)return aa-ba;if(aa!==null&&ba===null)return -1;if(aa===null&&ba!==null)return 1;
   const sexRank=(row)=>normalizeSex(row.sex)==='Mujer'?0:normalizeSex(row.sex)==='Hombre'?1:2;
   const sr=sexRank(a)-sexRank(b);if(sr)return sr;
-  const aa=normalizeAge(a.age),ba=normalizeAge(b.age);if(aa!==null&&ba!==null&&aa!==ba)return aa-ba;if(aa!==null&&ba===null)return -1;if(aa===null&&ba!==null)return 1;
   return compareOrigins(a,b);
 }
 function isCriticalDiagnosis(value){return /\b(evc|fractur|miasis|pie\s+diab|sepsis|absceso|tce|ictus|evento\s+vascular|hemorrag|infarto|disnea|hipox|cirrosis|erc|di[aá]lisis)\b/i.test(clean(value));}
@@ -274,11 +283,12 @@ function renderIncompleteFloor(incompleteRows){if(!incompleteRows.length)return 
 function renderImagingRow(row){
   const age=normalizeAge(row.age),sex=normalizeSex(row.sex),diagnosis=clean(row.diagnosis),meaning=clean(row.diagnosisMeaning);const critical=isCriticalDiagnosis(diagnosis);
   const patientMeta=[age!==null?`${age} años`:'',sex!=='No visible'?sex:''].filter(Boolean).join(' · ');
-  return `<tr class="patient-row imaging-row" data-id="${esc(row.id)}" title="Toca para editar">
+  const indicators=`${row.withContrast?'<span class="tac-indicator">Contraste</span>':''}${row.oxygenProbable?'<span class="tac-indicator tac-o2">O₂</span>':''}`;
+  return `<tr class="patient-row imaging-row" data-id="${esc(row.id)}" data-modality="${esc(normalizeModality(row.modality,row.target))}" title="Toca para editar">
     <td class="bed-cell" data-label="Origen"><span>${esc(displayOrigin(row.bed))}</span></td>
     <td class="name-cell" data-label="Paciente"><div class="patient-name">${esc(row.name||'—')}</div>${patientMeta?`<div class="age-line">${esc(patientMeta)}</div>`:''}</td>
     <td class="transport-cell" data-label="Traslado">${renderTransport(row)}</td>
-    <td class="study-cell" data-label="Estudio">${esc(normalizeStudyDisplay(row.target))}</td>
+    <td class="study-cell" data-label="Estudio">${esc(normalizeStudyDisplay(row.target))}${indicators?`<div class="tac-indicators">${indicators}</div>`:''}</td>
     <td class="diagnosis-cell ${critical?'critical':''}" data-label="Diagnóstico">${diagnosis?esc(diagnosis):'<span class="unknown-clinical">No visible</span>'}</td>
     <td class="meaning-cell" data-label="Qué significa">${meaning?esc(meaning):'<span class="unknown-clinical">—</span>'}</td>
     <td class="action-cell" data-label=""><button class="remove-btn" type="button" data-remove="${esc(row.id)}" aria-label="Quitar paciente">×</button></td>
@@ -296,8 +306,8 @@ function renderEmpty(){return `<section class="table-wrap" aria-label="Pacientes
 function renderUndo(){if(!undoState||undoState.expiresAt<=Date.now())return '';return `<div class="undo-bar" role="status"><span>Paciente quitado</span><button type="button" id="undoRemove">Deshacer</button></div>`;}
 
 function render(){
-  if(!root)return;const floorRows=rows.filter(isCompleteFloorRow),incompleteRows=rows.filter(isIncompleteFloorRow),imagingRows=rows.filter((row)=>!hasFloorTarget(row));
-  const body=rows.length?`${renderFloorSections(floorRows)}${renderIncompleteFloor(incompleteRows)}${renderImagingSections(imagingRows)}`:renderEmpty();
+  if(!root)return;const activeRows=rows.filter((row)=>!(row?.status==='Realizado'&&normalizeCategory(row?.category,row?.modality,row?.target)==='TAC')),floorRows=activeRows.filter(isCompleteFloorRow),incompleteRows=activeRows.filter(isIncompleteFloorRow),imagingRows=activeRows.filter((row)=>!hasFloorTarget(row));
+  const body=activeRows.length?`${renderFloorSections(floorRows)}${renderIncompleteFloor(incompleteRows)}${renderImagingSections(imagingRows)}`:renderEmpty();
   root.innerHTML=`<main class="app-shell"><header class="topbar"><div class="brand"><span class="brand-dot"></span><h1>Pendientes</h1></div><div class="capture-actions" aria-label="Opciones"><button class="shift-btn" id="newShift" type="button" aria-label="Iniciar nuevo turno">↻ Turno</button><button class="capture-icon-btn" id="galleryCapture" type="button" aria-label="Elegir foto">${ICONS.photo}</button><button class="capture-icon-btn manual" id="manualCapture" type="button" aria-label="Captura manual">${ICONS.pencil}</button></div><input id="galleryInput" type="file" accept="image/*" multiple hidden /></header><div class="capture-status" id="captureStatus" hidden></div>${body}</main>${renderUndo()}<div class="sheet-backdrop" id="sheetBackdrop" hidden><form class="capture-sheet" id="patientForm"><div class="sheet-handle"></div><div class="sheet-head"><div><div class="sheet-kicker">PENDIENTE</div><h2 id="sheetTitle">Capturar paciente</h2></div><button type="button" class="close-btn" id="closeSheet" aria-label="Cerrar">×</button></div><div class="form-grid">
     <label><span>Cama / área</span><input id="bed" name="bed" autocomplete="off" placeholder="15, CE2, UP1, UI1…" /></label>
     <label><span>Edad</span><input id="age" name="age" type="number" inputmode="numeric" min="0" max="130" autocomplete="off" placeholder="Años" /></label>
@@ -335,7 +345,7 @@ function parseVisionJSON(value){if(value&&typeof value==='object')return value;c
 function normalizeVisionRow(patient){
   const age=normalizeAge(patient?.age)??ageFromBirthDate(patient?.birthDate),oxygenProbable=Boolean(patient?.oxygenProbable),category=normalizeCategory(patient?.category,patient?.modality,patient?.target||patient?.study),destination=clean(patient?.destination),target=category==='Piso'?(destination||clean(patient?.target)):clean(patient?.target||patient?.study||destination),portable=/port[áa]til/i.test(target);
   const diagnosis=clean(patient?.diagnosis),diagnosisMeaning=diagnosis?clean(patient?.diagnosisMeaning):'';
-  return {id:uid(),shiftId:shift.id,bed:resolveVisionBed(patient),name:clean(patient?.name),age,sex:normalizeSex(patient?.sex),category,target,destination:category==='Piso'?target:destination,destinationFloor:category==='Piso'?clean(patient?.destinationFloor):'',destinationBlock:category==='Piso'?clean(patient?.destinationBlock):'',modality:normalizeModality(patient?.modality,target),status:'Pendiente',diagnosis,diagnosisMeaning,transport:portable?'No trasladar':(normalizeTransport(patient?.transport)||'Por definir'),transportReason:clean(patient?.transportReason),oxygenProbable,oxygenReason:oxygenProbable?clean(patient?.oxygenReason):'',createdAt:new Date().toISOString()};
+  return {id:uid(),shiftId:shift.id,bed:resolveVisionBed(patient),name:clean(patient?.name),age,sex:normalizeSex(patient?.sex),category,target,destination:category==='Piso'?target:destination,destinationFloor:category==='Piso'?clean(patient?.destinationFloor):'',destinationBlock:category==='Piso'?clean(patient?.destinationBlock):'',modality:normalizeModality(patient?.modality,target),region:clean(patient?.region),withContrast:Boolean(patient?.withContrast)&&/contraste/i.test(target),requestingDoctor:clean(patient?.requestingDoctor||patient?.doctor),status:'Pendiente',diagnosis,diagnosisMeaning,transport:portable?'No trasladar':(normalizeTransport(patient?.transport)||'Por definir'),transportReason:clean(patient?.transportReason),oxygenProbable,oxygenReason:oxygenProbable?clean(patient?.oxygenReason):'',createdAt:new Date().toISOString()};
 }
 async function analyzePhoto(file){
   if(!(file instanceof File)||!file.type.startsWith('image/'))throw new Error('Selecciona una imagen.');if(file.size>8*1024*1024)throw new Error(`${file.name||'La foto'} pesa más de 8 MB.`);
@@ -346,7 +356,7 @@ async function analyzePhoto(file){
 }
 function mergeRow(existing,incoming){
   const incomingTransport=normalizeTransport(incoming.transport),existingTransport=normalizeTransport(existing.transport),target=incoming.target||existing.target||'',portable=/port[áa]til/i.test(target);
-  return {...existing,bed:incoming.bed||normalizeBedCandidate(existing.bed)||'',name:incoming.name||existing.name||'',age:incoming.age??normalizeAge(existing.age),sex:incoming.sex&&incoming.sex!=='No visible'?incoming.sex:normalizeSex(existing.sex),category:incoming.category||existing.category||'Otro',target,destination:incoming.destination||existing.destination||'',destinationFloor:incoming.destinationFloor||existing.destinationFloor||'',destinationBlock:incoming.destinationBlock||existing.destinationBlock||'',modality:normalizeModality(incoming.modality||existing.modality,target),status:existing.status||incoming.status||'Pendiente',diagnosis:incoming.diagnosis||existing.diagnosis||'',diagnosisMeaning:incoming.diagnosisMeaning||existing.diagnosisMeaning||'',transport:portable?'No trasladar':(incomingTransport&&incomingTransport!=='Por definir'?incomingTransport:(existingTransport||incomingTransport||'Por definir')),transportReason:incoming.transportReason||existing.transportReason||'',oxygenProbable:Boolean(existing.oxygenProbable||incoming.oxygenProbable),oxygenReason:incoming.oxygenReason||existing.oxygenReason||''};
+  return {...existing,bed:incoming.bed||normalizeBedCandidate(existing.bed)||'',name:incoming.name||existing.name||'',age:incoming.age??normalizeAge(existing.age),sex:incoming.sex&&incoming.sex!=='No visible'?incoming.sex:normalizeSex(existing.sex),category:incoming.category||existing.category||'Otro',target,destination:incoming.destination||existing.destination||'',destinationFloor:incoming.destinationFloor||existing.destinationFloor||'',destinationBlock:incoming.destinationBlock||existing.destinationBlock||'',modality:normalizeModality(incoming.modality||existing.modality,target),region:incoming.region||existing.region||'',withContrast:Boolean(existing.withContrast||incoming.withContrast),requestingDoctor:incoming.requestingDoctor||existing.requestingDoctor||'',status:existing.status||incoming.status||'Pendiente',diagnosis:incoming.diagnosis||existing.diagnosis||'',diagnosisMeaning:incoming.diagnosisMeaning||existing.diagnosisMeaning||'',transport:portable?'No trasladar':(incomingTransport&&incomingTransport!=='Por definir'?incomingTransport:(existingTransport||incomingTransport||'Por definir')),transportReason:incoming.transportReason||existing.transportReason||'',oxygenProbable:Boolean(existing.oxygenProbable||incoming.oxygenProbable),oxygenReason:incoming.oxygenReason||existing.oxygenReason||''};
 }
 function addAnalyzedRows(incomingRows){const next=[...rows];for(const incoming of incomingRows){const index=findMatchingRowIndex(next,incoming);if(index>=0)next[index]=mergeRow(next[index],incoming);else next.unshift(incoming);}rows=next;save();}
 async function handlePhotoInput(event){
@@ -376,4 +386,4 @@ function startNewShift(){if(typeof window==='undefined')return;if(rows.length&&!
 
 if(root){render();if('serviceWorker' in navigator)window.addEventListener('load',()=>navigator.serviceWorker.register('/turno-rx/sw.js',{updateViaCache:'none'}).then((registration)=>registration.update()).catch(()=>{}));}
 
-export {displayOrigin,canonicalOrigin,compareOrigins,parseFloorTarget,floorGroupKey,rowFloorGroupKey,hasFloorTarget,isCompleteFloorRow,isIncompleteFloorRow,findDuplicateFloorOrigins,findConflictsAgainstExisting,rowKey,findMatchingRowIndex,normalizeAge,ageFromBirthDate,normalizeStudyDisplay,normalizeModality,normalizeCategory,compareFloorRows,compareImagingRows,effectiveTransport};
+export {displayOrigin,canonicalOrigin,compareOrigins,parseFloorTarget,floorGroupKey,rowFloorGroupKey,hasFloorTarget,isCompleteFloorRow,isIncompleteFloorRow,findDuplicateFloorOrigins,findConflictsAgainstExisting,rowKey,findMatchingRowIndex,normalizeAge,ageFromBirthDate,normalizeStudyDisplay,normalizeModality,normalizeCategory,compareFloorRows,compareImagingRows,effectiveTransport,normalizeVisionRow,mergeRow};

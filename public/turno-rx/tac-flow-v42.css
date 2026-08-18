@@ -1,0 +1,5 @@
+.modality-tac .imaging-table{table-layout:fixed}
+.modality-tac .tac-indicators{display:flex;gap:4px;flex-wrap:wrap;margin-top:3px}
+.modality-tac .tac-indicator{display:inline-flex;align-items:center;min-height:16px;padding:1px 5px;border-radius:999px;background:#ede9fe;color:#5b21b6;font-size:9px;font-weight:800;line-height:1.2}
+.modality-tac .tac-indicator.tac-o2{background:#dbeafe;color:#1d4ed8}
+@media(max-width:520px){.modality-tac .diagnosis-cell,.modality-tac .meaning-cell,.modality-tac .action-cell,.modality-tac thead th:nth-child(5),.modality-tac thead th:nth-child(6),.modality-tac thead th:nth-child(7){display:none!important}.modality-tac .imaging-row{touch-action:pan-y}.modality-tac .imaging-table .col-origin{width:15%}.modality-tac .imaging-table .col-patient{width:30%}.modality-tac .imaging-table .col-move{width:23%}.modality-tac .imaging-table .col-study{width:32%}}

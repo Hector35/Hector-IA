@@ -1,4 +1,4 @@
-import test from 'node:test';
+import {test} from 'vitest';
 import assert from 'node:assert/strict';
 import {readFileSync} from 'node:fs';
 import {
@@ -12,7 +12,7 @@ import {
 test('clasifica cada tipo sin mezclar Rayos X y Piso', () => {
   assert.equal(normalizeCategory('Piso', '', '72'), 'Piso');
   assert.equal(normalizeCategory('Rayos X', 'Rayos X', 'Tórax'), 'Rayos X');
-  assert.equal(normalizeCategory('TAC', '', 'cráneo'), 'TAC');
+  assert.equal(normalizeCategory('TAC', '', 'TAC de cráneo'), 'TAC');
   assert.equal(normalizeCategory('USG', '', 'abdomen'), 'USG');
   assert.equal(normalizeCategory('Interconsulta'), 'Interconsulta');
   assert.equal(normalizeCategory('Apoyo para movimiento'), 'Apoyo para movimiento');
@@ -52,7 +52,7 @@ test('la captura única pide categoría automática y el service worker carga v4
   assert.match(app,/category":"Rayos X\|TAC\|USG\|Piso\|Interconsulta\|Apoyo para movimiento/);
   assert.match(app,/category debe ser "Piso"/);
   assert.match(index,/floor-workflow-v42\.js\?v=1/);
-  assert.match(sw,/turno-rx-shell-v42-floor-workflow/);
+  assert.match(sw,/turno-rx-shell-v44-floor-tac-visible-palette/);
   assert.match(workflow,/status:'Realizado'/);
   assert.match(workflow,/SWIPE_THRESHOLD/);
 });

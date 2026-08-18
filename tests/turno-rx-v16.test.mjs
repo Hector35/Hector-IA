@@ -1,4 +1,4 @@
-import test from 'node:test';
+import {test} from 'vitest';
 import assert from 'node:assert/strict';
 import {
   displayOrigin,
@@ -30,10 +30,10 @@ test('sillas se ordenan antes que camillas',()=>{
   assert.ok(compareImagingRows(silla,camilla)<0);
 });
 
-test('dentro del mismo traslado prioriza mujeres y después menor edad',()=>{
+test('dentro del mismo traslado prioriza menor edad y después mujeres',()=>{
   const mujer={bed:'20',sex:'Mujer',age:60,target:'Tórax',transport:'Silla'};
   const hombreJoven={bed:'21',sex:'Hombre',age:18,target:'Tórax',transport:'Silla'};
-  assert.ok(compareImagingRows(mujer,hombreJoven)<0);
+  assert.ok(compareImagingRows(hombreJoven,mujer)<0);
   const joven={bed:'22',sex:'Mujer',age:25,target:'Tórax',transport:'Silla'};
   const mayor={bed:'23',sex:'Mujer',age:70,target:'Tórax',transport:'Silla'};
   assert.ok(compareImagingRows(joven,mayor)<0);
