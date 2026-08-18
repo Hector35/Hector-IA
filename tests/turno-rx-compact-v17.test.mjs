@@ -12,18 +12,27 @@ describe('Pendientes vista compacta',()=>{
   it('carga la capa compacta sin quitar la app principal',()=>{
     expect(index).toContain('/turno-rx/app-v16.js?v=2');
     expect(index).toContain('/turno-rx/compact-v17.js?v=2');
-    expect(index).toContain('/turno-rx/compact-v17.css?v=3');
-    expect(index).toContain('/turno-rx/transport-v20.js?v=1');
+    expect(index).toContain('/turno-rx/compact-v17.css?v=4');
+    expect(index).toContain('/turno-rx/transport-v20.js?v=2');
   });
 
-  it('usa un solo encabezado y cuatro columnas operativas',()=>{
-    expect(css).toContain('.imaging-table thead');
+  it('mantiene una tabla real de cuatro columnas también en móvil',()=>{
+    expect(css).toContain('.imaging-table colgroup { display: table-column-group !important; }');
+    expect(css).toContain('.imaging-table tbody { display: table-row-group !important; }');
+    expect(css).toContain('display: table-row !important');
+    expect(css).toContain('display: table-cell !important');
+    expect(css).toContain('.imaging-table col:nth-child(n+5)');
+    expect(css).toContain('visibility: collapse !important');
+    expect(css).toContain('overflow-x: hidden !important');
+    expect(css).toContain('word-break: normal !important');
+  });
+
+  it('usa un solo encabezado y oculta los datos clínicos de la lista',()=>{
     expect(css).toContain('display: table-header-group !important');
     expect(css).toContain('.imaging-table .imaging-row td::before');
     expect(css).toContain('content: none !important');
     expect(css).toContain('.imaging-table thead th:nth-child(n+5)');
     expect(css).toContain('.imaging-table .imaging-row td:nth-child(n+5)');
-    expect(css).toContain('overflow-x: hidden !important');
   });
 
   it('abre detalle al tocar paciente y conserva editar/quitar',()=>{
@@ -45,20 +54,22 @@ describe('Pendientes vista compacta',()=>{
     expect(js).toContain("regions.map((item) => item.label).join(' + ')");
   });
 
-  it('estima silla o camilla cuando hay pistas y conserva Por definir si es ambiguo',()=>{
-    expect(transport).toContain("label: 'Silla probable'");
-    expect(transport).toContain("label: 'Camilla probable'");
+  it('muestra Silla o Camilla sin la palabra probable',()=>{
+    expect(transport).toContain("label: 'Silla'");
+    expect(transport).toContain("label: 'Camilla'");
+    expect(transport).not.toContain("label: 'Silla probable'");
+    expect(transport).not.toContain("label: 'Camilla probable'");
     expect(transport).toContain('strongCamilla');
     expect(transport).toContain('likelyChairStudy');
     expect(transport).toContain('ambiguousMobilityStudy');
     expect(transport).toContain('transportRank(a) - transportRank(b)');
   });
 
-  it('fuerza shell v21 y mantiene APIs fuera de caché',()=>{
-    expect(sw).toContain("turno-rx-shell-v21");
-    expect(sw).toContain('/turno-rx/compact-v17.css?v=3');
+  it('fuerza shell v22 y mantiene APIs fuera de caché',()=>{
+    expect(sw).toContain("turno-rx-shell-v22");
+    expect(sw).toContain('/turno-rx/compact-v17.css?v=4');
     expect(sw).toContain('/turno-rx/compact-v17.js?v=2');
-    expect(sw).toContain('/turno-rx/transport-v20.js?v=1');
+    expect(sw).toContain('/turno-rx/transport-v20.js?v=2');
     expect(sw).toContain("url.pathname.startsWith('/api/')");
   });
 });
