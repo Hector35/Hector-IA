@@ -54,8 +54,13 @@ CAMA / ÁREA:
 - Si la cama o área no es legible, déjala vacía y marca confidence.bed="low". Nunca sustituyas un dato dudoso con Sala de espera.
 
 PIZARRÓN A PISO:
-- Si la foto es un pizarrón de pacientes que SUBEN A PISO, cada renglón es ORIGEN EN URGENCIAS -> CAMA DESTINO DE PISO. bed es el origen y target debe ser SOLO la cama destino o área especial visible como UEH.
+- El número del encabezado, por ejemplo "PISO = 11", es SOLO un total. NUNCA crees objetos patients a partir de ese número ni repitas filas para completar ese total.
+- Lee cada renglón real por separado. Solo devuelve un paciente válido cuando el renglón contiene una cama o área de origen reconocible. Conserva C11, C1, C23, CE1, UP, UI, etc. en bed; CE1 nunca significa cama 1.
+- Muchos pizarrones de Piso tienen dos columnas: H significa Hombre y M significa Mujer. Asigna sex según la columna física del renglón, no según una letra dentro del servicio.
+- Conserva el servicio visible del renglón literalmente en service y originService.
+- En estos pizarrones bed es el origen actual. target y destination son SOLO la cama destino visible. Si el destino no aparece, deja ambos vacíos; no uses el servicio como destino y no inventes una cama.
 - Para esos renglones category debe ser "Piso". Guarda también destination con la cama destino visible, destinationFloor con el piso visible y destinationBlock con A/B solo cuando se lean con seguridad. No deduzcas piso o bloque si la foto no lo confirma; la app puede mapear una cama confirmada después.
+- Si alcanzas a leer información parcial de un renglón pero no su cama/área, devuelve un solo objeto parcial con recognizedText y los campos visibles para revisión. No devuelvas filas completamente vacías.
 - En un mismo pizarrón no debe haber dos pacientes distintos en la misma cama de origen. Si parece duplicarse, revisa números parecidos antes de responder.
 
 IMAGENOLOGÍA:
@@ -122,6 +127,12 @@ function normalizeSex(value){
   if(['hombre','masculino','masculina','m'].includes(text))return 'Hombre';
   return 'No visible';
 }
+function normalizeFloorBoardSex(value){
+  const text=clean(value).toLowerCase();
+  if(text==='h')return 'Hombre';
+  if(text==='m')return 'Mujer';
+  return normalizeSex(value);
+}
 function normalizeAge(value){const text=clean(value);if(!text)return null;const age=Number.parseInt(text,10);return Number.isFinite(age)&&age>=0&&age<=130?age:null;}
 function ageFromBirthDate(value){
   const text=clean(value);if(!/^\d{4}-\d{2}-\d{2}$/.test(text))return null;
@@ -145,8 +156,11 @@ function isRayXStudyText(value){
 function confidenceValue(value){const text=plain(value);return text==='high'?'high':text==='medium'?'medium':text==='low'?'low':'';}
 function reviewFields(patient){
   const confidence=patient?.confidence&&typeof patient.confidence==='object'?patient.confidence:{};
-  const fields=['bed','name','age','sex','target'].filter((field)=>confidenceValue(confidence[field])==='low');
-  if(!resolveVisionBed(patient))fields.push('bed');if(!clean(patient?.name))fields.push('name');if(!clean(patient?.target||patient?.study||patient?.destination))fields.push('target');
+  const floor=clean(patient?.category).toLowerCase()==='piso';
+  const fields=(floor?['bed','sex']:['bed','name','age','sex','target']).filter((field)=>confidenceValue(confidence[field])==='low');
+  if(!resolveVisionBed(patient))fields.push('bed');
+  if(!floor&&!clean(patient?.name))fields.push('name');
+  if(!floor&&!clean(patient?.target||patient?.study||patient?.destination))fields.push('target');
   return [...new Set(fields)];
 }
 function normalizedName(value){return plain(value).replace(/\b(de|del|la|las|los)\b/g,' ').replace(/\s+/g,' ').trim();}
@@ -285,14 +299,14 @@ function explicitFloorGroup(row){
   if(/primero|1(?:º|°|o)?/.test(floor))return 'primero';
   return null;
 }
-function rowFloorGroupKey(row){return explicitFloorGroup(row)||floorGroupKey(row?.destination||row?.target);}
+function rowFloorGroupKey(row){return explicitFloorGroup(row)||floorGroupKey(row?.destination||row?.target)||'por-ubicar';}
 function hasFloorTarget(row){
   const category=normalizeCategory(row?.category,row?.modality,row?.target);
   if(category==='Piso')return true;
   if(clean(row?.category))return false;
   return floorGroupKey(row?.target)!==null;
 }
-function isCompleteFloorRow(row){return hasFloorTarget(row)&&Boolean(canonicalOrigin(row?.bed))&&Boolean(rowFloorGroupKey(row));}
+function isCompleteFloorRow(row){return hasFloorTarget(row)&&Boolean(canonicalOrigin(row?.bed))&&!row?.captureReviewOnly;}
 function isIncompleteFloorRow(row){return hasFloorTarget(row)&&!isCompleteFloorRow(row);}
 function findDuplicateFloorOrigins(candidateRows){const seen=new Set(),duplicates=new Set();for(const row of candidateRows.filter((item)=>hasFloorTarget(item))){const key=canonicalOrigin(row.bed);if(!key)continue;if(seen.has(key))duplicates.add(displayOrigin(row.bed));seen.add(key);}return [...duplicates].sort((a,b)=>a.localeCompare(b,'es-MX',{numeric:true}));}
 function findConflictsAgainstExisting(existingRows,incomingRows,excludeId=null){
@@ -305,6 +319,11 @@ function rowKey(row){return patientDedupeKey(row);}
 function canonicalName(value){return normalizedName(value).replace(/\s+/g,'');}
 function oneEditApart(a,b){if(a===b)return true;if(Math.abs(a.length-b.length)>1)return false;let i=0,j=0,edits=0;while(i<a.length&&j<b.length){if(a[i]===b[j]){i++;j++;continue;}if(++edits>1)return false;if(a.length>b.length)i++;else if(b.length>a.length)j++;else{i++;j++;}}return edits+(i<a.length||j<b.length?1:0)<=1;}
 function findMatchingRowIndex(list,incoming){
+  if(incoming?.captureReviewOnly){
+    const recognized=plain(incoming.recognizedText),service=plain(incoming.service||incoming.originService);
+    if(!incoming.imageFingerprint||(!recognized&&!service))return -1;
+    return list.findIndex((row)=>row?.captureReviewOnly&&row.imageFingerprint===incoming.imageFingerprint&&plain(row.recognizedText)===recognized&&plain(row.service||row.originService)===service);
+  }
   if(incoming?.imageFingerprint){
     const incomingBed=canonicalOrigin(incoming?.bed),incomingName=normalizedName(incoming?.name),incomingCategory=normalizeCategory(incoming?.category,incoming?.modality,incoming?.target);
     const exactImage=list.findIndex((row)=>{if(row?.imageFingerprint!==incoming.imageFingerprint||normalizeCategory(row?.category,row?.modality,row?.target)!==incomingCategory)return false;const rowBed=canonicalOrigin(row?.bed),rowName=normalizedName(row?.name);return Boolean((incomingBed&&rowBed===incomingBed)||(incomingName&&rowName&&(incomingName===rowName||incomingName.includes(rowName)||rowName.includes(incomingName))));});
@@ -357,13 +376,13 @@ function renderTransport(row){
   const type=effectiveTransport(row);const icon=type==='Camilla'?'🛏️':type==='Silla'?'♿':type==='No trasladar'?'🚫':'•';const klass=type==='Camilla'?'camilla':type==='Silla'?'silla':type==='No trasladar'?'no-transfer':'unset';const reason=clean(row.transportReason);
   return `<div class="transport-main ${klass}"><span>${icon}</span><b>${esc(type)}</b></div><div class="transport-reason ${reason?'':'is-empty'}"><span>Motivo</span>${esc(reason||'—')}</div>${row.oxygenProbable?`<div class="oxygen-chip">O₂${row.oxygenReason?` · ${esc(row.oxygenReason)}`:''}</div>`:''}`;
 }
-function renderFloorRow(row,incomplete=false){const destination=parseFloorTarget(row.destination||row.target)?.display||clean(row.destination||row.target)||'—',transport=effectiveTransport(row),realized=clean(row.status).toLowerCase()==='realizado',icon=transport==='Silla'?'♿':transport==='Camilla'?'🛏️':'•';return `<tr class="patient-row floor-patient-row ${incomplete?'incomplete-row':''} ${realized?'is-realized':''}" data-id="${esc(row.id)}" data-status="${realized?'Realizado':'Pendiente'}" title="Toca para abrir detalle"><td class="floor-origin"><strong>${incomplete?'⚠️ Falta':esc(displayOrigin(row.bed))}</strong></td><td class="floor-destination"><div class="floor-destination-line"><strong>${esc(destination)}</strong><button type="button" class="floor-transport" data-quick-transport="1" data-patient-id="${esc(row.id)}" aria-label="Cambiar traslado. Actual: ${esc(transport)}"><span aria-hidden="true">${icon}</span><b>${esc(transport)}</b></button>${realized?'<span class="floor-status">✓ Realizado</span>':''}<button class="remove-btn" type="button" data-remove="${esc(row.id)}" aria-label="Quitar paciente">×</button></div></td></tr>`;}
+function renderFloorRow(row,incomplete=false){const destination=parseFloorTarget(row.destination||row.target)?.display||clean(row.destination||row.target)||'Por confirmar',transport=effectiveTransport(row),realized=clean(row.status).toLowerCase()==='realizado',icon=transport==='Silla'?'♿':transport==='Camilla'?'🛏️':'•';return `<tr class="patient-row floor-patient-row ${incomplete?'incomplete-row':''} ${realized?'is-realized':''}" data-id="${esc(row.id)}" data-status="${realized?'Realizado':'Pendiente'}" title="Toca para abrir detalle"><td class="floor-origin"><strong>${incomplete?'⚠️ Revisar':esc(displayOrigin(row.bed))}</strong>${row.service?`<small>${esc(row.service)}</small>`:''}</td><td class="floor-destination"><div class="floor-destination-line"><strong>${esc(destination)}</strong><button type="button" class="floor-transport" data-quick-transport="1" data-patient-id="${esc(row.id)}" aria-label="Cambiar traslado. Actual: ${esc(transport)}"><span aria-hidden="true">${icon}</span><b>${esc(transport)}</b></button>${realized?'<span class="floor-status">✓ Realizado</span>':''}<button class="remove-btn" type="button" data-remove="${esc(row.id)}" aria-label="Quitar paciente">×</button></div></td></tr>`;}
 function renderFloorSections(floorRows){
   if(!floorRows.length)return '';const groups=new Map(FLOOR_GROUPS.map((group)=>[group.key,[]]));for(const row of floorRows)groups.get(rowFloorGroupKey(row))?.push(row);for(const list of groups.values())list.sort(compareFloorRows);
   const sections=FLOOR_GROUPS.map((group)=>({...group,rows:groups.get(group.key)||[]})).filter((group)=>group.rows.length).map((group)=>`<section class="floor-group"><div class="floor-group-title">${esc(group.label)} — <strong>${group.rows.length} ${group.rows.length===1?'paciente':'pacientes'}</strong></div><div class="floor-table-wrap"><table class="floor-group-table"><thead><tr><th>Origen</th><th>Destino</th></tr></thead><tbody>${group.rows.map((row)=>renderFloorRow(row)).join('')}</tbody></table></div></section>`).join('');
   return `<section class="floor-board" aria-label="Pacientes a piso">${sections}<div class="floor-total">Total: <strong>${floorRows.length} ${floorRows.length===1?'paciente':'pacientes'}</strong></div></section>`;
 }
-function renderIncompleteFloor(incompleteRows){if(!incompleteRows.length)return '';return `<section class="incomplete-section"><div class="incomplete-title">⚠️ Por revisar — <strong>${incompleteRows.length}</strong></div><div class="incomplete-note">No cuentan en el total hasta tener Origen + Destino.</div><div class="floor-table-wrap"><table class="floor-group-table"><thead><tr><th>Origen</th><th>Destino</th></tr></thead><tbody>${incompleteRows.map((row)=>renderFloorRow(row,true)).join('')}</tbody></table></div></section>`;}
+function renderIncompleteFloor(incompleteRows){if(!incompleteRows.length)return '';return `<section class="incomplete-section"><div class="incomplete-title">⚠️ Por revisar — <strong>${incompleteRows.length}</strong></div><div class="incomplete-note">Lecturas parciales: no cuentan como pacientes hasta confirmar la cama o área.</div><div class="floor-table-wrap"><table class="floor-group-table"><thead><tr><th>Origen</th><th>Destino</th></tr></thead><tbody>${incompleteRows.map((row)=>renderFloorRow(row,true)).join('')}</tbody></table></div></section>`;}
 
 function renderImagingRow(row){
   const age=normalizeAge(row.age),sex=normalizeSex(row.sex),diagnosis=clean(row.diagnosis),meaning=clean(row.diagnosisMeaning);const critical=isCriticalDiagnosis(diagnosis);
@@ -468,15 +487,37 @@ function normalizeVisionRow(patient,fingerprint=''){
   const age=normalizeAge(patient?.age)??ageFromBirthDate(patient?.birthDate),oxygenProbable=Boolean(patient?.oxygenProbable),category=normalizeCategory(patient?.category,patient?.modality,patient?.target||patient?.study),destination=clean(patient?.destination),target=category==='Piso'?(destination||clean(patient?.target)):clean(patient?.target||patient?.study||destination),portable=/port[áa]til/i.test(target);
   const diagnosis=clean(patient?.diagnosis),diagnosisMeaning=diagnosis?clean(patient?.diagnosisMeaning):'';
   const uncertain=reviewFields(patient);
-  return {id:uid(),shiftId:shift.id,bed:resolveVisionBed(patient),name:clean(patient?.name),age,sex:normalizeSex(patient?.sex),category,target,destination:category==='Piso'?target:destination,destinationFloor:category==='Piso'?clean(patient?.destinationFloor):'',destinationBlock:category==='Piso'?clean(patient?.destinationBlock):'',modality:normalizeModality(patient?.modality,target),region:clean(patient?.region),withContrast:Boolean(patient?.withContrast)&&/contraste/i.test(target),status:'Pendiente',diagnosis,diagnosisMeaning,requestingDoctor:clean(patient?.requestingDoctor||patient?.doctor),service:clean(patient?.service),originService:clean(patient?.originService),requestDate:clean(patient?.requestDate),requestTime:clean(patient?.requestTime),transferNotes:clean(patient?.transferNotes),recognizedText:clean(patient?.recognizedText),confidence:patient?.confidence&&typeof patient.confidence==='object'?patient.confidence:{},needsReview:uncertain.length>0,reviewFields:uncertain,imageFingerprint:fingerprint,transport:portable?'No trasladar':(normalizeTransport(patient?.transport)||'Por definir'),transportReason:clean(patient?.transportReason),oxygenProbable,oxygenReason:oxygenProbable?clean(patient?.oxygenReason):'',createdAt:new Date().toISOString()};
+  return {id:uid(),shiftId:shift.id,bed:resolveVisionBed(patient),name:clean(patient?.name),age,sex:category==='Piso'?normalizeFloorBoardSex(patient?.sex):normalizeSex(patient?.sex),category,target,destination:category==='Piso'?target:destination,destinationFloor:category==='Piso'?clean(patient?.destinationFloor):'',destinationBlock:category==='Piso'?clean(patient?.destinationBlock):'',modality:normalizeModality(patient?.modality,target),region:clean(patient?.region),withContrast:Boolean(patient?.withContrast)&&/contraste/i.test(target),status:'Pendiente',diagnosis,diagnosisMeaning,requestingDoctor:clean(patient?.requestingDoctor||patient?.doctor),service:clean(patient?.service),originService:clean(patient?.originService),requestDate:clean(patient?.requestDate),requestTime:clean(patient?.requestTime),transferNotes:clean(patient?.transferNotes),recognizedText:clean(patient?.recognizedText),confidence:patient?.confidence&&typeof patient.confidence==='object'?patient.confidence:{},needsReview:uncertain.length>0,reviewFields:uncertain,imageFingerprint:fingerprint,transport:portable?'No trasladar':(normalizeTransport(patient?.transport)||'Por definir'),transportReason:clean(patient?.transportReason),oxygenProbable,oxygenReason:oxygenProbable?clean(patient?.oxygenReason):'',createdAt:new Date().toISOString()};
+}
+function isFloorHeaderOnly(patient){
+  const text=plain(patient?.recognizedText);
+  return /^piso(?:\s+(?:total\s+)?\d+)?$/.test(text)||(/^\d+$/.test(text)&&clean(patient?.category).toLowerCase()==='piso');
+}
+function classifyVisionRows(patients,fingerprint=''){
+  const valid=[],review=[];
+  for(const patient of Array.isArray(patients)?patients:[]){
+    const row=normalizeVisionRow(patient,fingerprint);
+    if(row.category!=='Piso'){
+      if(row.bed||row.name||row.target)valid.push(row);
+      continue;
+    }
+    if(canonicalOrigin(row.bed)){
+      valid.push({...row,needsReview:row.reviewFields.includes('bed')||row.reviewFields.includes('sex')});
+      continue;
+    }
+    if(isFloorHeaderOnly(patient))continue;
+    const partial=Boolean(row.name||row.service||row.originService||row.transferNotes||row.recognizedText||row.sex!=='No visible');
+    if(partial)review.push({...row,captureReviewOnly:true,needsReview:true,reviewFields:[...new Set([...row.reviewFields,'bed'])]});
+  }
+  return {valid,review};
 }
 async function analyzePhoto(file){
   if(!(file instanceof File)||!file.type.startsWith('image/'))throw new Error('Selecciona una imagen.');if(file.size>8*1024*1024)throw new Error(`${file.name||'La foto'} pesa más de 8 MB.`);
   const fingerprint=await imageFingerprint(file),form=new FormData();form.append('image',file);form.append('prompt',VISION_PROMPT);
   const response=await fetch('/api/turno-rx/vision',{method:'POST',headers:{'X-Turno-RX':'1'},body:form,credentials:'same-origin'}),data=await response.json().catch(()=>({}));
   if(!response.ok)throw new Error(data.error||`No se pudo analizar la foto (${response.status}).`);
-  const parsed=parseVisionJSON(data.text||data.answer||data.output_text||data),patients=Array.isArray(parsed?.patients)?parsed.patients:[parsed],recognized=patients.map((patient)=>normalizeVisionRow(patient,fingerprint)).filter((row)=>row.bed||row.name||row.target);
-  if(!recognized.length)throw new Error('No se reconocieron pacientes en esta boleta. Intenta con una foto más cercana y nítida.');
+  const parsed=parseVisionJSON(data.text||data.answer||data.output_text||data),patients=Array.isArray(parsed?.patients)?parsed.patients:[parsed],recognized=classifyVisionRows(patients,fingerprint);
+  if(!recognized.valid.length&&!recognized.review.length)throw new Error('No se reconocieron renglones con cama o información parcial. El total del pizarrón no cuenta como paciente.');
   return recognized;
 }
 function mergeRow(existing,incoming){
@@ -485,9 +526,12 @@ function mergeRow(existing,incoming){
 }
 function addAnalyzedRows(incomingRows){const next=[...rows];for(const incoming of incomingRows){const index=findMatchingRowIndex(next,incoming);if(index>=0)next[index]=mergeRow(next[index],incoming);else next.unshift(incoming);}rows=next;save();}
 function commitPhotoResult(analyzed){
-  const duplicates=findDuplicateFloorOrigins(analyzed),conflicts=findConflictsAgainstExisting(rows,analyzed),blocked=[...new Set([...duplicates,...conflicts])];
+  const valid=Array.isArray(analyzed)?analyzed:(analyzed?.valid||[]),review=Array.isArray(analyzed)?[]:(analyzed?.review||[]);
+  const duplicates=findDuplicateFloorOrigins(valid),conflicts=findConflictsAgainstExisting(rows,valid),blocked=[...new Set([...duplicates,...conflicts])];
   if(blocked.length)return {patientsAdded:0,requiresReview:true,reviewReason:`Revisa ${blocked.length===1?`la cama ${blocked[0]}`:`las camas ${blocked.join(', ')}`}; no se agregó esa lectura.`};
-  const before=rows.length;addAnalyzedRows(analyzed);render();return {patientsAdded:Math.max(0,rows.length-before)};
+  const beforeValid=rows.filter((row)=>!row.captureReviewOnly).length;addAnalyzedRows([...valid,...review]);render();
+  const patientsAdded=Math.max(0,rows.filter((row)=>!row.captureReviewOnly).length-beforeValid);
+  return {patientsAdded,requiresReview:review.length>0,reviewReason:review.length?`${review.length} ${review.length===1?'renglón requiere':'renglones requieren'} revisar la cama/área.`:''};
 }
 async function processCurrentPhotoJobs(jobs=photoJobs){
   processingPhotos=true;stopPhotoQueue=false;render();
@@ -524,4 +568,4 @@ function startNewShift(){if(typeof window==='undefined')return;if(rows.length&&!
 
 if(root){render();if('serviceWorker' in navigator)window.addEventListener('load',()=>navigator.serviceWorker.register('/turno-rx/sw.js',{updateViaCache:'none'}).then((registration)=>registration.update()).catch(()=>{}));}
 
-export {displayOrigin,canonicalOrigin,compareOrigins,parseFloorTarget,floorGroupKey,rowFloorGroupKey,hasFloorTarget,isCompleteFloorRow,isIncompleteFloorRow,findDuplicateFloorOrigins,findConflictsAgainstExisting,rowKey,findMatchingRowIndex,normalizeAge,ageFromBirthDate,normalizeStudyDisplay,normalizeModality,normalizeCategory,isRayXStudyText,reviewFields,patientDedupeKey,imageFingerprint,compareFloorRows,compareImagingRows,effectiveTransport,normalizeVisionRow,mergeRow,mergeStudyTargets,commitPhotoResult,categoryTabForRow,rowsForCategoryTab,pendingCounts,preferredCategoryTab};
+export {displayOrigin,canonicalOrigin,compareOrigins,parseFloorTarget,floorGroupKey,rowFloorGroupKey,hasFloorTarget,isCompleteFloorRow,isIncompleteFloorRow,findDuplicateFloorOrigins,findConflictsAgainstExisting,rowKey,findMatchingRowIndex,normalizeAge,ageFromBirthDate,normalizeStudyDisplay,normalizeModality,normalizeCategory,normalizeFloorBoardSex,isRayXStudyText,reviewFields,patientDedupeKey,imageFingerprint,compareFloorRows,compareImagingRows,effectiveTransport,normalizeVisionRow,classifyVisionRows,mergeRow,mergeStudyTargets,commitPhotoResult,categoryTabForRow,rowsForCategoryTab,pendingCounts,preferredCategoryTab};
