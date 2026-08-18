@@ -5,6 +5,7 @@ import {formatPatientName} from '../public/turno-rx/name-format-v23.js';
 const read=(path)=>readFileSync(path,'utf8');
 const index=read('public/turno-rx/index.html');
 const css=read('public/turno-rx/compact-v17.css');
+const oneLine=read('public/turno-rx/one-line-v24.css');
 const js=read('public/turno-rx/compact-v17.js');
 const transport=read('public/turno-rx/transport-v20.js');
 const sw=read('public/turno-rx/sw.js');
@@ -14,6 +15,7 @@ describe('Pendientes vista compacta',()=>{
     expect(index).toContain('/turno-rx/app-v16.js?v=2');
     expect(index).toContain('/turno-rx/compact-v17.js?v=2');
     expect(index).toContain('/turno-rx/compact-v17.css?v=4');
+    expect(index).toContain('/turno-rx/one-line-v24.css?v=1');
     expect(index).toContain('/turno-rx/transport-v20.js?v=2');
     expect(index).toContain('type="module" src="/turno-rx/name-format-v23.js?v=1"');
   });
@@ -27,6 +29,15 @@ describe('Pendientes vista compacta',()=>{
     expect(css).toContain('visibility: collapse !important');
     expect(css).toContain('overflow-x: hidden !important');
     expect(css).toContain('word-break: normal !important');
+  });
+
+  it('mantiene cada paciente en un solo renglon en la vista principal',()=>{
+    expect(oneLine).toContain('.imaging-table .imaging-row td:nth-child(-n+4)');
+    expect(oneLine).toContain('white-space: nowrap !important');
+    expect(oneLine).toContain('text-overflow: ellipsis !important');
+    expect(oneLine).toContain('.imaging-table .age-line');
+    expect(oneLine).toContain('display: none !important');
+    expect(oneLine).toContain('.imaging-table col:nth-child(3) { width: 25% !important; }');
   });
 
   it('usa un solo encabezado y oculta los datos clínicos de la lista',()=>{
@@ -74,9 +85,10 @@ describe('Pendientes vista compacta',()=>{
     expect(formatPatientName('Pérez López, Juan Carlos')).toBe('JUAN CARLOS PÉREZ LÓPEZ');
   });
 
-  it('fuerza shell v23 y mantiene APIs fuera de caché',()=>{
-    expect(sw).toContain("turno-rx-shell-v23");
+  it('fuerza shell v24 y mantiene APIs fuera de caché',()=>{
+    expect(sw).toContain("turno-rx-shell-v24");
     expect(sw).toContain('/turno-rx/compact-v17.css?v=4');
+    expect(sw).toContain('/turno-rx/one-line-v24.css?v=1');
     expect(sw).toContain('/turno-rx/compact-v17.js?v=2');
     expect(sw).toContain('/turno-rx/transport-v20.js?v=2');
     expect(sw).toContain('/turno-rx/name-format-v23.js?v=1');
