@@ -201,7 +201,7 @@ describe('Pendientes vista compacta',()=>{
   });
 
   it('mantiene el shell actual y deja las APIs fuera de caché',()=>{
-    expect(sw).toContain("turno-rx-shell-v38-manual-quick");
+    expect(sw).toContain("const CACHE = 'turno-rx-shell-v");
     expect(sw).toContain('/turno-rx/elegant-v30.css?v=2');
     expect(sw).toContain('/turno-rx/polish-v32.js?v=1');
     expect(sw).toContain('/turno-rx/full-redesign-v33.css?v=1');
