@@ -56,9 +56,11 @@ test('restaura pestaña y aplica prioridad Piso, RX, TAC, USG',()=>{
 test('integra pestañas con el runtime consolidado, cola progresiva y gesto único',()=>{
   expect(index).toMatch(/category-tabs-v49\.css\?v=1/);
   expect(index).toMatch(/app-v16\.js\?v=65/);
+  expect(index).toMatch(/stability-guard-v66\.js\?v=66/);
   expect(index).toMatch(/stability\.js\?v=20260818\.1/);
-  expect(sw).toMatch(/pendientes-shell-20260818-1/);
+  expect(sw).toMatch(/pendientes-shell-20260818-2/);
   expect(sw).toMatch(/category-tabs-v49\.css\?v=1/);
+  expect(sw).toMatch(/stability-guard-v66\.js\?v=66/);
   expect(sw).toMatch(/stability\.js\?v=20260818\.1/);
   expect(source).toMatch(/unseenCategoryTabs/);expect(source).toMatch(/renderPhotoQueue\(\)/);
   expect(css).toMatch(/min-height:44px/);
