@@ -6,6 +6,7 @@ globalThis.localStorage={getItem:(key)=>storage.has(key)?storage.get(key):null,s
 const app=await import('../public/turno-rx/app-v16.js');
 const source=readFileSync('public/turno-rx/app-v16.js','utf8');
 const css=readFileSync('public/turno-rx/category-tabs-v49.css','utf8');
+const stability=readFileSync('public/turno-rx/stability.js','utf8');
 const index=readFileSync('public/turno-rx/index.html','utf8');
 const sw=readFileSync('public/turno-rx/sw.js','utf8');
 
@@ -52,12 +53,16 @@ test('restaura pestaña y aplica prioridad Piso, RX, TAC, USG',()=>{
   expect(app.preferredCategoryTab([{category:'Piso',status:'Pendiente'}])).toBe('USG');
 });
 
-test('integra pestañas debajo de captura y conserva cola progresiva y gestos',()=>{
-  expect(index).toMatch(/category-tabs-v49\.css\?v=1/);expect(index).toMatch(/app-v16\.js\?v=58/);
-  expect(sw).toMatch(/turno-rx-shell-v58-tac-live-interaction-hotfix/);expect(sw).toMatch(/category-tabs-v49\.css\?v=1/);
+test('integra pestañas con el runtime consolidado, cola progresiva y gesto único',()=>{
+  expect(index).toMatch(/category-tabs-v49\.css\?v=1/);
+  expect(index).toMatch(/app-v16\.js\?v=65/);
+  expect(index).toMatch(/stability\.js\?v=20260818\.1/);
+  expect(sw).toMatch(/pendientes-shell-20260818-1/);
+  expect(sw).toMatch(/category-tabs-v49\.css\?v=1/);
+  expect(sw).toMatch(/stability\.js\?v=20260818\.1/);
   expect(source).toMatch(/unseenCategoryTabs/);expect(source).toMatch(/renderPhotoQueue\(\)/);
-  expect(css).toMatch(/touch-action:pan-x/);expect(css).toMatch(/min-height:44px/);
-  expect(readFileSync('public/turno-rx/floor-workflow-v42.js','utf8')).toMatch(/SWIPE_THRESHOLD/);
-  expect(readFileSync('public/turno-rx/tac-flow-v42.js','utf8')).toMatch(/markRealizado/);
-  expect(readFileSync('public/turno-rx/patient-detail-v39.js','utf8')).toMatch(/v39-detail-sheet/);
+  expect(css).toMatch(/min-height:44px/);
+  expect(stability).toContain("document.addEventListener('pointerdown'");
+  expect(stability).toContain("setStatus(g.id,'Realizado')");
+  expect(stability).toContain("setStatus(g.id,'Pendiente')");
 });
