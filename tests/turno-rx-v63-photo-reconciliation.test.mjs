@@ -58,11 +58,13 @@ test('v63 no deja que un RX realizado absorba una solicitud nueva de otra fotogr
   expect(plan.nextRows.find((row)=>row.id==='rx-new')?.status).toBe('Pendiente');
 });
 
-test('v63 ya no carga el reconciliador que borraba y restauraba localStorage',()=>{
+test('v64 reemplaza el refuerzo v63 sin reintroducir borrado/restauración temporal',()=>{
   const index=readFileSync('public/turno-rx/index.html','utf8');
-  const prompt=readFileSync('public/turno-rx/floor-photo-prompt-v63.js','utf8');
-  expect(index).toContain('floor-photo-prompt-v63.js?v=63');
+  const floor=readFileSync('public/turno-rx/floor-intelligence-v64.js','utf8');
+  expect(index).toContain('floor-intelligence-v64.js?v=64');
+  expect(index).not.toContain('floor-photo-prompt-v63.js?v=63');
   expect(index).not.toContain('floor-photo-reconcile-v62.js?v=62');
-  expect(prompt).not.toContain('restoreAfterCommit');
-  expect(prompt).not.toContain('ROLLBACK_MS');
+  expect(floor).not.toContain('restoreAfterCommit');
+  expect(floor).not.toContain('ROLLBACK_MS');
+  expect(floor).not.toContain('localStorage');
 });
