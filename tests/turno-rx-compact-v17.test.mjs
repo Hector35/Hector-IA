@@ -18,6 +18,7 @@ const redesign=read('public/turno-rx/full-redesign-v33.css');
 const redesignJs=read('public/turno-rx/full-redesign-v33.js');
 const light=read('public/turno-rx/light-theme-v34.css');
 const premium=read('public/turno-rx/premium-v37.css');
+const palette=read('public/turno-rx/palette-v39.css');
 const premiumJs=read('public/turno-rx/premium-v37.js');
 const js=read('public/turno-rx/compact-v17.js');
 const transport=read('public/turno-rx/transport-v20.js');
@@ -44,6 +45,10 @@ describe('Pendientes vista compacta',()=>{
     expect(index).toContain('/turno-rx/premium-v37.css?v=1');
     expect(index).toContain('/turno-rx/premium-v37.js?v=1');
     expect(index).toContain('/turno-rx/manual-quick-v38.js?v=1');
+    expect(index).toContain('/turno-rx/palette-v39.css?v=1');
+    expect(palette).toContain('--pend-bg:#F1F5F9');
+    expect(palette).toContain('--pend-primary:#2563EB');
+    expect(palette).toContain('--pend-accent:#4F46E5');
     expect(index).toContain('type="module" src="/turno-rx/name-format-v23.js?v=1"');
   });
 
@@ -107,7 +112,7 @@ describe('Pendientes vista compacta',()=>{
   });
 
   it('aplica el tema premium solicitado sin quitar el tema claro base',()=>{
-    expect(index).toContain('<meta name="theme-color" content="#F8FAFC"');
+    expect(index).toContain('<meta name="theme-color" content="#F1F5F9"');
     expect(light).toContain('--v34-bg:#edf3f7');
     expect(light).toContain('color-scheme:light');
     expect(premium).toContain('--p37-blue:#2563EB');
@@ -202,6 +207,7 @@ describe('Pendientes vista compacta',()=>{
 
   it('mantiene el shell actual y deja las APIs fuera de caché',()=>{
     expect(sw).toContain("const CACHE = 'turno-rx-shell-v");
+    expect(sw).toContain('/turno-rx/palette-v39.css?v=1');
     expect(sw).toContain('/turno-rx/elegant-v30.css?v=2');
     expect(sw).toContain('/turno-rx/polish-v32.js?v=1');
     expect(sw).toContain('/turno-rx/full-redesign-v33.css?v=1');

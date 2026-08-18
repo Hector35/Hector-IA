@@ -1,0 +1,121 @@
+/* Pendientes v39 — paleta azul/gris aplicada a toda la interfaz. */
+:root{
+  --pend-bg:#F1F5F9;
+  --pend-primary:#2563EB;
+  --pend-accent:#4F46E5;
+  --pend-surface:#F8FAFC;
+  --pend-surface-blue:#EFF6FF;
+  --pend-surface-violet:#EEF2FF;
+  --pend-text:#0F172A;
+  --pend-muted:#64748B;
+  --pend-line:#CBD5E1;
+  --p37-bg:var(--pend-bg);
+  --p37-surface:var(--pend-surface);
+  --p37-blue:var(--pend-primary);
+  --p37-violet:var(--pend-accent);
+  --p37-text:var(--pend-text);
+  --p37-soft:var(--pend-surface-violet);
+  --v34-bg:var(--pend-bg);
+  --v34-bg-top:var(--pend-surface-blue);
+  --v34-surface:var(--pend-surface);
+  --v36-surface-strong:var(--pend-surface);
+}
+
+html,body,
+html.pendientes-v37,
+html.pendientes-v37 body{
+  background:linear-gradient(180deg,#EFF6FF 0,#F1F5F9 260px,#F1F5F9 100%) !important;
+  color:var(--pend-text) !important;
+}
+
+.pendientes-v37 .v37-menu-btn,
+.pendientes-v37 .v37-capture-btn:not(.v37-primary){
+  background:var(--pend-surface-blue) !important;
+  border-color:#BFDBFE !important;
+}
+.pendientes-v37 .v37-capture-btn:nth-child(2){background:var(--pend-surface-violet) !important;border-color:#C7D2FE !important;}
+.pendientes-v37 .v37-shift-badge{background:var(--pend-surface-violet) !important;}
+
+.pendientes-v37 .imaging-table-wrap,
+.pendientes-v37 .floor-table-wrap,
+.pendientes-v37 .table-wrap,
+.pendientes-v37 .imaging-table,
+.pendientes-v37 .floor-group-table,
+.pendientes-v37 .patient-table{
+  background:var(--pend-surface-blue) !important;
+}
+.pendientes-v37 .imaging-table thead th,
+.pendientes-v37 .floor-group-table th,
+.pendientes-v37 .v37-history-table th{
+  background:var(--pend-surface-violet) !important;
+  border-color:#DDE4F2 !important;
+}
+.pendientes-v37 .imaging-table .imaging-row,
+.pendientes-v37 .imaging-table .imaging-row td,
+.pendientes-v37 .floor-group-table td,
+.pendientes-v37 .patient-table td{
+  background:var(--pend-surface) !important;
+  border-color:#DDE4F2 !important;
+}
+.pendientes-v37 .imaging-table .imaging-row:nth-child(even) td,
+.pendientes-v37 .floor-group-table tr:nth-child(even) td{
+  background:var(--pend-surface-blue) !important;
+}
+.pendientes-v37 .empty-row td,
+.pendientes-v37 .empty-state{
+  background:var(--pend-surface-blue) !important;
+}
+.pendientes-v37 .empty-icon{background:var(--pend-surface-violet) !important;color:var(--pend-primary) !important;}
+
+.pendientes-v37 .v37-drawer{
+  background:#EEF2FF !important;
+  border-color:#C7D2FE !important;
+}
+.pendientes-v37 .v37-nav-item:not(.is-active):active,
+.pendientes-v37 .v37-nav-item:not(.is-active):hover{background:#EFF6FF !important;}
+
+.pendientes-v37 .v37-back,
+.pendientes-v37 .v37-history-list,
+.pendientes-v37 .v37-history-table-wrap,
+.pendientes-v37 .v37-empty-secondary,
+.pendientes-v37 .v37-stat,
+.pendientes-v37 .v37-settings-card{
+  background:var(--pend-surface-blue) !important;
+  border-color:#CBD5E1 !important;
+}
+.pendientes-v37 .v37-history-item,
+.pendientes-v37 .v37-history-table td{
+  background:var(--pend-surface) !important;
+  border-color:#DDE4F2 !important;
+}
+.pendientes-v37 .v37-history-item:nth-child(even),
+.pendientes-v37 .v37-history-table tr:nth-child(even) td{background:var(--pend-surface-blue) !important;}
+.pendientes-v37 .v37-stat:nth-child(2n),
+.pendientes-v37 .v37-settings-card:nth-child(2n){background:var(--pend-surface-violet) !important;}
+
+.pendientes-v37 .compact-detail-sheet,
+.pendientes-v37 .capture-sheet,
+.manual-quick-sheet{
+  background:var(--pend-surface-blue) !important;
+  border-color:#C7D2FE !important;
+}
+.pendientes-v37 input,
+.pendientes-v37 select,
+.pendientes-v37 textarea,
+.manual-quick-bed input{
+  background:var(--pend-surface) !important;
+  color:var(--pend-text) !important;
+  border-color:#CBD5E1 !important;
+}
+.pendientes-v37 input:focus,
+.pendientes-v37 select:focus,
+.pendientes-v37 textarea:focus,
+.manual-quick-bed input:focus{background:#EEF2FF !important;border-color:var(--pend-primary) !important;}
+.pendientes-v37 .detail-section,
+.pendientes-v37 .detail-card,
+.pendientes-v37 .compact-detail-photo,
+.pendientes-v37 .ticket-photo-wrap{background:var(--pend-surface-violet) !important;border-color:#C7D2FE !important;}
+
+@media (prefers-color-scheme:dark){
+  :root{color-scheme:light;}
+}

@@ -5,8 +5,8 @@
   "start_url": "/turno-rx/",
   "scope": "/turno-rx/",
   "display": "standalone",
-  "background_color": "#071017",
-  "theme_color": "#071017",
+  "background_color": "#F1F5F9",
+  "theme_color": "#2563EB",
   "orientation": "portrait-primary",
   "icons": [
     {"src":"/turno-rx/icon.svg","sizes":"any","type":"image/svg+xml","purpose":"any maskable"}
