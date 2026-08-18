@@ -10,6 +10,7 @@ const spacing=read('public/turno-rx/space-v25.css');
 const adaptiveCss=read('public/turno-rx/adaptive-row-v26.css');
 const adaptiveJs=read('public/turno-rx/adaptive-row-v26.js');
 const font=read('public/turno-rx/font-v27.css');
+const camaLabel=read('public/turno-rx/cama-label-v28.js');
 const js=read('public/turno-rx/compact-v17.js');
 const transport=read('public/turno-rx/transport-v20.js');
 const sw=read('public/turno-rx/sw.js');
@@ -24,6 +25,7 @@ describe('Pendientes vista compacta',()=>{
     expect(index).toContain('/turno-rx/adaptive-row-v26.css?v=1');
     expect(index).toContain('/turno-rx/font-v27.css?v=1');
     expect(index).toContain('/turno-rx/adaptive-row-v26.js?v=1');
+    expect(index).toContain('/turno-rx/cama-label-v28.js?v=1');
     expect(index).toContain('/turno-rx/transport-v20.js?v=2');
     expect(index).toContain('type="module" src="/turno-rx/name-format-v23.js?v=1"');
   });
@@ -76,6 +78,12 @@ describe('Pendientes vista compacta',()=>{
     expect(font).toContain('font-size:13px !important');
   });
 
+  it('muestra Cama en vez de Origen solo en imagenologia',()=>{
+    expect(camaLabel).toContain("firstHeader.textContent='Cama'");
+    expect(camaLabel).toContain("cell.setAttribute('data-label','Cama')");
+    expect(camaLabel).toContain("root.querySelectorAll?.('.imaging-table')");
+  });
+
   it('usa un solo encabezado y oculta los datos clínicos de la lista',()=>{
     expect(css).toContain('display: table-header-group !important');
     expect(css).toContain('.imaging-table .imaging-row td::before');
@@ -121,14 +129,15 @@ describe('Pendientes vista compacta',()=>{
     expect(formatPatientName('Pérez López, Juan Carlos')).toBe('JUAN CARLOS PÉREZ LÓPEZ');
   });
 
-  it('fuerza shell v27 y mantiene APIs fuera de caché',()=>{
-    expect(sw).toContain("turno-rx-shell-v27");
+  it('fuerza shell v28 y mantiene APIs fuera de caché',()=>{
+    expect(sw).toContain("turno-rx-shell-v28");
     expect(sw).toContain('/turno-rx/compact-v17.css?v=4');
     expect(sw).toContain('/turno-rx/one-line-v24.css?v=1');
     expect(sw).toContain('/turno-rx/space-v25.css?v=1');
     expect(sw).toContain('/turno-rx/adaptive-row-v26.css?v=1');
     expect(sw).toContain('/turno-rx/font-v27.css?v=1');
     expect(sw).toContain('/turno-rx/adaptive-row-v26.js?v=1');
+    expect(sw).toContain('/turno-rx/cama-label-v28.js?v=1');
     expect(sw).toContain('/turno-rx/compact-v17.js?v=2');
     expect(sw).toContain('/turno-rx/transport-v20.js?v=2');
     expect(sw).toContain('/turno-rx/name-format-v23.js?v=1');
