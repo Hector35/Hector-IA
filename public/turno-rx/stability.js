@@ -32,6 +32,7 @@ const plain=v=>clean(v).toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/
 const esc=v=>String(v??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
 const uid=()=>crypto.randomUUID?.()||`${Date.now()}-${Math.random().toString(16).slice(2)}`;
 const now=()=>new Date().toISOString();
+const study=v=>clean(v)?normalizeStudyDisplay(v):'';
 function read(key,fallback){try{const raw=localStorage.getItem(key);return raw?JSON.parse(raw):fallback}catch{return fallback}}
 function write(key,val){localStorage.setItem(key,JSON.stringify(val))}
 function rows(){const r=read(STORAGE_KEY,[]);return Array.isArray(r)?r:[]}
@@ -154,7 +155,7 @@ function manualSubmit(form){
   const next={
     bed:normalizeBed(fd.get('bed')),name:clean(fd.get('name')),age:normalizeAge(fd.get('age')),sex:normSex(fd.get('sex')),
     category,modality:category==='TAC'?'TAC':category==='USG'?'Ultrasonido':'Rayos X',
-    target:category==='Piso'?target:normalizeStudyDisplay(target),destination:category==='Piso'?target:'',
+    target:category==='Piso'?target:study(target),destination:category==='Piso'?target:'',
     diagnosis:clean(fd.get('diagnosis')),diagnosisMeaning:clean(fd.get('diagnosisMeaning')),
     transport:/port[áa]til/i.test(target)?'No trasladar':normTransport(fd.get('transport')),
     transportReason:clean(fd.get('transportReason')),oxygenProbable:fd.get('oxygenProbable')==='on',
@@ -174,7 +175,7 @@ function manualSubmit(form){
 async function fingerprint(file){const buf=await file.arrayBuffer(),hash=await crypto.subtle.digest('SHA-256',buf);return[...new Uint8Array(hash)].map(b=>b.toString(16).padStart(2,'0')).join('')}
 function parseJSON(v){if(v&&typeof v==='object')return v;const s=clean(v),f=s.match(/```(?:json)?\s*([\s\S]*?)```/i)?.[1]?.trim()||s;try{return JSON.parse(f)}catch{const a=f.indexOf('{'),b=f.lastIndexOf('}');if(a>=0&&b>a)return JSON.parse(f.slice(a,b+1));throw new Error('Respuesta de análisis inválida.')}}
 function normalizePhotoRow(p,fp,shiftId){
-  const rawTarget=clean(p?.target||p?.study||p?.destination),category=categoryFrom(p?.category,p?.modality,rawTarget),bed=normalizeBed(p?.handwrittenBed)||normalizeBed(p?.formBed)||normalizeBed(p?.bed),target=category==='Piso'?clean(p?.destination||rawTarget):normalizeStudyDisplay(rawTarget);
+  const rawTarget=clean(p?.target||p?.study||p?.destination),category=categoryFrom(p?.category,p?.modality,rawTarget),bed=normalizeBed(p?.handwrittenBed)||normalizeBed(p?.formBed)||normalizeBed(p?.bed),target=category==='Piso'?clean(p?.destination||rawTarget):study(rawTarget);
   const low=Object.entries(p?.confidence||{}).filter(([,v])=>plain(v)==='low').map(([k])=>k);
   return{id:uid(),shiftId,category,bed,name:clean(p?.name),age:normalizeAge(p?.age)??ageFromBirth(p?.birthDate),sex:normSex(p?.sex),target,destination:category==='Piso'?target:clean(p?.destination),modality:category==='TAC'?'TAC':category==='USG'?'Ultrasonido':'Rayos X',diagnosis:clean(p?.diagnosis),diagnosisMeaning:clean(p?.diagnosisMeaning),service:clean(p?.service||p?.originService),recognizedText:clean(p?.recognizedText),transport:/port[áa]til/i.test(target)?'No trasladar':normTransport(p?.transport),transportReason:clean(p?.transportReason),oxygenProbable:Boolean(p?.oxygenProbable),oxygenReason:p?.oxygenProbable?clean(p?.oxygenReason):'',status:'Pendiente',needsReview:low.length>0,reviewFields:low,imageFingerprint:fp,manualOverrides:{},createdAt:now(),updatedAt:now()}
 }
@@ -237,7 +238,8 @@ function renderQueue(){
   if(!queue.length){box?.remove();return}
   if(!box){box=document.createElement('section');box.id='stabilityQueue';box.className='stability-queue';const anchor=app.querySelector('.capture-status');anchor?.insertAdjacentElement('afterend',box)}
   const done=queue.filter(j=>['Lista','Revisar','Error'].includes(j.state)).length,added=queue.reduce((n,j)=>n+(j.added||0),0),active=queue.find(j=>j.state==='Analizando');
-  box.innerHTML=`<div class="stability-queue-head"><div><strong>${active?`Analizando foto ${active.index+1} de ${queue.length}`:`${done} de ${queue.length} procesadas`}</strong><small>${added} agregados</small></div>${processing?'<button data-stop-queue>Detener</button>':'<button data-clear-queue>Ocultar</button>'}</div><div class="stability-jobs">${queue.map(j=>`<div><span><b>Foto ${j.index+1}</b><small>${esc(j.message)}</small></span><span class="${j.state.toLowerCase()}">${esc(j.state)}${j.state==='Error'?` <button data-retry="${j.id}">Reintentar</button>`:''}</span></div>`).join('')}</div>`;
+  const html=`<div class="stability-queue-head"><div><strong>${active?`Analizando foto ${active.index+1} de ${queue.length}`:`${done} de ${queue.length} procesadas`}</strong><small>${added} agregados</small></div>${processing?'<button data-stop-queue>Detener</button>':'<button data-clear-queue>Ocultar</button>'}</div><div class="stability-jobs">${queue.map(j=>`<div><span><b>Foto ${j.index+1}</b><small>${esc(j.message)}</small></span><span class="${j.state.toLowerCase()}">${esc(j.state)}${j.state==='Error'?` <button data-retry="${j.id}">Reintentar</button>`:''}</span></div>`).join('')}</div>`;
+  if(box.innerHTML!==html)box.innerHTML=html;
 }
 
 document.addEventListener('click',e=>{
