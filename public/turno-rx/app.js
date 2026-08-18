@@ -8,7 +8,6 @@ let editingId = null;
 let processingPhotos = false;
 
 const ICONS = {
-  camera: '<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M9 5.5 10.2 4h3.6L15 5.5h2.5A2.5 2.5 0 0 1 20 8v8.5a2.5 2.5 0 0 1-2.5 2.5h-11A2.5 2.5 0 0 1 4 16.5V8a2.5 2.5 0 0 1 2.5-2.5H9Z"/><circle cx="12" cy="12.5" r="3.2"/></svg>',
   photo: '<svg viewBox="0 0 24 24" aria-hidden="true"><rect x="3.5" y="4" width="17" height="16" rx="2.5"/><circle cx="9" cy="9" r="1.7"/><path d="m5.5 17 4.2-4.3 3.1 3.1 2.1-2.2 3.6 3.4"/></svg>',
   pencil: '<svg viewBox="0 0 24 24" aria-hidden="true"><path d="m5 16.5-1 3.5 3.5-1L18.7 7.8a2.1 2.1 0 0 0 0-3l-.5-.5a2.1 2.1 0 0 0-3 0L5 14.5v2Z"/><path d="m13.8 5.7 4.5 4.5"/></svg>'
 };
@@ -138,11 +137,9 @@ function render() {
           <h1>Pendientes</h1>
         </div>
         <div class="capture-actions" aria-label="Opciones de captura">
-          <button class="capture-icon-btn" id="cameraCapture" type="button" aria-label="Tomar foto">${ICONS.camera}</button>
           <button class="capture-icon-btn" id="galleryCapture" type="button" aria-label="Elegir foto">${ICONS.photo}</button>
           <button class="capture-icon-btn manual" id="manualCapture" type="button" aria-label="Captura manual">${ICONS.pencil}</button>
         </div>
-        <input id="cameraInput" type="file" accept="image/*" capture="environment" hidden />
         <input id="galleryInput" type="file" accept="image/*" multiple hidden />
       </header>
 
@@ -173,7 +170,7 @@ function render() {
                   <div class="empty-state">
                     <div class="empty-icon">＋</div>
                     <b>Sin pendientes</b>
-                    <span>Usa cámara, foto o lápiz para capturar.</span>
+                    <span>Usa foto o lápiz para capturar.</span>
                   </div>
                 </td>
               </tr>
@@ -268,10 +265,8 @@ function renderRow(row) {
 }
 
 function bind() {
-  document.getElementById('cameraCapture')?.addEventListener('click', () => document.getElementById('cameraInput')?.click());
   document.getElementById('galleryCapture')?.addEventListener('click', () => document.getElementById('galleryInput')?.click());
   document.getElementById('manualCapture')?.addEventListener('click', () => openSheet());
-  document.getElementById('cameraInput')?.addEventListener('change', handlePhotoInput);
   document.getElementById('galleryInput')?.addEventListener('change', handlePhotoInput);
   document.getElementById('closeSheet')?.addEventListener('click', closeSheet);
   document.getElementById('sheetBackdrop')?.addEventListener('click', (event) => {
