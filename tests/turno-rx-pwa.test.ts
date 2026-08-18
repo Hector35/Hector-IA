@@ -30,6 +30,7 @@ describe('Pendientes PWA v16',()=>{
     expect(manifest.short_name).toBe('Pendientes');
     expect(index).toContain('/turno-rx/app-v16.js?v=2');
     expect(index).toContain('/turno-rx/integrity-v16.css?v=2');
+    expect(index).toContain('/turno-rx/name-format-v23.js?v=1');
   });
 
   it('mapea exactamente los límites de camas a sus pisos',()=>{
@@ -125,8 +126,9 @@ describe('Pendientes PWA v16',()=>{
     expect(app).toContain("'X-Turno-RX':'1'");
     expect(app).not.toMatch(/sk-[A-Za-z0-9_-]+/);
     expect(sw).toContain("url.pathname.startsWith('/api/')");
-    expect(sw).toContain("turno-rx-shell-v22");
+    expect(sw).toContain("turno-rx-shell-v23");
     expect(sw).toContain('/turno-rx/app-v16.js?v=2');
     expect(sw).toContain('/turno-rx/transport-v20.js?v=2');
+    expect(sw).toContain('/turno-rx/name-format-v23.js?v=1');
   });
 });
