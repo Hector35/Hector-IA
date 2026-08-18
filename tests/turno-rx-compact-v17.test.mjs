@@ -46,7 +46,7 @@ describe('Pendientes vista compacta',()=>{
     expect(index).toContain('/turno-rx/premium-v37.js?v=1');
     expect(index).toContain('/turno-rx/manual-quick-v38.js?v=1');
     expect(index).toContain('/turno-rx/palette-v39.css?v=1');
-    expect(palette).toContain('--pend-bg:#F1F5F9');
+    expect(palette).toContain('--pend-bg:#F8FAFC');
     expect(palette).toContain('--pend-primary:#2563EB');
     expect(palette).toContain('--pend-accent:#4F46E5');
     expect(index).toContain('type="module" src="/turno-rx/name-format-v23.js?v=1"');
