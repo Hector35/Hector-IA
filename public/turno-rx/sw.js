@@ -1,4 +1,4 @@
-const CACHE = 'turno-rx-shell-v40-detail-blue-gray';
+const CACHE = 'turno-rx-shell-v41-patient-detail-ready';
 const SHELL = [
   '/turno-rx/',
   '/turno-rx/index.html',
