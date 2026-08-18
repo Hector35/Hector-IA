@@ -10,6 +10,40 @@ export function hasDuplicateFingerprint(rows,fingerprint){
   return rows.some(row=>clean(row?.imageFingerprint)===fp);
 }
 
+export function duplicatePatientsForFingerprint(rows,fingerprint){
+  const fp=clean(fingerprint);
+  if(!fp||!Array.isArray(rows))return [];
+  return rows
+    .filter(row=>clean(row?.imageFingerprint)===fp)
+    .map(row=>({
+      handwrittenBed:clean(row?.bed),
+      formBed:'',
+      bed:clean(row?.bed),
+      name:clean(row?.name),
+      age:row?.age??null,
+      sex:clean(row?.sex)||'No visible',
+      category:clean(row?.category),
+      modality:clean(row?.modality),
+      target:clean(row?.target),
+      study:clean(row?.target),
+      destination:clean(row?.destination),
+      destinationFloor:clean(row?.destinationFloor),
+      destinationBlock:clean(row?.destinationBlock),
+      requestingDoctor:clean(row?.requestingDoctor),
+      service:clean(row?.service),
+      originService:clean(row?.originService),
+      requestDate:clean(row?.requestDate),
+      requestTime:clean(row?.requestTime),
+      transferNotes:clean(row?.transferNotes),
+      recognizedText:clean(row?.recognizedText),
+      confidence:row?.confidence&&typeof row.confidence==='object'?row.confidence:{},
+      transport:clean(row?.transport),
+      transportReason:clean(row?.transportReason),
+      oxygenProbable:Boolean(row?.oxygenProbable),
+      oxygenReason:clean(row?.oxygenReason)
+    }));
+}
+
 function readRows(){
   try{
     const parsed=JSON.parse(localStorage.getItem(STORAGE_KEY)||'[]');
@@ -45,18 +79,20 @@ const observer=new MutationObserver(()=>queueMicrotask(applyDuplicateNotices));
 const observeTarget=document.getElementById('app')||document.body;
 if(observeTarget)observer.observe(observeTarget,{childList:true,subtree:true});
 
-window.fetch=async function pendientesPhotoDedupeV68(input,init){
+window.fetch=async function pendientesPhotoDedupeV69(input,init){
   const url=typeof input==='string'?input:input?.url;
   const vision=typeof url==='string'&&url.includes('/api/turno-rx/vision');
   if(vision&&init?.body instanceof FormData){
     const file=init.body.get('image');
     if(file instanceof File){
       const fingerprint=await fileFingerprint(file);
-      if(hasDuplicateFingerprint(readRows(),fingerprint)){
+      const rows=readRows();
+      if(hasDuplicateFingerprint(rows,fingerprint)){
         const index=currentQueueIndex();
         if(index)notices.set(index,Date.now()+15000);
         queueMicrotask(applyDuplicateNotices);
-        return new Response(JSON.stringify({patients:[]}),{
+        const patients=duplicatePatientsForFingerprint(rows,fingerprint);
+        return new Response(JSON.stringify({patients,duplicatePhoto:true}),{
           status:200,
           headers:{'Content-Type':'application/json','X-Pendientes-Duplicate':'1'}
         });
@@ -66,4 +102,4 @@ window.fetch=async function pendientesPhotoDedupeV68(input,init){
   return originalFetch(input,init);
 };
 
-window.__pendientesPhotoDedupeV68={hasDuplicateFingerprint,fileFingerprint};
+window.__pendientesPhotoDedupeV69={hasDuplicateFingerprint,duplicatePatientsForFingerprint,fileFingerprint};

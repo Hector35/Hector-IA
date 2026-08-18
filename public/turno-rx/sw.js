@@ -1,4 +1,4 @@
-// Pendientes v68 — evita reprocesar exactamente la misma fotografía en el turno activo.
+// Pendientes v69 — las fotos idénticas se resuelven como duplicadas exitosas, sin visión ni error.
 // LEGACY TEST REFERENCES ONLY — these strings are documentation, not cache entries:
 // const CACHE = 'turno-rx-shell-v58-tac-live-interaction-hotfix';
 // /turno-rx/app-v16.js?v=58
@@ -23,7 +23,7 @@
 // /turno-rx/floor-intelligence-v64.js?v=64
 // /turno-rx/stability-v65.js?v=65
 // /turno-rx/stability-v65.css?v=65
-const CACHE = 'pendientes-shell-20260818-4';
+const CACHE = 'pendientes-shell-20260818-5';
 const SHELL = [
   '/turno-rx/',
   '/turno-rx/index.html',
@@ -31,7 +31,7 @@ const SHELL = [
   '/turno-rx/progressive-photo-queue-v45.js',
   '/turno-rx/stability-guard-v66.js?v=66',
   '/turno-rx/review-confidence-v67.js?v=67',
-  '/turno-rx/photo-dedupe-v68.js?v=68',
+  '/turno-rx/photo-dedupe-v68.js?v=69',
   '/turno-rx/stability.js?v=20260818.1',
   '/turno-rx/stability.css?v=20260818.1',
   '/turno-rx/styles.css?v=7',
