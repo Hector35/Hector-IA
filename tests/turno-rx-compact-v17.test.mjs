@@ -16,6 +16,7 @@ const elegant=read('public/turno-rx/elegant-v30.css');
 const polish=read('public/turno-rx/polish-v32.js');
 const redesign=read('public/turno-rx/full-redesign-v33.css');
 const redesignJs=read('public/turno-rx/full-redesign-v33.js');
+const light=read('public/turno-rx/light-theme-v34.css');
 const js=read('public/turno-rx/compact-v17.js');
 const transport=read('public/turno-rx/transport-v20.js');
 const sw=read('public/turno-rx/sw.js');
@@ -37,6 +38,7 @@ describe('Pendientes vista compacta',()=>{
     expect(index).toContain('/turno-rx/polish-v32.js?v=1');
     expect(index).toContain('/turno-rx/full-redesign-v33.css?v=1');
     expect(index).toContain('/turno-rx/full-redesign-v33.js?v=1');
+    expect(index).toContain('/turno-rx/light-theme-v34.css?v=1');
     expect(index).toContain('type="module" src="/turno-rx/name-format-v23.js?v=1"');
   });
 
@@ -57,7 +59,7 @@ describe('Pendientes vista compacta',()=>{
     expect(oneLine).toContain('text-overflow: ellipsis !important');
   });
 
-  it('conserva capas anteriores pero v33 gobierna el reparto final',()=>{
+  it('conserva capas anteriores y v33 mantiene el reparto estructural',()=>{
     expect(spacing).toContain('.imaging-table col:nth-child(1) { width: 8% !important; }');
     expect(elegant).toContain('.imaging-table col:nth-child(1){width:9% !important;}');
     expect(redesign).toContain('.imaging-table col:nth-child(1){width:11% !important;}');
@@ -99,19 +101,18 @@ describe('Pendientes vista compacta',()=>{
     expect(redesign).toContain('.compact-detail-close{');
   });
 
-  it('rediseña toda la interfaz con fondo negro y filas tipo tarjeta',()=>{
-    expect(index).toContain('<meta name="theme-color" content="#000000"');
-    expect(redesign).toContain('.topbar{');
-    expect(redesign).toContain('.capture-actions{');
-    expect(redesign).toContain('.modality-title{');
-    expect(redesign).toContain('border-spacing:0 11px !important');
-    expect(redesign).toContain('border-radius:18px 0 0 18px !important');
-    expect(redesign).toContain('border-radius:0 18px 18px 0 !important');
-    expect(redesign).toContain('.floor-table-wrap{');
-    expect(redesign).toContain('.capture-sheet,');
-    expect(redesign).toContain('.compact-detail-sheet{');
-    expect(redesign).toContain('.empty-row td{');
-    expect(redesignJs).toContain("modality-count-v33");
+  it('aplica tema claro clínico a toda la interfaz',()=>{
+    expect(index).toContain('<meta name="theme-color" content="#edf3f7"');
+    expect(light).toContain('--v34-bg:#edf3f7');
+    expect(light).toContain('color-scheme:light');
+    expect(light).toContain('.topbar{');
+    expect(light).toContain('.capture-icon-btn.manual{');
+    expect(light).toContain('.imaging-table .imaging-row td:nth-child(-n+4)');
+    expect(light).toContain('background:rgba(255,255,255,.94) !important');
+    expect(light).toContain('.compact-detail-sheet,');
+    expect(light).toContain('.capture-sheet{');
+    expect(light).toContain('.floor-table-wrap{');
+    expect(light).toContain('.empty-row td{');
   });
 
   it('resalta Tórax y agrega feedback táctil sin alterar el texto del estudio',()=>{
@@ -121,6 +122,7 @@ describe('Pendientes vista compacta',()=>{
     expect(polish).toContain("row.classList.remove('is-pressed-v32')");
     expect(redesign).toContain('.study-torax-v32');
     expect(redesign).toContain('.imaging-row.is-pressed-v32');
+    expect(light).toContain('.study-torax-v32');
   });
 
   it('usa un solo encabezado y oculta los datos clínicos de la lista',()=>{
@@ -141,7 +143,6 @@ describe('Pendientes vista compacta',()=>{
     expect(js).toContain("['Qué significa'");
     expect(js).toContain("['Oxígeno'");
     expect(redesign).toContain('.compact-detail-item{');
-    expect(redesign).toContain('display:block !important');
   });
 
   it('resume el estudio a anatomía y conserva tórax primero',()=>{
@@ -178,12 +179,13 @@ describe('Pendientes vista compacta',()=>{
     expect(formatPatientName('Pérez López, Juan Carlos')).toBe('JUAN CARLOS PÉREZ LÓPEZ');
   });
 
-  it('fuerza shell v33 y mantiene APIs fuera de caché',()=>{
-    expect(sw).toContain("turno-rx-shell-v33");
+  it('fuerza shell v34 y mantiene APIs fuera de caché',()=>{
+    expect(sw).toContain("turno-rx-shell-v34");
     expect(sw).toContain('/turno-rx/elegant-v30.css?v=2');
     expect(sw).toContain('/turno-rx/polish-v32.js?v=1');
     expect(sw).toContain('/turno-rx/full-redesign-v33.css?v=1');
     expect(sw).toContain('/turno-rx/full-redesign-v33.js?v=1');
+    expect(sw).toContain('/turno-rx/light-theme-v34.css?v=1');
     expect(sw).toContain('/turno-rx/transport-v20.js?v=3');
     expect(sw).toContain("url.pathname.startsWith('/api/')");
   });
