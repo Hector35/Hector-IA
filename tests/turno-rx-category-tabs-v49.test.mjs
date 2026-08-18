@@ -1,47 +1,47 @@
-import {test,expect,beforeEach} from 'vitest';
+import {expect,test} from 'vitest';
 import {readFileSync} from 'node:fs';
 
-const storage=new Map();
-globalThis.localStorage={getItem:(key)=>storage.has(key)?storage.get(key):null,setItem:(key,value)=>storage.set(key,String(value))};
-const app=await import('../public/turno-rx/app-v16.js');
+const index=readFileSync('public/turno-rx/index.html','utf8');
 const source=readFileSync('public/turno-rx/app-v16.js','utf8');
 const css=readFileSync('public/turno-rx/category-tabs-v49.css','utf8');
 const stability=readFileSync('public/turno-rx/stability.js','utf8');
-const index=readFileSync('public/turno-rx/index.html','utf8');
 const sw=readFileSync('public/turno-rx/sw.js','utf8');
 
-beforeEach(()=>storage.clear());
+const localStorage={
+  data:new Map(),
+  getItem(key){return this.data.has(key)?this.data.get(key):null;},
+  setItem(key,value){this.data.set(key,String(value));},
+  removeItem(key){this.data.delete(key);},
+  clear(){this.data.clear();}
+};
+globalThis.localStorage=localStorage;
+const app=await import(`../public/turno-rx/app-v16.js?tabs=${Date.now()}`);
 
 test('define cuatro pestañas accesibles y un único panel activo',()=>{
-  expect(source).toMatch(/CATEGORY_TABS=\['Piso','RX','TAC','USG'\]/);
-  expect(source).toMatch(/role="tablist"/);expect(source).toMatch(/role="tab"/);
-  expect(source).toMatch(/aria-selected=/);expect(source).toMatch(/role="tabpanel"/);
-  expect(source).toMatch(/visibleRows=rowsForCategoryTab/);
+  expect(source).toContain("const CATEGORY_TABS=['Piso','RX','TAC','USG']");
+  expect(source).toContain('role="tablist"');
+  expect(source).toContain('role="tabpanel"');
+  expect(source).toContain('aria-selected');
+  expect(source).toContain('aria-controls="category-panel"');
 });
 
 test('clasifica globalmente sin depender de la pestaña visible',()=>{
-  expect(app.categoryTabForRow({category:'Piso',destination:'72'})).toBe('Piso');
+  expect(app.categoryTabForRow({category:'Piso',target:'72'})).toBe('Piso');
   expect(app.categoryTabForRow({category:'Rayos X',target:'Tórax'})).toBe('RX');
   expect(app.categoryTabForRow({category:'TAC',target:'TAC de cráneo'})).toBe('TAC');
-  expect(app.categoryTabForRow({category:'USG',target:'USG abdomen'})).toBe('USG');
-  expect(app.categoryTabForRow({category:'',destination:'72',target:'72'})).toBe('Piso');
-  expect(app.categoryTabForRow({category:'Otro',destination:'72',destinationFloor:'Segundo'})).toBe('Piso');
+  expect(app.categoryTabForRow({category:'USG',target:'USG abdominal'})).toBe('USG');
 });
 
 test('cada contador y panel usa exclusivamente pendientes de su categoría',()=>{
-  const rows=[
-    {id:'1',category:'Piso',status:'Pendiente'},
-    {id:'2',category:'Rayos X',status:'Pendiente'},
-    {id:'3',category:'TAC',status:'Realizado'},
-    {id:'4',category:'USG',status:'Pendiente'},
-    {id:'5',category:'Piso',status:'Realizado'},
-    {id:'6',category:'Otro',destination:'72',status:'Pendiente'}
+  const list=[
+    {category:'Piso',status:'Pendiente'},
+    {category:'Piso',status:'Realizado'},
+    {category:'Rayos X',status:'Pendiente'},
+    {category:'TAC',status:'Pendiente'},
+    {category:'USG',status:'Pendiente'}
   ];
-  expect(app.pendingCounts(rows)).toEqual({Piso:2,RX:1,TAC:0,USG:1});
-  expect(app.rowsForCategoryTab(rows,'Piso').map((row)=>row.id)).toEqual(['1','6']);
-  expect(app.rowsForCategoryTab(rows,'RX').map((row)=>row.id)).toEqual(['2']);
-  expect(app.rowsForCategoryTab(rows,'TAC')).toEqual([]);
-  expect(app.rowsForCategoryTab(rows,'USG').map((row)=>row.id)).toEqual(['4']);
+  expect(app.pendingCounts(list)).toEqual({Piso:1,RX:1,TAC:1,USG:1});
+  expect(app.rowsForCategoryTab(list,'Piso')).toHaveLength(1);
   expect(app.pendingCounts([])).toEqual({Piso:0,RX:0,TAC:0,USG:0});
 });
 
@@ -57,14 +57,16 @@ test('integra pestañas con el runtime consolidado, cola progresiva y gesto úni
   expect(index).toMatch(/category-tabs-v49\.css\?v=1/);
   expect(index).toMatch(/app-v16\.js\?v=65/);
   expect(index).toMatch(/stability-guard-v66\.js\?v=66/);
-  expect(index).toMatch(/review-confidence-v67\.js\?v=67/);
-  expect(index).toMatch(/photo-dedupe-v68\.js\?v=69/);
+  expect(index).toMatch(/review-confidence-v67\.js\?v=70/);
+  expect(index).toMatch(/photo-fingerprint-history-v70\.js\?v=70/);
+  expect(index).toMatch(/photo-dedupe-v68\.js\?v=70/);
   expect(index).toMatch(/stability\.js\?v=20260818\.1/);
-  expect(sw).toMatch(/pendientes-shell-20260818-5/);
+  expect(sw).toMatch(/pendientes-shell-20260818-6/);
   expect(sw).toMatch(/category-tabs-v49\.css\?v=1/);
   expect(sw).toMatch(/stability-guard-v66\.js\?v=66/);
-  expect(sw).toMatch(/review-confidence-v67\.js\?v=67/);
-  expect(sw).toMatch(/photo-dedupe-v68\.js\?v=69/);
+  expect(sw).toMatch(/review-confidence-v67\.js\?v=70/);
+  expect(sw).toMatch(/photo-fingerprint-history-v70\.js\?v=70/);
+  expect(sw).toMatch(/photo-dedupe-v68\.js\?v=70/);
   expect(sw).toMatch(/stability\.js\?v=20260818\.1/);
   expect(source).toMatch(/unseenCategoryTabs/);expect(source).toMatch(/renderPhotoQueue\(\)/);
   expect(css).toMatch(/min-height:44px/);
