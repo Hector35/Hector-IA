@@ -1,3 +1,4 @@
+/* Pendientes v15 — integridad operativa */
 .shift-btn {
   min-height: 38px;
   padding: 0 9px;
@@ -111,12 +112,21 @@
 
 @media (max-width: 370px) {
   .shift-btn {
-    font-size: 0;
     width: 36px;
     padding: 0;
+    overflow: hidden;
+    white-space: nowrap;
+    text-indent: -999px;
+    position: relative;
   }
 
-  .shift-btn::first-letter {
-    font-size: 15px;
+  .shift-btn::after {
+    content: '↻';
+    position: absolute;
+    inset: 0;
+    display: grid;
+    place-items: center;
+    text-indent: 0;
+    font-size: 16px;
   }
 }
