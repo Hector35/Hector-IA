@@ -33,12 +33,12 @@
 
     const strongCamilla = /(fractur|luxacion|trauma|politrauma|tce|evc|ictus|evento vascular|deficit neurolog|hemorrag|sincope|convulsion|sepsis|disnea|hipox|insuficiencia respiratoria|pie diabet|miasis|inmovil|no deambula|postrado|dolor intenso|lesion de ligamento rotuliano|rotula)/;
     if (strongCamilla.test(diagnosis)) {
-      return { label: 'Camilla probable', type: 'camilla', icon: '🛏️', reason: `Dato clínico visible que puede limitar o hacer insegura la marcha: ${diagnosisText(row)}.` };
+      return { label: 'Camilla', type: 'camilla', icon: '🛏️', reason: `Dato clínico visible que puede limitar o hacer insegura la marcha: ${diagnosisText(row)}.` };
     }
 
     const likelyChairStudy = /(torax|mano|muneca|hombro|codo|brazo|antebrazo|clavicula|costillas|abdomen|senos paranasales)/;
     if (likelyChairStudy.test(study)) {
-      return { label: 'Silla probable', type: 'silla', icon: '♿', reason: 'No hay un dato visible de inmovilidad; por el tipo de estudio, lo más probable es traslado sentado si está estable.' };
+      return { label: 'Silla', type: 'silla', icon: '♿', reason: 'Sin datos visibles que obliguen a camilla; estimación operativa: traslado en silla si está estable.' };
     }
 
     const ambiguousMobilityStudy = /(pie|tobillo|rodilla|cadera|pelvis|femur|tibia|perone|rotula|craneo|cervical|lumbar|lumbosacra)/;
