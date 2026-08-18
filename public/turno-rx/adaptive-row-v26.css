@@ -1,0 +1,62 @@
+/* Pendientes v26 — usa 1 linea cuando cabe y 2 cuando nombre/estudio lo necesitan. */
+.imaging-table.study-wide-v26 col:nth-child(1){width:8% !important;}
+.imaging-table.study-wide-v26 col:nth-child(2){width:40% !important;}
+.imaging-table.study-wide-v26 col:nth-child(3){width:19% !important;}
+.imaging-table.study-wide-v26 col:nth-child(4){width:33% !important;}
+
+.imaging-table .imaging-row.adaptive-two-line-v26 td:nth-child(-n+4){
+  padding-top:7px !important;
+  padding-bottom:7px !important;
+  vertical-align:middle !important;
+}
+
+.imaging-table .imaging-row.adaptive-two-line-v26 .patient-name{
+  white-space:normal !important;
+  overflow:visible !important;
+  text-overflow:clip !important;
+  font-size:0 !important;
+  line-height:1 !important;
+}
+.imaging-table .imaging-row.adaptive-two-line-v26 .patient-name::before,
+.imaging-table .imaging-row.adaptive-two-line-v26 .patient-name::after{
+  display:block;
+  max-width:100%;
+  white-space:nowrap;
+  overflow:hidden;
+  text-overflow:ellipsis;
+  font-size:10.6px;
+  line-height:1.15;
+  letter-spacing:-.01em;
+}
+.imaging-table .imaging-row.adaptive-two-line-v26 .patient-name::before{
+  content:attr(data-given-names);
+  font-weight:900;
+}
+.imaging-table .imaging-row.adaptive-two-line-v26 .patient-name::after{
+  content:attr(data-surnames);
+  margin-top:2px;
+  font-weight:750;
+  color:#b8c8d1;
+}
+.imaging-table .imaging-row.adaptive-two-line-v26 .patient-name[data-surnames=""]::after{display:none;}
+
+/* Si el estudio fue el que pidio espacio, puede usar la misma altura de dos lineas. */
+.imaging-table .imaging-row.adaptive-two-line-v26 .study-cell{
+  max-width:none !important;
+  white-space:normal !important;
+  overflow:visible !important;
+  text-overflow:clip !important;
+  line-height:1.12 !important;
+  overflow-wrap:normal !important;
+  word-break:normal !important;
+}
+
+@media (max-width:430px){
+  .imaging-table.study-wide-v26 col:nth-child(1){width:8% !important;}
+  .imaging-table.study-wide-v26 col:nth-child(2){width:40% !important;}
+  .imaging-table.study-wide-v26 col:nth-child(3){width:19% !important;}
+  .imaging-table.study-wide-v26 col:nth-child(4){width:33% !important;}
+  .imaging-table .imaging-row.adaptive-two-line-v26 .patient-name::before,
+  .imaging-table .imaging-row.adaptive-two-line-v26 .patient-name::after{font-size:10.3px;}
+  .imaging-table .imaging-row.adaptive-two-line-v26 .study-cell{font-size:10.2px !important;}
+}
