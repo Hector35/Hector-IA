@@ -24,7 +24,7 @@ jobs:
           set -euo pipefail
           BASE='https://hector-os.hectorhdzr035.workers.dev/turno-rx'
           for attempt in $(seq 1 30); do
-            if curl -fsS "$BASE/" -o /tmp/index.html && grep -q 'app.js?v=9' /tmp/index.html && grep -q 'capture-enhancements.css?v=1' /tmp/index.html; then
+            if curl -fsS "$BASE/" -o /tmp/index.html && grep -q 'app.js?v=11' /tmp/index.html && grep -q 'capture-enhancements.css?v=1' /tmp/index.html; then
               exit 0
             fi
             sleep 4
@@ -38,23 +38,26 @@ jobs:
           set -euo pipefail
           BASE='https://hector-os.hectorhdzr035.workers.dev/turno-rx'
           curl -fsS "$BASE/" -o /tmp/index.html
-          curl -fsS "$BASE/app.js?v=9" -o /tmp/app.js
+          curl -fsS "$BASE/app.js?v=11" -o /tmp/app.js
           curl -fsS "$BASE/capture-enhancements.css?v=1" -o /tmp/capture.css
           curl -fsS "$BASE/manifest.webmanifest" -o /tmp/manifest.webmanifest
           curl -fsS "$BASE/sw.js" -o /tmp/sw.js
-          grep -q 'cameraCapture' /tmp/app.js
           grep -q 'galleryCapture' /tmp/app.js
           grep -q 'manualCapture' /tmp/app.js
+          ! grep -q 'cameraCapture' /tmp/app.js
           grep -q '/api/turno-rx/vision' /tmp/app.js
           grep -q 'X-Turno-RX' /tmp/app.js
           grep -q 'Nombre / edad' /tmp/app.js
           grep -q 'Traslado / motivo' /tmp/app.js
           grep -q 'oxygenProbable' /tmp/app.js
+          grep -q 'handwrittenBed' /tmp/app.js
+          grep -q 'formBed' /tmp/app.js
+          grep -q 'Sala de espera.*NUNCA es una cama' /tmp/app.js
           grep -q 'capture-icon-btn' /tmp/capture.css
           grep -q '"short_name": "Pendientes"' /tmp/manifest.webmanifest
-          grep -q "turno-rx-shell-v8" /tmp/sw.js
+          grep -q "turno-rx-shell-v10" /tmp/sw.js
           grep -q 'capture-enhancements.css?v=1' /tmp/sw.js
-          grep -q 'app.js?v=9' /tmp/sw.js
+          grep -q 'app.js?v=11' /tmp/sw.js
 
       - name: Verificar visión sin login
         shell: bash
