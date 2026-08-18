@@ -1,5 +1,5 @@
 // Pendientes v70 — historial de fingerprints + limpieza de revisión acotada a filas actualizadas.
-// Verificación de regresión v70 alineada con el contrato actual.
+// Verificación de regresión v70 alineada con el contrato actual; segunda pasada tras corregir el import del test de pestañas.
 // LEGACY TEST REFERENCES ONLY — these strings are documentation, not cache entries:
 // const CACHE = 'turno-rx-shell-v58-tac-live-interaction-hotfix';
 // /turno-rx/app-v16.js?v=58
