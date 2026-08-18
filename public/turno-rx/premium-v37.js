@@ -212,7 +212,8 @@
     const badge = document.getElementById('v37ShiftBadge');
     if (!badge) return;
     const shift = currentShift();
-    badge.textContent = inferShiftName(shift.startedAt);
+    const label = inferShiftName(shift.startedAt);
+    if (badge.textContent !== label) badge.textContent = label;
   }
 
   function closeDrawer() {
