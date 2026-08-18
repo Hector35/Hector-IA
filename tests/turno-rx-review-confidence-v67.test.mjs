@@ -16,10 +16,10 @@ function runtime(seed={}){
   return {localStorage,api:window.__pendientesReviewConfidenceV67};
 }
 
-describe('Pendientes review confidence v67',()=>{
+describe('Pendientes review confidence v67/v70',()=>{
   it('limpia una revisión cuando una relectura confirma el mismo valor con confianza alta',()=>{
     const key='pendientes-table-v2';
-    const before=[{id:'1',category:'Rayos X',bed:'22',name:'ANA',target:'Tórax',needsReview:true,reviewFields:['bed'],manualOverrides:{}}];
+    const before=[{id:'1',category:'Rayos X',bed:'22',name:'ANA',target:'Tórax',needsReview:true,reviewFields:['bed'],manualOverrides:{},updatedAt:'2026-08-18T16:00:00.000Z'}];
     const {localStorage,api}=runtime({[key]:JSON.stringify(before)});
     api.captureHints({patients:[{category:'Rayos X',bed:'22',name:'ANA',target:'Tórax',confidence:{bed:'high'}}]});
     const after=[{...before[0],updatedAt:'2026-08-18T17:00:00.000Z'}];
@@ -48,5 +48,17 @@ describe('Pendientes review confidence v67',()=>{
     localStorage.setItem(key,JSON.stringify(before));
     const [saved]=JSON.parse(localStorage.getItem(key));
     expect(saved.needsReview).toBe(true);
+  });
+
+  it('no limpia una fila vieja sin cambios aunque una foto nueva confirme la misma cama',()=>{
+    const key='pendientes-table-v2';
+    const before=[{id:'old',category:'Rayos X',bed:'22',name:'ANA',target:'Tórax',needsReview:true,reviewFields:['bed'],manualOverrides:{},updatedAt:'2026-08-18T16:00:00.000Z'}];
+    const {localStorage,api}=runtime({[key]:JSON.stringify(before)});
+    api.captureHints({patients:[{category:'Rayos X',bed:'22',name:'LUIS',target:'Tórax',confidence:{bed:'high'}}]});
+    const incoming=[before[0],{id:'new',category:'Rayos X',bed:'22',name:'LUIS',target:'Tórax',needsReview:false,reviewFields:[],updatedAt:'2026-08-18T17:00:00.000Z'}];
+    localStorage.setItem(key,JSON.stringify(incoming));
+    const saved=JSON.parse(localStorage.getItem(key));
+    expect(saved[0].needsReview).toBe(true);
+    expect(saved[0].reviewFields).toEqual(['bed']);
   });
 });
