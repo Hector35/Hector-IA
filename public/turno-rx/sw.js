@@ -1,4 +1,4 @@
-const CACHE = 'turno-rx-shell-v45-floor-tac-rx-visible-palette';
+const CACHE = 'turno-rx-shell-v46-progressive-photos-rx-tac';
 const SHELL = [
   '/turno-rx/',
   '/turno-rx/index.html',
@@ -21,9 +21,11 @@ const SHELL = [
   '/turno-rx/patient-detail-v39.css?v=1',
   '/turno-rx/palette-v39.css?v=1',
   '/turno-rx/tac-flow-v42.css?v=1',
+  '/turno-rx/progressive-photo-v45.css?v=1',
   '/turno-rx/quick-transport-v37.js?v=1',
   '/turno-rx/patient-detail-v39.js?v=2',
   '/turno-rx/app-v16.js?v=4',
+  '/turno-rx/progressive-photo-queue-v45.js',
   '/turno-rx/floor-workflow-v42.js?v=1',
   '/turno-rx/compact-v17.js?v=2',
   '/turno-rx/transport-v20.js?v=3',
