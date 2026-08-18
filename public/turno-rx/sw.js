@@ -31,7 +31,7 @@ const SHELL = [
   '/turno-rx/row-actions-v61.css?v=61',
   '/turno-rx/quick-transport-v37.js?v=2',
   '/turno-rx/patient-detail-v39.js?v=4',
-  '/turno-rx/floor-photo-reconcile-v61.js?v=61',
+  '/turno-rx/floor-photo-reconcile-v62.js?v=62',
   '/turno-rx/app-v16.js?v=58',
   '/turno-rx/progressive-photo-queue-v45.js',
   '/turno-rx/floor-workflow-v42.js?v=58',
