@@ -24,7 +24,7 @@ jobs:
           set -euo pipefail
           BASE='https://hector-os.hectorhdzr035.workers.dev/turno-rx'
           for attempt in $(seq 1 30); do
-            if curl -fsS "$BASE/" -o /tmp/index.html && grep -q 'app.js?v=13' /tmp/index.html && grep -q 'capture-enhancements.css?v=2' /tmp/index.html; then
+            if curl -fsS "$BASE/" -o /tmp/index.html && grep -q 'app.js?v=14' /tmp/index.html && grep -q 'capture-enhancements.css?v=2' /tmp/index.html; then
               exit 0
             fi
             sleep 4
@@ -38,7 +38,7 @@ jobs:
           set -euo pipefail
           BASE='https://hector-os.hectorhdzr035.workers.dev/turno-rx'
           curl -fsS "$BASE/" -o /tmp/index.html
-          curl -fsS "$BASE/app.js?v=13" -o /tmp/app.js
+          curl -fsS "$BASE/app.js?v=14" -o /tmp/app.js
           curl -fsS "$BASE/capture-enhancements.css?v=2" -o /tmp/capture.css
           curl -fsS "$BASE/manifest.webmanifest" -o /tmp/manifest.webmanifest
           curl -fsS "$BASE/sw.js" -o /tmp/sw.js
@@ -60,9 +60,9 @@ jobs:
           grep -q 'floor-group-title' /tmp/capture.css
           grep -q 'capture-icon-btn' /tmp/capture.css
           grep -q '"short_name": "Pendientes"' /tmp/manifest.webmanifest
-          grep -q "turno-rx-shell-v12" /tmp/sw.js
+          grep -q "turno-rx-shell-v13" /tmp/sw.js
           grep -q 'capture-enhancements.css?v=2' /tmp/sw.js
-          grep -q 'app.js?v=13' /tmp/sw.js
+          grep -q 'app.js?v=14' /tmp/sw.js
 
       - name: Verificar visión sin login
         shell: bash
