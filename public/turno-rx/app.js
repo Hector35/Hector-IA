@@ -12,8 +12,11 @@ const ICONS = {
   pencil: '<svg viewBox="0 0 24 24" aria-hidden="true"><path d="m5 16.5-1 3.5 3.5-1L18.7 7.8a2.1 2.1 0 0 0 0-3l-.5-.5a2.1 2.1 0 0 0-3 0L5 14.5v2Z"/><path d="m13.8 5.7 4.5 4.5"/></svg>'
 };
 
-const VISION_PROMPT = `Analiza esta foto de una solicitud, boleta o pizarrón hospitalario para crear pendientes operativos de traslado. Devuelve SOLO JSON válido, sin markdown, con este formato exacto: {"patients":[{"bed":"","name":"","birthDate":null,"age":null,"target":"","transport":"Silla|Camilla|Por definir","transportReason":"","oxygenProbable":false,"oxygenReason":""}]}.
-Extrae únicamente datos visibles; no inventes nombres, edades, estudios, destinos ni hechos clínicos. bed debe conservar exactamente cama/área; CE significa Corta Estancia y no debe convertirse en cama numérica; UP significa Urgencias Pediátricas. target es el destino/piso o el estudio solicitado, según lo visible. Si hay fecha de nacimiento visible, colócala como YYYY-MM-DD en birthDate; si la edad está explícita, úsala en age.
+const VISION_PROMPT = `Analiza esta foto de una solicitud, boleta o pizarrón hospitalario para crear pendientes operativos de traslado. Devuelve SOLO JSON válido, sin markdown, con este formato exacto: {"patients":[{"handwrittenBed":"","formBed":"","waitingRoomMarked":false,"bed":"","name":"","birthDate":null,"age":null,"target":"","transport":"Silla|Camilla|Por definir","transportReason":"","oxygenProbable":false,"oxygenReason":""}]}.
+Extrae únicamente datos visibles; no inventes nombres, edades, estudios, destinos ni hechos clínicos.
+REGLA CRÍTICA PARA CAMA: en estas solicitudes el número de cama puede estar escrito A MANO como un número grande y aislado en el margen o parte superior de la hoja (por ejemplo 10, 16, 28). Debes buscarlo de forma explícita aunque no esté dentro del recuadro impreso "CAMA NO.". Pon ese valor en handwrittenBed. Si el recuadro impreso "CAMA NO." contiene un código como UA16, CE1, C15 o UP, ponlo en formBed. waitingRoomMarked=true solo si está marcada la casilla "SALA DE ESPERA".
+Para bed usa esta prioridad: 1) handwrittenBed si existe; 2) formBed si no hay handwrittenBed; 3) vacío si ninguno existe. "Sala de espera" NUNCA es una cama y NUNCA debe devolverse en bed, handwrittenBed ni formBed, aunque su casilla esté marcada. Una marca de sala de espera no invalida ni reemplaza un número manuscrito visible.
+CE significa Corta Estancia y no debe convertirse en cama numérica; UP significa Urgencias Pediátricas. target es el destino/piso o el estudio solicitado, según lo visible. Si hay fecha de nacimiento visible, colócala como YYYY-MM-DD en birthDate; si la edad está explícita, úsala en age.
 transport es una ESTIMACIÓN OPERATIVA, no una orden médica. Elige Silla cuando la información visible sugiera que el paciente está estable, ambulante o puede ir sentado; Camilla cuando haya inmovilidad, trauma importante, déficit neurológico, condición delicada, necesidad evidente de ir acostado o información equivalente. Puedes usar la ubicación visible como pista operativa, pero no inventes condiciones clínicas. Si no hay base suficiente, usa Por definir. transportReason debe explicar brevemente la pista visible o decir que no hay datos suficientes.
 oxygenProbable=true SOLO si hay evidencia visible de oxígeno ya indicado/usado, soporte respiratorio, hipoxemia/SpO2 baja o dificultad respiratoria significativa. Si es false, oxygenReason debe ser vacío. Si es true, oxygenReason debe explicar brevemente la evidencia visible. Si hay varios pacientes en la foto, devuelve todos en patients.`;
 
@@ -46,6 +49,19 @@ function esc(value) {
 
 function clean(value) {
   return String(value ?? '').trim();
+}
+
+function normalizeBedCandidate(value) {
+  const text = clean(value);
+  if (!text) return '';
+  if (/sala\s+de\s+espera/i.test(text)) return '';
+  return text;
+}
+
+function resolveVisionBed(patient) {
+  return normalizeBedCandidate(patient?.handwrittenBed)
+    || normalizeBedCandidate(patient?.formBed)
+    || normalizeBedCandidate(patient?.bed);
 }
 
 function normalizeTransport(value) {
@@ -323,7 +339,7 @@ function normalizeVisionRow(patient) {
   const oxygenProbable = Boolean(patient?.oxygenProbable);
   return {
     id: uid(),
-    bed: clean(patient?.bed),
+    bed: resolveVisionBed(patient),
     name: clean(patient?.name),
     age,
     target: clean(patient?.target || patient?.study || patient?.destination),
@@ -361,12 +377,29 @@ function rowKey(row) {
   return [row.bed, row.name, row.target].map((value) => clean(value).toLowerCase()).join('|');
 }
 
+function findMatchingRowIndex(list, incoming) {
+  const key = rowKey(incoming);
+  let index = key !== '||' ? list.findIndex((row) => rowKey(row) === key) : -1;
+  if (index >= 0) return index;
+
+  const name = clean(incoming.name).toLowerCase();
+  const target = clean(incoming.target).toLowerCase();
+  if (!name) return -1;
+
+  index = list.findIndex((row) => {
+    const rowName = clean(row.name).toLowerCase();
+    const rowTarget = clean(row.target).toLowerCase();
+    return rowName === name && (!target || !rowTarget || rowTarget === target);
+  });
+  return index;
+}
+
 function mergeRow(existing, incoming) {
   const incomingTransport = normalizeTransport(incoming.transport);
   const existingTransport = normalizeTransport(existing.transport);
   return {
     ...existing,
-    bed: incoming.bed || existing.bed || '',
+    bed: incoming.bed || normalizeBedCandidate(existing.bed) || '',
     name: incoming.name || existing.name || '',
     age: incoming.age ?? normalizeAge(existing.age),
     target: incoming.target || existing.target || '',
@@ -380,8 +413,7 @@ function mergeRow(existing, incoming) {
 function addAnalyzedRows(incomingRows) {
   const next = [...rows];
   for (const incoming of incomingRows) {
-    const key = rowKey(incoming);
-    const index = key !== '||' ? next.findIndex((row) => rowKey(row) === key) : -1;
+    const index = findMatchingRowIndex(next, incoming);
     if (index >= 0) next[index] = mergeRow(next[index], incoming);
     else next.unshift(incoming);
   }
