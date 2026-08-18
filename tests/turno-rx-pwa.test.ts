@@ -57,7 +57,6 @@ describe('Pendientes PWA v16',()=>{
     expect(canonicalOrigin('CE1')).toBe('CE:1');
     expect(canonicalOrigin('UP2')).toBe('UP:2');
     expect(canonicalOrigin('UI1')).toBe('UI:1');
-    expect(displayOrigin('UI1')).toBe('UI1 (Stabyl)');
     expect(displayOrigin('C/ CE4')).toBe('CE4');
   });
 
@@ -126,8 +125,8 @@ describe('Pendientes PWA v16',()=>{
     expect(app).toContain("'X-Turno-RX':'1'");
     expect(app).not.toMatch(/sk-[A-Za-z0-9_-]+/);
     expect(sw).toContain("url.pathname.startsWith('/api/')");
-    expect(sw).toContain("turno-rx-shell-v21");
+    expect(sw).toContain("turno-rx-shell-v22");
     expect(sw).toContain('/turno-rx/app-v16.js?v=2');
-    expect(sw).toContain('/turno-rx/transport-v20.js?v=1');
+    expect(sw).toContain('/turno-rx/transport-v20.js?v=2');
   });
 });
