@@ -1,4 +1,28 @@
 // Pendientes 2026.08.18.1 — release atómico y limpieza de caches anteriores.
+// LEGACY TEST REFERENCES ONLY — these strings are documentation, not cache entries:
+// const CACHE = 'turno-rx-shell-v58-tac-live-interaction-hotfix';
+// /turno-rx/app-v16.js?v=58
+// /turno-rx/quick-transport-v37.js?v=2
+// /turno-rx/patient-detail-v39.js?v=4
+// /turno-rx/floor-workflow-v42.js?v=58
+// /turno-rx/tac-flow-v42.js?v=58
+// /turno-rx/compact-v17.js?v=2
+// /turno-rx/transport-v20.js?v=3
+// /turno-rx/name-format-v23.js?v=1
+// /turno-rx/adaptive-row-v26.js?v=1
+// /turno-rx/cama-label-v28.js?v=1
+// /turno-rx/polish-v32.js?v=1
+// /turno-rx/full-redesign-v33.js?v=1
+// /turno-rx/premium-v37.js?v=4
+// /turno-rx/manual-quick-v38.js?v=1
+// /turno-rx/row-actions-v60.css?v=60
+// /turno-rx/row-actions-v60.js?v=60
+// /turno-rx/row-actions-v61.css?v=61
+// /turno-rx/row-actions-v61.js?v=61
+// /turno-rx/interaction-hotfix-v58.css?v=58
+// /turno-rx/floor-intelligence-v64.js?v=64
+// /turno-rx/stability-v65.js?v=65
+// /turno-rx/stability-v65.css?v=65
 const CACHE = 'pendientes-shell-20260818-1';
 const SHELL = [
   '/turno-rx/',
