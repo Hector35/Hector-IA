@@ -363,7 +363,8 @@
       ['Diagnóstico / dato clínico', firstAvailable(row, ['diagnosis'])],
       ['Qué significa', firstAvailable(row, ['diagnosisMeaning'])],
       ['Folio', firstAvailable(row, ['folio'])],
-      ['Fecha de solicitud', firstAvailable(row, ['requestDate'])],
+      ['Fecha de solicitud', [firstAvailable(row, ['requestDate']), firstAvailable(row, ['requestTime'])].filter(Boolean).join(' · ')],
+      ['Indicaciones de traslado', firstAvailable(row, ['transferNotes'])],
       ['Notas de boleta', firstAvailable(row, ['boletaNotes','notes'])]
     ].filter(([, value]) => value && value !== '—');
 
@@ -385,7 +386,11 @@
         extra.push([humanizeKey(key), shown]);
       }
     }
-    return { primary, transfer, extra };
+    const review = [];
+    if (row?.needsReview) review.push(['Revisión necesaria', (Array.isArray(row?.reviewFields) ? row.reviewFields : []).join(', ') || 'Campos dudosos']);
+    const recognizedText = firstAvailable(row, ['recognizedText']);
+    if (recognizedText) review.push(['Texto reconocido', recognizedText]);
+    return { primary, transfer, extra, review };
   }
 
   function humanizeKey(key) {
@@ -460,6 +465,7 @@
     const fields = detailFields(row, historical);
     body.innerHTML = `<section class="v39-detail-section"><h3>Paciente</h3><div class="v39-detail-card">${rowsHtml(fields.primary)}</div></section>
       <section class="v39-detail-section"><h3>Traslado</h3><div class="v39-detail-card">${rowsHtml(fields.transfer)}</div></section>
+      ${fields.review.length ? `<section class="v39-detail-section"><h3>Revisión de lectura</h3><div class="v39-detail-card">${rowsHtml(fields.review)}</div></section>` : ''}
       ${fields.extra.length ? `<section class="v39-detail-section"><h3>Otros datos de la boleta</h3><div class="v39-detail-card">${rowsHtml(fields.extra)}</div></section>` : ''}
       <section class="v39-detail-section"><h3>Boleta original</h3><div class="v39-detail-card v39-photo-card" id="v39PhotoHost"><div class="v39-photo-loading">Cargando foto…</div></div></section>`;
     actions.hidden = historical;

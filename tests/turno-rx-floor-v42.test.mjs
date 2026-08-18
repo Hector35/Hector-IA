@@ -52,7 +52,7 @@ test('la captura única pide categoría automática y el service worker carga v4
   assert.match(app,/category":"Rayos X\|TAC\|USG\|Piso\|Interconsulta\|Apoyo para movimiento/);
   assert.match(app,/category debe ser "Piso"/);
   assert.match(index,/floor-workflow-v42\.js\?v=1/);
-  assert.match(sw,/turno-rx-shell-v44-floor-tac-visible-palette/);
+  assert.match(sw,/turno-rx-shell-v\d+-/);
   assert.match(workflow,/status:'Realizado'/);
   assert.match(workflow,/SWIPE_THRESHOLD/);
 });

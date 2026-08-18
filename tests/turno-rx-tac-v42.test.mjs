@@ -48,7 +48,7 @@ test('carga flujo TAC, caché, detalle, boleta e historial',()=>{
   const detail=readFileSync('public/turno-rx/patient-detail-v39.js','utf8');
   const history=readFileSync('public/turno-rx/premium-v37.js','utf8');
   assert.match(index,/tac-flow-v42\.js/);
-  assert.match(sw,/turno-rx-shell-v44-floor-tac-visible-palette/);
+  assert.match(sw,/turno-rx-shell-v\d+-.*tac/);
   assert.match(flow,/status:'Realizado'/);
   assert.match(flow,/dx < -72/);
   assert.match(detail,/boletaPhotoId/);
