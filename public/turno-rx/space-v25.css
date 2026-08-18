@@ -1,0 +1,59 @@
+/* Pendientes v25 — aprovechar huecos de Origen y Traslado */
+/* Origen y Traslado ocupan solo lo necesario; el espacio recuperado va a Paciente. */
+.imaging-table col:nth-child(1) { width: 8% !important; }
+.imaging-table col:nth-child(2) { width: 48% !important; }
+.imaging-table col:nth-child(3) { width: 19% !important; }
+.imaging-table col:nth-child(4) { width: 25% !important; }
+
+.imaging-table .imaging-row td:nth-child(1),
+.imaging-table th:nth-child(1) {
+  padding-left: 3px !important;
+  padding-right: 1px !important;
+}
+
+.imaging-table .imaging-row td:nth-child(2),
+.imaging-table th:nth-child(2) {
+  padding-left: 3px !important;
+  padding-right: 3px !important;
+}
+
+.imaging-table .imaging-row td:nth-child(3),
+.imaging-table th:nth-child(3) {
+  padding-left: 2px !important;
+  padding-right: 2px !important;
+}
+
+.imaging-table .imaging-row td:nth-child(4),
+.imaging-table th:nth-child(4) {
+  padding-left: 3px !important;
+  padding-right: 2px !important;
+}
+
+.imaging-table .patient-name {
+  font-size: 10.8px !important;
+  letter-spacing: -.01em !important;
+}
+
+.imaging-table .study-cell {
+  font-size: 10.5px !important;
+  letter-spacing: -.005em !important;
+}
+
+/* El botón no reserva más ancho del que realmente usa. */
+.imaging-table .transport-main {
+  width: max-content !important;
+  max-width: 100% !important;
+  padding-left: 3px !important;
+  padding-right: 3px !important;
+}
+
+@media (max-width: 430px) {
+  .imaging-table col:nth-child(1) { width: 8% !important; }
+  .imaging-table col:nth-child(2) { width: 48% !important; }
+  .imaging-table col:nth-child(3) { width: 19% !important; }
+  .imaging-table col:nth-child(4) { width: 25% !important; }
+
+  .imaging-table .patient-name { font-size: 10.6px !important; }
+  .imaging-table .study-cell { font-size: 10.3px !important; }
+  .imaging-table th { font-size: 7.7px !important; letter-spacing: .035em !important; }
+}
