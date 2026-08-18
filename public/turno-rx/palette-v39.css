@@ -381,3 +381,196 @@ button{-webkit-tap-highlight-color:transparent;touch-action:manipulation;}
 @media(prefers-reduced-motion:reduce){
   .pendientes-v37 *, .manual-quick-sheet *, .v39-detail-sheet *{scroll-behavior:auto !important;transition-duration:.01ms !important;animation-duration:.01ms !important;}
 }
+
+/* v42 — superficies cromáticas visibles; el blanco queda solo para detalles pequeños. */
+:root{
+  --pend-bg:#F1F5F9;
+  --pend-surface:#F8FAFC;
+  --pend-surface-blue:#EFF6FF;
+  --pend-surface-violet:#EEF2FF;
+  --p37-bg:#F1F5F9;
+  --p37-surface:#F8FAFC;
+  --p37-soft:#EEF2FF;
+  --v34-bg:#F1F5F9;
+  --v34-bg-top:#F1F5F9;
+  --v34-surface:#F8FAFC;
+  --v36-surface-strong:#F8FAFC;
+}
+
+html,body,html.pendientes-v37,html.pendientes-v37 body{
+  background:#F1F5F9 !important;
+}
+
+/* Captura: Cámara y Foto ya no son botones blancos. */
+.pendientes-v37 .v37-capture-btn:not(.v37-primary){
+  background:#E7EEF8 !important;
+  border-color:#CBD8E8 !important;
+  color:#1E3A5F !important;
+  box-shadow:0 2px 8px rgba(30,64,175,.055) !important;
+}
+.pendientes-v37 .v37-capture-btn:not(.v37-primary):nth-child(2){
+  background:#E4E9F8 !important;
+  border-color:#CDD4EE !important;
+  color:#3730A3 !important;
+}
+.pendientes-v37 .v37-capture-btn:not(.v37-primary):active{
+  background:#DCE8F8 !important;
+}
+.pendientes-v37 .v37-menu-btn{
+  background:#E8EEF7 !important;
+  border-color:#CBD5E1 !important;
+}
+
+/* Tablas compactas: contenedor azul, cabecera violeta y filas alternadas. */
+.pendientes-v37 .imaging-table-wrap,
+.pendientes-v37 .floor-table-wrap,
+.pendientes-v37 .table-wrap{
+  background:#EFF6FF !important;
+  border-color:#D7E3F4 !important;
+}
+.pendientes-v37 .imaging-table,
+.pendientes-v37 .floor-group-table,
+.pendientes-v37 .patient-table{
+  background:#EFF6FF !important;
+}
+.pendientes-v37 .imaging-table thead th,
+.pendientes-v37 .floor-group-table thead th,
+.pendientes-v37 .patient-table thead th,
+.pendientes-v37 .v37-history-table thead th{
+  background:#EEF2FF !important;
+  border-color:#DDE3F5 !important;
+  color:#64748B !important;
+}
+.pendientes-v37 .imaging-table tbody tr:nth-child(odd) td,
+.pendientes-v37 .floor-group-table tbody tr:nth-child(odd) td,
+.pendientes-v37 .patient-table tbody tr:nth-child(odd) td{
+  background:#F8FAFC !important;
+}
+.pendientes-v37 .imaging-table tbody tr:nth-child(even) td,
+.pendientes-v37 .floor-group-table tbody tr:nth-child(even) td,
+.pendientes-v37 .patient-table tbody tr:nth-child(even) td{
+  background:#EFF6FF !important;
+}
+.pendientes-v37 .imaging-table tbody tr td,
+.pendientes-v37 .floor-group-table tbody tr td,
+.pendientes-v37 .patient-table tbody tr td{
+  border-color:#DDE8F5 !important;
+}
+.pendientes-v37 .imaging-table tbody tr:active td,
+.pendientes-v37 .floor-group-table tbody tr:active td,
+.pendientes-v37 .patient-table tbody tr:active td{
+  background:#DBEAFE !important;
+}
+.pendientes-v37 .empty-row td,
+.pendientes-v37 .empty-state{
+  background:#EFF6FF !important;
+}
+.pendientes-v37 .empty-icon{background:#DEE7FF !important;}
+
+/* Menú lateral con superficie violeta visible. */
+.pendientes-v37 .v37-drawer{
+  background:#EEF2FF !important;
+  border-color:#D8DEF3 !important;
+}
+.pendientes-v37 .v37-drawer-head{
+  border-bottom:1px solid rgba(99,102,241,.12);
+  margin-bottom:8px;
+}
+.pendientes-v37 .v37-nav-item{color:#475569 !important;}
+.pendientes-v37 .v37-nav-item.is-active{
+  background:#DCE5FF !important;
+  color:#3730A3 !important;
+}
+.pendientes-v37 .v37-nav-item:not(.is-active):active,
+.pendientes-v37 .v37-nav-item:not(.is-active):hover{
+  background:#E0E7FF !important;
+}
+
+/* Historial: las superficies alternan igual que la tabla principal. */
+.pendientes-v37 .v37-history-list,
+.pendientes-v37 .v37-history-table-wrap,
+.pendientes-v37 .v37-empty-secondary{
+  background:#EFF6FF !important;
+  border-color:#D7E3F4 !important;
+}
+.pendientes-v37 .v37-history-item:nth-child(odd),
+.pendientes-v37 .v37-history-table tbody tr:nth-child(odd) td{
+  background:#F8FAFC !important;
+}
+.pendientes-v37 .v37-history-item:nth-child(even),
+.pendientes-v37 .v37-history-table tbody tr:nth-child(even) td{
+  background:#EFF6FF !important;
+}
+.pendientes-v37 .v37-history-item:active,
+.pendientes-v37 .v37-history-table tbody tr:active td{
+  background:#DBEAFE !important;
+}
+.pendientes-v37 .v37-stat:nth-child(odd),
+.pendientes-v37 .v37-settings-card:nth-child(odd){background:#F8FAFC !important;}
+.pendientes-v37 .v37-stat:nth-child(even),
+.pendientes-v37 .v37-settings-card:nth-child(even){background:#EFF6FF !important;}
+
+/* Formularios y hojas inferiores: azul claro en toda la superficie. */
+.pendientes-v37 .capture-sheet,
+.pendientes-v37 .compact-detail-sheet,
+.manual-quick-sheet{
+  background:#EFF6FF !important;
+  border-color:#D7E3F4 !important;
+}
+.pendientes-v37 .sheet-head,
+.pendientes-v37 .compact-detail-head,
+.manual-quick-head{
+  background:#EFF6FF !important;
+}
+.pendientes-v37 .form-grid,
+.pendientes-v37 .compact-detail-list,
+.manual-quick-categories{
+  background:#EFF6FF !important;
+}
+.pendientes-v37 input,
+.pendientes-v37 select,
+.pendientes-v37 textarea,
+.manual-quick-bed input{
+  background:#F8FAFC !important;
+  border-color:#C9D7E8 !important;
+}
+.manual-category-btn{
+  background:#E8F0FB !important;
+  border-color:#CBD8E8 !important;
+}
+.manual-category-btn:nth-child(even){background:#E8EAF8 !important;}
+.manual-category-btn.is-selected{
+  background:#DDE4FF !important;
+  border-color:#818CF8 !important;
+  color:#3730A3 !important;
+}
+
+/* Detalle: lienzo gris azulado y secciones violetas. */
+.v39-detail-sheet{
+  background:#F8FAFC !important;
+  border-color:#D7E3F4 !important;
+}
+.v39-detail-head,
+.v39-detail-scroll,
+.v39-detail-actions{
+  background:#F8FAFC !important;
+}
+.v39-detail-card,
+.pendientes-v37 .detail-section,
+.pendientes-v37 .detail-card,
+.pendientes-v37 .compact-detail-photo,
+.pendientes-v37 .ticket-photo-wrap{
+  background:#EEF2FF !important;
+  border-color:#D8DEF3 !important;
+}
+.v39-detail-row:nth-child(even){background:rgba(239,246,255,.72) !important;}
+.v39-photo-card{background:#EEF2FF !important;}
+.v39-photo-thumb img{background:#F8FAFC !important;}
+
+@media(max-width:430px){
+  .pendientes-v37 .imaging-table tbody tr:nth-child(odd) td,
+  .pendientes-v37 .imaging-table tbody tr:nth-child(even) td{
+    /* Conserva la alternancia por paciente sin cambiar la altura de las filas. */
+    min-height:0 !important;
+  }
+}
