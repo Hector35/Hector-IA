@@ -61,13 +61,15 @@ test('integra pestañas con el runtime consolidado, cola progresiva y gesto úni
   expect(index).toMatch(/photo-fingerprint-history-v70\.js\?v=70/);
   expect(index).toMatch(/photo-dedupe-v68\.js\?v=70/);
   expect(index).toMatch(/stability\.js\?v=20260818\.1/);
-  expect(sw).toMatch(/pendientes-shell-20260818-6/);
+  expect(index).toMatch(/manual-category-v72\.js\?v=72/);
+  expect(sw).toMatch(/pendientes-shell-20260818-7/);
   expect(sw).toMatch(/category-tabs-v49\.css\?v=1/);
   expect(sw).toMatch(/stability-guard-v66\.js\?v=66/);
   expect(sw).toMatch(/review-confidence-v67\.js\?v=70/);
   expect(sw).toMatch(/photo-fingerprint-history-v70\.js\?v=70/);
   expect(sw).toMatch(/photo-dedupe-v68\.js\?v=70/);
   expect(sw).toMatch(/stability\.js\?v=20260818\.1/);
+  expect(sw).toMatch(/manual-category-v72\.js\?v=72/);
   expect(source).toMatch(/unseenCategoryTabs/);expect(source).toMatch(/renderPhotoQueue\(\)/);
   expect(css).toMatch(/min-height:44px/);
   expect(stability).toContain("document.addEventListener('pointerdown'");
