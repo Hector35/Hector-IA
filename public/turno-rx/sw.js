@@ -14,6 +14,7 @@ const SHELL = [
   '/turno-rx/elegant-v30.css?v=2',
   '/turno-rx/full-redesign-v33.css?v=1',
   '/turno-rx/light-theme-v34.css?v=1',
+  '/turno-rx/light-polish-v35.css?v=1',
   '/turno-rx/app-v16.js?v=2',
   '/turno-rx/compact-v17.js?v=2',
   '/turno-rx/transport-v20.js?v=3',
