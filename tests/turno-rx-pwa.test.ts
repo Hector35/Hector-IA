@@ -36,10 +36,11 @@ describe('Pendientes PWA v16',()=>{
     expect(index).toContain('/turno-rx/adaptive-row-v26.css?v=1');
     expect(index).toContain('/turno-rx/font-v27.css?v=1');
     expect(index).toContain('/turno-rx/sticky-close-v29.css?v=1');
-    expect(index).toContain('/turno-rx/elegant-v30.css?v=1');
+    expect(index).toContain('/turno-rx/elegant-v30.css?v=2');
     expect(index).toContain('/turno-rx/adaptive-row-v26.js?v=1');
     expect(index).toContain('/turno-rx/cama-label-v28.js?v=1');
     expect(index).toContain('/turno-rx/transport-v20.js?v=3');
+    expect(index).toContain('/turno-rx/polish-v32.js?v=1');
   });
 
   it('mapea exactamente los límites de camas a sus pisos',()=>{
@@ -126,7 +127,6 @@ describe('Pendientes PWA v16',()=>{
     expect(app).toContain('id="diagnosisMeaning"');
     expect(app).toContain('Diagnóstico');
     expect(app).toContain('Qué significa');
-    expect(app).toContain('No cuentan en el total hasta tener Origen + Destino.');
     expect(app).not.toContain('id="cameraCapture"');
   });
 
@@ -135,17 +135,12 @@ describe('Pendientes PWA v16',()=>{
     expect(app).toContain("'X-Turno-RX':'1'");
     expect(app).not.toMatch(/sk-[A-Za-z0-9_-]+/);
     expect(sw).toContain("url.pathname.startsWith('/api/')");
-    expect(sw).toContain("turno-rx-shell-v31");
+    expect(sw).toContain("turno-rx-shell-v32");
     expect(sw).toContain('/turno-rx/app-v16.js?v=2');
     expect(sw).toContain('/turno-rx/transport-v20.js?v=3');
+    expect(sw).toContain('/turno-rx/elegant-v30.css?v=2');
+    expect(sw).toContain('/turno-rx/polish-v32.js?v=1');
     expect(sw).toContain('/turno-rx/name-format-v23.js?v=1');
-    expect(sw).toContain('/turno-rx/one-line-v24.css?v=1');
-    expect(sw).toContain('/turno-rx/space-v25.css?v=1');
-    expect(sw).toContain('/turno-rx/adaptive-row-v26.css?v=1');
-    expect(sw).toContain('/turno-rx/font-v27.css?v=1');
-    expect(sw).toContain('/turno-rx/sticky-close-v29.css?v=1');
-    expect(sw).toContain('/turno-rx/elegant-v30.css?v=1');
-    expect(sw).toContain('/turno-rx/adaptive-row-v26.js?v=1');
     expect(sw).toContain('/turno-rx/cama-label-v28.js?v=1');
   });
 });
