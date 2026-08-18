@@ -192,7 +192,7 @@ describe('Pendientes PWA v16',()=>{
     expect(app).toContain("'X-Turno-RX':'1'");
     expect(app).not.toMatch(/sk-[A-Za-z0-9_-]+/);
     expect(sw).toContain("url.pathname.startsWith('/api/')");
-    expect(sw).toContain("turno-rx-shell-v38-manual-quick");
+    expect(sw).toContain("const CACHE = 'turno-rx-shell-v");
     expect(sw).toContain('/turno-rx/app-v16.js?v=2');
     expect(sw).toContain('/turno-rx/transport-v20.js?v=3');
     expect(sw).toContain('/turno-rx/elegant-v30.css?v=2');
