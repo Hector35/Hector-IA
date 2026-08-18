@@ -1,0 +1,56 @@
+/* Pendientes v35 — correcciones finas sobre el tema claro v34. */
+
+/* Tórax nunca debe heredar el blanco del tema oscuro anterior. */
+.imaging-table .imaging-row .study-cell .study-torax-v32,
+.imaging-table .imaging-row td:nth-child(4) .study-torax-v32{
+  color:#17384f !important;
+  font-weight:950 !important;
+}
+
+/* Más aire entre traslado y estudio, sin perder espacio del paciente. */
+.imaging-table col:nth-child(1){width:10% !important;}
+.imaging-table col:nth-child(2){width:39% !important;}
+.imaging-table col:nth-child(3){width:22% !important;}
+.imaging-table col:nth-child(4){width:29% !important;}
+
+.imaging-table .transport-cell{
+  padding-left:4px !important;
+  padding-right:5px !important;
+}
+.imaging-table .transport-main{
+  padding:6px 8px !important;
+  gap:5px !important;
+}
+.imaging-table .transport-main span{
+  font-size:14px !important;
+}
+.imaging-table .transport-main b{
+  font-size:12px !important;
+}
+.imaging-table .transport-main.camilla b{
+  font-size:11.6px !important;
+}
+.imaging-table .study-cell{
+  padding-left:10px !important;
+  padding-right:10px !important;
+  color:#263946 !important;
+}
+
+/* Un poco más de contraste en tarjetas sin volverlas pesadas. */
+.imaging-table .imaging-row td:nth-child(-n+4){
+  background:#ffffff !important;
+  border-top-color:rgba(88,114,131,.12) !important;
+  border-bottom-color:rgba(88,114,131,.10) !important;
+}
+.imaging-table .imaging-row{
+  filter:drop-shadow(0 7px 16px rgba(49,76,95,.065)) !important;
+}
+
+@media(max-width:430px){
+  .imaging-table col:nth-child(1){width:10% !important;}
+  .imaging-table col:nth-child(2){width:39% !important;}
+  .imaging-table col:nth-child(3){width:22% !important;}
+  .imaging-table col:nth-child(4){width:29% !important;}
+  .imaging-table .study-cell{font-size:14px !important;line-height:1.16 !important;}
+  .imaging-table .transport-main{padding:6px 7px !important;}
+}
