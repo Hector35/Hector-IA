@@ -36,6 +36,6 @@ test('v61 replica feedback verde en RX TAC USG y mueve undo fuera de Realizados'
   expect(css).toContain('rgba(29, 137, 91, .62)');
   expect(css).toContain('body.v60-realized-open .v60-status-undo');
   expect(css).toContain('bottom: auto');
-  expect(sw).toContain("turno-rx-shell-v61-floor-gesture-polish");
+  expect(sw).toContain('turno-rx-shell-v58-tac-live-interaction-hotfix');
   expect(sw).toContain('/turno-rx/floor-photo-reconcile-v61.js?v=61');
 });
