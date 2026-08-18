@@ -1,36 +1,40 @@
-/* Pendientes v30 — negro real, mejor simetría y uso del ancho. */
+/* Pendientes v30.2 — negro real, simetría y jerarquía visual más limpia. */
 :root{
   --rx-black:#000;
-  --rx-panel:#05080b;
-  --rx-line:rgba(255,255,255,.09);
-  --rx-line-soft:rgba(255,255,255,.055);
+  --rx-line:rgba(255,255,255,.10);
+  --rx-line-soft:rgba(255,255,255,.045);
   --rx-text:#f7f9fb;
-  --rx-muted:#8f9ca6;
-  --rx-accent:#78d7fb;
+  --rx-muted:#939faa;
+  --rx-accent:#72d8ff;
 }
 
 html,body{
   background:#000 !important;
+  color:var(--rx-text) !important;
 }
-body{
-  background-image:none !important;
-}
+body{background-image:none !important;}
+
 .app-shell{
   max-width:920px !important;
+  margin:0 auto !important;
+  padding-left:14px !important;
+  padding-right:14px !important;
   background:#000 !important;
-  padding-left:12px !important;
-  padding-right:12px !important;
 }
+
 .topbar{
-  margin-bottom:14px !important;
-  padding-bottom:16px !important;
-  border-bottom:1px solid rgba(255,255,255,.055) !important;
+  margin-bottom:18px !important;
+  padding-bottom:18px !important;
+  border-bottom:1px solid rgba(255,255,255,.065) !important;
 }
+
 .modality-title{
-  margin:0 4px 10px !important;
-  color:#f4f7f9 !important;
-  font-size:17px !important;
-  letter-spacing:-.015em !important;
+  margin:0 4px 14px !important;
+  color:#fff !important;
+  font-size:18px !important;
+  line-height:1.1 !important;
+  font-weight:900 !important;
+  letter-spacing:-.025em !important;
 }
 
 .imaging-table-wrap{
@@ -45,118 +49,152 @@ body{
   background:#000 !important;
 }
 
-/* El ancho se reparte con Origen/Cama mínimo y Traslado suficiente para Camilla. */
-.imaging-table col:nth-child(1){width:8% !important;}
-.imaging-table col:nth-child(2){width:40% !important;}
-.imaging-table col:nth-child(3){width:24% !important;}
-.imaging-table col:nth-child(4){width:28% !important;}
+/* Más espacio real para Paciente y Estudio; Cama y Traslado quedan compactos. */
+.imaging-table col:nth-child(1){width:9% !important;}
+.imaging-table col:nth-child(2){width:42% !important;}
+.imaging-table col:nth-child(3){width:22% !important;}
+.imaging-table col:nth-child(4){width:27% !important;}
 
 .imaging-table thead th:nth-child(-n+4){
-  padding:0 7px 9px !important;
-  color:#8e9da8 !important;
-  font-size:9.5px !important;
+  padding:0 8px 11px !important;
+  color:#8f9da8 !important;
+  font-size:9.7px !important;
   line-height:1 !important;
   font-weight:900 !important;
-  letter-spacing:.11em !important;
+  letter-spacing:.115em !important;
   text-transform:uppercase !important;
   white-space:nowrap !important;
+  overflow:visible !important;
+  word-break:normal !important;
 }
-.imaging-table thead th:nth-child(1){padding-left:3px !important;}
+.imaging-table thead th:nth-child(1){padding-left:4px !important;}
 .imaging-table thead th:nth-child(3){text-align:center !important;}
+.imaging-table thead th:nth-child(4){padding-left:11px !important;}
 
 .imaging-table .imaging-row{
   background:#000 !important;
+  cursor:pointer;
+  transform:translateZ(0);
+  transition:background-color .14s ease,transform .12s ease,opacity .12s ease;
 }
 .imaging-table .imaging-row td:nth-child(-n+4){
-  padding:13px 7px !important;
+  padding:15px 8px !important;
   vertical-align:middle !important;
-  background:#000 !important;
+  background:transparent !important;
   border-bottom:1px solid var(--rx-line) !important;
 }
-.imaging-table .imaging-row td:nth-child(1){
-  padding-left:3px !important;
-  color:var(--rx-accent) !important;
-  font-size:18px !important;
-  font-weight:950 !important;
-  letter-spacing:-.025em !important;
+.imaging-table .imaging-row:first-child td:nth-child(-n+4){
+  border-top:1px solid var(--rx-line-soft) !important;
+}
+.imaging-table .imaging-row.is-pressed-v32{
+  background:rgba(255,255,255,.035) !important;
+  transform:scale(.993);
+  opacity:.94;
 }
 
-.imaging-table .name-cell{
-  padding-right:10px !important;
+/* Cama */
+.imaging-table .imaging-row td:nth-child(1){
+  padding-left:4px !important;
+  padding-right:3px !important;
+  color:var(--rx-accent) !important;
+  font-size:19px !important;
+  line-height:1 !important;
+  font-weight:950 !important;
+  letter-spacing:-.03em !important;
+  white-space:nowrap !important;
 }
+
+/* Paciente */
+.imaging-table .name-cell{padding-right:12px !important;}
 .imaging-table .patient-name{
-  color:var(--rx-text) !important;
-  font-size:15px !important;
-  line-height:1.08 !important;
+  color:#fff !important;
+  font-size:15.5px !important;
+  line-height:1.07 !important;
   font-weight:900 !important;
-  letter-spacing:-.015em !important;
+  letter-spacing:-.018em !important;
+  white-space:normal !important;
+  overflow:visible !important;
+  text-overflow:clip !important;
+  word-break:normal !important;
 }
 .imaging-table .age-line{
   display:block !important;
-  margin-top:4px !important;
+  margin-top:5px !important;
   color:var(--rx-muted) !important;
-  font-size:10.8px !important;
+  font-size:11px !important;
   line-height:1.1 !important;
   font-weight:700 !important;
   white-space:nowrap !important;
 }
 
+/* Traslado: botón compacto, centrado y sin reservar ancho de más. */
 .imaging-table .transport-cell{
-  padding-left:6px !important;
-  padding-right:6px !important;
+  padding-left:4px !important;
+  padding-right:4px !important;
   text-align:center !important;
   overflow:visible !important;
 }
 .imaging-table .transport-main{
   display:inline-flex !important;
-  width:100% !important;
+  width:auto !important;
   max-width:100% !important;
   min-width:0 !important;
-  min-height:38px !important;
-  padding:5px 6px !important;
+  min-height:36px !important;
+  padding:5px 8px !important;
   align-items:center !important;
   justify-content:center !important;
-  gap:4px !important;
-  border-radius:13px !important;
+  gap:5px !important;
+  border-radius:12px !important;
   overflow:visible !important;
   white-space:nowrap !important;
+  box-sizing:border-box !important;
 }
 .imaging-table .transport-main span{
   flex:0 0 auto !important;
-  font-size:15px !important;
+  font-size:14px !important;
 }
 .imaging-table .transport-main b{
   min-width:0 !important;
   overflow:visible !important;
   text-overflow:clip !important;
   white-space:nowrap !important;
-  font-size:12.4px !important;
+  font-size:11.8px !important;
   line-height:1 !important;
   font-weight:900 !important;
 }
 .imaging-table .transport-main.silla{
-  background:rgba(52,170,228,.12) !important;
-  border-color:rgba(84,196,244,.25) !important;
-  color:#bfeeff !important;
+  background:rgba(51,171,228,.11) !important;
+  border-color:rgba(82,197,244,.23) !important;
+  color:#c4efff !important;
 }
 .imaging-table .transport-main.camilla{
-  background:rgba(231,166,62,.105) !important;
-  border-color:rgba(244,181,78,.24) !important;
-  color:#ffd79a !important;
+  background:rgba(231,166,62,.10) !important;
+  border-color:rgba(244,181,78,.22) !important;
+  color:#ffd89b !important;
 }
 
+/* Estudio */
 .imaging-table .study-cell{
-  padding-left:10px !important;
+  padding-left:11px !important;
   padding-right:3px !important;
-  color:#f1f4f6 !important;
+  color:#e8edf1 !important;
   font-size:13.8px !important;
-  line-height:1.12 !important;
-  font-weight:820 !important;
+  line-height:1.14 !important;
+  font-weight:760 !important;
   letter-spacing:-.008em !important;
+  white-space:normal !important;
+  overflow:visible !important;
+  text-overflow:clip !important;
+  overflow-wrap:normal !important;
+  word-break:normal !important;
+}
+.imaging-table .study-cell .study-torax-v32{
+  color:#fff !important;
+  font-weight:950 !important;
+  letter-spacing:-.015em !important;
 }
 
-/* Cuando hace falta espacio, conserva el esquema solicitado: nombres arriba,
-   apellidos abajo, y estudio en hasta dos líneas. */
+/* Dos líneas limpias cuando hace falta: nombres arriba, apellidos abajo. */
 .imaging-table .imaging-row.adaptive-two-line-v26 .name-cell,
 .imaging-table .imaging-row.adaptive-two-line-v26 .study-cell{
   white-space:normal !important;
@@ -165,49 +203,53 @@ body{
 }
 .imaging-table .imaging-row.adaptive-two-line-v26 .patient-name::before{
   color:#fff !important;
-  font-size:14.6px !important;
-  line-height:1.06 !important;
+  font-size:15.1px !important;
+  line-height:1.05 !important;
   font-weight:900 !important;
 }
 .imaging-table .imaging-row.adaptive-two-line-v26 .patient-name::after{
   margin-top:2px !important;
-  color:#bfc9cf !important;
-  font-size:13.2px !important;
-  line-height:1.06 !important;
+  color:#bbc4cb !important;
+  font-size:13.3px !important;
+  line-height:1.05 !important;
   font-weight:800 !important;
 }
 .imaging-table .imaging-row.adaptive-two-line-v26 .study-cell{
-  font-size:13.4px !important;
-  line-height:1.12 !important;
+  font-size:13.5px !important;
+  line-height:1.13 !important;
 }
 
-/* Ficha y edición: negro uniforme y sin perder la X sticky de v29. */
+/* Ficha y edición: negro uniforme; la X sticky sigue viniendo de v29. */
 .capture-sheet,
 .compact-detail-sheet{
-  background:#05080b !important;
-  border-color:rgba(255,255,255,.09) !important;
-  box-shadow:0 26px 72px rgba(0,0,0,.72) !important;
+  background:#050607 !important;
+  border-color:rgba(255,255,255,.085) !important;
+  box-shadow:0 28px 80px rgba(0,0,0,.78) !important;
 }
 .sheet-head,
 .compact-detail-head{
-  background:linear-gradient(180deg,#05080b 0%,#05080b 82%,rgba(5,8,11,.94) 100%) !important;
+  background:linear-gradient(180deg,#050607 0%,#050607 84%,rgba(5,6,7,.94) 100%) !important;
 }
-.compact-detail-item{
-  border-bottom-color:rgba(255,255,255,.07) !important;
-}
+.compact-detail-item{border-bottom-color:rgba(255,255,255,.065) !important;}
 
 @media(max-width:430px){
-  .app-shell{padding-left:10px !important;padding-right:10px !important;}
-  .imaging-table col:nth-child(1){width:8% !important;}
-  .imaging-table col:nth-child(2){width:40% !important;}
-  .imaging-table col:nth-child(3){width:24% !important;}
-  .imaging-table col:nth-child(4){width:28% !important;}
-  .imaging-table thead th:nth-child(-n+4){font-size:9px !important;padding-left:5px !important;padding-right:5px !important;}
-  .imaging-table .imaging-row td:nth-child(-n+4){padding-top:12px !important;padding-bottom:12px !important;}
-  .imaging-table .patient-name{font-size:14.4px !important;}
-  .imaging-table .age-line{font-size:10.4px !important;}
-  .imaging-table .transport-main{min-height:36px !important;padding-left:5px !important;padding-right:5px !important;}
-  .imaging-table .transport-main span{font-size:14px !important;}
-  .imaging-table .transport-main b{font-size:11.8px !important;}
-  .imaging-table .study-cell{font-size:13.2px !important;}
+  .app-shell{padding-left:12px !important;padding-right:12px !important;}
+  .imaging-table col:nth-child(1){width:9% !important;}
+  .imaging-table col:nth-child(2){width:42% !important;}
+  .imaging-table col:nth-child(3){width:22% !important;}
+  .imaging-table col:nth-child(4){width:27% !important;}
+  .imaging-table thead th:nth-child(-n+4){font-size:9.2px !important;padding-left:5px !important;padding-right:5px !important;}
+  .imaging-table thead th:nth-child(4){padding-left:8px !important;}
+  .imaging-table .imaging-row td:nth-child(-n+4){padding-top:14px !important;padding-bottom:14px !important;}
+  .imaging-table .patient-name{font-size:15px !important;}
+  .imaging-table .age-line{font-size:10.7px !important;}
+  .imaging-table .transport-main{min-height:35px !important;padding-left:6px !important;padding-right:6px !important;gap:4px !important;}
+  .imaging-table .transport-main span{font-size:13px !important;}
+  .imaging-table .transport-main b{font-size:11.2px !important;}
+  .imaging-table .study-cell{font-size:13.4px !important;}
+}
+
+@media(prefers-reduced-motion:reduce){
+  .imaging-table .imaging-row{transition:none !important;}
+  .imaging-table .imaging-row.is-pressed-v32{transform:none !important;}
 }
