@@ -10,14 +10,16 @@ test('v68 detecta fingerprint idéntico sin confundir fotografías distintas',as
   expect(mod.hasDuplicateFingerprint([], 'abc')).toBe(false);
 });
 
-test('v68 se carga antes del controlador consolidado y evita otra llamada de visión',()=>{
+test('v69 se carga antes del controlador consolidado y evita otra llamada de visión sin producir error vacío',()=>{
   const source=readFileSync('public/turno-rx/photo-dedupe-v68.js','utf8');
   const index=readFileSync('public/turno-rx/index.html','utf8');
   const sw=readFileSync('public/turno-rx/sw.js','utf8');
   expect(source).toContain("url.includes('/api/turno-rx/vision')");
   expect(source).toContain("X-Pendientes-Duplicate");
   expect(source).toContain('Foto duplicada · sin cambios');
-  expect(index.indexOf('photo-dedupe-v68.js?v=68')).toBeGreaterThan(-1);
-  expect(index.indexOf('photo-dedupe-v68.js?v=68')).toBeLessThan(index.indexOf('stability.js?v=20260818.1'));
-  expect(sw).toContain('/turno-rx/photo-dedupe-v68.js?v=68');
+  expect(source).toContain('duplicatePatientsForFingerprint');
+  expect(source).toContain('JSON.stringify({patients,duplicatePhoto:true})');
+  expect(index.indexOf('photo-dedupe-v68.js?v=69')).toBeGreaterThan(-1);
+  expect(index.indexOf('photo-dedupe-v68.js?v=69')).toBeLessThan(index.indexOf('stability.js?v=20260818.1'));
+  expect(sw).toContain('/turno-rx/photo-dedupe-v68.js?v=69');
 });
