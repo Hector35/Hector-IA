@@ -20,6 +20,8 @@ const read=(path:string)=>readFileSync(path,'utf8');
 const app=read('public/turno-rx/app-v16.js');
 const index=read('public/turno-rx/index.html');
 const sw=read('public/turno-rx/sw.js');
+const redesignCss=read('public/turno-rx/full-redesign-v33.css');
+const redesignJs=read('public/turno-rx/full-redesign-v33.js');
 const manifest=JSON.parse(read('public/turno-rx/manifest.webmanifest'));
 
 describe('Pendientes PWA v16',()=>{
@@ -41,6 +43,21 @@ describe('Pendientes PWA v16',()=>{
     expect(index).toContain('/turno-rx/cama-label-v28.js?v=1');
     expect(index).toContain('/turno-rx/transport-v20.js?v=3');
     expect(index).toContain('/turno-rx/polish-v32.js?v=1');
+    expect(index).toContain('/turno-rx/full-redesign-v33.css?v=1');
+    expect(index).toContain('/turno-rx/full-redesign-v33.js?v=1');
+  });
+
+  it('rediseña el shell completo, no solo la tabla',()=>{
+    expect(redesignCss).toContain('.topbar{');
+    expect(redesignCss).toContain('.capture-actions{');
+    expect(redesignCss).toContain('.modality-title{');
+    expect(redesignCss).toContain('.imaging-table .imaging-row td:nth-child(-n+4)');
+    expect(redesignCss).toContain('.floor-table-wrap{');
+    expect(redesignCss).toContain('.capture-sheet,');
+    expect(redesignCss).toContain('.compact-detail-sheet{');
+    expect(redesignCss).toContain('.empty-row td{');
+    expect(redesignJs).toContain("modality-count-v33");
+    expect(redesignJs).toContain("replaceChildren(name, badge)");
   });
 
   it('mapea exactamente los límites de camas a sus pisos',()=>{
@@ -135,11 +152,13 @@ describe('Pendientes PWA v16',()=>{
     expect(app).toContain("'X-Turno-RX':'1'");
     expect(app).not.toMatch(/sk-[A-Za-z0-9_-]+/);
     expect(sw).toContain("url.pathname.startsWith('/api/')");
-    expect(sw).toContain("turno-rx-shell-v32");
+    expect(sw).toContain("turno-rx-shell-v33");
     expect(sw).toContain('/turno-rx/app-v16.js?v=2');
     expect(sw).toContain('/turno-rx/transport-v20.js?v=3');
     expect(sw).toContain('/turno-rx/elegant-v30.css?v=2');
     expect(sw).toContain('/turno-rx/polish-v32.js?v=1');
+    expect(sw).toContain('/turno-rx/full-redesign-v33.css?v=1');
+    expect(sw).toContain('/turno-rx/full-redesign-v33.js?v=1');
     expect(sw).toContain('/turno-rx/name-format-v23.js?v=1');
     expect(sw).toContain('/turno-rx/cama-label-v28.js?v=1');
   });
