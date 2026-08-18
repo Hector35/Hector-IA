@@ -1,0 +1,122 @@
+.shift-btn {
+  min-height: 38px;
+  padding: 0 9px;
+  border: 1px solid rgba(126, 176, 204, .17);
+  border-radius: 12px;
+  background: rgba(255,255,255,.035);
+  color: #91a8b6;
+  font-size: 10.5px;
+  font-weight: 850;
+  white-space: nowrap;
+  cursor: pointer;
+}
+
+.shift-btn:active {
+  background: rgba(102, 208, 244, .08);
+  color: #b8ecfb;
+}
+
+.incomplete-section {
+  margin-top: 18px;
+  padding-top: 16px;
+  border-top: 1px solid rgba(255, 190, 98, .16);
+}
+
+.incomplete-title {
+  margin: 0 4px 4px;
+  color: #ffd6a0;
+  font-size: 14px;
+  font-weight: 850;
+}
+
+.incomplete-note {
+  margin: 0 4px 8px;
+  color: #9b8b76;
+  font-size: 10.5px;
+  font-weight: 700;
+}
+
+.incomplete-row .floor-origin strong {
+  color: #ffd6a0;
+  font-size: 12px;
+}
+
+.form-error {
+  margin-top: 12px;
+  padding: 10px 12px;
+  border: 1px solid rgba(255, 114, 114, .22);
+  border-radius: 12px;
+  background: rgba(255, 114, 114, .08);
+  color: #ffc1c1;
+  font-size: 12px;
+  font-weight: 800;
+  line-height: 1.35;
+}
+
+.undo-bar {
+  position: fixed;
+  z-index: 80;
+  left: max(12px, env(safe-area-inset-left));
+  right: max(12px, env(safe-area-inset-right));
+  bottom: max(14px, calc(env(safe-area-inset-bottom) + 8px));
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  max-width: 520px;
+  margin: 0 auto;
+  padding: 10px 12px 10px 14px;
+  border: 1px solid rgba(122, 182, 213, .19);
+  border-radius: 15px;
+  background: rgba(9, 19, 26, .97);
+  color: #dce8ee;
+  box-shadow: 0 12px 34px rgba(0,0,0,.38);
+  font-size: 12px;
+  font-weight: 800;
+}
+
+.undo-bar button {
+  min-height: 34px;
+  padding: 0 11px;
+  border: 0;
+  border-radius: 10px;
+  background: #6bd1f2;
+  color: #06141b;
+  font-size: 11px;
+  font-weight: 950;
+  cursor: pointer;
+}
+
+.floor-group-table .remove-btn {
+  min-width: 32px;
+  width: 32px;
+  min-height: 32px;
+  height: 32px;
+}
+
+@media (max-width: 430px) {
+  .shift-btn {
+    min-height: 34px;
+    padding: 0 7px;
+    font-size: 9.5px;
+  }
+
+  .floor-group-table .remove-btn {
+    min-width: 32px;
+    width: 32px;
+    min-height: 32px;
+    height: 32px;
+  }
+}
+
+@media (max-width: 370px) {
+  .shift-btn {
+    font-size: 0;
+    width: 36px;
+    padding: 0;
+  }
+
+  .shift-btn::first-letter {
+    font-size: 15px;
+  }
+}
