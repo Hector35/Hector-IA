@@ -1,5 +1,5 @@
 // Pendientes v71 — restaura normalización de destinos de Piso en runtime sin reactivar controladores legacy.
-// Verificación de regresión v70 alineada con el contrato actual; segunda pasada tras corregir el import del test de pestañas.
+// Verificación v71: contratos históricos alineados con el runtime activo; reejecutar CI y despliegue de producción.
 // LEGACY TEST REFERENCES ONLY — these strings are documentation, not cache entries:
 // const CACHE = 'turno-rx-shell-v58-tac-live-interaction-hotfix';
 // /turno-rx/app-v16.js?v=58
