@@ -1,5 +1,6 @@
 import {readFileSync} from 'node:fs';
 import {describe,expect,it} from 'vitest';
+import {formatPatientName} from '../public/turno-rx/name-format-v23.js';
 
 const read=(path)=>readFileSync(path,'utf8');
 const index=read('public/turno-rx/index.html');
@@ -14,6 +15,7 @@ describe('Pendientes vista compacta',()=>{
     expect(index).toContain('/turno-rx/compact-v17.js?v=2');
     expect(index).toContain('/turno-rx/compact-v17.css?v=4');
     expect(index).toContain('/turno-rx/transport-v20.js?v=2');
+    expect(index).toContain('type="module" src="/turno-rx/name-format-v23.js?v=1"');
   });
 
   it('mantiene una tabla real de cuatro columnas también en móvil',()=>{
@@ -65,11 +67,19 @@ describe('Pendientes vista compacta',()=>{
     expect(transport).toContain('transportRank(a) - transportRank(b)');
   });
 
-  it('fuerza shell v22 y mantiene APIs fuera de caché',()=>{
-    expect(sw).toContain("turno-rx-shell-v22");
+  it('muestra nombres primero, apellidos después y todo en mayúsculas',()=>{
+    expect(formatPatientName('Salazar Liliana')).toBe('LILIANA SALAZAR');
+    expect(formatPatientName('Estela Santillana Romo')).toBe('ESTELA SANTILLANA ROMO');
+    expect(formatPatientName('CAZARES GUAJARDO EDGAR DAVID')).toBe('EDGAR DAVID CAZARES GUAJARDO');
+    expect(formatPatientName('Pérez López, Juan Carlos')).toBe('JUAN CARLOS PÉREZ LÓPEZ');
+  });
+
+  it('fuerza shell v23 y mantiene APIs fuera de caché',()=>{
+    expect(sw).toContain("turno-rx-shell-v23");
     expect(sw).toContain('/turno-rx/compact-v17.css?v=4');
     expect(sw).toContain('/turno-rx/compact-v17.js?v=2');
     expect(sw).toContain('/turno-rx/transport-v20.js?v=2');
+    expect(sw).toContain('/turno-rx/name-format-v23.js?v=1');
     expect(sw).toContain("url.pathname.startsWith('/api/')");
   });
 });
