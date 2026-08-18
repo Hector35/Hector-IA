@@ -78,6 +78,11 @@
     return 3;
   }
 
+  function ageValue(row) {
+    const match = txt(row.querySelector('.age-line')).match(/(\d{1,3})\s*años/i);
+    return match ? Number(match[1]) : 999;
+  }
+
   function sexRank(row) {
     const meta = norm(txt(row.querySelector('.age-line')));
     if (meta.includes('mujer')) return 0;
@@ -85,13 +90,12 @@
     return 2;
   }
 
-  function ageValue(row) {
-    const match = txt(row.querySelector('.age-line')).match(/(\d{1,3})\s*años/i);
-    return match ? Number(match[1]) : 999;
+  function chestRank(row) {
+    return /\btorax\b/.test(norm(studyText(row))) ? 0 : 1;
   }
 
   function originValue(row) {
-    const value = txt(row.querySelector('[data-label="Origen"]'));
+    const value = txt(row.querySelector('[data-label="Origen"], [data-label="Cama"]'));
     const numeric = Number.parseInt(value, 10);
     return Number.isFinite(numeric) ? numeric : 9999;
   }
@@ -102,8 +106,9 @@
     const rows = [...tbody.querySelectorAll('.imaging-row')];
     const sorted = [...rows].sort((a, b) =>
       transportRank(a) - transportRank(b) ||
-      sexRank(a) - sexRank(b) ||
       ageValue(a) - ageValue(b) ||
+      sexRank(a) - sexRank(b) ||
+      chestRank(a) - chestRank(b) ||
       originValue(a) - originValue(b)
     );
     const changed = rows.some((row, index) => row !== sorted[index]);
