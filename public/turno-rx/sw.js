@@ -1,4 +1,4 @@
-const CACHE = 'turno-rx-shell-v61-floor-gesture-polish';
+const CACHE = 'turno-rx-shell-v58-tac-live-interaction-hotfix';
 const SHELL = [
   '/turno-rx/',
   '/turno-rx/index.html',
