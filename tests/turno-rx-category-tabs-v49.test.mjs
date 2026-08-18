@@ -58,11 +58,13 @@ test('integra pestañas con el runtime consolidado, cola progresiva y gesto úni
   expect(index).toMatch(/app-v16\.js\?v=65/);
   expect(index).toMatch(/stability-guard-v66\.js\?v=66/);
   expect(index).toMatch(/review-confidence-v67\.js\?v=67/);
+  expect(index).toMatch(/photo-dedupe-v68\.js\?v=68/);
   expect(index).toMatch(/stability\.js\?v=20260818\.1/);
-  expect(sw).toMatch(/pendientes-shell-20260818-3/);
+  expect(sw).toMatch(/pendientes-shell-20260818-4/);
   expect(sw).toMatch(/category-tabs-v49\.css\?v=1/);
   expect(sw).toMatch(/stability-guard-v66\.js\?v=66/);
   expect(sw).toMatch(/review-confidence-v67\.js\?v=67/);
+  expect(sw).toMatch(/photo-dedupe-v68\.js\?v=68/);
   expect(sw).toMatch(/stability\.js\?v=20260818\.1/);
   expect(source).toMatch(/unseenCategoryTabs/);expect(source).toMatch(/renderPhotoQueue\(\)/);
   expect(css).toMatch(/min-height:44px/);
