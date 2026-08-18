@@ -1,0 +1,54 @@
+/* Pendientes v73 — final iPhone/responsive stabilization layer. */
+html,body{max-width:100%;overflow-x:hidden;-webkit-text-size-adjust:100%;}
+body{overscroll-behavior-y:none;}
+button,[role="button"],select,input,textarea{font:inherit;}
+button,[role="button"]{-webkit-tap-highlight-color:transparent;touch-action:manipulation;}
+.patient-row,[data-realized-id]{touch-action:pan-y;will-change:transform;}
+.app-shell{width:min(100%,1180px);margin-inline:auto;box-sizing:border-box;}
+.topbar{gap:10px;min-width:0;}
+.topbar .brand{min-width:0;flex:1 1 auto;}
+.topbar .brand h1{min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;}
+.capture-actions{display:flex;align-items:center;justify-content:flex-end;gap:8px;flex:0 0 auto;min-width:0;}
+.capture-actions button{min-width:44px;min-height:44px;}
+.category-tabs{max-width:100%;overflow-x:auto;overflow-y:hidden;-webkit-overflow-scrolling:touch;scrollbar-width:none;}
+.category-tabs::-webkit-scrollbar{display:none;}
+.category-tabs [data-category-tab]{flex:1 0 max-content;min-height:42px;}
+.category-panel,.floor-table-wrap{max-width:100%;min-width:0;}
+.imaging-row td,.floor-group-table td{overflow-wrap:normal;word-break:normal;}
+.floor-destination-line{min-width:0;}
+.floor-destination-line>strong{white-space:nowrap;}
+.transport-cell,.study-cell,.bed-cell{min-width:0;}
+.stability-backdrop,.sheet-backdrop{padding-bottom:env(safe-area-inset-bottom);}
+.stability-sheet,.capture-sheet{max-height:calc(100dvh - env(safe-area-inset-top) - 8px);overflow:auto;-webkit-overflow-scrolling:touch;}
+@supports not (height:100dvh){.stability-sheet,.capture-sheet{max-height:calc(100vh - 8px);}}
+
+@media (max-width:640px){
+  .app-shell{padding-left:max(10px,env(safe-area-inset-left));padding-right:max(10px,env(safe-area-inset-right));}
+  .topbar{display:grid;grid-template-columns:minmax(0,1fr) auto;align-items:center;padding-top:max(8px,env(safe-area-inset-top));}
+  .topbar .brand h1{font-size:clamp(1.12rem,5vw,1.42rem);}
+  .capture-actions{gap:6px;}
+  .capture-actions .shift-btn{min-width:auto;padding-inline:10px;white-space:nowrap;}
+  .capture-icon-btn{width:44px;height:44px;padding:0;display:grid;place-items:center;}
+  .category-tabs{margin-inline:-2px;padding:2px;gap:4px;}
+  .category-tabs [data-category-tab]{padding-inline:10px;}
+  .capture-status,.stability-queue{margin-inline:0;}
+  .floor-group-table{table-layout:fixed;width:100%;}
+  .floor-group-table th:first-child,.floor-group-table td:first-child{width:34%;}
+  .floor-group-table th:last-child,.floor-group-table td:last-child{width:66%;}
+  .floor-destination-line{display:flex;align-items:center;gap:6px;flex-wrap:nowrap;}
+  .floor-destination-line>strong{flex:0 1 auto;min-width:0;}
+  .floor-transport{flex:0 0 auto;max-width:54%;}
+  .remove-btn{display:none!important;}
+  .stability-realized-pill{max-width:calc(100vw - 24px);}
+}
+
+@media (max-width:390px){
+  .topbar{gap:6px;}
+  .capture-actions{gap:4px;}
+  .capture-actions .shift-btn{font-size:.78rem;padding-inline:8px;}
+  .category-tabs [data-category-tab]{font-size:.82rem;padding-inline:8px;}
+}
+
+@media (prefers-reduced-motion:reduce){
+  .patient-row,[data-realized-id],.stability-sheet,.capture-sheet{scroll-behavior:auto;transition-duration:.01ms!important;animation-duration:.01ms!important;}
+}

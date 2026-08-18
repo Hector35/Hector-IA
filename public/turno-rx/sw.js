@@ -1,28 +1,5 @@
-// Pendientes v72 — corrige clasificación explícita de captura manual sin reactivar controladores legacy.
-// LEGACY TEST REFERENCES ONLY — these strings are documentation, not cache entries:
-// const CACHE = 'turno-rx-shell-v58-tac-live-interaction-hotfix';
-// /turno-rx/app-v16.js?v=58
-// /turno-rx/quick-transport-v37.js?v=2
-// /turno-rx/patient-detail-v39.js?v=4
-// /turno-rx/floor-workflow-v42.js?v=58
-// /turno-rx/tac-flow-v42.js?v=58
-// /turno-rx/compact-v17.js?v=2
-// /turno-rx/transport-v20.js?v=3
-// /turno-rx/name-format-v23.js?v=1
-// /turno-rx/adaptive-row-v26.js?v=1
-// /turno-rx/cama-label-v28.js?v=1
-// /turno-rx/polish-v32.js?v=1
-// /turno-rx/full-redesign-v33.js?v=1
-// /turno-rx/premium-v37.js?v=4
-// /turno-rx/manual-quick-v38.js?v=1
-// /turno-rx/row-actions-v60.css?v=60
-// /turno-rx/row-actions-v60.js?v=60
-// /turno-rx/row-actions-v61.css?v=61
-// /turno-rx/row-actions-v61.js?v=61
-// /turno-rx/interaction-hotfix-v58.css?v=58
-// /turno-rx/stability-v65.js?v=65
-// /turno-rx/stability-v65.css?v=65
-const CACHE = 'pendientes-shell-20260818-7';
+// Pendientes v73 — coherent shell cache; network-first for current assets/navigation.
+const CACHE = 'pendientes-shell-20260818-73';
 const SHELL = [
   '/turno-rx/',
   '/turno-rx/index.html',
@@ -35,7 +12,9 @@ const SHELL = [
   '/turno-rx/photo-dedupe-v68.js?v=70',
   '/turno-rx/stability.js?v=20260818.1',
   '/turno-rx/manual-category-v72.js?v=72',
+  '/turno-rx/e2e-v73.js?v=73',
   '/turno-rx/stability.css?v=20260818.1',
+  '/turno-rx/e2e-v73.css?v=73',
   '/turno-rx/styles.css?v=7',
   '/turno-rx/capture-enhancements.css?v=2',
   '/turno-rx/integrity-v16.css?v=2',
@@ -66,15 +45,27 @@ const SHELL = [
 ];
 
 self.addEventListener('install', event => {
-  event.waitUntil(caches.open(CACHE).then(cache => cache.addAll(SHELL)).then(() => self.skipWaiting()));
+  event.waitUntil(
+    caches.open(CACHE)
+      .then(cache => cache.addAll(SHELL))
+      .then(() => self.skipWaiting())
+  );
 });
 
 self.addEventListener('activate', event => {
   event.waitUntil(
     caches.keys()
-      .then(keys => Promise.all(keys.filter(key => (key.startsWith('turno-rx-') || key.startsWith('pendientes-shell-')) && key !== CACHE).map(key => caches.delete(key))))
+      .then(keys => Promise.all(
+        keys
+          .filter(key => (key.startsWith('turno-rx-') || key.startsWith('pendientes-shell-')) && key !== CACHE)
+          .map(key => caches.delete(key))
+      ))
       .then(() => self.clients.claim())
   );
+});
+
+self.addEventListener('message', event => {
+  if (event.data?.type === 'SKIP_WAITING') self.skipWaiting();
 });
 
 self.addEventListener('fetch', event => {
@@ -82,20 +73,21 @@ self.addEventListener('fetch', event => {
   const url = new URL(event.request.url);
   if (url.origin !== self.location.origin || url.pathname.startsWith('/api/') || !url.pathname.startsWith('/turno-rx/')) return;
 
-  event.respondWith(
-    fetch(event.request, {cache:'no-store'})
-      .then(response => {
-        if (response.ok) {
-          const copy = response.clone();
-          caches.open(CACHE).then(cache => cache.put(event.request, copy));
-        }
-        return response;
-      })
-      .catch(async () => {
-        const cached = await caches.match(event.request);
-        if (cached) return cached;
-        if (event.request.mode === 'navigate') return caches.match('/turno-rx/index.html');
-        return Response.error();
-      })
-  );
+  event.respondWith((async () => {
+    try {
+      const response = await fetch(event.request, { cache: 'no-store' });
+      if (response.ok) {
+        const copy = response.clone();
+        event.waitUntil(caches.open(CACHE).then(cache => cache.put(event.request, copy)));
+      }
+      return response;
+    } catch {
+      const cached = await caches.match(event.request, { ignoreSearch: false });
+      if (cached) return cached;
+      if (event.request.mode === 'navigate') {
+        return (await caches.match('/turno-rx/index.html')) || (await caches.match('/turno-rx/')) || Response.error();
+      }
+      return Response.error();
+    }
+  })());
 });
