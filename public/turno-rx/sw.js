@@ -1,4 +1,4 @@
-const CACHE = 'turno-rx-shell-v34';
+const CACHE = 'turno-rx-shell-v36';
 const SHELL = [
   '/turno-rx/',
   '/turno-rx/index.html',
@@ -15,6 +15,7 @@ const SHELL = [
   '/turno-rx/full-redesign-v33.css?v=1',
   '/turno-rx/light-theme-v34.css?v=1',
   '/turno-rx/light-polish-v35.css?v=1',
+  '/turno-rx/premium-v36.css?v=1',
   '/turno-rx/app-v16.js?v=2',
   '/turno-rx/compact-v17.js?v=2',
   '/turno-rx/transport-v20.js?v=3',
