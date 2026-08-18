@@ -1,4 +1,4 @@
-const CACHE = 'turno-rx-shell-v51-tac-category-isolation';
+const CACHE = 'turno-rx-shell-v51-tac-category-isolation-v52-clinical-ui';
 const SHELL = [
   '/turno-rx/',
   '/turno-rx/index.html',
@@ -24,6 +24,7 @@ const SHELL = [
   '/turno-rx/progressive-photo-v45.css?v=1',
   '/turno-rx/category-tabs-v49.css?v=1',
   '/turno-rx/floor-rx-night-fix-v50.css?v=50',
+  '/turno-rx/clinical-intelligence-v52.css?v=52',
   '/turno-rx/quick-transport-v37.js?v=2',
   '/turno-rx/patient-detail-v39.js?v=3',
   '/turno-rx/app-v16.js?v=7',
