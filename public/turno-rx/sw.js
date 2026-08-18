@@ -1,4 +1,4 @@
-const CACHE = 'turno-rx-shell-v58-tac-live-interaction-hotfix';
+const CACHE = 'turno-rx-shell-v59-render-observer-guard';
 const SHELL = [
   '/turno-rx/',
   '/turno-rx/index.html',
@@ -27,7 +27,7 @@ const SHELL = [
   '/turno-rx/clinical-intelligence-v52.css?v=53',
   '/turno-rx/art-direction-v56.css?v=56',
   '/turno-rx/interaction-hotfix-v58.css?v=58',
-  '/turno-rx/quick-transport-v37.js?v=2',
+  '/turno-rx/quick-transport-v37.js?v=59',
   '/turno-rx/patient-detail-v39.js?v=4',
   '/turno-rx/app-v16.js?v=58',
   '/turno-rx/progressive-photo-queue-v45.js',
@@ -39,6 +39,7 @@ const SHELL = [
   '/turno-rx/cama-label-v28.js?v=1',
   '/turno-rx/polish-v32.js?v=1',
   '/turno-rx/full-redesign-v33.js?v=1',
+  '/turno-rx/observer-guard-v59.js?v=59',
   '/turno-rx/premium-v37.js?v=4',
   '/turno-rx/manual-quick-v38.js?v=1',
   '/turno-rx/tac-flow-v42.js?v=58',
