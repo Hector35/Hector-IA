@@ -1,3 +1,4 @@
+// v63: reconciliación de capturas por renglón; históricos Realizados no bloquean nuevos pendientes.
 const CACHE = 'turno-rx-shell-v58-tac-live-interaction-hotfix';
 const SHELL = [
   '/turno-rx/',
