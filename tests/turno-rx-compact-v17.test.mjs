@@ -14,6 +14,8 @@ const camaLabel=read('public/turno-rx/cama-label-v28.js');
 const stickyClose=read('public/turno-rx/sticky-close-v29.css');
 const elegant=read('public/turno-rx/elegant-v30.css');
 const polish=read('public/turno-rx/polish-v32.js');
+const redesign=read('public/turno-rx/full-redesign-v33.css');
+const redesignJs=read('public/turno-rx/full-redesign-v33.js');
 const js=read('public/turno-rx/compact-v17.js');
 const transport=read('public/turno-rx/transport-v20.js');
 const sw=read('public/turno-rx/sw.js');
@@ -33,6 +35,8 @@ describe('Pendientes vista compacta',()=>{
     expect(index).toContain('/turno-rx/cama-label-v28.js?v=1');
     expect(index).toContain('/turno-rx/transport-v20.js?v=3');
     expect(index).toContain('/turno-rx/polish-v32.js?v=1');
+    expect(index).toContain('/turno-rx/full-redesign-v33.css?v=1');
+    expect(index).toContain('/turno-rx/full-redesign-v33.js?v=1');
     expect(index).toContain('type="module" src="/turno-rx/name-format-v23.js?v=1"');
   });
 
@@ -53,13 +57,13 @@ describe('Pendientes vista compacta',()=>{
     expect(oneLine).toContain('text-overflow: ellipsis !important');
   });
 
-  it('conserva la capa que aprovecha huecos y la sobrescribe con el reparto elegante final',()=>{
+  it('conserva capas anteriores pero v33 gobierna el reparto final',()=>{
     expect(spacing).toContain('.imaging-table col:nth-child(1) { width: 8% !important; }');
-    expect(spacing).toContain('width: max-content !important');
     expect(elegant).toContain('.imaging-table col:nth-child(1){width:9% !important;}');
-    expect(elegant).toContain('.imaging-table col:nth-child(2){width:42% !important;}');
-    expect(elegant).toContain('.imaging-table col:nth-child(3){width:22% !important;}');
-    expect(elegant).toContain('.imaging-table col:nth-child(4){width:27% !important;}');
+    expect(redesign).toContain('.imaging-table col:nth-child(1){width:11% !important;}');
+    expect(redesign).toContain('.imaging-table col:nth-child(2){width:40% !important;}');
+    expect(redesign).toContain('.imaging-table col:nth-child(3){width:23% !important;}');
+    expect(redesign).toContain('.imaging-table col:nth-child(4){width:26% !important;}');
   });
 
   it('pasa a dos lineas con nombres arriba y apellidos abajo si falta espacio',()=>{
@@ -70,14 +74,15 @@ describe('Pendientes vista compacta',()=>{
     expect(adaptiveJs).toContain('node.dataset.surnames=parts.surnames');
     expect(adaptiveCss).toContain('content:attr(data-given-names)');
     expect(adaptiveCss).toContain('content:attr(data-surnames)');
+    expect(redesign).toContain('.imaging-row.adaptive-two-line-v26 .patient-name::before');
+    expect(redesign).toContain('.imaging-row.adaptive-two-line-v26 .patient-name::after');
   });
 
-  it('amplia tipografia y vuelve a mostrar edad y sexo debajo del paciente',()=>{
+  it('mantiene edad y sexo debajo del paciente con tipografía mayor',()=>{
     expect(font).toContain('.imaging-table .patient-name');
     expect(font).toContain('.imaging-table .age-line');
-    expect(font).toContain('display:block !important');
-    expect(elegant).toContain('font-size:15.5px !important');
-    expect(elegant).toContain('font-size:11px !important');
+    expect(redesign).toContain('font-size:15.8px !important');
+    expect(redesign).toContain('font-size:11.2px !important');
   });
 
   it('muestra Cama en vez de Origen solo en imagenologia',()=>{
@@ -90,14 +95,23 @@ describe('Pendientes vista compacta',()=>{
     expect(stickyClose).toContain('env(safe-area-inset-top)');
     expect(stickyClose).toContain('position: sticky !important');
     expect(stickyClose).toContain('min-width: 44px !important');
+    expect(redesign).toContain('.close-btn,');
+    expect(redesign).toContain('.compact-detail-close{');
   });
 
-  it('usa fondo negro y un reparto simétrico sin cortar traslado',()=>{
+  it('rediseña toda la interfaz con fondo negro y filas tipo tarjeta',()=>{
     expect(index).toContain('<meta name="theme-color" content="#000000"');
-    expect(elegant).toContain('background:#000 !important');
-    expect(elegant).toContain('.imaging-table .transport-main{');
-    expect(elegant).toContain('width:auto !important');
-    expect(elegant).toContain('text-overflow:clip !important');
+    expect(redesign).toContain('.topbar{');
+    expect(redesign).toContain('.capture-actions{');
+    expect(redesign).toContain('.modality-title{');
+    expect(redesign).toContain('border-spacing:0 11px !important');
+    expect(redesign).toContain('border-radius:18px 0 0 18px !important');
+    expect(redesign).toContain('border-radius:0 18px 18px 0 !important');
+    expect(redesign).toContain('.floor-table-wrap{');
+    expect(redesign).toContain('.capture-sheet,');
+    expect(redesign).toContain('.compact-detail-sheet{');
+    expect(redesign).toContain('.empty-row td{');
+    expect(redesignJs).toContain("modality-count-v33");
   });
 
   it('resalta Tórax y agrega feedback táctil sin alterar el texto del estudio',()=>{
@@ -105,8 +119,8 @@ describe('Pendientes vista compacta',()=>{
     expect(polish).toContain("strong.className = 'study-torax-v32'");
     expect(polish).toContain("row.classList.add('is-pressed-v32')");
     expect(polish).toContain("row.classList.remove('is-pressed-v32')");
-    expect(elegant).toContain('.study-torax-v32');
-    expect(elegant).toContain('.imaging-row.is-pressed-v32');
+    expect(redesign).toContain('.study-torax-v32');
+    expect(redesign).toContain('.imaging-row.is-pressed-v32');
   });
 
   it('usa un solo encabezado y oculta los datos clínicos de la lista',()=>{
@@ -115,6 +129,7 @@ describe('Pendientes vista compacta',()=>{
     expect(css).toContain('content: none !important');
     expect(css).toContain('.imaging-table thead th:nth-child(n+5)');
     expect(css).toContain('.imaging-table .imaging-row td:nth-child(n+5)');
+    expect(redesign).toContain('.imaging-table thead th:nth-child(n+5){display:none !important;}');
   });
 
   it('abre detalle al tocar paciente y conserva editar/quitar',()=>{
@@ -125,6 +140,8 @@ describe('Pendientes vista compacta',()=>{
     expect(js).toContain("['Diagnóstico / dato clínico'");
     expect(js).toContain("['Qué significa'");
     expect(js).toContain("['Oxígeno'");
+    expect(redesign).toContain('.compact-detail-item{');
+    expect(redesign).toContain('display:block !important');
   });
 
   it('resume el estudio a anatomía y conserva tórax primero',()=>{
@@ -161,10 +178,12 @@ describe('Pendientes vista compacta',()=>{
     expect(formatPatientName('Pérez López, Juan Carlos')).toBe('JUAN CARLOS PÉREZ LÓPEZ');
   });
 
-  it('fuerza shell v32 y mantiene APIs fuera de caché',()=>{
-    expect(sw).toContain("turno-rx-shell-v32");
+  it('fuerza shell v33 y mantiene APIs fuera de caché',()=>{
+    expect(sw).toContain("turno-rx-shell-v33");
     expect(sw).toContain('/turno-rx/elegant-v30.css?v=2');
     expect(sw).toContain('/turno-rx/polish-v32.js?v=1');
+    expect(sw).toContain('/turno-rx/full-redesign-v33.css?v=1');
+    expect(sw).toContain('/turno-rx/full-redesign-v33.js?v=1');
     expect(sw).toContain('/turno-rx/transport-v20.js?v=3');
     expect(sw).toContain("url.pathname.startsWith('/api/')");
   });
