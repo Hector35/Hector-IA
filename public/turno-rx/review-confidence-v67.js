@@ -11,6 +11,8 @@
   const bed=v=>plain(v).replace(/^cama /,'').replace(/^c /,'').replace(/\s+/g,'');
   const category=p=>{const c=plain(p?.category),m=plain(p?.modality),t=plain(p?.target||p?.study||p?.destination);if(c==='piso')return'Piso';if(c==='tac'||m==='tac'||/\b(tac|tc|tomografia|angiotac)\b/.test(t))return'TAC';if(c==='usg'||c==='ultrasonido'||m==='ultrasonido'||/\b(usg|ultrasonido|ecografia)\b/.test(t))return'USG';return'RX'};
   const hasValue=(row,field)=>field==='bed'?Boolean(clean(row?.bed)):field==='name'?Boolean(clean(row?.name)):field==='age'?row?.age!==null&&row?.age!==undefined&&row?.age!=='':field==='sex'?!['','no visible'].includes(plain(row?.sex)):field==='target'?Boolean(clean(row?.target||row?.destination)):Boolean(clean(row?.[field]));
+  const comparable=(row,field)=>field==='target'?clean(row?.target||row?.destination):field==='age'?String(row?.age??''):field==='oxygenProbable'?String(Boolean(row?.oxygenProbable)):clean(row?.[field]);
+  const UPDATE_FIELDS=['bed','name','age','sex','target','destination','diagnosis','diagnosisMeaning','transport','oxygenProbable','updatedAt','imageFingerprint'];
 
   function captureHints(data){
     const payload=parse(data?.text??data?.answer??data?.output_text??data);if(!payload)return;
@@ -34,12 +36,19 @@
     return bestScore>=4?best:null;
   }
 
+  function rowWasUpdated(before,row){
+    if(!before||!row)return false;
+    return UPDATE_FIELDS.some(field=>comparable(before,field)!==comparable(row,field));
+  }
+
   function resolveConfirmedReview(incoming){
     if(!Array.isArray(incoming))return incoming;
     const before=parse(nativeGetItem.call(localStorage,STORAGE_KEY))||[];
     const previous=new Map((Array.isArray(before)?before:[]).filter(r=>r?.id).map(r=>[String(r.id),r]));
     return incoming.map(row=>{
       if(!row?.id||!row?.needsReview||!Array.isArray(row.reviewFields)||!row.reviewFields.length||!previous.has(String(row.id)))return row;
+      const prior=previous.get(String(row.id));
+      if(!rowWasUpdated(prior,row))return row;
       const hint=bestHint(row);if(!hint)return row;
       const remaining=row.reviewFields.filter(field=>!(hint.high.has(field)&&hasValue(row,field)));
       return remaining.length===row.reviewFields.length?row:{...row,needsReview:remaining.length>0,reviewFields:remaining};
@@ -61,5 +70,5 @@
     return response;
   };
 
-  window.__pendientesReviewConfidenceV67={resolveConfirmedReview,captureHints};
+  window.__pendientesReviewConfidenceV67={resolveConfirmedReview,captureHints,rowWasUpdated};
 })();
