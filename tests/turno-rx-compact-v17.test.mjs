@@ -7,6 +7,8 @@ const index=read('public/turno-rx/index.html');
 const css=read('public/turno-rx/compact-v17.css');
 const oneLine=read('public/turno-rx/one-line-v24.css');
 const spacing=read('public/turno-rx/space-v25.css');
+const adaptiveCss=read('public/turno-rx/adaptive-row-v26.css');
+const adaptiveJs=read('public/turno-rx/adaptive-row-v26.js');
 const js=read('public/turno-rx/compact-v17.js');
 const transport=read('public/turno-rx/transport-v20.js');
 const sw=read('public/turno-rx/sw.js');
@@ -18,6 +20,8 @@ describe('Pendientes vista compacta',()=>{
     expect(index).toContain('/turno-rx/compact-v17.css?v=4');
     expect(index).toContain('/turno-rx/one-line-v24.css?v=1');
     expect(index).toContain('/turno-rx/space-v25.css?v=1');
+    expect(index).toContain('/turno-rx/adaptive-row-v26.css?v=1');
+    expect(index).toContain('/turno-rx/adaptive-row-v26.js?v=1');
     expect(index).toContain('/turno-rx/transport-v20.js?v=2');
     expect(index).toContain('type="module" src="/turno-rx/name-format-v23.js?v=1"');
   });
@@ -33,7 +37,7 @@ describe('Pendientes vista compacta',()=>{
     expect(css).toContain('word-break: normal !important');
   });
 
-  it('mantiene cada paciente en un solo renglon en la vista principal',()=>{
+  it('mantiene cada paciente en un solo renglon cuando cabe',()=>{
     expect(oneLine).toContain('.imaging-table .imaging-row td:nth-child(-n+4)');
     expect(oneLine).toContain('white-space: nowrap !important');
     expect(oneLine).toContain('text-overflow: ellipsis !important');
@@ -47,6 +51,17 @@ describe('Pendientes vista compacta',()=>{
     expect(spacing).toContain('.imaging-table col:nth-child(3) { width: 19% !important; }');
     expect(spacing).toContain('.imaging-table col:nth-child(4) { width: 25% !important; }');
     expect(spacing).toContain('width: max-content !important');
+  });
+
+  it('pasa a dos lineas con nombres arriba y apellidos abajo si falta espacio',()=>{
+    expect(adaptiveJs).toContain('isOverflowing(name)');
+    expect(adaptiveJs).toContain("row.dataset.studyNeedsSpace==='1'");
+    expect(adaptiveJs).toContain("row.classList.add('adaptive-two-line-v26')");
+    expect(adaptiveJs).toContain('node.dataset.givenNames=parts.given');
+    expect(adaptiveJs).toContain('node.dataset.surnames=parts.surnames');
+    expect(adaptiveCss).toContain('content:attr(data-given-names)');
+    expect(adaptiveCss).toContain('content:attr(data-surnames)');
+    expect(adaptiveCss).toContain('.imaging-table.study-wide-v26 col:nth-child(4){width:33% !important;}');
   });
 
   it('usa un solo encabezado y oculta los datos clínicos de la lista',()=>{
@@ -94,11 +109,13 @@ describe('Pendientes vista compacta',()=>{
     expect(formatPatientName('Pérez López, Juan Carlos')).toBe('JUAN CARLOS PÉREZ LÓPEZ');
   });
 
-  it('fuerza shell v25 y mantiene APIs fuera de caché',()=>{
-    expect(sw).toContain("turno-rx-shell-v25");
+  it('fuerza shell v26 y mantiene APIs fuera de caché',()=>{
+    expect(sw).toContain("turno-rx-shell-v26");
     expect(sw).toContain('/turno-rx/compact-v17.css?v=4');
     expect(sw).toContain('/turno-rx/one-line-v24.css?v=1');
     expect(sw).toContain('/turno-rx/space-v25.css?v=1');
+    expect(sw).toContain('/turno-rx/adaptive-row-v26.css?v=1');
+    expect(sw).toContain('/turno-rx/adaptive-row-v26.js?v=1');
     expect(sw).toContain('/turno-rx/compact-v17.js?v=2');
     expect(sw).toContain('/turno-rx/transport-v20.js?v=2');
     expect(sw).toContain('/turno-rx/name-format-v23.js?v=1');
