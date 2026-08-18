@@ -214,6 +214,9 @@
     const shift = currentShift();
     const label = inferShiftName(shift.startedAt);
     if (badge.textContent !== label) badge.textContent = label;
+    const total = [...document.querySelectorAll('.category-count')].reduce((sum, node) => sum + (Number.parseInt(node.textContent || '0', 10) || 0), 0);
+    const pending = document.getElementById('v56PendingTotal');
+    if (pending) pending.textContent = `${total} ${total === 1 ? 'pendiente' : 'pendientes'}`;
   }
 
   function closeDrawer() {
@@ -320,7 +323,7 @@
 
     const header = document.createElement('header');
     header.className = 'v37-header';
-    header.innerHTML = `<button type="button" class="v37-menu-btn" id="v37Menu" aria-label="Abrir menú">${ICONS.menu}</button><h1>Pendientes</h1><span class="v37-shift-badge" id="v37ShiftBadge"></span>`;
+    header.innerHTML = `<button type="button" class="v37-menu-btn" id="v37Menu" aria-label="Abrir menú">${ICONS.menu}</button><div class="v56-title-block"><h1>Pendientes</h1><div class="v56-header-context"><span id="v56PendingTotal">0 pendientes</span><span aria-hidden="true">·</span><span class="v37-shift-badge" id="v37ShiftBadge"></span></div></div>`;
 
     const capture = document.createElement('section');
     capture.className = 'v37-capture-bar';

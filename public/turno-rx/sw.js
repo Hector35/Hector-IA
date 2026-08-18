@@ -1,4 +1,4 @@
-const CACHE = 'turno-rx-shell-v55-floor-board-row-validation';
+const CACHE = 'turno-rx-shell-v56-tac-clinical-control-art-direction';
 const SHELL = [
   '/turno-rx/',
   '/turno-rx/index.html',
@@ -25,8 +25,9 @@ const SHELL = [
   '/turno-rx/category-tabs-v49.css?v=1',
   '/turno-rx/floor-rx-night-fix-v50.css?v=50',
   '/turno-rx/clinical-intelligence-v52.css?v=53',
+  '/turno-rx/art-direction-v56.css?v=56',
   '/turno-rx/quick-transport-v37.js?v=2',
-  '/turno-rx/patient-detail-v39.js?v=3',
+  '/turno-rx/patient-detail-v39.js?v=4',
   '/turno-rx/app-v16.js?v=9',
   '/turno-rx/progressive-photo-queue-v45.js',
   '/turno-rx/floor-workflow-v42.js?v=1',
@@ -37,7 +38,7 @@ const SHELL = [
   '/turno-rx/cama-label-v28.js?v=1',
   '/turno-rx/polish-v32.js?v=1',
   '/turno-rx/full-redesign-v33.js?v=1',
-  '/turno-rx/premium-v37.js?v=3',
+  '/turno-rx/premium-v37.js?v=4',
   '/turno-rx/manual-quick-v38.js?v=1',
   '/turno-rx/tac-flow-v42.js?v=1',
   '/turno-rx/manifest.webmanifest',

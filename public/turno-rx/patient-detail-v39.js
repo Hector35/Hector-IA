@@ -487,9 +487,9 @@
     const fields = detailFields(row, historical);
     body.innerHTML = `<section class="v39-detail-section"><h3>Paciente</h3><div class="v39-detail-card">${rowsHtml(fields.primary)}</div></section>
       <section class="v39-detail-section"><h3>Traslado</h3><div class="v39-detail-card">${rowsHtml(fields.transfer)}</div></section>
-      ${fields.review.length ? `<section class="v39-detail-section"><h3>Revisión de lectura</h3><div class="v39-detail-card">${rowsHtml(fields.review)}</div></section>` : ''}
-      ${fields.extra.length ? `<section class="v39-detail-section"><h3>Otros datos de la boleta</h3><div class="v39-detail-card">${rowsHtml(fields.extra)}</div></section>` : ''}
-      <section class="v39-detail-section"><h3>Boleta original</h3><div class="v39-detail-card v39-photo-card" id="v39PhotoHost"><div class="v39-photo-loading">Cargando foto…</div></div></section>`;
+      ${fields.review.length ? `<details class="v39-detail-section v56-detail-fold"><summary>Revisión de lectura</summary><div class="v39-detail-card">${rowsHtml(fields.review)}</div></details>` : ''}
+      ${fields.extra.length ? `<details class="v39-detail-section v56-detail-fold"><summary>Otros datos de la boleta</summary><div class="v39-detail-card">${rowsHtml(fields.extra)}</div></details>` : ''}
+      <details class="v39-detail-section v56-detail-fold"><summary>Boleta original</summary><div class="v39-detail-card v39-photo-card" id="v39PhotoHost"><div class="v39-photo-loading">Cargando foto…</div></div></details>`;
     actions.hidden = historical;
     selectedCurrentRowId = historical ? null : String(row?.id ?? '');
     makeTransportInteractive(row, historical);
