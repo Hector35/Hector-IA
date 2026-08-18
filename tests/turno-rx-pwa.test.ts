@@ -23,6 +23,8 @@ const sw=read('public/turno-rx/sw.js');
 const redesignCss=read('public/turno-rx/full-redesign-v33.css');
 const redesignJs=read('public/turno-rx/full-redesign-v33.js');
 const lightCss=read('public/turno-rx/light-theme-v34.css');
+const premiumCss=read('public/turno-rx/premium-v37.css');
+const premiumJs=read('public/turno-rx/premium-v37.js');
 const manifest=JSON.parse(read('public/turno-rx/manifest.webmanifest'));
 
 describe('Pendientes PWA v16',()=>{
@@ -47,6 +49,9 @@ describe('Pendientes PWA v16',()=>{
     expect(index).toContain('/turno-rx/full-redesign-v33.css?v=1');
     expect(index).toContain('/turno-rx/full-redesign-v33.js?v=1');
     expect(index).toContain('/turno-rx/light-theme-v34.css?v=1');
+    expect(index).toContain('/turno-rx/premium-v37.css?v=1');
+    expect(index).toContain('/turno-rx/premium-v37.js?v=1');
+    expect(index).toContain('/turno-rx/manual-quick-v38.js?v=1');
   });
 
   it('rediseña el shell completo, no solo la tabla',()=>{
@@ -60,18 +65,39 @@ describe('Pendientes PWA v16',()=>{
     expect(redesignCss).toContain('.empty-row td{');
     expect(redesignJs).toContain("modality-count-v33");
     expect(redesignJs).toContain("replaceChildren(name, badge)");
+    expect(premiumCss).toContain('.v37-header{');
+    expect(premiumCss).toContain('.v37-capture-bar{');
+    expect(premiumCss).toContain('.v37-drawer{');
   });
 
-  it('aplica tema claro clínico a header, tarjetas, ficha y edición',()=>{
-    expect(index).toContain('<meta name="theme-color" content="#edf3f7"');
+  it('aplica la paleta premium solicitada a la interfaz',()=>{
+    expect(index).toContain('<meta name="theme-color" content="#F8FAFC"');
     expect(index).toContain('apple-mobile-web-app-status-bar-style" content="default"');
     expect(lightCss).toContain('--v34-bg:#edf3f7');
-    expect(lightCss).toContain('.topbar{');
-    expect(lightCss).toContain('.imaging-table .imaging-row td:nth-child(-n+4)');
     expect(lightCss).toContain('.compact-detail-sheet,');
     expect(lightCss).toContain('.capture-sheet{');
-    expect(lightCss).toContain('.imaging-table .transport-main.silla');
-    expect(lightCss).toContain('.imaging-table .transport-main.camilla');
+    expect(premiumCss).toContain('--p37-blue:#2563EB');
+    expect(premiumCss).toContain('--p37-violet:#4F46E5');
+    expect(premiumCss).toContain('--p37-bg:#F8FAFC');
+    expect(premiumCss).toContain('--p37-surface:#FFFFFF');
+    expect(premiumCss).toContain('--p37-text:#0F172A');
+    expect(premiumCss).toContain('.imaging-table .transport-main');
+  });
+
+  it('añade captura rápida, menú secundario e historial por snapshots sin reemplazar la lógica base',()=>{
+    expect(premiumJs).toContain("const STORAGE_KEY = 'pendientes-table-v2'");
+    expect(premiumJs).toContain("const SHIFT_KEY = 'pendientes-shift-v1'");
+    expect(premiumJs).toContain("const SNAPSHOT_KEY = 'pendientes-shift-snapshots-v37'");
+    expect(premiumJs).toContain('id="v37Camera"');
+    expect(premiumJs).toContain('id="v37Photo"');
+    expect(premiumJs).toContain('id="v37Manual"');
+    expect(premiumJs).toContain('Pendientes</span></button>');
+    expect(premiumJs).toContain('Historial de turnos');
+    expect(premiumJs).toContain('Estadísticas');
+    expect(premiumJs).toContain('Configuración');
+    expect(premiumJs).toContain('rows: clone(Array.isArray(shiftRows) ? shiftRows : [])');
+    expect(premiumJs).toContain('Solo lectura');
+    expect(premiumJs).not.toContain('.slice(0,7)');
   });
 
   it('mapea exactamente los límites de camas a sus pisos',()=>{
@@ -166,7 +192,7 @@ describe('Pendientes PWA v16',()=>{
     expect(app).toContain("'X-Turno-RX':'1'");
     expect(app).not.toMatch(/sk-[A-Za-z0-9_-]+/);
     expect(sw).toContain("url.pathname.startsWith('/api/')");
-    expect(sw).toContain("turno-rx-shell-v34");
+    expect(sw).toContain("turno-rx-shell-v38-manual-quick");
     expect(sw).toContain('/turno-rx/app-v16.js?v=2');
     expect(sw).toContain('/turno-rx/transport-v20.js?v=3');
     expect(sw).toContain('/turno-rx/elegant-v30.css?v=2');
@@ -174,6 +200,9 @@ describe('Pendientes PWA v16',()=>{
     expect(sw).toContain('/turno-rx/full-redesign-v33.css?v=1');
     expect(sw).toContain('/turno-rx/full-redesign-v33.js?v=1');
     expect(sw).toContain('/turno-rx/light-theme-v34.css?v=1');
+    expect(sw).toContain('/turno-rx/premium-v37.css?v=1');
+    expect(sw).toContain('/turno-rx/premium-v37.js?v=1');
+    expect(sw).toContain('/turno-rx/manual-quick-v38.js?v=1');
     expect(sw).toContain('/turno-rx/name-format-v23.js?v=1');
     expect(sw).toContain('/turno-rx/cama-label-v28.js?v=1');
   });
