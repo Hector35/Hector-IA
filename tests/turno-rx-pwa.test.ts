@@ -7,6 +7,10 @@ const sw=read('public/turno-rx/sw.js');
 const manifest=JSON.parse(read('public/turno-rx/manifest.webmanifest'));
 
 describe('Pendientes PWA independiente',()=>{
+  it('mantiene JavaScript válido en la PWA estática',()=>{
+    expect(()=>new Function(app)).not.toThrow();
+  });
+
   it('mantiene una PWA instalable con alcance propio',()=>{
     expect(manifest.start_url).toBe('/turno-rx/');
     expect(manifest.scope).toBe('/turno-rx/');
