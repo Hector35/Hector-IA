@@ -26,7 +26,7 @@ const sw=read('public/turno-rx/sw.js');
 
 describe('Pendientes vista compacta',()=>{
   it('carga la capa compacta sin quitar la app principal',()=>{
-    expect(index).toContain('/turno-rx/app-v16.js?v=5');
+    expect(index).toContain('/turno-rx/app-v16.js?v=6');
     expect(index).toContain('/turno-rx/compact-v17.js?v=2');
     expect(index).toContain('/turno-rx/compact-v17.css?v=4');
     expect(index).toContain('/turno-rx/one-line-v24.css?v=1');
@@ -43,7 +43,7 @@ describe('Pendientes vista compacta',()=>{
     expect(index).toContain('/turno-rx/full-redesign-v33.js?v=1');
     expect(index).toContain('/turno-rx/light-theme-v34.css?v=1');
     expect(index).toContain('/turno-rx/premium-v37.css?v=1');
-    expect(index).toContain('/turno-rx/premium-v37.js?v=1');
+    expect(index).toContain('/turno-rx/premium-v37.js?v=2');
     expect(index).toContain('/turno-rx/manual-quick-v38.js?v=1');
     expect(index).toContain('/turno-rx/palette-v39.css?v=1');
     expect(palette).toContain('--pend-bg:#F8FAFC');
@@ -214,7 +214,7 @@ describe('Pendientes vista compacta',()=>{
     expect(sw).toContain('/turno-rx/full-redesign-v33.js?v=1');
     expect(sw).toContain('/turno-rx/light-theme-v34.css?v=1');
     expect(sw).toContain('/turno-rx/premium-v37.css?v=1');
-    expect(sw).toContain('/turno-rx/premium-v37.js?v=1');
+    expect(sw).toContain('/turno-rx/premium-v37.js?v=2');
     expect(sw).toContain('/turno-rx/manual-quick-v38.js?v=1');
     expect(sw).toContain('/turno-rx/transport-v20.js?v=3');
     expect(sw).toContain('/turno-rx/floor-workflow-v42.js?v=1');

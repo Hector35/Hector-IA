@@ -1,4 +1,4 @@
-import test from 'node:test';
+import {test} from 'vitest';
 import assert from 'node:assert/strict';
 import {readFileSync} from 'node:fs';
 
@@ -42,7 +42,7 @@ test('el detalle de Piso muestra Destino y medio interactivo sin categoría dupl
 test('la caché fuerza la versión publicada del selector', () => {
   assert.match(index,/quick-transport-v37\.js\?v=2/);
   assert.match(index,/patient-detail-v39\.js\?v=3/);
-  assert.match(index,/app-v16\.js\?v=5/);
-  assert.match(sw,/turno-rx-shell-v47-progressive-floor-selector/);
+  assert.match(index,/app-v16\.js\?v=6/);
+  assert.match(sw,/turno-rx-shell-v49-tac-category-tabs/);
   assert.match(sw,/quick-transport-v37\.js\?v=2/);
 });

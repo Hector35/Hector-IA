@@ -4,6 +4,8 @@ const STORAGE_KEY='pendientes-table-v2';
 const LEGACY_STORAGE_KEY='pendientes-table-v1';
 const LEGACY_RX_KEY='turno-rx-patients-v1';
 const LEGACY_FLOOR_KEY='turno-rx-floor-v1';
+const ACTIVE_TAB_KEY='pendientes-active-category-v49';
+const CATEGORY_TABS=['Piso','RX','TAC','USG'];
 const SHIFT_KEY='pendientes-shift-v1';
 const HISTORY_KEY='pendientes-shift-history-v1';
 const SHIFT_MAX_AGE_MS=18*60*60*1000;
@@ -13,6 +15,9 @@ const root=typeof document!=='undefined'?document.getElementById('app'):null;
 let editingId=null;
 let processingPhotos=false;
 let photoJobs=[];
+let activeCategoryTab='';
+const unseenCategoryTabs=new Set();
+let knownPendingIds=new Set();
 let stopPhotoQueue=false;
 let undoState=null;
 let undoTimer=null;
@@ -183,6 +188,28 @@ function normalizeCategory(value,modality='',target=''){
   return 'Otro';
 }
 
+function categoryTabForRow(row){
+  const explicit=clean(row?.category).toLowerCase();
+  if(explicit==='piso')return 'Piso';
+  if(explicit==='tac'||explicit==='tc'||explicit.includes('tomograf'))return 'TAC';
+  if(explicit==='usg'||explicit.includes('ultrason')||explicit.includes('ecograf'))return 'USG';
+  const category=normalizeCategory(row?.category,row?.modality,row?.target);
+  if(category==='Piso'||category==='TAC'||category==='USG')return category;
+  return 'RX';
+}
+function isPendingRow(row){return clean(row?.status).toLowerCase()!=='realizado';}
+function pendingCounts(list){
+  const counts={Piso:0,RX:0,TAC:0,USG:0};
+  for(const row of Array.isArray(list)?list:[]){if(isPendingRow(row))counts[categoryTabForRow(row)]++;}
+  return counts;
+}
+function preferredCategoryTab(list){
+  const stored=clean(read(ACTIVE_TAB_KEY,''));
+  if(CATEGORY_TABS.includes(stored))return stored;
+  const counts=pendingCounts(list);
+  return CATEGORY_TABS.find((tab)=>counts[tab]>0)||'RX';
+}
+
 function normalizeStudyDisplay(value){
   let text=clean(value);
   if(!text)return '—';
@@ -300,6 +327,8 @@ function bootstrapState(){
   current=current.map((row)=>upgradeRow(row,shift.id));write(SHIFT_KEY,shift);write(STORAGE_KEY,current);return {shift,rows:current};
 }
 let {shift,rows}=bootstrapState();
+activeCategoryTab=preferredCategoryTab(rows);
+knownPendingIds=new Set(rows.filter(isPendingRow).map((row)=>String(row.id)));
 function save(){write(STORAGE_KEY,rows);write(SHIFT_KEY,shift);}
 
 function effectiveTransport(row){if(/port[áa]til/i.test(clean(row?.target)))return 'No trasladar';return normalizeTransport(row?.transport)||'Por definir';}
@@ -351,6 +380,9 @@ function renderImagingSections(imagingRows){
   return `<section class="imaging-board" aria-label="Imagenología">${MODALITY_ORDER.map((name)=>renderModalitySection(name,groups.get(name)||[])).join('')}</section>`;
 }
 function renderEmpty(){return `<section class="table-wrap" aria-label="Pacientes pendientes"><table class="patient-table"><tbody><tr class="empty-row"><td colspan="7"><div class="empty-state"><div class="empty-icon">＋</div><b>Sin pendientes</b><span>Usa foto o lápiz para capturar.</span></div></td></tr></tbody></table></section>`;}
+function renderCategoryTabs(counts){
+  return `<nav class="category-tabs" role="tablist" aria-label="Categorías de pacientes">${CATEGORY_TABS.map((tab)=>`<button type="button" class="category-tab ${activeCategoryTab===tab?'is-active':''} ${unseenCategoryTabs.has(tab)?'has-new':''}" id="category-tab-${tab.toLowerCase()}" role="tab" aria-selected="${activeCategoryTab===tab?'true':'false'}" aria-controls="category-panel" tabindex="${activeCategoryTab===tab?'0':'-1'}" data-category-tab="${tab}"><span>${tab}</span><span class="category-count" aria-label="${counts[tab]} pendientes">${counts[tab]}</span>${unseenCategoryTabs.has(tab)?'<span class="category-new-dot" aria-label="Nuevos resultados"></span>':''}</button>`).join('')}</nav>`;
+}
 function renderUndo(){if(!undoState||undoState.expiresAt<=Date.now())return '';return `<div class="undo-bar" role="status"><span>Paciente quitado</span><button type="button" id="undoRemove">Deshacer</button></div>`;}
 function renderPhotoQueue(){
   if(!photoJobs.length)return '';
@@ -362,9 +394,13 @@ function renderPhotoQueue(){
 }
 
 function render(){
-  if(!root)return;const activeRows=rows.filter((row)=>!(row?.status==='Realizado'&&normalizeCategory(row?.category,row?.modality,row?.target)==='TAC')),floorRows=activeRows.filter(isCompleteFloorRow),incompleteRows=activeRows.filter(isIncompleteFloorRow),imagingRows=activeRows.filter((row)=>!hasFloorTarget(row));
-  const body=activeRows.length?`${renderFloorSections(floorRows)}${renderIncompleteFloor(incompleteRows)}${renderImagingSections(imagingRows)}`:renderEmpty();
-  root.innerHTML=`<main class="app-shell"><header class="topbar"><div class="brand"><span class="brand-dot"></span><h1>Pendientes</h1></div><div class="capture-actions" aria-label="Opciones"><button class="shift-btn" id="newShift" type="button" aria-label="Iniciar nuevo turno">↻ Turno</button><button class="capture-icon-btn" id="galleryCapture" type="button" aria-label="Elegir foto">${ICONS.photo}</button><button class="capture-icon-btn manual" id="manualCapture" type="button" aria-label="Captura manual">${ICONS.pencil}</button></div><input id="galleryInput" type="file" accept="image/*" multiple hidden /></header><div class="capture-status" id="captureStatus" hidden></div>${renderPhotoQueue()}${body}</main>${renderUndo()}<div class="sheet-backdrop" id="sheetBackdrop" hidden><form class="capture-sheet" id="patientForm"><div class="sheet-handle"></div><div class="sheet-head"><div><div class="sheet-kicker">PENDIENTE</div><h2 id="sheetTitle">Capturar paciente</h2></div><button type="button" class="close-btn" id="closeSheet" aria-label="Cerrar">×</button></div><div class="form-grid">
+  if(!root)return;
+  const pendingNow=rows.filter(isPendingRow),pendingIds=new Set(pendingNow.map((row)=>String(row.id)));
+  for(const row of pendingNow){if(!knownPendingIds.has(String(row.id))){const tab=categoryTabForRow(row);if(tab!==activeCategoryTab)unseenCategoryTabs.add(tab);}}
+  knownPendingIds=pendingIds;
+  const counts=pendingCounts(rows),visibleRows=rows.filter((row)=>categoryTabForRow(row)===activeCategoryTab),floorRows=visibleRows.filter(isCompleteFloorRow),incompleteRows=visibleRows.filter(isIncompleteFloorRow),imagingRows=visibleRows.filter((row)=>!hasFloorTarget(row));
+  const body=visibleRows.length?`${renderFloorSections(floorRows)}${renderIncompleteFloor(incompleteRows)}${renderImagingSections(imagingRows)}`:renderEmpty();
+  root.innerHTML=`<main class="app-shell"><header class="topbar"><div class="brand"><span class="brand-dot"></span><h1>Pendientes</h1></div><div class="capture-actions" aria-label="Opciones"><button class="shift-btn" id="newShift" type="button" aria-label="Iniciar nuevo turno">↻ Turno</button><button class="capture-icon-btn" id="galleryCapture" type="button" aria-label="Elegir foto">${ICONS.photo}</button><button class="capture-icon-btn manual" id="manualCapture" type="button" aria-label="Captura manual">${ICONS.pencil}</button></div><input id="galleryInput" type="file" accept="image/*" multiple hidden /></header>${renderCategoryTabs(counts)}<div class="capture-status" id="captureStatus" hidden></div>${renderPhotoQueue()}<section id="category-panel" class="category-panel" role="tabpanel" aria-labelledby="category-tab-${activeCategoryTab.toLowerCase()}" data-active-category="${activeCategoryTab}">${body}</section></main>${renderUndo()}<div class="sheet-backdrop" id="sheetBackdrop" hidden><form class="capture-sheet" id="patientForm"><div class="sheet-handle"></div><div class="sheet-head"><div><div class="sheet-kicker">PENDIENTE</div><h2 id="sheetTitle">Capturar paciente</h2></div><button type="button" class="close-btn" id="closeSheet" aria-label="Cerrar">×</button></div><div class="form-grid">
     <label><span>Cama / área</span><input id="bed" name="bed" autocomplete="off" placeholder="15, CE2, UP1, UI1…" /></label>
     <label><span>Edad</span><input id="age" name="age" type="number" inputmode="numeric" min="0" max="130" autocomplete="off" placeholder="Años" /></label>
     <label class="full"><span>Nombre</span><input id="name" name="name" autocomplete="off" placeholder="Nombre del paciente" /></label>
@@ -382,6 +418,8 @@ function render(){
 }
 
 function bind(){
+  document.querySelectorAll('[data-category-tab]').forEach((button)=>button.addEventListener('click',()=>selectCategoryTab(button.dataset.categoryTab)));
+  document.querySelector('.category-tabs')?.addEventListener('keydown',handleCategoryTabKeydown);
   document.getElementById('galleryCapture')?.addEventListener('click',()=>document.getElementById('galleryInput')?.click());
   document.getElementById('manualCapture')?.addEventListener('click',()=>openSheet());
   document.getElementById('newShift')?.addEventListener('click',startNewShift);
@@ -395,6 +433,18 @@ function bind(){
   document.getElementById('undoRemove')?.addEventListener('click',undoRemove);
   document.getElementById('stopPhotoQueue')?.addEventListener('click',()=>{stopPhotoQueue=true;});
   document.querySelectorAll('[data-retry-photo]').forEach((button)=>button.addEventListener('click',()=>retryPhotoJob(button.dataset.retryPhoto)));
+}
+function selectCategoryTab(tab){
+  if(!CATEGORY_TABS.includes(tab)||tab===activeCategoryTab)return;
+  activeCategoryTab=tab;unseenCategoryTabs.delete(tab);write(ACTIVE_TAB_KEY,tab);render();
+}
+function handleCategoryTabKeydown(event){
+  if(!['ArrowLeft','ArrowRight','Home','End'].includes(event.key))return;
+  event.preventDefault();const current=CATEGORY_TABS.indexOf(activeCategoryTab);let next=current;
+  if(event.key==='ArrowLeft')next=(current-1+CATEGORY_TABS.length)%CATEGORY_TABS.length;
+  if(event.key==='ArrowRight')next=(current+1)%CATEGORY_TABS.length;
+  if(event.key==='Home')next=0;if(event.key==='End')next=CATEGORY_TABS.length-1;
+  selectCategoryTab(CATEGORY_TABS[next]);requestAnimationFrame(()=>document.querySelector(`[data-category-tab="${CATEGORY_TABS[next]}"]`)?.focus());
 }
 function setCaptureStatus(message,state='busy'){const status=document.getElementById('captureStatus');if(!status)return;if(!message){status.hidden=true;status.textContent='';status.dataset.state='';return;}status.hidden=false;status.dataset.state=state;status.textContent=message;}
 function setFormError(message=''){const error=document.getElementById('formError');if(!error)return;error.hidden=!message;error.textContent=message;}
@@ -458,4 +508,4 @@ function startNewShift(){if(typeof window==='undefined')return;if(rows.length&&!
 
 if(root){render();if('serviceWorker' in navigator)window.addEventListener('load',()=>navigator.serviceWorker.register('/turno-rx/sw.js',{updateViaCache:'none'}).then((registration)=>registration.update()).catch(()=>{}));}
 
-export {displayOrigin,canonicalOrigin,compareOrigins,parseFloorTarget,floorGroupKey,rowFloorGroupKey,hasFloorTarget,isCompleteFloorRow,isIncompleteFloorRow,findDuplicateFloorOrigins,findConflictsAgainstExisting,rowKey,findMatchingRowIndex,normalizeAge,ageFromBirthDate,normalizeStudyDisplay,normalizeModality,normalizeCategory,isRayXStudyText,reviewFields,patientDedupeKey,imageFingerprint,compareFloorRows,compareImagingRows,effectiveTransport,normalizeVisionRow,mergeRow,mergeStudyTargets,commitPhotoResult};
+export {displayOrigin,canonicalOrigin,compareOrigins,parseFloorTarget,floorGroupKey,rowFloorGroupKey,hasFloorTarget,isCompleteFloorRow,isIncompleteFloorRow,findDuplicateFloorOrigins,findConflictsAgainstExisting,rowKey,findMatchingRowIndex,normalizeAge,ageFromBirthDate,normalizeStudyDisplay,normalizeModality,normalizeCategory,isRayXStudyText,reviewFields,patientDedupeKey,imageFingerprint,compareFloorRows,compareImagingRows,effectiveTransport,normalizeVisionRow,mergeRow,mergeStudyTargets,commitPhotoResult,categoryTabForRow,pendingCounts,preferredCategoryTab};

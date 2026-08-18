@@ -1,4 +1,4 @@
-const CACHE = 'turno-rx-shell-v48-progressive-floor-selector-night-theme';
+const CACHE = 'turno-rx-shell-v49-tac-category-tabs';
 const SHELL = [
   '/turno-rx/',
   '/turno-rx/index.html',
@@ -22,9 +22,10 @@ const SHELL = [
   '/turno-rx/palette-v39.css?v=1',
   '/turno-rx/tac-flow-v42.css?v=1',
   '/turno-rx/progressive-photo-v45.css?v=1',
+  '/turno-rx/category-tabs-v49.css?v=1',
   '/turno-rx/quick-transport-v37.js?v=2',
   '/turno-rx/patient-detail-v39.js?v=3',
-  '/turno-rx/app-v16.js?v=5',
+  '/turno-rx/app-v16.js?v=6',
   '/turno-rx/progressive-photo-queue-v45.js',
   '/turno-rx/floor-workflow-v42.js?v=1',
   '/turno-rx/compact-v17.js?v=2',
@@ -34,7 +35,7 @@ const SHELL = [
   '/turno-rx/cama-label-v28.js?v=1',
   '/turno-rx/polish-v32.js?v=1',
   '/turno-rx/full-redesign-v33.js?v=1',
-  '/turno-rx/premium-v37.js?v=1',
+  '/turno-rx/premium-v37.js?v=2',
   '/turno-rx/manual-quick-v38.js?v=1',
   '/turno-rx/tac-flow-v42.js?v=1',
   '/turno-rx/manifest.webmanifest',

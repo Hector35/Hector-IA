@@ -236,6 +236,8 @@
     currentView = ['pending','history','stats','settings'].includes(view) ? view : 'pending';
     const capture = document.querySelector('.v37-capture-bar');
     if (capture) capture.hidden = currentView !== 'pending';
+    const categoryTabs = document.querySelector('.category-tabs');
+    if (categoryTabs) categoryTabs.hidden = currentView !== 'pending';
     document.querySelectorAll('.v37-view').forEach((node) => { node.hidden = node.dataset.view !== currentView; });
     document.querySelectorAll('.v37-nav-item').forEach((node) => node.classList.toggle('is-active', node.dataset.view === currentView));
     if (currentView !== 'history') historyDetailId = null;
@@ -314,6 +316,7 @@
 
     const topbar = main.querySelector('.topbar');
     const status = main.querySelector('#captureStatus');
+    const categoryTabs = main.querySelector('.category-tabs');
 
     const header = document.createElement('header');
     header.className = 'v37-header';
@@ -327,14 +330,15 @@
     if (topbar) topbar.insertAdjacentElement('beforebegin', header);
     else main.prepend(header);
     header.insertAdjacentElement('afterend', capture);
-    if (status) capture.insertAdjacentElement('afterend', status);
+    if (categoryTabs) capture.insertAdjacentElement('afterend', categoryTabs);
+    if (status) (categoryTabs || capture).insertAdjacentElement('afterend', status);
 
     const pending = document.createElement('section');
     pending.id = 'v37PendingView';
     pending.className = 'v37-view v37-pending-view';
     pending.dataset.view = 'pending';
 
-    const keep = new Set([topbar, header, capture, status].filter(Boolean));
+    const keep = new Set([topbar, header, capture, categoryTabs, status].filter(Boolean));
     [...main.children].forEach((child) => {
       if (!keep.has(child) && !child.classList.contains('v37-view')) pending.appendChild(child);
     });
