@@ -4,72 +4,61 @@ const notices=new Map();
 
 const clean=value=>String(value??'').trim();
 
+export function fingerprintsForRow(row){
+  return [...new Set([...(Array.isArray(row?.imageFingerprints)?row.imageFingerprints:[]),row?.imageFingerprint].map(clean).filter(Boolean))];
+}
+
 export function hasDuplicateFingerprint(rows,fingerprint){
   const fp=clean(fingerprint);
   if(!fp||!Array.isArray(rows))return false;
-  return rows.some(row=>clean(row?.imageFingerprint)===fp);
+  return rows.some(row=>fingerprintsForRow(row).includes(fp));
 }
 
 export function duplicatePatientsForFingerprint(rows,fingerprint){
   const fp=clean(fingerprint);
   if(!fp||!Array.isArray(rows))return [];
   return rows
-    .filter(row=>clean(row?.imageFingerprint)===fp)
+    .filter(row=>fingerprintsForRow(row).includes(fp))
     .map(row=>({
-      handwrittenBed:clean(row?.bed),
-      formBed:'',
-      bed:clean(row?.bed),
-      name:clean(row?.name),
-      age:row?.age??null,
-      sex:clean(row?.sex)||'No visible',
-      category:clean(row?.category),
-      modality:clean(row?.modality),
-      target:clean(row?.target),
-      study:clean(row?.target),
-      destination:clean(row?.destination),
-      destinationFloor:clean(row?.destinationFloor),
-      destinationBlock:clean(row?.destinationBlock),
-      requestingDoctor:clean(row?.requestingDoctor),
-      service:clean(row?.service),
-      originService:clean(row?.originService),
-      requestDate:clean(row?.requestDate),
-      requestTime:clean(row?.requestTime),
-      transferNotes:clean(row?.transferNotes),
-      recognizedText:clean(row?.recognizedText),
-      confidence:row?.confidence&&typeof row.confidence==='object'?row.confidence:{},
-      transport:clean(row?.transport),
-      transportReason:clean(row?.transportReason),
-      oxygenProbable:Boolean(row?.oxygenProbable),
-      oxygenReason:clean(row?.oxygenReason)
+      handwrittenBed:clean(row?.bed),formBed:'',bed:clean(row?.bed),name:clean(row?.name),age:row?.age??null,
+      sex:clean(row?.sex)||'No visible',category:clean(row?.category),modality:clean(row?.modality),target:clean(row?.target),study:clean(row?.target),
+      destination:clean(row?.destination),destinationFloor:clean(row?.destinationFloor),destinationBlock:clean(row?.destinationBlock),
+      requestingDoctor:clean(row?.requestingDoctor),service:clean(row?.service),originService:clean(row?.originService),requestDate:clean(row?.requestDate),
+      requestTime:clean(row?.requestTime),transferNotes:clean(row?.transferNotes),recognizedText:clean(row?.recognizedText),
+      confidence:row?.confidence&&typeof row.confidence==='object'?row.confidence:{},transport:clean(row?.transport),transportReason:clean(row?.transportReason),
+      oxygenProbable:Boolean(row?.oxygenProbable),oxygenReason:clean(row?.oxygenReason)
     }));
 }
 
-function readRows(){
-  try{
-    const parsed=JSON.parse(localStorage.getItem(STORAGE_KEY)||'[]');
-    return Array.isArray(parsed)?parsed:[];
-  }catch{return[];}
-}
-
+function readRows(){try{const parsed=JSON.parse(localStorage.getItem(STORAGE_KEY)||'[]');return Array.isArray(parsed)?parsed:[]}catch{return[]}}
 async function fileFingerprint(file){
   if(!(file instanceof File)||!globalThis.crypto?.subtle)return'';
   const digest=await crypto.subtle.digest('SHA-256',await file.arrayBuffer());
   return [...new Uint8Array(digest)].map(byte=>byte.toString(16).padStart(2,'0')).join('');
 }
-
+function parsePayload(value){
+  if(value&&typeof value==='object')return value;
+  const raw=clean(value);if(!raw)return null;
+  const fenced=raw.match(/```(?:json)?\s*([\s\S]*?)```/i)?.[1]?.trim(),source=fenced||raw;
+  try{return JSON.parse(source)}catch{const start=source.indexOf('{'),end=source.lastIndexOf('}');if(start>=0&&end>start){try{return JSON.parse(source.slice(start,end+1))}catch{}}return null}
+}
+function hasUsableVisionPayload(data){
+  const payload=parsePayload(data?.text??data?.answer??data?.output_text??data);
+  if(!payload||typeof payload!=='object')return false;
+  if(Array.isArray(payload?.patients))return payload.patients.length>0;
+  return Object.keys(payload).length>0;
+}
 function currentQueueIndex(){
   const text=document.querySelector('#stabilityQueue .stability-queue-head strong')?.textContent||'';
   const match=text.match(/Analizando foto\s+(\d+)\s+de/i);
   return match?Number(match[1]):null;
 }
-
 function applyDuplicateNotices(){
   const jobs=[...document.querySelectorAll('#stabilityQueue .stability-jobs > div')];
   for(const [index,expiresAt] of notices){
     if(expiresAt<=Date.now()){notices.delete(index);continue;}
     const job=jobs[index-1];if(!job)continue;
-    const message=job.querySelector('span:first-child small');
-    const state=job.querySelector('span:last-child');
+    const message=job.querySelector('span:first-child small'),state=job.querySelector('span:last-child');
     if(!message||!state)continue;
     if(/lista/i.test(state.textContent||'')&&!clean(message.textContent))message.textContent='Foto duplicada · sin cambios';
   }
@@ -79,27 +68,36 @@ const observer=new MutationObserver(()=>queueMicrotask(applyDuplicateNotices));
 const observeTarget=document.getElementById('app')||document.body;
 if(observeTarget)observer.observe(observeTarget,{childList:true,subtree:true});
 
-window.fetch=async function pendientesPhotoDedupeV69(input,init){
+window.fetch=async function pendientesPhotoDedupeV70(input,init){
   const url=typeof input==='string'?input:input?.url;
   const vision=typeof url==='string'&&url.includes('/api/turno-rx/vision');
+  let fingerprint='';
   if(vision&&init?.body instanceof FormData){
     const file=init.body.get('image');
     if(file instanceof File){
-      const fingerprint=await fileFingerprint(file);
-      const rows=readRows();
-      if(hasDuplicateFingerprint(rows,fingerprint)){
+      fingerprint=await fileFingerprint(file);
+      if(hasDuplicateFingerprint(readRows(),fingerprint)){
         const index=currentQueueIndex();
         if(index)notices.set(index,Date.now()+15000);
         queueMicrotask(applyDuplicateNotices);
-        const patients=duplicatePatientsForFingerprint(rows,fingerprint);
-        return new Response(JSON.stringify({patients,duplicatePhoto:true}),{
-          status:200,
-          headers:{'Content-Type':'application/json','X-Pendientes-Duplicate':'1'}
+        return new Response(JSON.stringify({patients:[],duplicatePhoto:true,duplicateFingerprint:fingerprint}),{
+          status:200,headers:{'Content-Type':'application/json','X-Pendientes-Duplicate':'1'}
         });
       }
     }
   }
-  return originalFetch(input,init);
+
+  const response=await originalFetch(input,init);
+  if(!vision||!fingerprint||!response?.ok||typeof response.json!=='function')return response;
+  const upstream=response.json.bind(response);
+  try{
+    Object.defineProperty(response,'json',{configurable:true,value:async(...args)=>{
+      const data=await upstream(...args);
+      if(hasUsableVisionPayload(data))window.__pendientesVisionFingerprintV70={fingerprint,capturedAt:Date.now(),expires:Date.now()+10000};
+      return data;
+    }});
+  }catch{}
+  return response;
 };
 
-window.__pendientesPhotoDedupeV69={hasDuplicateFingerprint,duplicatePatientsForFingerprint,fileFingerprint};
+window.__pendientesPhotoDedupeV70={hasDuplicateFingerprint,duplicatePatientsForFingerprint,fingerprintsForRow,fileFingerprint};
