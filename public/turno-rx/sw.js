@@ -1,4 +1,4 @@
-const CACHE = 'turno-rx-shell-v58-tac-live-interaction-hotfix';
+const CACHE = 'turno-rx-shell-v61-floor-gesture-polish';
 const SHELL = [
   '/turno-rx/',
   '/turno-rx/index.html',
@@ -28,8 +28,10 @@ const SHELL = [
   '/turno-rx/art-direction-v56.css?v=56',
   '/turno-rx/interaction-hotfix-v58.css?v=58',
   '/turno-rx/row-actions-v60.css?v=60',
+  '/turno-rx/row-actions-v61.css?v=61',
   '/turno-rx/quick-transport-v37.js?v=2',
   '/turno-rx/patient-detail-v39.js?v=4',
+  '/turno-rx/floor-photo-reconcile-v61.js?v=61',
   '/turno-rx/app-v16.js?v=58',
   '/turno-rx/progressive-photo-queue-v45.js',
   '/turno-rx/floor-workflow-v42.js?v=58',
@@ -45,6 +47,7 @@ const SHELL = [
   '/turno-rx/manual-quick-v38.js?v=1',
   '/turno-rx/tac-flow-v42.js?v=58',
   '/turno-rx/row-actions-v60.js?v=60',
+  '/turno-rx/row-actions-v61.js?v=61',
   '/turno-rx/manifest.webmanifest',
   '/turno-rx/icon.svg'
 ];
