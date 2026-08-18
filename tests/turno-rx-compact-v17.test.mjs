@@ -30,7 +30,7 @@ describe('Pendientes vista compacta',()=>{
     expect(index).toContain('/turno-rx/elegant-v30.css?v=1');
     expect(index).toContain('/turno-rx/adaptive-row-v26.js?v=1');
     expect(index).toContain('/turno-rx/cama-label-v28.js?v=1');
-    expect(index).toContain('/turno-rx/transport-v20.js?v=2');
+    expect(index).toContain('/turno-rx/transport-v20.js?v=3');
     expect(index).toContain('type="module" src="/turno-rx/name-format-v23.js?v=1"');
   });
 
@@ -150,6 +150,20 @@ describe('Pendientes vista compacta',()=>{
     expect(transport).toContain('transportRank(a) - transportRank(b)');
   });
 
+  it('ordena por traslado, luego menor edad, mujer, tórax y cama',()=>{
+    expect(transport).toContain('function chestRank(row)');
+    const tr=transport.indexOf('transportRank(a) - transportRank(b)');
+    const age=transport.indexOf('ageValue(a) - ageValue(b)');
+    const sex=transport.indexOf('sexRank(a) - sexRank(b)');
+    const chest=transport.indexOf('chestRank(a) - chestRank(b)');
+    const origin=transport.indexOf('originValue(a) - originValue(b)');
+    expect(tr).toBeGreaterThan(-1);
+    expect(age).toBeGreaterThan(tr);
+    expect(sex).toBeGreaterThan(age);
+    expect(chest).toBeGreaterThan(sex);
+    expect(origin).toBeGreaterThan(chest);
+  });
+
   it('muestra nombres primero, apellidos después y todo en mayúsculas',()=>{
     expect(formatPatientName('Salazar Liliana')).toBe('LILIANA SALAZAR');
     expect(formatPatientName('Estela Santillana Romo')).toBe('ESTELA SANTILLANA ROMO');
@@ -157,8 +171,8 @@ describe('Pendientes vista compacta',()=>{
     expect(formatPatientName('Pérez López, Juan Carlos')).toBe('JUAN CARLOS PÉREZ LÓPEZ');
   });
 
-  it('fuerza shell v30 y mantiene APIs fuera de caché',()=>{
-    expect(sw).toContain("turno-rx-shell-v30");
+  it('fuerza shell v31 y mantiene APIs fuera de caché',()=>{
+    expect(sw).toContain("turno-rx-shell-v31");
     expect(sw).toContain('/turno-rx/compact-v17.css?v=4');
     expect(sw).toContain('/turno-rx/one-line-v24.css?v=1');
     expect(sw).toContain('/turno-rx/space-v25.css?v=1');
@@ -169,7 +183,7 @@ describe('Pendientes vista compacta',()=>{
     expect(sw).toContain('/turno-rx/adaptive-row-v26.js?v=1');
     expect(sw).toContain('/turno-rx/cama-label-v28.js?v=1');
     expect(sw).toContain('/turno-rx/compact-v17.js?v=2');
-    expect(sw).toContain('/turno-rx/transport-v20.js?v=2');
+    expect(sw).toContain('/turno-rx/transport-v20.js?v=3');
     expect(sw).toContain('/turno-rx/name-format-v23.js?v=1');
     expect(sw).toContain("url.pathname.startsWith('/api/')");
   });
