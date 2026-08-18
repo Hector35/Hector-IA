@@ -83,7 +83,7 @@ describe('Pendientes PWA independiente',()=>{
 
   it('detiene un pizarrón si la lectura duplica una cama de origen',()=>{
     expect(app).toContain('findDuplicateFloorOrigins');
-    expect(app).toContain('en un mismo pizarrón');
+    expect(app).toContain('En un mismo pizarrón');
     expect(app).toContain('No agregué esa foto para evitar mezclar pacientes');
     expect(app).toContain('números manuscritos parecidos como 13 y 15');
   });
