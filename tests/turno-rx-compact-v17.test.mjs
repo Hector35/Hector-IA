@@ -10,7 +10,7 @@ const sw=read('public/turno-rx/sw.js');
 describe('Pendientes v17 vista compacta',()=>{
   it('carga la capa compacta sin quitar la app principal',()=>{
     expect(index).toContain('/turno-rx/app-v16.js?v=2');
-    expect(index).toContain('/turno-rx/compact-v17.js?v=1');
+    expect(index).toContain('/turno-rx/compact-v17.js?v=2');
     expect(index).toContain('/turno-rx/compact-v17.css?v=2');
   });
 
@@ -33,10 +33,21 @@ describe('Pendientes v17 vista compacta',()=>{
     expect(js).toContain("['Oxígeno'");
   });
 
-  it('fuerza shell v18 y mantiene APIs fuera de caché',()=>{
-    expect(sw).toContain("turno-rx-shell-v18");
+  it('resume el estudio a anatomía y conserva tórax primero',()=>{
+    expect(js).toContain('function conciseStudy(value)');
+    expect(js).toContain("add(portable ? 'Tórax portátil' : 'Tórax'");
+    expect(js).toContain("add('Abdomen'");
+    expect(js).toContain("add('Cráneo'");
+    expect(js).toContain("add('Cervicales'");
+    expect(js).toContain("detect('Pie'");
+    expect(js).toContain("regions.map((item) => item.label).join(' + ')");
+    expect(js).toContain('cell.dataset.fullStudy');
+  });
+
+  it('fuerza shell v19 y mantiene APIs fuera de caché',()=>{
+    expect(sw).toContain("turno-rx-shell-v19");
     expect(sw).toContain('/turno-rx/compact-v17.css?v=2');
-    expect(sw).toContain('/turno-rx/compact-v17.js?v=1');
+    expect(sw).toContain('/turno-rx/compact-v17.js?v=2');
     expect(sw).toContain("url.pathname.startsWith('/api/')");
   });
 });
