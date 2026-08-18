@@ -17,6 +17,8 @@ const polish=read('public/turno-rx/polish-v32.js');
 const redesign=read('public/turno-rx/full-redesign-v33.css');
 const redesignJs=read('public/turno-rx/full-redesign-v33.js');
 const light=read('public/turno-rx/light-theme-v34.css');
+const premium=read('public/turno-rx/premium-v37.css');
+const premiumJs=read('public/turno-rx/premium-v37.js');
 const js=read('public/turno-rx/compact-v17.js');
 const transport=read('public/turno-rx/transport-v20.js');
 const sw=read('public/turno-rx/sw.js');
@@ -39,6 +41,9 @@ describe('Pendientes vista compacta',()=>{
     expect(index).toContain('/turno-rx/full-redesign-v33.css?v=1');
     expect(index).toContain('/turno-rx/full-redesign-v33.js?v=1');
     expect(index).toContain('/turno-rx/light-theme-v34.css?v=1');
+    expect(index).toContain('/turno-rx/premium-v37.css?v=1');
+    expect(index).toContain('/turno-rx/premium-v37.js?v=1');
+    expect(index).toContain('/turno-rx/manual-quick-v38.js?v=1');
     expect(index).toContain('type="module" src="/turno-rx/name-format-v23.js?v=1"');
   });
 
@@ -101,18 +106,34 @@ describe('Pendientes vista compacta',()=>{
     expect(redesign).toContain('.compact-detail-close{');
   });
 
-  it('aplica tema claro clínico a toda la interfaz',()=>{
-    expect(index).toContain('<meta name="theme-color" content="#edf3f7"');
+  it('aplica el tema premium solicitado sin quitar el tema claro base',()=>{
+    expect(index).toContain('<meta name="theme-color" content="#F8FAFC"');
     expect(light).toContain('--v34-bg:#edf3f7');
     expect(light).toContain('color-scheme:light');
-    expect(light).toContain('.topbar{');
-    expect(light).toContain('.capture-icon-btn.manual{');
-    expect(light).toContain('.imaging-table .imaging-row td:nth-child(-n+4)');
-    expect(light).toContain('background:rgba(255,255,255,.94) !important');
+    expect(premium).toContain('--p37-blue:#2563EB');
+    expect(premium).toContain('--p37-violet:#4F46E5');
+    expect(premium).toContain('--p37-bg:#F8FAFC');
+    expect(premium).toContain('--p37-surface:#FFFFFF');
+    expect(premium).toContain('--p37-text:#0F172A');
+    expect(premium).toContain('.v37-header h1');
+    expect(premium).toContain('.v37-capture-bar');
+    expect(premium).toContain('.v37-drawer');
     expect(light).toContain('.compact-detail-sheet,');
     expect(light).toContain('.capture-sheet{');
-    expect(light).toContain('.floor-table-wrap{');
-    expect(light).toContain('.empty-row td{');
+  });
+
+  it('mantiene captura directa, menú lateral y snapshots históricos inmutables',()=>{
+    expect(premiumJs).toContain("const SNAPSHOT_KEY = 'pendientes-shift-snapshots-v37'");
+    expect(premiumJs).toContain('id="v37Camera"');
+    expect(premiumJs).toContain('id="v37Photo"');
+    expect(premiumJs).toContain('id="v37Manual"');
+    expect(premiumJs).toContain('Historial de turnos');
+    expect(premiumJs).toContain('Estadísticas');
+    expect(premiumJs).toContain('Configuración');
+    expect(premiumJs).toContain('storeSnapshot(makeSnapshot(previousShift, previousRows');
+    expect(premiumJs).toContain('rows: clone(Array.isArray(shiftRows) ? shiftRows : [])');
+    expect(premiumJs).not.toContain('.slice(0,7)');
+    expect(premiumJs).toContain('Solo lectura');
   });
 
   it('resalta Tórax y agrega feedback táctil sin alterar el texto del estudio',()=>{
@@ -179,13 +200,16 @@ describe('Pendientes vista compacta',()=>{
     expect(formatPatientName('Pérez López, Juan Carlos')).toBe('JUAN CARLOS PÉREZ LÓPEZ');
   });
 
-  it('fuerza shell v34 y mantiene APIs fuera de caché',()=>{
-    expect(sw).toContain("turno-rx-shell-v34");
+  it('mantiene el shell actual y deja las APIs fuera de caché',()=>{
+    expect(sw).toContain("turno-rx-shell-v38-manual-quick");
     expect(sw).toContain('/turno-rx/elegant-v30.css?v=2');
     expect(sw).toContain('/turno-rx/polish-v32.js?v=1');
     expect(sw).toContain('/turno-rx/full-redesign-v33.css?v=1');
     expect(sw).toContain('/turno-rx/full-redesign-v33.js?v=1');
     expect(sw).toContain('/turno-rx/light-theme-v34.css?v=1');
+    expect(sw).toContain('/turno-rx/premium-v37.css?v=1');
+    expect(sw).toContain('/turno-rx/premium-v37.js?v=1');
+    expect(sw).toContain('/turno-rx/manual-quick-v38.js?v=1');
     expect(sw).toContain('/turno-rx/transport-v20.js?v=3');
     expect(sw).toContain("url.pathname.startsWith('/api/')");
   });
