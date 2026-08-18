@@ -193,14 +193,22 @@ function categoryTabForRow(row){
   if(explicit==='piso')return 'Piso';
   if(explicit==='tac'||explicit==='tc'||explicit.includes('tomograf'))return 'TAC';
   if(explicit==='usg'||explicit.includes('ultrason')||explicit.includes('ecograf'))return 'USG';
+  if(/rayos|radiograf|^rx$/.test(explicit))return 'RX';
+  const hasExplicitImaging=Boolean(explicit&&explicit!=='otro');
+  const hasFloorDestination=Boolean(clean(row?.destination)||clean(row?.destinationFloor||row?.floor)||clean(row?.destinationBlock||row?.block));
+  if(!hasExplicitImaging&&(hasFloorDestination||floorGroupKey(row?.target)!==null))return 'Piso';
   const category=normalizeCategory(row?.category,row?.modality,row?.target);
   if(category==='Piso'||category==='TAC'||category==='USG')return category;
   return 'RX';
 }
 function isPendingRow(row){return clean(row?.status).toLowerCase()!=='realizado';}
+function rowsForCategoryTab(list,tab){
+  if(!CATEGORY_TABS.includes(tab))return [];
+  return (Array.isArray(list)?list:[]).filter((row)=>isPendingRow(row)&&categoryTabForRow(row)===tab);
+}
 function pendingCounts(list){
   const counts={Piso:0,RX:0,TAC:0,USG:0};
-  for(const row of Array.isArray(list)?list:[]){if(isPendingRow(row))counts[categoryTabForRow(row)]++;}
+  for(const tab of CATEGORY_TABS)counts[tab]=rowsForCategoryTab(list,tab).length;
   return counts;
 }
 function preferredCategoryTab(list){
@@ -398,8 +406,14 @@ function render(){
   const pendingNow=rows.filter(isPendingRow),pendingIds=new Set(pendingNow.map((row)=>String(row.id)));
   for(const row of pendingNow){if(!knownPendingIds.has(String(row.id))){const tab=categoryTabForRow(row);if(tab!==activeCategoryTab)unseenCategoryTabs.add(tab);}}
   knownPendingIds=pendingIds;
-  const counts=pendingCounts(rows),visibleRows=rows.filter((row)=>categoryTabForRow(row)===activeCategoryTab),floorRows=visibleRows.filter(isCompleteFloorRow),incompleteRows=visibleRows.filter(isIncompleteFloorRow),imagingRows=visibleRows.filter((row)=>!hasFloorTarget(row));
-  const body=visibleRows.length?`${renderFloorSections(floorRows)}${renderIncompleteFloor(incompleteRows)}${renderImagingSections(imagingRows)}`:renderEmpty();
+  const counts=pendingCounts(rows),visibleRows=rowsForCategoryTab(rows,activeCategoryTab);
+  let body=renderEmpty();
+  if(visibleRows.length&&activeCategoryTab==='Piso'){
+    const floorRows=visibleRows.filter(isCompleteFloorRow),incompleteRows=visibleRows.filter((row)=>!isCompleteFloorRow(row));
+    body=`${renderFloorSections(floorRows)}${renderIncompleteFloor(incompleteRows)}`;
+  }else if(visibleRows.length){
+    body=renderImagingSections(visibleRows);
+  }
   root.innerHTML=`<main class="app-shell"><header class="topbar"><div class="brand"><span class="brand-dot"></span><h1>Pendientes</h1></div><div class="capture-actions" aria-label="Opciones"><button class="shift-btn" id="newShift" type="button" aria-label="Iniciar nuevo turno">↻ Turno</button><button class="capture-icon-btn" id="galleryCapture" type="button" aria-label="Elegir foto">${ICONS.photo}</button><button class="capture-icon-btn manual" id="manualCapture" type="button" aria-label="Captura manual">${ICONS.pencil}</button></div><input id="galleryInput" type="file" accept="image/*" multiple hidden /></header>${renderCategoryTabs(counts)}<div class="capture-status" id="captureStatus" hidden></div>${renderPhotoQueue()}<section id="category-panel" class="category-panel" role="tabpanel" aria-labelledby="category-tab-${activeCategoryTab.toLowerCase()}" data-active-category="${activeCategoryTab}">${body}</section></main>${renderUndo()}<div class="sheet-backdrop" id="sheetBackdrop" hidden><form class="capture-sheet" id="patientForm"><div class="sheet-handle"></div><div class="sheet-head"><div><div class="sheet-kicker">PENDIENTE</div><h2 id="sheetTitle">Capturar paciente</h2></div><button type="button" class="close-btn" id="closeSheet" aria-label="Cerrar">×</button></div><div class="form-grid">
     <label><span>Cama / área</span><input id="bed" name="bed" autocomplete="off" placeholder="15, CE2, UP1, UI1…" /></label>
     <label><span>Edad</span><input id="age" name="age" type="number" inputmode="numeric" min="0" max="130" autocomplete="off" placeholder="Años" /></label>
@@ -508,4 +522,4 @@ function startNewShift(){if(typeof window==='undefined')return;if(rows.length&&!
 
 if(root){render();if('serviceWorker' in navigator)window.addEventListener('load',()=>navigator.serviceWorker.register('/turno-rx/sw.js',{updateViaCache:'none'}).then((registration)=>registration.update()).catch(()=>{}));}
 
-export {displayOrigin,canonicalOrigin,compareOrigins,parseFloorTarget,floorGroupKey,rowFloorGroupKey,hasFloorTarget,isCompleteFloorRow,isIncompleteFloorRow,findDuplicateFloorOrigins,findConflictsAgainstExisting,rowKey,findMatchingRowIndex,normalizeAge,ageFromBirthDate,normalizeStudyDisplay,normalizeModality,normalizeCategory,isRayXStudyText,reviewFields,patientDedupeKey,imageFingerprint,compareFloorRows,compareImagingRows,effectiveTransport,normalizeVisionRow,mergeRow,mergeStudyTargets,commitPhotoResult,categoryTabForRow,pendingCounts,preferredCategoryTab};
+export {displayOrigin,canonicalOrigin,compareOrigins,parseFloorTarget,floorGroupKey,rowFloorGroupKey,hasFloorTarget,isCompleteFloorRow,isIncompleteFloorRow,findDuplicateFloorOrigins,findConflictsAgainstExisting,rowKey,findMatchingRowIndex,normalizeAge,ageFromBirthDate,normalizeStudyDisplay,normalizeModality,normalizeCategory,isRayXStudyText,reviewFields,patientDedupeKey,imageFingerprint,compareFloorRows,compareImagingRows,effectiveTransport,normalizeVisionRow,mergeRow,mergeStudyTargets,commitPhotoResult,categoryTabForRow,rowsForCategoryTab,pendingCounts,preferredCategoryTab};

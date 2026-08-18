@@ -15,7 +15,7 @@ test('define cuatro pestañas accesibles y un único panel activo',()=>{
   expect(source).toMatch(/CATEGORY_TABS=\['Piso','RX','TAC','USG'\]/);
   expect(source).toMatch(/role="tablist"/);expect(source).toMatch(/role="tab"/);
   expect(source).toMatch(/aria-selected=/);expect(source).toMatch(/role="tabpanel"/);
-  expect(source).toMatch(/visibleRows=rows\.filter/);
+  expect(source).toMatch(/visibleRows=rowsForCategoryTab/);
 });
 
 test('clasifica globalmente sin depender de la pestaña visible',()=>{
@@ -23,16 +23,24 @@ test('clasifica globalmente sin depender de la pestaña visible',()=>{
   expect(app.categoryTabForRow({category:'Rayos X',target:'Tórax'})).toBe('RX');
   expect(app.categoryTabForRow({category:'TAC',target:'TAC de cráneo'})).toBe('TAC');
   expect(app.categoryTabForRow({category:'USG',target:'USG abdomen'})).toBe('USG');
+  expect(app.categoryTabForRow({category:'',destination:'72',target:'72'})).toBe('Piso');
+  expect(app.categoryTabForRow({category:'Otro',destination:'72',destinationFloor:'Segundo'})).toBe('Piso');
 });
 
-test('cuenta solo pendientes, sin duplicar ni producir negativos',()=>{
+test('cada contador y panel usa exclusivamente pendientes de su categoría',()=>{
   const rows=[
     {id:'1',category:'Piso',status:'Pendiente'},
     {id:'2',category:'Rayos X',status:'Pendiente'},
     {id:'3',category:'TAC',status:'Realizado'},
-    {id:'4',category:'USG',status:'Pendiente'}
+    {id:'4',category:'USG',status:'Pendiente'},
+    {id:'5',category:'Piso',status:'Realizado'},
+    {id:'6',category:'Otro',destination:'72',status:'Pendiente'}
   ];
-  expect(app.pendingCounts(rows)).toEqual({Piso:1,RX:1,TAC:0,USG:1});
+  expect(app.pendingCounts(rows)).toEqual({Piso:2,RX:1,TAC:0,USG:1});
+  expect(app.rowsForCategoryTab(rows,'Piso').map((row)=>row.id)).toEqual(['1','6']);
+  expect(app.rowsForCategoryTab(rows,'RX').map((row)=>row.id)).toEqual(['2']);
+  expect(app.rowsForCategoryTab(rows,'TAC')).toEqual([]);
+  expect(app.rowsForCategoryTab(rows,'USG').map((row)=>row.id)).toEqual(['4']);
   expect(app.pendingCounts([])).toEqual({Piso:0,RX:0,TAC:0,USG:0});
 });
 
@@ -45,8 +53,8 @@ test('restaura pestaña y aplica prioridad Piso, RX, TAC, USG',()=>{
 });
 
 test('integra pestañas debajo de captura y conserva cola progresiva y gestos',()=>{
-  expect(index).toMatch(/category-tabs-v49\.css\?v=1/);expect(index).toMatch(/app-v16\.js\?v=6/);
-  expect(sw).toMatch(/turno-rx-shell-v49-tac-category-tabs/);expect(sw).toMatch(/category-tabs-v49\.css\?v=1/);
+  expect(index).toMatch(/category-tabs-v49\.css\?v=1/);expect(index).toMatch(/app-v16\.js\?v=7/);
+  expect(sw).toMatch(/turno-rx-shell-v51-tac-category-isolation/);expect(sw).toMatch(/category-tabs-v49\.css\?v=1/);
   expect(source).toMatch(/unseenCategoryTabs/);expect(source).toMatch(/renderPhotoQueue\(\)/);
   expect(css).toMatch(/touch-action:pan-x/);expect(css).toMatch(/min-height:44px/);
   expect(readFileSync('public/turno-rx/floor-workflow-v42.js','utf8')).toMatch(/SWIPE_THRESHOLD/);

@@ -26,7 +26,7 @@ const sw=read('public/turno-rx/sw.js');
 
 describe('Pendientes vista compacta',()=>{
   it('carga la capa compacta sin quitar la app principal',()=>{
-    expect(index).toContain('/turno-rx/app-v16.js?v=6');
+    expect(index).toContain('/turno-rx/app-v16.js?v=7');
     expect(index).toContain('/turno-rx/compact-v17.js?v=2');
     expect(index).toContain('/turno-rx/compact-v17.css?v=4');
     expect(index).toContain('/turno-rx/one-line-v24.css?v=1');

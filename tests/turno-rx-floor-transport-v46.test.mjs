@@ -42,7 +42,7 @@ test('el detalle de Piso muestra Destino y medio interactivo sin categoría dupl
 test('la caché fuerza la versión publicada del selector', () => {
   assert.match(index,/quick-transport-v37\.js\?v=2/);
   assert.match(index,/patient-detail-v39\.js\?v=3/);
-  assert.match(index,/app-v16\.js\?v=6/);
-  assert.match(sw,/turno-rx-shell-v49-tac-category-tabs/);
+  assert.match(index,/app-v16\.js\?v=7/);
+  assert.match(sw,/turno-rx-shell-v51-tac-category-isolation/);
   assert.match(sw,/quick-transport-v37\.js\?v=2/);
 });
