@@ -13,14 +13,15 @@ test('v70 resuelve una foto duplicada como no-op exitoso y conserva historial de
   expect(history).toContain('imageFingerprints:unique');
 });
 
-test('v70 fuerza assets y shell nuevos para no mezclar el contrato anterior en iPhone',()=>{
+test('v71 conserva assets v70 y shell actual sin mezclar el contrato anterior en iPhone',()=>{
   const index=readFileSync('public/turno-rx/index.html','utf8');
   const sw=readFileSync('public/turno-rx/sw.js','utf8');
 
   expect(index).toContain('/turno-rx/photo-fingerprint-history-v70.js?v=70');
   expect(index).toContain('/turno-rx/photo-dedupe-v68.js?v=70');
-  expect(index).toContain('Pendientes v70');
+  expect(index).toContain('Pendientes v71');
   expect(sw).toContain("const CACHE = 'pendientes-shell-20260818-6'");
   expect(sw).toContain('/turno-rx/photo-fingerprint-history-v70.js?v=70');
   expect(sw).toContain('/turno-rx/photo-dedupe-v68.js?v=70');
+  expect(sw).toContain('/turno-rx/floor-intelligence-v64.js?v=64');
 });

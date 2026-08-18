@@ -1,15 +1,18 @@
 import {expect,test} from 'vitest';
 import {readFileSync} from 'node:fs';
 
-test('v64 carga inteligencia de Piso antes de app sin mutar almacenamiento',()=>{
+test('v71 carga inteligencia de Piso antes del app activo sin mutar almacenamiento',()=>{
   const floor=readFileSync('public/turno-rx/floor-intelligence-v64.js','utf8');
   const gesture=readFileSync('public/turno-rx/row-actions-v61.js','utf8');
   const index=readFileSync('public/turno-rx/index.html','utf8');
+  const floorScript='<script src="/turno-rx/floor-intelligence-v64.js?v=64"></script>';
+  const appScript='<script type="module" src="/turno-rx/app-v16.js?v=65"></script>';
 
   expect(()=>new Function(floor)).not.toThrow();
   expect(()=>new Function(gesture)).not.toThrow();
-  expect(index.indexOf('floor-intelligence-v64.js?v=64')).toBeGreaterThan(-1);
-  expect(index.indexOf('floor-intelligence-v64.js?v=64')).toBeLessThan(index.indexOf('app-v16.js?v=58'));
+  expect(index).toContain(floorScript);
+  expect(index).toContain(appScript);
+  expect(index.indexOf(floorScript)).toBeLessThan(index.indexOf(appScript));
   expect(index).not.toContain('<script src="/turno-rx/floor-photo-reconcile-v62.js?v=62"></script>');
   expect(index).not.toContain('<script src="/turno-rx/floor-photo-prompt-v63.js?v=63"></script>');
   expect(index).toContain('row-actions-v61.css?v=61');
