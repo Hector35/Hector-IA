@@ -1,0 +1,71 @@
+/* Pendientes v29 — la X siempre accesible en fichas/formularios largos. */
+
+/* Respeta la zona segura superior del iPhone para que el panel nunca quede
+   debajo de la hora, señal o batería. */
+.sheet-backdrop,
+.compact-detail-backdrop {
+  padding-top: max(10px, calc(env(safe-area-inset-top) + 8px)) !important;
+}
+
+/* El alto máximo se limita al área realmente utilizable del backdrop. */
+.capture-sheet,
+.compact-detail-sheet {
+  max-height: 100% !important;
+  overscroll-behavior: contain;
+  -webkit-overflow-scrolling: touch;
+}
+
+/* El encabezado y la X permanecen visibles mientras se desplaza el contenido. */
+.sheet-head,
+.compact-detail-head {
+  position: sticky !important;
+  top: 0 !important;
+  z-index: 30 !important;
+  margin-left: -4px !important;
+  margin-right: -4px !important;
+  padding: 7px 4px 10px !important;
+  background: linear-gradient(
+    180deg,
+    rgba(20, 36, 47, 1) 0%,
+    rgba(20, 36, 47, .995) 78%,
+    rgba(20, 36, 47, .92) 100%
+  ) !important;
+  box-shadow: 0 8px 14px rgba(7,16,23,.16);
+}
+
+/* Área táctil mínima cómoda en iPhone. */
+.close-btn,
+.compact-detail-close {
+  position: relative !important;
+  z-index: 31 !important;
+  flex: 0 0 44px !important;
+  width: 44px !important;
+  height: 44px !important;
+  min-width: 44px !important;
+  min-height: 44px !important;
+  touch-action: manipulation;
+}
+
+/* Evita que un nombre muy largo empuje la X fuera del panel. */
+.sheet-head > div,
+.compact-detail-head > div {
+  min-width: 0 !important;
+  flex: 1 1 auto !important;
+}
+
+.sheet-head h2,
+.compact-detail-head h2 {
+  overflow-wrap: anywhere;
+}
+
+@media (max-width: 430px) {
+  .sheet-backdrop,
+  .compact-detail-backdrop {
+    padding-top: max(8px, calc(env(safe-area-inset-top) + 6px)) !important;
+  }
+
+  .sheet-head,
+  .compact-detail-head {
+    padding-top: 6px !important;
+  }
+}
