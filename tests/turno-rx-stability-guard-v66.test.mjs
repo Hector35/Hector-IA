@@ -53,8 +53,9 @@ describe('Pendientes stability guard v66',()=>{
     const sw=readFileSync('public/turno-rx/sw.js','utf8');
     expect(index.indexOf('stability-guard-v66.js?v=66')).toBeGreaterThan(-1);
     expect(index.indexOf('stability-guard-v66.js?v=66')).toBeLessThan(index.indexOf('stability.js?v=20260818.1'));
-    expect(sw).toContain("const CACHE = 'pendientes-shell-20260818-3'");
+    expect(sw).toContain("const CACHE = 'pendientes-shell-20260818-4'");
     expect(sw).toContain('/turno-rx/stability-guard-v66.js?v=66');
     expect(sw).toContain('/turno-rx/review-confidence-v67.js?v=67');
+    expect(sw).toContain('/turno-rx/photo-dedupe-v68.js?v=68');
   });
 });
