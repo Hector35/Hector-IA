@@ -1,4 +1,4 @@
-const CACHE = 'turno-rx-shell-v38-manual-quick';
+const CACHE = 'turno-rx-shell-v39-patient-detail';
 const SHELL = [
   '/turno-rx/',
   '/turno-rx/index.html',
@@ -18,7 +18,9 @@ const SHELL = [
   '/turno-rx/premium-v36.css?v=1',
   '/turno-rx/premium-v37.css?v=1',
   '/turno-rx/manual-quick-v38.css?v=1',
+  '/turno-rx/patient-detail-v39.css?v=1',
   '/turno-rx/quick-transport-v37.js?v=1',
+  '/turno-rx/patient-detail-v39.js?v=1',
   '/turno-rx/app-v16.js?v=2',
   '/turno-rx/compact-v17.js?v=2',
   '/turno-rx/transport-v20.js?v=3',
