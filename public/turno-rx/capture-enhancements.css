@@ -101,6 +101,111 @@
   white-space: normal;
 }
 
+.floor-board {
+  display: grid;
+  gap: 18px;
+}
+
+.floor-group {
+  padding-top: 2px;
+}
+
+.floor-group + .floor-group {
+  padding-top: 18px;
+  border-top: 1px solid rgba(130, 184, 214, .13);
+}
+
+.floor-group-title,
+.other-section-title {
+  margin: 0 4px 7px;
+  color: #dce9ef;
+  font-size: 15px;
+  font-weight: 800;
+  letter-spacing: -.01em;
+}
+
+.floor-group-title strong {
+  color: #86defb;
+}
+
+.floor-table-wrap {
+  overflow: hidden;
+  border: 1px solid rgba(120, 177, 207, .14);
+  border-radius: 15px;
+  background: rgba(13, 25, 34, .72);
+}
+
+.floor-group-table {
+  width: 100%;
+  border-collapse: collapse;
+  table-layout: fixed;
+}
+
+.floor-group-table th {
+  width: 50%;
+  padding: 9px 13px 7px;
+  background: rgba(7, 16, 23, .42);
+  color: #7991a1;
+  font-size: 9.5px;
+  text-align: left;
+}
+
+.floor-group-table td {
+  width: 50%;
+  padding: 11px 13px;
+  border: 0;
+  border-top: 1px solid rgba(120, 177, 207, .09);
+  border-radius: 0 !important;
+  background: transparent;
+  font-size: 15px;
+  vertical-align: middle;
+}
+
+.floor-group-table tbody tr:first-child td {
+  border-top: 0;
+}
+
+.floor-origin strong {
+  color: #8fe1fb;
+  font-size: 16px;
+  font-weight: 950;
+}
+
+.floor-destination-line {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+}
+
+.floor-destination-line > strong {
+  color: #f2f7fa;
+  font-size: 16px;
+  font-weight: 900;
+}
+
+.floor-group-table .remove-btn {
+  flex: 0 0 auto;
+}
+
+.floor-total {
+  margin: -2px 4px 2px;
+  padding-top: 13px;
+  border-top: 1px solid rgba(130, 184, 214, .13);
+  color: #91a8b6;
+  font-size: 13px;
+}
+
+.floor-total strong {
+  color: #f4f8fb;
+}
+
+.other-pending-section {
+  margin-top: 24px;
+  padding-top: 18px;
+  border-top: 1px solid rgba(130, 184, 214, .13);
+}
+
 @media (max-width: 430px) {
   .topbar {
     gap: 8px;
@@ -132,6 +237,33 @@
   .age-line span,
   .transport-reason span {
     font-size: 7.8px;
+  }
+
+  .floor-board {
+    gap: 15px;
+  }
+
+  .floor-group + .floor-group {
+    padding-top: 15px;
+  }
+
+  .floor-group-title,
+  .other-section-title {
+    font-size: 14px;
+  }
+
+  .floor-group-table th {
+    padding: 8px 11px 6px;
+    font-size: 9px;
+  }
+
+  .floor-group-table td {
+    padding: 10px 11px;
+  }
+
+  .floor-origin strong,
+  .floor-destination-line > strong {
+    font-size: 15px;
   }
 }
 
