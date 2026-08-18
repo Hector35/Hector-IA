@@ -286,8 +286,8 @@
 
   function wireCaptureActions(main) {
     main.querySelector('#v37Menu')?.addEventListener('click', openDrawer);
-    main.querySelector('#v37Camera')?.addEventListener('click', () => prepareGalleryInput('camera')?.click());
-    main.querySelector('#v37Photo')?.addEventListener('click', () => prepareGalleryInput('gallery')?.click());
+    main.querySelector('#v37Camera')?.addEventListener('click', () => prepareGalleryInput('camera'));
+    main.querySelector('#v37Photo')?.addEventListener('click', () => prepareGalleryInput('gallery'));
     main.querySelector('#v37Manual')?.addEventListener('click', () => document.getElementById('manualCapture')?.click());
     const input = document.getElementById('galleryInput');
     input?.addEventListener('change', () => {
@@ -325,7 +325,7 @@
     const capture = document.createElement('section');
     capture.className = 'v37-capture-bar';
     capture.setAttribute('aria-label', 'Captura rápida');
-    capture.innerHTML = `<button type="button" class="v37-capture-btn" id="v37Camera">${ICONS.camera}<span>Cámara</span></button><button type="button" class="v37-capture-btn" id="v37Photo">${ICONS.photo}<span>Foto</span></button><button type="button" class="v37-capture-btn v37-primary" id="v37Manual">${ICONS.pencil}<span>Manual</span></button>`;
+    capture.innerHTML = `<label class="v37-capture-btn" id="v37Camera" for="galleryInput">${ICONS.camera}<span>Cámara</span></label><label class="v37-capture-btn" id="v37Photo" for="galleryInput">${ICONS.photo}<span>Foto</span></label><button type="button" class="v37-capture-btn v37-primary" id="v37Manual">${ICONS.pencil}<span>Manual</span></button>`;
 
     if (topbar) topbar.insertAdjacentElement('beforebegin', header);
     else main.prepend(header);

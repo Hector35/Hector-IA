@@ -43,6 +43,6 @@ test('la caché fuerza la versión publicada del selector', () => {
   assert.match(index,/quick-transport-v37\.js\?v=2/);
   assert.match(index,/patient-detail-v39\.js\?v=3/);
   assert.match(index,/app-v16\.js\?v=8/);
-  assert.match(sw,/turno-rx-shell-v53-tac-category-isolation/);
+  assert.match(sw,/turno-rx-shell-v54-tac-category-isolation/);
   assert.match(sw,/quick-transport-v37\.js\?v=2/);
 });

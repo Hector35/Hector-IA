@@ -1,4 +1,4 @@
-const CACHE = 'turno-rx-shell-v53-tac-category-isolation-photo-feedback-clinical-ui';
+const CACHE = 'turno-rx-shell-v54-tac-category-isolation-ios-photo-picker-feedback-clinical-ui';
 const SHELL = [
   '/turno-rx/',
   '/turno-rx/index.html',
@@ -37,7 +37,7 @@ const SHELL = [
   '/turno-rx/cama-label-v28.js?v=1',
   '/turno-rx/polish-v32.js?v=1',
   '/turno-rx/full-redesign-v33.js?v=1',
-  '/turno-rx/premium-v37.js?v=2',
+  '/turno-rx/premium-v37.js?v=3',
   '/turno-rx/manual-quick-v38.js?v=1',
   '/turno-rx/tac-flow-v42.js?v=1',
   '/turno-rx/manifest.webmanifest',
