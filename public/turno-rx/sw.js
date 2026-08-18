@@ -1,4 +1,4 @@
-// v64: reconciliación por renglón + destino de Piso por cama/servicio + tabla operativa limpia.
+// v65: estabilidad de captura manual + reconciliación segura sobre la inteligencia de Piso v64.
 const CACHE = 'turno-rx-shell-v58-tac-live-interaction-hotfix';
 const SHELL = [
   '/turno-rx/',
@@ -31,9 +31,11 @@ const SHELL = [
   '/turno-rx/row-actions-v60.css?v=60',
   '/turno-rx/row-actions-v61.css?v=61',
   '/turno-rx/boleta-visibility-v64.css?v=64',
+  '/turno-rx/stability-v65.css?v=65',
   '/turno-rx/quick-transport-v37.js?v=2',
   '/turno-rx/patient-detail-v39.js?v=4',
   '/turno-rx/floor-intelligence-v64.js?v=64',
+  '/turno-rx/stability-v65.js?v=65',
   '/turno-rx/app-v16.js?v=58',
   '/turno-rx/progressive-photo-queue-v45.js',
   '/turno-rx/floor-workflow-v42.js?v=58',

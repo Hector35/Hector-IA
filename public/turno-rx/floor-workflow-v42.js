@@ -12,6 +12,7 @@
     }
   }
 
+  // Compatibilidad/fallback: v65 usa row-actions-v60 como único escritor de estado táctil.
   function markRealized(id) {
     const rows = readRows();
     let changed = false;
@@ -23,7 +24,7 @@
     });
     if (!changed) return;
     localStorage.setItem(STORAGE_KEY, JSON.stringify(next));
-    document.dispatchEvent(new CustomEvent('pendientes:status-changed', {detail:{id:String(id),status:'Realizado',source:'Piso'}}));
+    document.dispatchEvent(new CustomEvent('pendientes:status-changed', {detail:{id:String(id),status:'Realizado',source:'Piso-fallback'}}));
   }
 
   function floorRow(target) {
@@ -57,7 +58,7 @@
     gesture = null;
     row.style.transform = '';
     row.classList.remove('is-swipe-ready');
-    if (dx <= -SWIPE_THRESHOLD) markRealized(row.dataset.id);
+    if (dx <= -SWIPE_THRESHOLD && window.__PENDIENTES_GLOBAL_STATUS_GESTURES__ !== true) markRealized(row.dataset.id);
   }
 
   const style = document.createElement('style');

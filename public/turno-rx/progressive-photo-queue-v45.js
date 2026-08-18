@@ -52,12 +52,31 @@ function normalizeTransport(value){
   if(text.includes('definir')||text.includes('pendiente'))return 'Por definir';
   return clean(value);
 }
+function visibleSex(value){const text=plain(value);return text&&text!=='no visible'?text:'';}
+function pendingIdentityConflict(existing,incoming){
+  const existingName=canonicalName(existing?.name),incomingName=canonicalName(incoming?.name);
+  if(existingName.length>=4&&incomingName.length>=4&&existingName!==incomingName&&!oneEditApart(existingName,incomingName))return 'nombre';
+  const existingSex=visibleSex(existing?.sex),incomingSex=visibleSex(incoming?.sex);
+  if(existingSex&&incomingSex&&existingSex!==incomingSex)return 'sexo';
+  return '';
+}
+function unresolvedReviewFields(existing,incoming,merged){
+  const fields=new Set([...(existing?.reviewFields||[]),...(incoming?.reviewFields||[])]);
+  const incomingFields=new Set(incoming?.reviewFields||[]);
+  if(canonicalOrigin(incoming?.bed)&&!incomingFields.has('bed'))fields.delete('bed');
+  if(clean(incoming?.name)&&!incomingFields.has('name'))fields.delete('name');
+  if(incoming?.age!==null&&incoming?.age!==undefined&&clean(incoming?.age)!==''&&!incomingFields.has('age'))fields.delete('age');
+  if(visibleSex(incoming?.sex)&&!incomingFields.has('sex'))fields.delete('sex');
+  if(clean(incoming?.destination||incoming?.target)&&!incomingFields.has('target'))fields.delete('target');
+  if(!canonicalOrigin(merged?.bed))fields.add('bed');
+  return [...fields];
+}
 function mergeFloorPending(existing,incoming){
   const incomingTransport=normalizeTransport(incoming?.transport),existingTransport=normalizeTransport(existing?.transport);
   const manual=existing?.manualTransportOverride===true&&['Silla','Camilla','Por definir'].includes(existingTransport);
   const target=clean(incoming?.target)||clean(incoming?.destination)||clean(existing?.target)||clean(existing?.destination);
   const portable=/port[áa]til/i.test(target);
-  return {
+  const merged={
     ...existing,
     bed:clean(incoming?.bed)||clean(existing?.bed),
     name:clean(incoming?.name)||clean(existing?.name),
@@ -68,13 +87,12 @@ function mergeFloorPending(existing,incoming){
     destination:clean(incoming?.destination)||clean(incoming?.target)||clean(existing?.destination)||clean(existing?.target),
     destinationFloor:clean(incoming?.destinationFloor)||clean(existing?.destinationFloor),
     destinationBlock:clean(incoming?.destinationBlock)||clean(existing?.destinationBlock),
+    destinationService:clean(incoming?.destinationService)||clean(existing?.destinationService),
     service:clean(incoming?.service)||clean(existing?.service),
     originService:clean(incoming?.originService)||clean(existing?.originService),
     transferNotes:clean(incoming?.transferNotes)||clean(existing?.transferNotes),
     recognizedText:clean(incoming?.recognizedText)||clean(existing?.recognizedText),
     confidence:{...(existing?.confidence||{}),...(incoming?.confidence||{})},
-    needsReview:Boolean(existing?.needsReview||incoming?.needsReview),
-    reviewFields:[...new Set([...(existing?.reviewFields||[]),...(incoming?.reviewFields||[])])],
     imageFingerprint:clean(incoming?.imageFingerprint)||clean(existing?.imageFingerprint),
     transport:portable?'No trasladar':manual?existingTransport:(incomingTransport&&incomingTransport!=='Por definir'?incomingTransport:(existingTransport||incomingTransport||'Por definir')),
     transportReason:manual?clean(existing?.transportReason):(clean(incoming?.transportReason)||clean(existing?.transportReason)),
@@ -82,6 +100,9 @@ function mergeFloorPending(existing,incoming){
     oxygenReason:clean(incoming?.oxygenReason)||clean(existing?.oxygenReason),
     status:clean(existing?.status)||'Pendiente'
   };
+  merged.reviewFields=unresolvedReviewFields(existing,incoming,merged);
+  merged.needsReview=merged.reviewFields.length>0||Boolean(incoming?.needsReview&&!(incoming?.reviewFields||[]).length);
+  return merged;
 }
 function reviewRow(message,source={}){
   return {...source,id:source?.id||`review-${Date.now()}-${Math.random().toString(16).slice(2)}`,category:'Piso',bed:'',handwrittenBed:'',formBed:'',captureReviewOnly:true,needsReview:true,reviewFields:[...new Set([...(source?.reviewFields||[]),'bed'])],transferNotes:[clean(source?.transferNotes),message].filter(Boolean).join(' · '),recognizedText:[clean(source?.recognizedText),message].filter(Boolean).join(' · ')};
@@ -121,6 +142,12 @@ export function planPhotoReconciliation(existingRows,analyzed){
         continue;
       }
       if(pendingMatches.length===1){
+        const identityConflict=pendingIdentityConflict(pendingMatches[0],incoming);
+        if(identityConflict){
+          metrics.review+=1;
+          generatedReview.push(reviewRow(`El origen ${origin.replace(/^N:/,'')} ya tiene un pendiente activo con ${identityConflict} diferente. No se sobrescribió; revisa solo esa cama.`,incoming));
+          continue;
+        }
         const index=current.indexOf(pendingMatches[0]);
         current[index]=mergeFloorPending(pendingMatches[0],incoming);
         metrics.updated+=1;storageChanged=true;continue;
@@ -155,7 +182,7 @@ function applyReconciliation(analyzed){
   const plan=planPhotoReconciliation(stored,analyzed);
   if(plan.storageChanged){
     localStorage.setItem(STORAGE_KEY,JSON.stringify(plan.nextRows));
-    if(typeof document!=='undefined')document.dispatchEvent(new CustomEvent('pendientes:status-changed',{detail:{source:'photo-reconciliation-v63',...plan.metrics}}));
+    if(typeof document!=='undefined'&&typeof CustomEvent!=='undefined')document.dispatchEvent(new CustomEvent('pendientes:status-changed',{detail:{source:'photo-reconciliation-v65',...plan.metrics}}));
   }
   return plan;
 }
@@ -164,15 +191,23 @@ export function createPhotoJobs(files){
   return [...files].map((file,index)=>({id:`photo-${Date.now()}-${index}-${Math.random().toString(16).slice(2)}`,index,file,name:file?.name||`Foto ${index+1}`,state:PHOTO_JOB_STATES.WAITING,patientsAdded:0,patientsUpdated:0,duplicatesSkipped:0,error:'',reviewReason:''}));
 }
 
+function publishSummary(jobs){
+  const summary=photoQueueSummary(jobs);
+  if(typeof window!=='undefined')window.__pendientesPhotoQueueSummaryV65=summary;
+  if(typeof document!=='undefined'&&typeof CustomEvent!=='undefined')document.dispatchEvent(new CustomEvent('pendientes:photo-queue-summary',{detail:summary}));
+  return summary;
+}
+function notify(job,jobs,onUpdate){onUpdate(job,jobs);publishSummary(jobs);}
+
 export async function runPhotoJobs(jobs,{analyze,commit,onUpdate=()=>{},shouldStop=()=>false}={}){
   for(const job of jobs){
     if(shouldStop()){
       if(job.state===PHOTO_JOB_STATES.WAITING)job.state=PHOTO_JOB_STATES.STOPPED;
-      onUpdate(job,jobs);
+      notify(job,jobs,onUpdate);
       continue;
     }
     if(job.state!==PHOTO_JOB_STATES.WAITING&&job.state!==PHOTO_JOB_STATES.ERROR)continue;
-    job.state=PHOTO_JOB_STATES.ANALYZING;job.error='';job.reviewReason='';onUpdate(job,jobs);
+    job.state=PHOTO_JOB_STATES.ANALYZING;job.error='';job.reviewReason='';notify(job,jobs,onUpdate);
     try{
       const result=await analyze(job.file,job);
       const prepared=applyReconciliation(result);
@@ -190,8 +225,9 @@ export async function runPhotoJobs(jobs,{analyze,commit,onUpdate=()=>{},shouldSt
       job.state=PHOTO_JOB_STATES.ERROR;
       job.error=error instanceof Error?error.message:'No se pudo leer esta fotografía.';
     }
-    onUpdate(job,jobs);
+    notify(job,jobs,onUpdate);
   }
+  publishSummary(jobs);
   return jobs;
 }
 
