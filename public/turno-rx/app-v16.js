@@ -29,10 +29,10 @@ const FLOOR_GROUPS=[
   {key:'por-ubicar',label:'Destino por ubicar'}
 ];
 
-const MODALITY_ORDER=['Rayos X','TAC','Ultrasonido','Otro'];
+const MODALITY_ORDER=['Rayos X','TAC','Ultrasonido','Interconsulta','Apoyo para movimiento','Otro'];
 
 const VISION_PROMPT=`Analiza esta foto de una solicitud, boleta o pizarrón hospitalario para crear pendientes operativos de traslado. Devuelve SOLO JSON válido, sin markdown, con este formato exacto:
-{"patients":[{"handwrittenBed":"","formBed":"","waitingRoomMarked":false,"bed":"","name":"","birthDate":null,"age":null,"sex":"Mujer|Hombre|No visible","target":"","modality":"Rayos X|TAC|Ultrasonido|Otro","diagnosis":"","diagnosisMeaning":"","transport":"Silla|Camilla|No trasladar|Por definir","transportReason":"","oxygenProbable":false,"oxygenReason":""}]}.
+{"patients":[{"category":"Rayos X|TAC|USG|Piso|Interconsulta|Apoyo para movimiento","handwrittenBed":"","formBed":"","waitingRoomMarked":false,"bed":"","name":"","birthDate":null,"age":null,"sex":"Mujer|Hombre|No visible","target":"","destination":"","destinationFloor":"","destinationBlock":"","modality":"Rayos X|TAC|Ultrasonido|Otro","diagnosis":"","diagnosisMeaning":"","transport":"Silla|Camilla|No trasladar|Por definir","transportReason":"","oxygenProbable":false,"oxygenReason":""}]}.
 
 Extrae únicamente datos VISIBLES. No inventes nombres, edades, estudios, diagnósticos, antecedentes, camas, destinos ni hechos clínicos. Si algo clínico no se alcanza a leer con seguridad, déjalo vacío; nunca lo completes por contexto.
 
@@ -45,9 +45,11 @@ CAMA / ÁREA:
 
 PIZARRÓN A PISO:
 - Si la foto es un pizarrón de pacientes que SUBEN A PISO, cada renglón es ORIGEN EN URGENCIAS -> CAMA DESTINO DE PISO. bed es el origen y target debe ser SOLO la cama destino o área especial visible como UEH.
+- Para esos renglones category debe ser "Piso". Guarda también destination con la cama destino visible, destinationFloor con el piso visible y destinationBlock con A/B solo cuando se lean con seguridad. No deduzcas piso o bloque si la foto no lo confirma; la app puede mapear una cama confirmada después.
 - En un mismo pizarrón no debe haber dos pacientes distintos en la misma cama de origen. Si parece duplicarse, revisa números parecidos antes de responder.
 
 IMAGENOLOGÍA:
+- Usa category "Rayos X", "TAC" o "USG" según corresponda. Usa "Interconsulta" y "Apoyo para movimiento" únicamente cuando la solicitud visible sea realmente de ese tipo. Nunca clasifiques una boleta de imagen como Piso solo porque contenga números.
 - target debe contener el estudio solicitado tal como se entiende de la boleta.
 - modality SIEMPRE separada: TAC/tomografía -> TAC; USG/ultrasonido/ecografía -> Ultrasonido; radiografía/RX/tele de tórax/proyecciones AP-lateral-oblicua -> Rayos X. Nunca mezcles TAC ni USG dentro de Rayos X.
 - Si hay tórax junto con otro estudio, conserva ambos; la interfaz pondrá Tórax primero.
@@ -126,6 +128,24 @@ function normalizeModality(value,target=''){
   return 'Otro';
 }
 
+function normalizeCategory(value,modality='',target=''){
+  const explicit=clean(value).toLowerCase();
+  if(explicit==='piso'||/subir\s+a\s+piso|traslado\s+a\s+piso/.test(explicit))return 'Piso';
+  if(/interconsulta/.test(explicit))return 'Interconsulta';
+  if(/apoyo(?:\s+para)?\s+(?:el\s+)?movimiento|apoyo\s+movimiento/.test(explicit))return 'Apoyo para movimiento';
+  if(/tac|tomograf|^tc$/.test(explicit))return 'TAC';
+  if(/usg|ultrason|ecograf/.test(explicit))return 'USG';
+  if(/rayos|radiograf|^rx$/.test(explicit))return 'Rayos X';
+  const normalized=normalizeModality(modality,target);
+  if(normalized==='TAC')return 'TAC';
+  if(normalized==='Ultrasonido')return 'USG';
+  if(normalized==='Rayos X')return 'Rayos X';
+  const targetText=clean(target).toLowerCase();
+  if(targetText==='interconsulta')return 'Interconsulta';
+  if(/apoyo(?:\s+para)?\s+(?:el\s+)?movimiento/.test(targetText))return 'Apoyo para movimiento';
+  return 'Otro';
+}
+
 function normalizeStudyDisplay(value){
   let text=clean(value);
   if(!text)return '—';
@@ -179,9 +199,24 @@ function floorGroupKey(target){
   const parsed=parseFloorTarget(target);if(!parsed)return null;if(parsed.type==='special')return 'ueh';const n=parsed.value;
   if(n>=1&&n<=44)return 'primero';if(n>=45&&n<=88)return 'segundo';if(n>=89&&n<=132)return 'tercero';if(n>=133&&n<=165)return 'segundo-otra';if(n>=166&&n<=189)return 'tercero-otra';if(n>=190&&n<=204)return 'quinto-otra';return 'por-ubicar';
 }
-function hasFloorTarget(row){return floorGroupKey(row?.target)!==null;}
-function isCompleteFloorRow(row){return hasFloorTarget(row)&&Boolean(canonicalOrigin(row?.bed));}
-function isIncompleteFloorRow(row){return hasFloorTarget(row)&&!canonicalOrigin(row?.bed);}
+function explicitFloorGroup(row){
+  const floor=clean(row?.destinationFloor||row?.floor).toLowerCase(),block=clean(row?.destinationBlock||row?.block).toLowerCase();
+  const other=/\ba\b|otra\s+unidad|otro\s+bloque/.test(block)||/otra\s+unidad/.test(floor);
+  if(/quinto|5(?:º|°|o)?/.test(floor)&&other)return 'quinto-otra';
+  if(/tercero|3(?:º|°|o)?/.test(floor))return other?'tercero-otra':'tercero';
+  if(/segundo|2(?:º|°|o)?/.test(floor))return other?'segundo-otra':'segundo';
+  if(/primero|1(?:º|°|o)?/.test(floor))return 'primero';
+  return null;
+}
+function rowFloorGroupKey(row){return explicitFloorGroup(row)||floorGroupKey(row?.destination||row?.target);}
+function hasFloorTarget(row){
+  const category=normalizeCategory(row?.category,row?.modality,row?.target);
+  if(category==='Piso')return true;
+  if(clean(row?.category))return false;
+  return floorGroupKey(row?.target)!==null;
+}
+function isCompleteFloorRow(row){return hasFloorTarget(row)&&Boolean(canonicalOrigin(row?.bed))&&Boolean(rowFloorGroupKey(row));}
+function isIncompleteFloorRow(row){return hasFloorTarget(row)&&!isCompleteFloorRow(row);}
 function findDuplicateFloorOrigins(candidateRows){const seen=new Set(),duplicates=new Set();for(const row of candidateRows.filter((item)=>hasFloorTarget(item))){const key=canonicalOrigin(row.bed);if(!key)continue;if(seen.has(key))duplicates.add(displayOrigin(row.bed));seen.add(key);}return [...duplicates].sort((a,b)=>a.localeCompare(b,'es-MX',{numeric:true}));}
 function findConflictsAgainstExisting(existingRows,incomingRows,excludeId=null){
   const active=new Map();for(const row of existingRows){if(row.id===excludeId||!hasFloorTarget(row))continue;const key=canonicalOrigin(row.bed);if(key)active.set(key,row);}
@@ -189,15 +224,15 @@ function findConflictsAgainstExisting(existingRows,incomingRows,excludeId=null){
   return [...conflicts].sort((a,b)=>a.localeCompare(b,'es-MX',{numeric:true}));
 }
 function normalizedTarget(value){const parsed=parseFloorTarget(value);return parsed?parsed.display.toLowerCase():clean(value).toLowerCase().replace(/\s+/g,' ');}
-function rowKey(row){return [canonicalOrigin(row.bed),clean(row.name).toLowerCase(),normalizedTarget(row.target)].join('|');}
-function findMatchingRowIndex(list,incoming){const key=rowKey(incoming);if(key==='||')return -1;return list.findIndex((row)=>rowKey(row)===key);}
+function rowKey(row){return [normalizeCategory(row?.category,row?.modality,row?.target),canonicalOrigin(row.bed),clean(row.name).toLowerCase(),normalizedTarget(row.destination||row.target)].join('|');}
+function findMatchingRowIndex(list,incoming){const key=rowKey(incoming);if(key==='|||')return -1;return list.findIndex((row)=>rowKey(row)===key);}
 
 function newShiftMeta(){return {id:uid(),startedAt:new Date().toISOString()};}
 function archiveShift(shiftMeta,shiftRows){if(!shiftRows.length||!hasStorage())return;const history=read(HISTORY_KEY,[]);write(HISTORY_KEY,[{shift:shiftMeta,rows:shiftRows,archivedAt:new Date().toISOString()},...history].slice(0,7));}
 function upgradeRow(row,shiftId){
-  const target=clean(row?.target||row?.study||row?.destination);
+  const target=clean(row?.target||row?.study||row?.destination),legacyFloor=!clean(row?.category)&&Boolean(clean(row?.destination)||floorGroupKey(target)),category=legacyFloor?'Piso':normalizeCategory(row?.category,row?.modality,target);
   const portable=/port[áa]til/i.test(target);
-  return {...row,id:row?.id||uid(),shiftId:shiftId||row?.shiftId,bed:normalizeBedCandidate(row?.bed),name:clean(row?.name),age:normalizeAge(row?.age),sex:normalizeSex(row?.sex),target,modality:normalizeModality(row?.modality,target),diagnosis:clean(row?.diagnosis),diagnosisMeaning:clean(row?.diagnosisMeaning),transport:portable?'No trasladar':(normalizeTransport(row?.transport)||'Por definir'),transportReason:clean(row?.transportReason),oxygenProbable:Boolean(row?.oxygenProbable),oxygenReason:row?.oxygenProbable?clean(row?.oxygenReason):'',createdAt:row?.createdAt||new Date().toISOString()};
+  return {...row,id:row?.id||uid(),shiftId:shiftId||row?.shiftId,bed:normalizeBedCandidate(row?.bed),name:clean(row?.name),age:normalizeAge(row?.age),sex:normalizeSex(row?.sex),target,destination:clean(row?.destination),destinationFloor:clean(row?.destinationFloor||row?.floor),destinationBlock:clean(row?.destinationBlock||row?.block),category,modality:normalizeModality(row?.modality,target),status:clean(row?.status)||'Pendiente',diagnosis:clean(row?.diagnosis),diagnosisMeaning:clean(row?.diagnosisMeaning),transport:portable?'No trasladar':(normalizeTransport(row?.transport)||'Por definir'),transportReason:clean(row?.transportReason),oxygenProbable:Boolean(row?.oxygenProbable),oxygenReason:row?.oxygenProbable?clean(row?.oxygenReason):'',createdAt:row?.createdAt||new Date().toISOString()};
 }
 function bootstrapState(){
   let shift=read(SHIFT_KEY,null),current=read(STORAGE_KEY,null);if(!Array.isArray(current))current=read(LEGACY_STORAGE_KEY,null);
@@ -214,6 +249,7 @@ function save(){write(STORAGE_KEY,rows);write(SHIFT_KEY,shift);}
 
 function effectiveTransport(row){if(/port[áa]til/i.test(clean(row?.target)))return 'No trasladar';return normalizeTransport(row?.transport)||'Por definir';}
 function transportRank(row){const t=effectiveTransport(row);if(t==='Silla')return 0;if(t==='Camilla')return 1;if(t==='No trasladar')return 2;return 3;}
+function compareFloorRows(a,b){const transport=transportRank(a)-transportRank(b);return transport||compareOrigins(a,b);}
 function compareImagingRows(a,b){
   const tr=transportRank(a)-transportRank(b);if(tr)return tr;
   const sexRank=(row)=>normalizeSex(row.sex)==='Mujer'?0:normalizeSex(row.sex)==='Hombre'?1:2;
@@ -227,9 +263,9 @@ function renderTransport(row){
   const type=effectiveTransport(row);const icon=type==='Camilla'?'🛏️':type==='Silla'?'♿':type==='No trasladar'?'🚫':'•';const klass=type==='Camilla'?'camilla':type==='Silla'?'silla':type==='No trasladar'?'no-transfer':'unset';const reason=clean(row.transportReason);
   return `<div class="transport-main ${klass}"><span>${icon}</span><b>${esc(type)}</b></div><div class="transport-reason ${reason?'':'is-empty'}"><span>Motivo</span>${esc(reason||'—')}</div>${row.oxygenProbable?`<div class="oxygen-chip">O₂${row.oxygenReason?` · ${esc(row.oxygenReason)}`:''}</div>`:''}`;
 }
-function renderFloorRow(row,incomplete=false){const destination=parseFloorTarget(row.target)?.display||clean(row.target)||'—';return `<tr class="patient-row floor-patient-row ${incomplete?'incomplete-row':''}" data-id="${esc(row.id)}" title="Toca para editar"><td class="floor-origin"><strong>${incomplete?'⚠️ Falta':esc(displayOrigin(row.bed))}</strong></td><td class="floor-destination"><div class="floor-destination-line"><strong>${esc(destination)}</strong><button class="remove-btn" type="button" data-remove="${esc(row.id)}" aria-label="Quitar paciente">×</button></div></td></tr>`;}
+function renderFloorRow(row,incomplete=false){const destination=parseFloorTarget(row.destination||row.target)?.display||clean(row.destination||row.target)||'—',transport=effectiveTransport(row),realized=clean(row.status).toLowerCase()==='realizado';return `<tr class="patient-row floor-patient-row ${incomplete?'incomplete-row':''} ${realized?'is-realized':''}" data-id="${esc(row.id)}" data-status="${realized?'Realizado':'Pendiente'}" title="Toca para editar"><td class="floor-origin"><strong>${incomplete?'⚠️ Falta':esc(displayOrigin(row.bed))}</strong></td><td class="floor-destination"><div class="floor-destination-line"><strong>${esc(destination)}</strong><span class="floor-transport">${transport==='Silla'?'♿ Silla':transport==='Camilla'?'🛏️ Camilla':'• Por definir'}</span>${realized?'<span class="floor-status">✓ Realizado</span>':''}<button class="remove-btn" type="button" data-remove="${esc(row.id)}" aria-label="Quitar paciente">×</button></div></td></tr>`;}
 function renderFloorSections(floorRows){
-  if(!floorRows.length)return '';const groups=new Map(FLOOR_GROUPS.map((group)=>[group.key,[]]));for(const row of floorRows)groups.get(floorGroupKey(row.target))?.push(row);for(const list of groups.values())list.sort(compareOrigins);
+  if(!floorRows.length)return '';const groups=new Map(FLOOR_GROUPS.map((group)=>[group.key,[]]));for(const row of floorRows)groups.get(rowFloorGroupKey(row))?.push(row);for(const list of groups.values())list.sort(compareFloorRows);
   const sections=FLOOR_GROUPS.map((group)=>({...group,rows:groups.get(group.key)||[]})).filter((group)=>group.rows.length).map((group)=>`<section class="floor-group"><div class="floor-group-title">${esc(group.label)} — <strong>${group.rows.length} ${group.rows.length===1?'paciente':'pacientes'}</strong></div><div class="floor-table-wrap"><table class="floor-group-table"><thead><tr><th>Origen</th><th>Destino</th></tr></thead><tbody>${group.rows.map((row)=>renderFloorRow(row)).join('')}</tbody></table></div></section>`).join('');
   return `<section class="floor-board" aria-label="Pacientes a piso">${sections}<div class="floor-total">Total: <strong>${floorRows.length} ${floorRows.length===1?'paciente':'pacientes'}</strong></div></section>`;
 }
@@ -253,7 +289,7 @@ function renderModalitySection(modality,list){
   return `<section class="modality-section modality-${modality.toLowerCase().replace(/\s+/g,'-')}" aria-label="${esc(label)}"><div class="modality-title">${esc(label)} — <strong>${sorted.length}</strong></div><div class="table-wrap imaging-table-wrap"><table class="patient-table imaging-table"><colgroup><col class="col-origin"/><col class="col-patient"/><col class="col-move"/><col class="col-study"/><col class="col-diagnosis"/><col class="col-meaning"/><col class="col-action"/></colgroup><thead><tr><th>Origen</th><th>Paciente</th><th>Traslado</th><th>Estudio</th><th>Diagnóstico</th><th>Qué significa</th><th></th></tr></thead><tbody>${sorted.map(renderImagingRow).join('')}</tbody></table></div></section>`;
 }
 function renderImagingSections(imagingRows){
-  if(!imagingRows.length)return '';const groups=new Map(MODALITY_ORDER.map((name)=>[name,[]]));for(const row of imagingRows){const modality=normalizeModality(row.modality,row.target);groups.get(modality)?.push(row);}
+  if(!imagingRows.length)return '';const groups=new Map(MODALITY_ORDER.map((name)=>[name,[]]));for(const row of imagingRows){const category=normalizeCategory(row.category,row.modality,row.target),modality=category==='USG'?'Ultrasonido':category;groups.get(groups.has(modality)?modality:'Otro')?.push(row);}
   return `<section class="imaging-board" aria-label="Imagenología">${MODALITY_ORDER.map((name)=>renderModalitySection(name,groups.get(name)||[])).join('')}</section>`;
 }
 function renderEmpty(){return `<section class="table-wrap" aria-label="Pacientes pendientes"><table class="patient-table"><tbody><tr class="empty-row"><td colspan="7"><div class="empty-state"><div class="empty-icon">＋</div><b>Sin pendientes</b><span>Usa foto o lápiz para capturar.</span></div></td></tr></tbody></table></section>`;}
@@ -297,9 +333,9 @@ function setFormError(message=''){const error=document.getElementById('formError
 function parseVisionJSON(value){if(value&&typeof value==='object')return value;const raw=clean(value);if(!raw)throw new Error('La IA no devolvió datos.');const fenced=raw.match(/```(?:json)?\s*([\s\S]*?)```/i)?.[1]?.trim(),source=fenced||raw;try{return JSON.parse(source);}catch{const start=source.indexOf('{'),end=source.lastIndexOf('}');if(start>=0&&end>start)return JSON.parse(source.slice(start,end+1));throw new Error('No pude interpretar los datos de la foto.');}}
 
 function normalizeVisionRow(patient){
-  const age=normalizeAge(patient?.age)??ageFromBirthDate(patient?.birthDate),oxygenProbable=Boolean(patient?.oxygenProbable),target=clean(patient?.target||patient?.study||patient?.destination),portable=/port[áa]til/i.test(target);
+  const age=normalizeAge(patient?.age)??ageFromBirthDate(patient?.birthDate),oxygenProbable=Boolean(patient?.oxygenProbable),category=normalizeCategory(patient?.category,patient?.modality,patient?.target||patient?.study),destination=clean(patient?.destination),target=category==='Piso'?(destination||clean(patient?.target)):clean(patient?.target||patient?.study||destination),portable=/port[áa]til/i.test(target);
   const diagnosis=clean(patient?.diagnosis),diagnosisMeaning=diagnosis?clean(patient?.diagnosisMeaning):'';
-  return {id:uid(),shiftId:shift.id,bed:resolveVisionBed(patient),name:clean(patient?.name),age,sex:normalizeSex(patient?.sex),target,modality:normalizeModality(patient?.modality,target),diagnosis,diagnosisMeaning,transport:portable?'No trasladar':(normalizeTransport(patient?.transport)||'Por definir'),transportReason:clean(patient?.transportReason),oxygenProbable,oxygenReason:oxygenProbable?clean(patient?.oxygenReason):'',createdAt:new Date().toISOString()};
+  return {id:uid(),shiftId:shift.id,bed:resolveVisionBed(patient),name:clean(patient?.name),age,sex:normalizeSex(patient?.sex),category,target,destination:category==='Piso'?target:destination,destinationFloor:category==='Piso'?clean(patient?.destinationFloor):'',destinationBlock:category==='Piso'?clean(patient?.destinationBlock):'',modality:normalizeModality(patient?.modality,target),status:'Pendiente',diagnosis,diagnosisMeaning,transport:portable?'No trasladar':(normalizeTransport(patient?.transport)||'Por definir'),transportReason:clean(patient?.transportReason),oxygenProbable,oxygenReason:oxygenProbable?clean(patient?.oxygenReason):'',createdAt:new Date().toISOString()};
 }
 async function analyzePhoto(file){
   if(!(file instanceof File)||!file.type.startsWith('image/'))throw new Error('Selecciona una imagen.');if(file.size>8*1024*1024)throw new Error(`${file.name||'La foto'} pesa más de 8 MB.`);
@@ -310,7 +346,7 @@ async function analyzePhoto(file){
 }
 function mergeRow(existing,incoming){
   const incomingTransport=normalizeTransport(incoming.transport),existingTransport=normalizeTransport(existing.transport),target=incoming.target||existing.target||'',portable=/port[áa]til/i.test(target);
-  return {...existing,bed:incoming.bed||normalizeBedCandidate(existing.bed)||'',name:incoming.name||existing.name||'',age:incoming.age??normalizeAge(existing.age),sex:incoming.sex&&incoming.sex!=='No visible'?incoming.sex:normalizeSex(existing.sex),target,modality:normalizeModality(incoming.modality||existing.modality,target),diagnosis:incoming.diagnosis||existing.diagnosis||'',diagnosisMeaning:incoming.diagnosisMeaning||existing.diagnosisMeaning||'',transport:portable?'No trasladar':(incomingTransport&&incomingTransport!=='Por definir'?incomingTransport:(existingTransport||incomingTransport||'Por definir')),transportReason:incoming.transportReason||existing.transportReason||'',oxygenProbable:Boolean(existing.oxygenProbable||incoming.oxygenProbable),oxygenReason:incoming.oxygenReason||existing.oxygenReason||''};
+  return {...existing,bed:incoming.bed||normalizeBedCandidate(existing.bed)||'',name:incoming.name||existing.name||'',age:incoming.age??normalizeAge(existing.age),sex:incoming.sex&&incoming.sex!=='No visible'?incoming.sex:normalizeSex(existing.sex),category:incoming.category||existing.category||'Otro',target,destination:incoming.destination||existing.destination||'',destinationFloor:incoming.destinationFloor||existing.destinationFloor||'',destinationBlock:incoming.destinationBlock||existing.destinationBlock||'',modality:normalizeModality(incoming.modality||existing.modality,target),status:existing.status||incoming.status||'Pendiente',diagnosis:incoming.diagnosis||existing.diagnosis||'',diagnosisMeaning:incoming.diagnosisMeaning||existing.diagnosisMeaning||'',transport:portable?'No trasladar':(incomingTransport&&incomingTransport!=='Por definir'?incomingTransport:(existingTransport||incomingTransport||'Por definir')),transportReason:incoming.transportReason||existing.transportReason||'',oxygenProbable:Boolean(existing.oxygenProbable||incoming.oxygenProbable),oxygenReason:incoming.oxygenReason||existing.oxygenReason||''};
 }
 function addAnalyzedRows(incomingRows){const next=[...rows];for(const incoming of incomingRows){const index=findMatchingRowIndex(next,incoming);if(index>=0)next[index]=mergeRow(next[index],incoming);else next.unshift(incoming);}rows=next;save();}
 async function handlePhotoInput(event){
@@ -340,4 +376,4 @@ function startNewShift(){if(typeof window==='undefined')return;if(rows.length&&!
 
 if(root){render();if('serviceWorker' in navigator)window.addEventListener('load',()=>navigator.serviceWorker.register('/turno-rx/sw.js',{updateViaCache:'none'}).then((registration)=>registration.update()).catch(()=>{}));}
 
-export {displayOrigin,canonicalOrigin,compareOrigins,parseFloorTarget,floorGroupKey,hasFloorTarget,isCompleteFloorRow,isIncompleteFloorRow,findDuplicateFloorOrigins,findConflictsAgainstExisting,rowKey,findMatchingRowIndex,normalizeAge,ageFromBirthDate,normalizeStudyDisplay,normalizeModality,compareImagingRows,effectiveTransport};
+export {displayOrigin,canonicalOrigin,compareOrigins,parseFloorTarget,floorGroupKey,rowFloorGroupKey,hasFloorTarget,isCompleteFloorRow,isIncompleteFloorRow,findDuplicateFloorOrigins,findConflictsAgainstExisting,rowKey,findMatchingRowIndex,normalizeAge,ageFromBirthDate,normalizeStudyDisplay,normalizeModality,normalizeCategory,compareFloorRows,compareImagingRows,effectiveTransport};
