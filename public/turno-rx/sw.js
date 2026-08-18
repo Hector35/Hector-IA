@@ -1,4 +1,4 @@
-// Pendientes v70 — historial de fingerprints + limpieza de revisión acotada a filas actualizadas.
+// Pendientes v71 — restaura normalización de destinos de Piso en runtime sin reactivar controladores legacy.
 // Verificación de regresión v70 alineada con el contrato actual; segunda pasada tras corregir el import del test de pestañas.
 // LEGACY TEST REFERENCES ONLY — these strings are documentation, not cache entries:
 // const CACHE = 'turno-rx-shell-v58-tac-live-interaction-hotfix';
@@ -21,7 +21,6 @@
 // /turno-rx/row-actions-v61.css?v=61
 // /turno-rx/row-actions-v61.js?v=61
 // /turno-rx/interaction-hotfix-v58.css?v=58
-// /turno-rx/floor-intelligence-v64.js?v=64
 // /turno-rx/stability-v65.js?v=65
 // /turno-rx/stability-v65.css?v=65
 const CACHE = 'pendientes-shell-20260818-6';
@@ -33,6 +32,7 @@ const SHELL = [
   '/turno-rx/stability-guard-v66.js?v=66',
   '/turno-rx/review-confidence-v67.js?v=70',
   '/turno-rx/photo-fingerprint-history-v70.js?v=70',
+  '/turno-rx/floor-intelligence-v64.js?v=64',
   '/turno-rx/photo-dedupe-v68.js?v=70',
   '/turno-rx/stability.js?v=20260818.1',
   '/turno-rx/stability.css?v=20260818.1',
