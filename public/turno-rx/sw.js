@@ -1,4 +1,4 @@
-const CACHE = 'turno-rx-shell-v49-tac-category-tabs';
+const CACHE = 'turno-rx-shell-v49-tac-category-tabs-v50-floor-rx-night-legibility';
 const SHELL = [
   '/turno-rx/',
   '/turno-rx/index.html',
@@ -23,6 +23,7 @@ const SHELL = [
   '/turno-rx/tac-flow-v42.css?v=1',
   '/turno-rx/progressive-photo-v45.css?v=1',
   '/turno-rx/category-tabs-v49.css?v=1',
+  '/turno-rx/floor-rx-night-fix-v50.css?v=50',
   '/turno-rx/quick-transport-v37.js?v=2',
   '/turno-rx/patient-detail-v39.js?v=3',
   '/turno-rx/app-v16.js?v=6',

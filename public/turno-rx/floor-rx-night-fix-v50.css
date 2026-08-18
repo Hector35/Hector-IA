@@ -1,0 +1,29 @@
+/* Ajustes visuales v50: legibilidad nocturna de Piso y RX. Sin cambios funcionales. */
+.pendientes-v37 .floor-table-wrap,.pendientes-v37 .floor-group-table{background:#162337!important;border-color:#314563!important}
+.pendientes-v37 .floor-group-table th{background:#223451!important;color:#AFC0D4!important;border-color:#314563!important}
+.pendientes-v37 .floor-group-table tbody tr.floor-patient-row:nth-child(odd) td{background:#18273C!important}
+.pendientes-v37 .floor-group-table tbody tr.floor-patient-row:nth-child(even) td{background:#1D2D44!important}
+.pendientes-v37 .floor-group-table tbody tr.floor-patient-row.is-realized td{background:#142B32!important;color:#D8E6E8!important}
+.pendientes-v37 .floor-group-table tbody tr.floor-patient-row.is-swipe-ready td{background:#17352F!important}
+.pendientes-v37 .floor-patient-row.is-realized{opacity:.88!important}
+.pendientes-v37 .floor-group-table td{color:#F1F5F9!important;border-color:#314563!important}
+.pendientes-v37 .floor-origin strong{color:#60A5FA!important;white-space:nowrap!important}
+.pendientes-v37 .floor-destination{min-width:0!important}
+.pendientes-v37 .floor-destination-line{display:flex!important;align-items:center!important;justify-content:flex-start!important;gap:6px!important;min-width:0!important;width:100%!important}
+.pendientes-v37 .floor-destination-line>strong{flex:1 1 auto!important;min-width:2.4ch!important;color:#F1F5F9!important;white-space:nowrap!important;word-break:keep-all!important;overflow-wrap:normal!important}
+.pendientes-v37 button.floor-transport{flex:0 1 auto!important;min-width:80px!important;max-width:116px!important;min-height:32px!important;padding:5px 17px 5px 7px!important;border:1px solid #3E5778!important;background:#223451!important;color:#D9E3EF!important;box-shadow:none!important;white-space:nowrap!important}
+.pendientes-v37 button.floor-transport.silla{background:#172D4A!important;border-color:#28517F!important;color:#60A5FA!important}
+.pendientes-v37 button.floor-transport.camilla{background:#3A2C18!important;border-color:#715628!important;color:#FBBF24!important}
+.pendientes-v37 button.floor-transport.unset{background:#223451!important;border-color:#526885!important;color:#D9E3EF!important}
+.pendientes-v37 button.floor-transport span,.pendientes-v37 button.floor-transport b{color:inherit!important;white-space:nowrap!important}
+.pendientes-v37 .floor-status{flex:0 0 auto!important;max-width:72px!important;color:#6EE7B7!important;font-size:9px!important;line-height:1!important;white-space:nowrap!important;overflow:hidden!important;text-overflow:ellipsis!important}
+.pendientes-v37 .floor-group-table .remove-btn{flex:0 0 27px!important;width:27px!important;min-width:27px!important;height:27px!important;min-height:27px!important;background:#3A202B!important;border-color:#6B3543!important;color:#F87171!important}
+.quick-transport-popover-v37{background:#111C2E!important;border-color:#314563!important;box-shadow:0 16px 40px rgba(2,8,23,.58)!important;backdrop-filter:none!important;-webkit-backdrop-filter:none!important}
+.quick-transport-option-v37{background:#162337!important;color:#F1F5F9!important;border:1px solid transparent!important}
+.quick-transport-option-v37+.quick-transport-option-v37{margin-top:4px!important}
+.quick-transport-option-v37:active,.quick-transport-option-v37.is-current{background:#302E68!important;border-color:#6366F1!important;color:#F1F5F9!important}
+.pendientes-v37 .imaging-table .imaging-row td,.pendientes-v37 .imaging-table .imaging-row .study-cell,.pendientes-v37 .imaging-table .imaging-row .study-cell strong{color:#F1F5F9!important}
+.pendientes-v37 .imaging-table .imaging-row .meaning-cell,.pendientes-v37 .imaging-table .imaging-row .age-line,.pendientes-v37 .imaging-table .imaging-row .transport-reason{color:#AFC0D4!important}
+.pendientes-v37 .imaging-table .imaging-row.is-realized td,.pendientes-v37 .imaging-table .imaging-row[data-status="Realizado"] td{background:#142B32!important;color:#D8E6E8!important}
+@media(max-width:430px){.pendientes-v37 .floor-group-table td{padding:5px 7px!important}.pendientes-v37 .floor-origin{width:22%!important}.pendientes-v37 .floor-destination{width:78%!important}.pendientes-v37 .floor-origin strong,.pendientes-v37 .floor-destination-line>strong{font-size:13px!important}.pendientes-v37 button.floor-transport{min-width:74px!important;max-width:104px!important;font-size:10px!important}.pendientes-v37 .floor-status{max-width:58px!important;font-size:8.5px!important}}
+@media(max-width:370px){.pendientes-v37 .floor-destination-line{gap:4px!important}.pendientes-v37 button.floor-transport{min-width:68px!important;max-width:92px!important;padding-left:5px!important}.pendientes-v37 .floor-status{max-width:48px!important}}
