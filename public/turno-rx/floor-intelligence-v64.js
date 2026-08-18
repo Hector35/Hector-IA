@@ -110,6 +110,7 @@ DESTINO OPERATIVO DE PISO V64:
     const literalService = serviceInDestination ? rawDestination : clean(patient.service);
     return {
       ...patient,
+      service: clean(patient.service) || literalService,
       destination: serviceHint.label,
       target: serviceHint.label,
       destinationFloor: clean(patient.destinationFloor) || serviceHint.floor,
