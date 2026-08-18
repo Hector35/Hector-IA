@@ -167,7 +167,7 @@
   function compactExtraData(raw) {
     if (!raw || typeof raw !== 'object') return null;
     const ignored = new Set([
-      'handwrittenBed','formBed','waitingRoomMarked','bed','name','birthDate','age','sex','target','study','destination','modality',
+      'handwrittenBed','formBed','waitingRoomMarked','bed','name','birthDate','age','sex','category','target','study','destination','destinationFloor','destinationBlock','modality',
       'diagnosis','diagnosisMeaning','transport','transportReason','oxygenProbable','oxygenReason','requestingDoctor','doctor','physician',
       'service','originService','procedence','provenance','folio','requestDate','notes','extraData'
     ]);
@@ -348,14 +348,15 @@
     const service = firstAvailable(row, ['service','servicio']);
     const origin = firstAvailable(row, ['originService','procedencia','provenance']);
     const serviceOrigin = [service, origin].filter(Boolean).filter((value, index, list) => list.indexOf(value) === index).join(' · ');
-    const study = firstAvailable(row, ['target','study','destination']);
+    const floorPatient = categoryFor(row) === 'Piso';
+    const study = floorPatient ? firstAvailable(row, ['destination','target']) : firstAvailable(row, ['target','study']);
     const transport = firstAvailable(row, ['transport','transportType','movement']);
     const primary = [
       ['Cama / área', firstAvailable(row, ['bed','origin'])],
       ['Nombre', firstAvailable(row, ['name','patientName'])],
       ['Edad', age],
       ['Sexo', sex && sex !== 'No visible' ? sex : ''],
-      ['Estudio solicitado', study],
+      [floorPatient ? 'Destino' : 'Estudio solicitado', study],
       ['Categoría', categoryFor(row)],
       ['Médico solicitante', doctor],
       ['Servicio / procedencia', serviceOrigin],
@@ -381,6 +382,7 @@
     const extra = [];
     if (row?.boletaExtra && typeof row.boletaExtra === 'object' && !Array.isArray(row.boletaExtra)) {
       for (const [key, value] of Object.entries(row.boletaExtra)) {
+        if (['category','categoria','target','study','destination','transport','transportType','movement'].includes(plain(key))) continue;
         if (value === '' || value === null || value === undefined) continue;
         const shown = typeof value === 'object' ? JSON.stringify(value) : String(value);
         extra.push([humanizeKey(key), shown]);
@@ -404,6 +406,26 @@
   function rowsHtml(entries) {
     if (!entries.length) return '<div class="v39-empty-section">Sin datos adicionales guardados.</div>';
     return entries.map(([label, value]) => `<div class="v39-detail-row"><span>${esc(label)}</span><strong>${esc(value)}</strong></div>`).join('');
+  }
+
+  function makeTransportInteractive(row, historical) {
+    if (historical || !row?.id) return;
+    const body = document.getElementById('v39DetailBody');
+    const transferRows = [...(body?.querySelectorAll('.v39-detail-section') || [])]
+      .find((section) => plain(section.querySelector('h3')?.textContent) === 'traslado')
+      ?.querySelectorAll('.v39-detail-row');
+    const mediumRow = [...(transferRows || [])].find((entry) => plain(entry.querySelector('span')?.textContent) === 'medio');
+    const value = mediumRow?.querySelector('strong');
+    if (!value) return;
+    const transport = firstAvailable(row, ['transport','transportType','movement']) || 'Por definir';
+    const button = document.createElement('button');
+    button.type = 'button';
+    button.className = 'v39-transport-button';
+    button.dataset.quickTransport = '1';
+    button.dataset.patientId = String(row.id);
+    button.setAttribute('aria-label', `Cambiar traslado. Actual: ${transport}`);
+    button.innerHTML = `<span aria-hidden="true">${transport === 'Silla' ? '♿' : transport === 'Camilla' ? '🛏️' : '•'}</span><b>${esc(transport)}</b>`;
+    value.replaceWith(button);
   }
 
   function ensureDetailSheet() {
@@ -470,6 +492,7 @@
       <section class="v39-detail-section"><h3>Boleta original</h3><div class="v39-detail-card v39-photo-card" id="v39PhotoHost"><div class="v39-photo-loading">Cargando foto…</div></div></section>`;
     actions.hidden = historical;
     selectedCurrentRowId = historical ? null : String(row?.id ?? '');
+    makeTransportInteractive(row, historical);
     backdrop.hidden = false;
     document.body.classList.add('v39-detail-open');
     await renderPhotoSection(row);
@@ -608,7 +631,7 @@
       return;
     }
 
-    const transport = event.target.closest?.('.transport-main[data-quick-transport="1"]');
+    const transport = event.target.closest?.('[data-quick-transport="1"]');
     if (transport) {
       event.stopImmediatePropagation();
       return;
@@ -623,6 +646,13 @@
     event.stopImmediatePropagation();
     openDetail(stored, { historical:false });
   }, true);
+
+  document.addEventListener('pendientes:transport-changed', (event) => {
+    const id = String(event.detail?.id || '');
+    if (!id || id !== selectedCurrentRowId || document.getElementById('patientDetailV39')?.hidden) return;
+    const updated = currentRowById(id);
+    if (updated) openDetail(updated, { historical:false });
+  });
 
   document.addEventListener('keydown', (event) => {
     if (event.key !== 'Escape') return;

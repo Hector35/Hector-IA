@@ -60,7 +60,7 @@
         const pending = pendingManualOverride?.id === id ? pendingManualOverride : null;
         const previous = locked.get(id);
         const lockedTransport = normalizeTransport(pending?.transport || previous?.transport);
-        if (lockedTransport !== 'Silla' && lockedTransport !== 'Camilla') return row;
+        if (!['Silla','Camilla','Por definir'].includes(lockedTransport)) return row;
 
         return {
           ...row,
@@ -81,14 +81,14 @@
     const style = document.createElement('style');
     style.id = 'quickTransportV37Styles';
     style.textContent = `
-      .transport-main[data-quick-transport="1"] {
+      [data-quick-transport="1"] {
         position: relative;
         cursor: pointer;
         -webkit-tap-highlight-color: transparent;
         touch-action: manipulation;
         padding-right: 15px !important;
       }
-      .transport-main[data-quick-transport="1"]::after {
+      [data-quick-transport="1"]::after {
         content: '⌄';
         position: absolute;
         right: 2px;
@@ -99,12 +99,30 @@
         opacity: .5;
         pointer-events: none;
       }
-      .transport-main[data-manual-transport="1"]::after { opacity: .82; }
-      .transport-main[data-quick-transport="1"]:focus-visible {
+      [data-manual-transport="1"]::after { opacity: .82; }
+      [data-quick-transport="1"]:focus-visible {
         outline: 2px solid currentColor;
         outline-offset: 2px;
         border-radius: 7px;
       }
+      button.floor-transport,
+      button.v39-transport-button {
+        appearance: none;
+        border: 1px solid rgba(59,130,246,.32);
+        border-radius: 10px;
+        min-height: 38px;
+        min-width: 92px;
+        padding: 7px 22px 7px 10px !important;
+        display: inline-flex;
+        align-items: center;
+        justify-content: center;
+        gap: 6px;
+        background: rgba(59,130,246,.12);
+        color: inherit;
+        font: inherit;
+        white-space: nowrap;
+      }
+      button.v39-transport-button { min-height: 44px; }
       .quick-transport-popover-v37 {
         position: fixed;
         z-index: 10050;
@@ -169,6 +187,9 @@
       <button type="button" class="quick-transport-option-v37" data-quick-value="Camilla" role="menuitem">
         <span aria-hidden="true">🛏️</span><span>Camilla</span><span class="quick-check-v37" aria-hidden="true">✓</span>
       </button>
+      <button type="button" class="quick-transport-option-v37" data-quick-value="Por definir" role="menuitem">
+        <span aria-hidden="true">•</span><span>Por definir</span><span class="quick-check-v37" aria-hidden="true">✓</span>
+      </button>
     `;
     document.body.appendChild(popover);
     return popover;
@@ -186,19 +207,19 @@
   function applyStoredStateToRow(tr, storedRow) {
     if (!tr || !storedRow) return false;
     const transport = normalizeTransport(storedRow.transport);
-    const main = tr.querySelector('.transport-main');
+    const main = tr.querySelector('[data-quick-transport="1"]') || tr.querySelector('.transport-main');
     const label = main?.querySelector('b');
     const icon = main?.querySelector('span');
     if (!main || !label) return false;
 
     const before = normalizeTransport(label.textContent);
-    const manual = storedRow.manualTransportOverride === true && (transport === 'Silla' || transport === 'Camilla');
+    const manual = storedRow.manualTransportOverride === true && ['Silla','Camilla','Por definir'].includes(transport);
 
     if (manual) {
       main.classList.remove('silla','camilla','no-transfer','unset');
-      main.classList.add(transport === 'Silla' ? 'silla' : 'camilla');
+      main.classList.add(transport === 'Silla' ? 'silla' : transport === 'Camilla' ? 'camilla' : 'unset');
       label.textContent = transport;
-      if (icon) icon.textContent = transport === 'Silla' ? '♿' : '🛏️';
+      if (icon) icon.textContent = transport === 'Silla' ? '♿' : transport === 'Camilla' ? '🛏️' : '•';
       main.dataset.manualTransport = '1';
       main.removeAttribute('data-inferred');
     } else {
@@ -206,7 +227,7 @@
     }
 
     const visible = normalizeTransport(label.textContent);
-    if (visible === 'Silla' || visible === 'Camilla') {
+    if (['Silla','Camilla','Por definir'].includes(visible)) {
       main.dataset.quickTransport = '1';
       main.setAttribute('role', 'button');
       main.setAttribute('tabindex', '0');
@@ -237,7 +258,7 @@
     const previous = normalizeTransport(stored.transport);
     const alreadyManual = stored.manualTransportOverride === true;
 
-    if (selected === 'Silla' || selected === 'Camilla') {
+    if (['Silla','Camilla','Por definir'].includes(selected)) {
       if (alreadyManual || selected !== previous) {
         pendingManualOverride = {
           id: String(activeEditingId),
@@ -245,9 +266,7 @@
           updatedAt: new Date().toISOString()
         };
       }
-    } else if (alreadyManual) {
-      pendingManualReleaseId = String(activeEditingId);
-    }
+    } else if (alreadyManual) pendingManualReleaseId = String(activeEditingId);
 
     clearPendingSoon();
   }
@@ -305,11 +324,12 @@
     activeAnchor = null;
   }
 
-  function openPopover(tr, anchor) {
-    const id = tr?.dataset?.id;
+  function openPopover(anchor) {
+    const tr = anchor?.closest?.('.patient-row[data-id]');
+    const id = anchor?.dataset?.patientId || tr?.dataset?.id;
     if (!id) return;
     const visible = normalizeTransport(anchor.querySelector('b')?.textContent || rowById(id)?.transport);
-    if (visible !== 'Silla' && visible !== 'Camilla') return;
+    if (!['Silla','Camilla','Por definir'].includes(visible)) return;
 
     const popover = ensurePopover();
     activeRowId = id;
@@ -340,40 +360,16 @@
     const tr = findRowElement(id);
     const stored = next.find((row) => String(row?.id ?? '') === String(id));
     if (tr && stored) applyStoredStateToRow(tr, stored);
-    setTimeout(() => location.reload(), 0);
+    document.dispatchEvent(new CustomEvent('pendientes:transport-changed', {detail:{id:String(id),transport}}));
+    scheduleSync();
   }
 
   function commitThroughApp(id, value, fromReconcile = false) {
     const transport = normalizeTransport(value);
-    if (transport !== 'Silla' && transport !== 'Camilla') return;
-    const tr = findRowElement(id);
-    if (!tr) return fallbackCommit(id, transport);
-
+    if (!['Silla','Camilla','Por definir'].includes(transport)) return;
     closePopover();
-    activeEditingId = String(id);
-    document.documentElement.classList.add('quick-transport-commit-v37');
-
-    try {
-      tr.click();
-
-      const sheet = document.getElementById('sheetBackdrop');
-      if (!sheet || sheet.hidden) {
-        const detail = document.getElementById('compactDetailBackdrop');
-        const edit = detail?.querySelector('.compact-detail-edit');
-        edit?.click();
-      }
-
-      const form = document.getElementById('patientForm');
-      const select = form?.querySelector('#transport');
-      const openSheet = document.getElementById('sheetBackdrop');
-      if (!form || !select || openSheet?.hidden) return fallbackCommit(id, transport);
-
-      select.value = transport;
-      form.dispatchEvent(new Event('submit', {bubbles:true, cancelable:true}));
-      if (!fromReconcile) scheduleSync();
-    } finally {
-      document.documentElement.classList.remove('quick-transport-commit-v37');
-    }
+    fallbackCommit(id, transport);
+    if (!fromReconcile) scheduleSync();
   }
 
   function reconcileVisibleLocks() {
@@ -381,8 +377,8 @@
     stored.forEach((row) => {
       const transport = normalizeTransport(row.transport);
       const tr = findRowElement(row.id);
-      const visible = normalizeTransport(tr?.querySelector('.transport-main b')?.textContent);
-      if (tr && (transport === 'Silla' || transport === 'Camilla') && visible !== transport) {
+      const visible = normalizeTransport(tr?.querySelector('[data-quick-transport="1"] b')?.textContent || tr?.querySelector('.transport-main b')?.textContent);
+      if (tr && ['Silla','Camilla','Por definir'].includes(transport) && visible !== transport) {
         commitThroughApp(row.id, transport, true);
       }
     });
@@ -399,13 +395,11 @@
       return;
     }
 
-    const main = event.target.closest?.('.transport-main[data-quick-transport="1"]');
+    const main = event.target.closest?.('[data-quick-transport="1"]');
     if (main) {
-      const tr = main.closest('.patient-row[data-id]');
-      if (!tr) return;
       event.preventDefault();
       event.stopImmediatePropagation();
-      openPopover(tr, main);
+      openPopover(main);
       return;
     }
 
@@ -420,13 +414,11 @@
   }
 
   function onDocumentKeydown(event) {
-    const main = event.target.closest?.('.transport-main[data-quick-transport="1"]');
+    const main = event.target.closest?.('[data-quick-transport="1"]');
     if (main && (event.key === 'Enter' || event.key === ' ')) {
-      const tr = main.closest('.patient-row[data-id]');
-      if (!tr) return;
       event.preventDefault();
       event.stopImmediatePropagation();
-      openPopover(tr, main);
+      openPopover(main);
       return;
     }
     if (event.key === 'Escape') closePopover();
