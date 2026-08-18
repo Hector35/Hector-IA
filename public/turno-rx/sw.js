@@ -1,4 +1,4 @@
-// v63: reconciliación de capturas por renglón; históricos Realizados no bloquean nuevos pendientes.
+// v64: reconciliación por renglón + destino de Piso por cama/servicio + tabla operativa limpia.
 const CACHE = 'turno-rx-shell-v58-tac-live-interaction-hotfix';
 const SHELL = [
   '/turno-rx/',
@@ -30,9 +30,10 @@ const SHELL = [
   '/turno-rx/interaction-hotfix-v58.css?v=58',
   '/turno-rx/row-actions-v60.css?v=60',
   '/turno-rx/row-actions-v61.css?v=61',
+  '/turno-rx/boleta-visibility-v64.css?v=64',
   '/turno-rx/quick-transport-v37.js?v=2',
   '/turno-rx/patient-detail-v39.js?v=4',
-  '/turno-rx/floor-photo-prompt-v63.js?v=63',
+  '/turno-rx/floor-intelligence-v64.js?v=64',
   '/turno-rx/app-v16.js?v=58',
   '/turno-rx/progressive-photo-queue-v45.js',
   '/turno-rx/floor-workflow-v42.js?v=58',
