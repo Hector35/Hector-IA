@@ -24,7 +24,7 @@ test('v60 usa el mismo gesto para Piso RX TAC y USG y conserva acciones reversib
   expect(js).toContain("current.mode === 'realized' && dx > 0");
   expect(js).toContain("setStatus(current.id, 'Pendiente')");
   expect(js).toContain("document.dispatchEvent(new CustomEvent('pendientes:status-changed'");
-  expect(js).toContain("['data-v60-restore']".replace("['", "["));
+  expect(js).toContain('[data-v60-restore]');
   expect(js).toContain("if (category === 'piso') return 'Piso'");
   expect(js).toContain("return 'TAC'");
   expect(js).toContain("return 'USG'");
