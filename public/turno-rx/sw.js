@@ -4,8 +4,8 @@ const SHELL = [
   '/turno-rx/index.html',
   '/turno-rx/styles.css?v=7',
   '/turno-rx/capture-enhancements.css?v=2',
-  '/turno-rx/integrity-v16.css?v=1',
-  '/turno-rx/app-v16.js?v=1',
+  '/turno-rx/integrity-v16.css?v=2',
+  '/turno-rx/app-v16.js?v=2',
   '/turno-rx/manifest.webmanifest',
   '/turno-rx/icon.svg'
 ];
