@@ -451,6 +451,17 @@ html,body,html.pendientes-v37,html.pendientes-v37 body{
 .pendientes-v37 .patient-table tbody tr:nth-child(even) td{
   background:#EFF6FF !important;
 }
+/* Supera las reglas heredadas que seleccionan explícitamente .imaging-row. */
+.pendientes-v37 .imaging-table tbody tr.imaging-row:nth-child(odd) td,
+.pendientes-v37 .floor-group-table tbody tr.patient-row:nth-child(odd) td,
+.pendientes-v37 .patient-table tbody tr.patient-row:nth-child(odd) td{
+  background:#F8FAFC !important;
+}
+.pendientes-v37 .imaging-table tbody tr.imaging-row:nth-child(even) td,
+.pendientes-v37 .floor-group-table tbody tr.patient-row:nth-child(even) td,
+.pendientes-v37 .patient-table tbody tr.patient-row:nth-child(even) td{
+  background:#EFF6FF !important;
+}
 .pendientes-v37 .imaging-table tbody tr td,
 .pendientes-v37 .floor-group-table tbody tr td,
 .pendientes-v37 .patient-table tbody tr td{
