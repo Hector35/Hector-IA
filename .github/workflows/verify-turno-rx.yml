@@ -24,45 +24,40 @@ jobs:
           set -euo pipefail
           BASE='https://hector-os.hectorhdzr035.workers.dev/turno-rx'
           for attempt in $(seq 1 30); do
-            if curl -fsS "$BASE/" -o /tmp/index.html && grep -q 'app.js?v=14' /tmp/index.html && grep -q 'capture-enhancements.css?v=2' /tmp/index.html; then
+            if curl -fsS "$BASE/" -o /tmp/index.html && grep -q 'app-v15.js?v=1' /tmp/index.html && grep -q 'integrity-v15.css?v=1' /tmp/index.html; then
               exit 0
             fi
             sleep 4
           done
-          echo 'Pendientes actualizado no apareció en producción dentro del tiempo esperado.'
+          echo 'Pendientes v15 no apareció en producción dentro del tiempo esperado.'
           exit 1
 
-      - name: Verificar captura y datos operativos
+      - name: Verificar captura e integridad operativa
         shell: bash
         run: |
           set -euo pipefail
           BASE='https://hector-os.hectorhdzr035.workers.dev/turno-rx'
-          curl -fsS "$BASE/" -o /tmp/index.html
-          curl -fsS "$BASE/app.js?v=14" -o /tmp/app.js
-          curl -fsS "$BASE/capture-enhancements.css?v=2" -o /tmp/capture.css
+          curl -fsS "$BASE/app-v15.js?v=1" -o /tmp/app.mjs
+          curl -fsS "$BASE/integrity-v15.css?v=1" -o /tmp/integrity.css
           curl -fsS "$BASE/manifest.webmanifest" -o /tmp/manifest.webmanifest
           curl -fsS "$BASE/sw.js" -o /tmp/sw.js
-          node --check /tmp/app.js
-          grep -q 'galleryCapture' /tmp/app.js
-          grep -q 'manualCapture' /tmp/app.js
-          ! grep -q 'cameraCapture' /tmp/app.js
-          grep -q '/api/turno-rx/vision' /tmp/app.js
-          grep -q 'X-Turno-RX' /tmp/app.js
-          grep -q 'Nombre / edad' /tmp/app.js
-          grep -q 'Traslado / motivo' /tmp/app.js
-          grep -q 'oxygenProbable' /tmp/app.js
-          grep -q 'handwrittenBed' /tmp/app.js
-          grep -q 'formBed' /tmp/app.js
-          grep -q 'Sala de espera.*NUNCA es una cama' /tmp/app.js
-          grep -q 'findDuplicateFloorOrigins' /tmp/app.js
-          grep -q 'Segundo de la otra unidad' /tmp/app.js
-          grep -q '<th>Origen</th><th>Destino</th>' /tmp/app.js
-          grep -q 'floor-group-title' /tmp/capture.css
-          grep -q 'capture-icon-btn' /tmp/capture.css
+          node --check /tmp/app.mjs
+          grep -q 'galleryCapture' /tmp/app.mjs
+          grep -q 'manualCapture' /tmp/app.mjs
+          grep -q 'newShift' /tmp/app.mjs
+          grep -q 'undoRemove' /tmp/app.mjs
+          grep -q 'findConflictsAgainstExisting' /tmp/app.mjs
+          grep -q 'isIncompleteFloorRow' /tmp/app.mjs
+          grep -q 'No cuentan en el total hasta tener Origen + Destino' /tmp/app.mjs
+          grep -q 'Segundo de la otra unidad' /tmp/app.mjs
+          grep -q '<th>Origen</th><th>Destino</th>' /tmp/app.mjs
+          ! grep -q 'cameraCapture' /tmp/app.mjs
+          grep -q 'undo-bar' /tmp/integrity.css
+          grep -q 'form-error' /tmp/integrity.css
           grep -q '"short_name": "Pendientes"' /tmp/manifest.webmanifest
-          grep -q "turno-rx-shell-v13" /tmp/sw.js
-          grep -q 'capture-enhancements.css?v=2' /tmp/sw.js
-          grep -q 'app.js?v=14' /tmp/sw.js
+          grep -q "turno-rx-shell-v15" /tmp/sw.js
+          grep -q 'app-v15.js?v=1' /tmp/sw.js
+          grep -q 'integrity-v15.css?v=1' /tmp/sw.js
 
       - name: Verificar visión sin login
         shell: bash
