@@ -397,7 +397,7 @@ function renderPhotoQueue(){
   const summary=photoQueueSummary(photoJobs),active=photoJobs.find((job)=>job.state===PHOTO_JOB_STATES.ANALYZING);
   const headline=active?`Analizando foto ${active.index+1} de ${summary.total}`:`${summary.processed} de ${summary.total} procesadas`;
   const detail=`${summary.added} ${summary.added===1?'paciente agregado':'pacientes agregados'}${summary.review?` · ${summary.review} requiere revisión`:''}${summary.errors?` · ${summary.errors} con error`:''}`;
-  const jobs=photoJobs.map((job)=>`<div class="photo-job" data-state="${esc(job.state)}"><span class="photo-job-name">Foto ${job.index+1}</span><span class="photo-job-state">${esc(job.state)}${job.state===PHOTO_JOB_STATES.ERROR?` <button type="button" data-retry-photo="${esc(job.id)}">Reintentar</button>`:''}</span></div>`).join('');
+  const jobs=photoJobs.map((job)=>`<div class="photo-job" data-state="${esc(job.state)}"><span class="photo-job-name">Boleta ${job.index+1}${job.error?`<small>${esc(job.error)}</small>`:job.reviewReason?`<small>${esc(job.reviewReason)}</small>`:''}</span><span class="photo-job-state">${esc(job.state)}${job.state===PHOTO_JOB_STATES.ERROR?` <button type="button" data-retry-photo="${esc(job.id)}">Reintentar</button>`:''}</span></div>`).join('');
   return `<section class="photo-queue" aria-live="polite"><div class="photo-queue-head"><div><strong>${esc(headline)}</strong><div class="photo-queue-summary">${esc(detail)}</div></div><div class="photo-queue-actions">${processingPhotos?'<button type="button" id="stopPhotoQueue">Detener análisis</button>':''}</div></div><div class="photo-jobs">${jobs}</div></section>`;
 }
 
@@ -475,7 +475,9 @@ async function analyzePhoto(file){
   const fingerprint=await imageFingerprint(file),form=new FormData();form.append('image',file);form.append('prompt',VISION_PROMPT);
   const response=await fetch('/api/turno-rx/vision',{method:'POST',headers:{'X-Turno-RX':'1'},body:form,credentials:'same-origin'}),data=await response.json().catch(()=>({}));
   if(!response.ok)throw new Error(data.error||`No se pudo analizar la foto (${response.status}).`);
-  const parsed=parseVisionJSON(data.text||data.answer||data.output_text||data),patients=Array.isArray(parsed?.patients)?parsed.patients:[parsed];return patients.map((patient)=>normalizeVisionRow(patient,fingerprint)).filter((row)=>row.bed||row.name||row.target);
+  const parsed=parseVisionJSON(data.text||data.answer||data.output_text||data),patients=Array.isArray(parsed?.patients)?parsed.patients:[parsed],recognized=patients.map((patient)=>normalizeVisionRow(patient,fingerprint)).filter((row)=>row.bed||row.name||row.target);
+  if(!recognized.length)throw new Error('No se reconocieron pacientes en esta boleta. Intenta con una foto más cercana y nítida.');
+  return recognized;
 }
 function mergeRow(existing,incoming){
   const incomingTransport=normalizeTransport(incoming.transport),existingTransport=normalizeTransport(existing.transport),category=incoming.category||existing.category||'Otro',target=category==='Piso'?(incoming.target||existing.target||''):mergeStudyTargets(existing.target,incoming.target),portable=/port[áa]til/i.test(target);

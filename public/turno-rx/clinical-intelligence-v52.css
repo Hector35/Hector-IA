@@ -58,4 +58,24 @@ html,body,html.pendientes-v37,html.pendientes-v37 body,.pendientes-v37 .app-shel
 .manual-quick-close,.v39-close,.pendientes-v37 .close-btn,.pendientes-v37 .compact-detail-close{background:transparent!important;border:0!important;color:var(--clinical-muted)!important}.manual-quick-save,.pendientes-v37 .save-btn,.v39-edit{background:var(--clinical-blue)!important;color:var(--clinical-text)!important;border:0!important;border-radius:9px!important;box-shadow:none!important}
 .manual-quick-backdrop,.v39-detail-backdrop,.pendientes-v37 .sheet-backdrop,.pendientes-v37 .v37-drawer-backdrop{background:rgba(3,8,18,.76)!important}
 @media(max-width:430px){.pendientes-v37 .v37-header h1{font-size:22px!important}.pendientes-v37 .v37-capture-btn{min-height:36px!important}.pendientes-v37 .imaging-table tbody td,.pendientes-v37 .floor-group-table tbody td{height:41px!important;padding:4px 5px!important}.pendientes-v37 .floor-origin strong,.pendientes-v37 .floor-destination-line>strong{font-size:12.5px!important}.pendientes-v37 button.floor-transport{min-width:70px!important;max-width:98px!important;font-size:9.5px!important}}
+/* v53: selectores del DOM efectivo y jerarquía clínica perceptible. */
+.pendientes-v37 body{background:#080F1D!important}
+.pendientes-v37 .app-shell>.v37-header{min-height:48px!important;padding:max(3px,env(safe-area-inset-top)) 4px 3px!important;background:#080F1D!important}
+.pendientes-v37 .app-shell>.v37-capture-bar{display:grid!important;grid-template-columns:repeat(3,minmax(0,1fr))!important;gap:6px!important;margin:5px 0 7px!important;padding:0!important;background:transparent!important;border:0!important;box-shadow:none!important}
+.pendientes-v37 .app-shell>.v37-capture-bar>.v37-capture-btn,.pendientes-v37 .app-shell>.v37-capture-bar>.v37-capture-btn:not(.v37-primary){min-height:36px!important;padding:4px 8px!important;background:#17263B!important;color:#CBD5E1!important;border:0!important;border-radius:8px!important;box-shadow:none!important}
+.pendientes-v37 .app-shell>.v37-capture-bar>.v37-capture-btn.v37-primary{background:#1E3350!important;color:#F1F5F9!important;box-shadow:inset 0 -2px 0 #3B82F6!important}
+.pendientes-v37 .app-shell>.v37-capture-bar>.v37-capture-btn svg{width:17px!important;height:17px!important;color:#60A5FA!important}
+.pendientes-v37 .app-shell>.category-tabs{background:#101B2D!important}
+.pendientes-v37 #v37PendingView,.pendientes-v37 #category-panel{background:#080F1D!important;color:#F1F5F9!important}
+.pendientes-v37 #v37PendingView>.photo-queue{margin:7px 0 8px!important;padding:8px 10px!important;background:#101B2D!important;border:0!important;border-left:3px solid #3B82F6!important;border-radius:8px!important}
+.pendientes-v37 #v37PendingView>.photo-queue .photo-job{align-items:flex-start!important;padding:6px 0!important;background:transparent!important}
+.pendientes-v37 #v37PendingView>.photo-queue .photo-job-name{display:flex!important;flex-direction:column!important;min-width:0!important;color:#F1F5F9!important}
+.pendientes-v37 #v37PendingView>.photo-queue .photo-job-name small{margin-top:2px!important;color:#F87171!important;font-size:10px!important;font-weight:550!important;line-height:1.25!important}
+.pendientes-v37 #v37PendingView>.capture-status{margin:0 0 7px!important;padding:7px 9px!important;background:#101B2D!important;color:#AFC0D4!important;border:0!important;border-left:3px solid #3B82F6!important;border-radius:7px!important}
+.pendientes-v37 #v37PendingView>.capture-status[data-state="success"]{background:#102B29!important;color:#6EE7B7!important;border-left-color:#34D399!important}
+.pendientes-v37 #v37PendingView>.capture-status[data-state="error"]{background:#2B1D29!important;color:#FCA5A5!important;border-left-color:#F87171!important}
+.pendientes-v37 .floor-group-table tbody td,.pendientes-v37 .imaging-table tbody td{background-clip:padding-box!important}
+.pendientes-v37 .floor-group-table tbody tr:nth-child(odd)>td,.pendientes-v37 .imaging-table tbody tr:nth-child(odd)>td{background-color:#142238!important}
+.pendientes-v37 .floor-group-table tbody tr:nth-child(even)>td,.pendientes-v37 .imaging-table tbody tr:nth-child(even)>td{background-color:#17263B!important}
+.pendientes-v37 .floor-group-table tbody tr.is-realized>td,.pendientes-v37 .imaging-table tbody tr.is-realized>td{background-color:#102B29!important}
 @media(prefers-reduced-motion:reduce){.pendientes-v37 *,.category-new-dot{animation:none!important;transition-duration:.01ms!important}}
