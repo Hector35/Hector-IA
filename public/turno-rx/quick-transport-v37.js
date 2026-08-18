@@ -2,12 +2,15 @@
   const STORAGE_KEY = 'pendientes-table-v2';
   const nativeGetItem = Storage.prototype.getItem;
   const nativeSetItem = Storage.prototype.setItem;
-  let internalWrite = false;
+
   let activeEditingId = null;
   let activeRowId = null;
   let activeAnchor = null;
+  let pendingManualOverride = null;
+  let pendingManualReleaseId = null;
   let observer = null;
   let syncScheduled = false;
+  let reconciling = false;
 
   const normalize = (value) => String(value ?? '').trim();
   const normalizeTransport = (value) => {
@@ -29,19 +32,8 @@
     }
   }
 
-  function writeRows(rows) {
-    internalWrite = true;
-    try {
-      nativeSetItem.call(localStorage, STORAGE_KEY, JSON.stringify(rows));
-    } finally {
-      internalWrite = false;
-    }
-  }
-
   Storage.prototype.setItem = function patchedSetItem(key, value) {
-    if (this !== localStorage || key !== STORAGE_KEY || internalWrite) {
-      return nativeSetItem.call(this, key, value);
-    }
+    if (this !== localStorage || key !== STORAGE_KEY) return nativeSetItem.call(this, key, value);
 
     try {
       const incoming = JSON.parse(value);
@@ -55,15 +47,26 @@
       );
 
       const protectedRows = incoming.map((row) => {
-        const previous = locked.get(String(row?.id ?? ''));
-        if (!previous) return row;
-        const transport = normalizeTransport(previous.transport);
+        const id = String(row?.id ?? '');
+        if (!id) return row;
+
+        if (pendingManualReleaseId === id) {
+          const released = {...row};
+          delete released.manualTransportOverride;
+          delete released.manualTransportUpdatedAt;
+          return released;
+        }
+
+        const pending = pendingManualOverride?.id === id ? pendingManualOverride : null;
+        const previous = locked.get(id);
+        const lockedTransport = normalizeTransport(pending?.transport || previous?.transport);
+        if (lockedTransport !== 'Silla' && lockedTransport !== 'Camilla') return row;
+
         return {
           ...row,
-          transport: transport === 'Silla' || transport === 'Camilla' ? transport : row.transport,
-          transportReason: previous.transportReason ?? row.transportReason ?? '',
+          transport: lockedTransport,
           manualTransportOverride: true,
-          manualTransportUpdatedAt: previous.manualTransportUpdatedAt || row.manualTransportUpdatedAt || null
+          manualTransportUpdatedAt: pending?.updatedAt || previous?.manualTransportUpdatedAt || new Date().toISOString()
         };
       });
 
@@ -96,23 +99,21 @@
         opacity: .5;
         pointer-events: none;
       }
+      .transport-main[data-manual-transport="1"]::after { opacity: .82; }
       .transport-main[data-quick-transport="1"]:focus-visible {
         outline: 2px solid currentColor;
         outline-offset: 2px;
         border-radius: 7px;
-      }
-      .transport-main[data-manual-transport="1"]::after {
-        opacity: .8;
       }
       .quick-transport-popover-v37 {
         position: fixed;
         z-index: 10050;
         min-width: 150px;
         padding: 6px;
-        border: 1px solid rgba(30, 52, 68, .14);
+        border: 1px solid rgba(30,52,68,.14);
         border-radius: 14px;
-        background: rgba(255, 255, 255, .98);
-        box-shadow: 0 14px 36px rgba(28, 45, 57, .18);
+        background: rgba(255,255,255,.98);
+        box-shadow: 0 14px 36px rgba(28,45,57,.18);
         backdrop-filter: blur(18px);
         -webkit-backdrop-filter: blur(18px);
       }
@@ -135,15 +136,15 @@
       }
       .quick-transport-option-v37 + .quick-transport-option-v37 { margin-top: 2px; }
       .quick-transport-option-v37:active,
-      .quick-transport-option-v37.is-current {
-        background: rgba(28, 92, 122, .09);
-      }
+      .quick-transport-option-v37.is-current { background: rgba(28,92,122,.09); }
       .quick-transport-option-v37 .quick-check-v37 {
         margin-left: auto;
         opacity: 0;
         font-size: 12px;
       }
       .quick-transport-option-v37.is-current .quick-check-v37 { opacity: .75; }
+      html.quick-transport-commit-v37 #compactDetailBackdrop,
+      html.quick-transport-commit-v37 #sheetBackdrop { visibility: hidden !important; }
       @media (max-width: 520px) {
         .quick-transport-popover-v37 { min-width: 144px; }
         .quick-transport-option-v37 { min-height: 44px; }
@@ -173,32 +174,33 @@
     return popover;
   }
 
+  function findRowElement(id) {
+    return [...document.querySelectorAll('.patient-row[data-id]')]
+      .find((row) => String(row.dataset.id || '') === String(id || '')) || null;
+  }
+
   function rowById(id) {
     return readRows().find((row) => String(row?.id ?? '') === String(id ?? '')) || null;
   }
 
   function applyStoredStateToRow(tr, storedRow) {
-    if (!tr || !storedRow) return;
+    if (!tr || !storedRow) return false;
     const transport = normalizeTransport(storedRow.transport);
     const main = tr.querySelector('.transport-main');
     const label = main?.querySelector('b');
     const icon = main?.querySelector('span');
-    if (!main || !label) return;
+    if (!main || !label) return false;
 
-    if (storedRow.manualTransportOverride === true && (transport === 'Silla' || transport === 'Camilla')) {
-      main.classList.remove('silla', 'camilla', 'no-transfer', 'unset');
+    const before = normalizeTransport(label.textContent);
+    const manual = storedRow.manualTransportOverride === true && (transport === 'Silla' || transport === 'Camilla');
+
+    if (manual) {
+      main.classList.remove('silla','camilla','no-transfer','unset');
       main.classList.add(transport === 'Silla' ? 'silla' : 'camilla');
       label.textContent = transport;
       if (icon) icon.textContent = transport === 'Silla' ? '♿' : '🛏️';
       main.dataset.manualTransport = '1';
       main.removeAttribute('data-inferred');
-
-      const reason = tr.querySelector('.transport-reason');
-      if (reason) {
-        const text = normalize(storedRow.transportReason);
-        reason.classList.toggle('is-empty', !text);
-        reason.innerHTML = `<span>Motivo</span>${escapeHtml(text || '—')}`;
-      }
     } else {
       delete main.dataset.manualTransport;
     }
@@ -215,21 +217,63 @@
       main.removeAttribute('tabindex');
       main.removeAttribute('aria-label');
     }
+
+    return manual && before !== transport;
   }
 
-  function escapeHtml(value) {
-    return String(value ?? '').replace(/[&<>"']/g, (char) => ({
-      '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;'
-    }[char]));
+  function clearPendingSoon() {
+    queueMicrotask(() => {
+      pendingManualOverride = null;
+      pendingManualReleaseId = null;
+    });
+  }
+
+  function prepareManualFormSubmit(form) {
+    if (!activeEditingId || !(form instanceof HTMLFormElement)) return;
+    const stored = rowById(activeEditingId);
+    if (!stored) return;
+
+    const selected = normalizeTransport(form.querySelector('#transport')?.value);
+    const previous = normalizeTransport(stored.transport);
+    const alreadyManual = stored.manualTransportOverride === true;
+
+    if (selected === 'Silla' || selected === 'Camilla') {
+      if (alreadyManual || selected !== previous) {
+        pendingManualOverride = {
+          id: String(activeEditingId),
+          transport: selected,
+          updatedAt: new Date().toISOString()
+        };
+      }
+    } else if (alreadyManual) {
+      pendingManualReleaseId = String(activeEditingId);
+    }
+
+    clearPendingSoon();
   }
 
   function syncRowsFromStorage() {
     syncScheduled = false;
     const stored = new Map(readRows().filter((row) => row?.id).map((row) => [String(row.id), row]));
+    const mismatches = [];
+
     document.querySelectorAll('.patient-row[data-id]').forEach((tr) => {
       const row = stored.get(String(tr.dataset.id || ''));
-      if (row) applyStoredStateToRow(tr, row);
+      if (!row) return;
+      if (applyStoredStateToRow(tr, row)) mismatches.push({id:String(row.id), transport:normalizeTransport(row.transport)});
     });
+
+    if (!reconciling && mismatches.length) {
+      queueMicrotask(() => {
+        if (reconciling) return;
+        reconciling = true;
+        try {
+          mismatches.forEach(({id,transport}) => commitThroughApp(id, transport, true));
+        } finally {
+          reconciling = false;
+        }
+      });
+    }
   }
 
   function scheduleSync() {
@@ -264,8 +308,7 @@
   function openPopover(tr, anchor) {
     const id = tr?.dataset?.id;
     if (!id) return;
-    const row = rowById(id);
-    const visible = normalizeTransport(anchor.querySelector('b')?.textContent || row?.transport);
+    const visible = normalizeTransport(anchor.querySelector('b')?.textContent || rowById(id)?.transport);
     if (visible !== 'Silla' && visible !== 'Camilla') return;
 
     const popover = ensurePopover();
@@ -279,12 +322,10 @@
     positionPopover(popover, anchor);
   }
 
-  function setQuickTransport(id, value) {
-    const transport = normalizeTransport(value);
-    if (transport !== 'Silla' && transport !== 'Camilla') return;
-    const current = readRows();
+  function fallbackCommit(id, transport) {
+    const rows = readRows();
     let changed = false;
-    const next = current.map((row) => {
+    const next = rows.map((row) => {
       if (String(row?.id ?? '') !== String(id)) return row;
       changed = true;
       return {
@@ -295,57 +336,66 @@
       };
     });
     if (!changed) return;
-    writeRows(next);
-    const tr = document.querySelector(`.patient-row[data-id="${CSS.escape(String(id))}"]`);
+    nativeSetItem.call(localStorage, STORAGE_KEY, JSON.stringify(next));
+    const tr = findRowElement(id);
     const stored = next.find((row) => String(row?.id ?? '') === String(id));
     if (tr && stored) applyStoredStateToRow(tr, stored);
-    closePopover();
+    setTimeout(() => location.reload(), 0);
   }
 
-  function prepareManualFormSubmit(form) {
-    if (!activeEditingId || !(form instanceof HTMLFormElement)) return;
-    const selected = normalizeTransport(form.querySelector('#transport')?.value);
-    const reason = normalize(form.querySelector('#transportReason')?.value);
-    const rows = readRows();
-    const index = rows.findIndex((row) => String(row?.id ?? '') === String(activeEditingId));
-    if (index < 0) return;
+  function commitThroughApp(id, value, fromReconcile = false) {
+    const transport = normalizeTransport(value);
+    if (transport !== 'Silla' && transport !== 'Camilla') return;
+    const tr = findRowElement(id);
+    if (!tr) return fallbackCommit(id, transport);
 
-    const previous = rows[index];
-    const previousTransport = normalizeTransport(previous.transport);
-    const alreadyManual = previous.manualTransportOverride === true;
-    const isQuickType = selected === 'Silla' || selected === 'Camilla';
-    const userChangedQuickType = isQuickType && selected !== previousTransport;
+    closePopover();
+    activeEditingId = String(id);
+    document.documentElement.classList.add('quick-transport-commit-v37');
 
-    if (!alreadyManual && !userChangedQuickType) return;
+    try {
+      tr.click();
 
-    const next = [...rows];
-    if (isQuickType) {
-      next[index] = {
-        ...previous,
-        transport: selected,
-        transportReason: reason,
-        manualTransportOverride: true,
-        manualTransportUpdatedAt: new Date().toISOString()
-      };
-    } else {
-      const replacement = {
-        ...previous,
-        transport: selected || previous.transport,
-        transportReason: reason
-      };
-      delete replacement.manualTransportOverride;
-      delete replacement.manualTransportUpdatedAt;
-      next[index] = replacement;
+      const sheet = document.getElementById('sheetBackdrop');
+      if (!sheet || sheet.hidden) {
+        const detail = document.getElementById('compactDetailBackdrop');
+        const edit = detail?.querySelector('.compact-detail-edit');
+        edit?.click();
+      }
+
+      const form = document.getElementById('patientForm');
+      const select = form?.querySelector('#transport');
+      const openSheet = document.getElementById('sheetBackdrop');
+      if (!form || !select || openSheet?.hidden) return fallbackCommit(id, transport);
+
+      select.value = transport;
+      form.dispatchEvent(new Event('submit', {bubbles:true, cancelable:true}));
+      if (!fromReconcile) scheduleSync();
+    } finally {
+      document.documentElement.classList.remove('quick-transport-commit-v37');
     }
-    writeRows(next);
+  }
+
+  function reconcileVisibleLocks() {
+    const stored = readRows().filter((row) => row?.manualTransportOverride === true);
+    stored.forEach((row) => {
+      const transport = normalizeTransport(row.transport);
+      const tr = findRowElement(row.id);
+      const visible = normalizeTransport(tr?.querySelector('.transport-main b')?.textContent);
+      if (tr && (transport === 'Silla' || transport === 'Camilla') && visible !== transport) {
+        commitThroughApp(row.id, transport, true);
+      }
+    });
   }
 
   function onDocumentClick(event) {
     const option = event.target.closest?.('[data-quick-value]');
     if (option && activeRowId) {
       event.preventDefault();
-      event.stopPropagation();
-      setQuickTransport(activeRowId, option.dataset.quickValue);
+      event.stopImmediatePropagation();
+      const id = activeRowId;
+      const value = option.dataset.quickValue;
+      commitThroughApp(id, value);
       return;
     }
 
@@ -354,7 +404,7 @@
       const tr = main.closest('.patient-row[data-id]');
       if (!tr) return;
       event.preventDefault();
-      event.stopPropagation();
+      event.stopImmediatePropagation();
       openPopover(tr, main);
       return;
     }
@@ -362,6 +412,7 @@
     const patientRow = event.target.closest?.('.patient-row[data-id]');
     if (patientRow && !event.target.closest('[data-remove]')) activeEditingId = patientRow.dataset.id || null;
     if (event.target.closest?.('#manualCapture')) activeEditingId = null;
+    if (event.target.closest?.('#newShift')) reconcileVisibleLocks();
     if (event.target.closest?.('#closeSheet') || event.target.id === 'sheetBackdrop') activeEditingId = null;
 
     const popover = document.getElementById('quickTransportPopoverV37');
@@ -374,26 +425,20 @@
       const tr = main.closest('.patient-row[data-id]');
       if (!tr) return;
       event.preventDefault();
-      event.stopPropagation();
+      event.stopImmediatePropagation();
       openPopover(tr, main);
       return;
     }
     if (event.key === 'Escape') closePopover();
   }
 
-  function start() {
+  function startDom() {
     ensureStyles();
     ensurePopover();
     scheduleSync();
 
-    document.addEventListener('click', onDocumentClick, true);
-    document.addEventListener('keydown', onDocumentKeydown, true);
-    document.addEventListener('submit', (event) => {
-      if (event.target?.id === 'patientForm') prepareManualFormSubmit(event.target);
-    }, true);
-
-    window.addEventListener('resize', closePopover, { passive: true });
-    window.addEventListener('scroll', closePopover, { passive: true, capture: true });
+    window.addEventListener('resize', closePopover, {passive:true});
+    window.addEventListener('scroll', closePopover, {passive:true, capture:true});
 
     const target = document.getElementById('app') || document.body;
     if (target && !observer) {
@@ -401,10 +446,16 @@
         scheduleSync();
         if (activeAnchor && !document.contains(activeAnchor)) closePopover();
       });
-      observer.observe(target, { childList: true, subtree: true, characterData: true });
+      observer.observe(target, {childList:true, subtree:true, characterData:true});
     }
   }
 
-  if (document.readyState === 'loading') document.addEventListener('DOMContentLoaded', start, { once: true });
-  else start();
+  document.addEventListener('click', onDocumentClick, true);
+  document.addEventListener('keydown', onDocumentKeydown, true);
+  document.addEventListener('submit', (event) => {
+    if (event.target?.id === 'patientForm') prepareManualFormSubmit(event.target);
+  }, true);
+
+  if (document.readyState === 'loading') document.addEventListener('DOMContentLoaded', startDom, {once:true});
+  else startDom();
 })();
