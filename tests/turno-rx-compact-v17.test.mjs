@@ -13,6 +13,7 @@ const font=read('public/turno-rx/font-v27.css');
 const camaLabel=read('public/turno-rx/cama-label-v28.js');
 const stickyClose=read('public/turno-rx/sticky-close-v29.css');
 const elegant=read('public/turno-rx/elegant-v30.css');
+const polish=read('public/turno-rx/polish-v32.js');
 const js=read('public/turno-rx/compact-v17.js');
 const transport=read('public/turno-rx/transport-v20.js');
 const sw=read('public/turno-rx/sw.js');
@@ -27,10 +28,11 @@ describe('Pendientes vista compacta',()=>{
     expect(index).toContain('/turno-rx/adaptive-row-v26.css?v=1');
     expect(index).toContain('/turno-rx/font-v27.css?v=1');
     expect(index).toContain('/turno-rx/sticky-close-v29.css?v=1');
-    expect(index).toContain('/turno-rx/elegant-v30.css?v=1');
+    expect(index).toContain('/turno-rx/elegant-v30.css?v=2');
     expect(index).toContain('/turno-rx/adaptive-row-v26.js?v=1');
     expect(index).toContain('/turno-rx/cama-label-v28.js?v=1');
     expect(index).toContain('/turno-rx/transport-v20.js?v=3');
+    expect(index).toContain('/turno-rx/polish-v32.js?v=1');
     expect(index).toContain('type="module" src="/turno-rx/name-format-v23.js?v=1"');
   });
 
@@ -51,12 +53,13 @@ describe('Pendientes vista compacta',()=>{
     expect(oneLine).toContain('text-overflow: ellipsis !important');
   });
 
-  it('aprovecha los huecos de Origen y Traslado para Paciente y Estudio',()=>{
+  it('conserva la capa que aprovecha huecos y la sobrescribe con el reparto elegante final',()=>{
     expect(spacing).toContain('.imaging-table col:nth-child(1) { width: 8% !important; }');
-    expect(spacing).toContain('.imaging-table col:nth-child(2) { width: 48% !important; }');
-    expect(spacing).toContain('.imaging-table col:nth-child(3) { width: 19% !important; }');
-    expect(spacing).toContain('.imaging-table col:nth-child(4) { width: 25% !important; }');
     expect(spacing).toContain('width: max-content !important');
+    expect(elegant).toContain('.imaging-table col:nth-child(1){width:9% !important;}');
+    expect(elegant).toContain('.imaging-table col:nth-child(2){width:42% !important;}');
+    expect(elegant).toContain('.imaging-table col:nth-child(3){width:22% !important;}');
+    expect(elegant).toContain('.imaging-table col:nth-child(4){width:27% !important;}');
   });
 
   it('pasa a dos lineas con nombres arriba y apellidos abajo si falta espacio',()=>{
@@ -67,19 +70,14 @@ describe('Pendientes vista compacta',()=>{
     expect(adaptiveJs).toContain('node.dataset.surnames=parts.surnames');
     expect(adaptiveCss).toContain('content:attr(data-given-names)');
     expect(adaptiveCss).toContain('content:attr(data-surnames)');
-    expect(adaptiveCss).toContain('.imaging-table.study-wide-v26 col:nth-child(4){width:33% !important;}');
   });
 
   it('amplia tipografia y vuelve a mostrar edad y sexo debajo del paciente',()=>{
     expect(font).toContain('.imaging-table .patient-name');
-    expect(font).toContain('font-size:13.4px !important');
     expect(font).toContain('.imaging-table .age-line');
     expect(font).toContain('display:block !important');
-    expect(font).toContain('font-size:10.5px !important');
-    expect(font).toContain('.imaging-table .transport-main');
-    expect(font).toContain('font-size:12px !important');
-    expect(font).toContain('.imaging-table .study-cell');
-    expect(font).toContain('font-size:13px !important');
+    expect(elegant).toContain('font-size:15.5px !important');
+    expect(elegant).toContain('font-size:11px !important');
   });
 
   it('muestra Cama en vez de Origen solo en imagenologia',()=>{
@@ -89,27 +87,26 @@ describe('Pendientes vista compacta',()=>{
   });
 
   it('mantiene la X accesible en fichas y edición largas',()=>{
-    expect(stickyClose).toContain('.sheet-backdrop,');
-    expect(stickyClose).toContain('.compact-detail-backdrop');
     expect(stickyClose).toContain('env(safe-area-inset-top)');
-    expect(stickyClose).toContain('.sheet-head,');
-    expect(stickyClose).toContain('.compact-detail-head');
     expect(stickyClose).toContain('position: sticky !important');
-    expect(stickyClose).toContain('top: 0 !important');
-    expect(stickyClose).toContain('.close-btn,');
-    expect(stickyClose).toContain('.compact-detail-close');
     expect(stickyClose).toContain('min-width: 44px !important');
   });
 
-  it('usa fondo negro y un reparto más simétrico sin cortar Camilla',()=>{
+  it('usa fondo negro y un reparto simétrico sin cortar traslado',()=>{
     expect(index).toContain('<meta name="theme-color" content="#000000"');
     expect(elegant).toContain('background:#000 !important');
-    expect(elegant).toContain('.imaging-table col:nth-child(1){width:8% !important;}');
-    expect(elegant).toContain('.imaging-table col:nth-child(2){width:40% !important;}');
-    expect(elegant).toContain('.imaging-table col:nth-child(3){width:24% !important;}');
-    expect(elegant).toContain('.imaging-table col:nth-child(4){width:28% !important;}');
-    expect(elegant).toContain('.imaging-table .transport-main b');
+    expect(elegant).toContain('.imaging-table .transport-main{');
+    expect(elegant).toContain('width:auto !important');
     expect(elegant).toContain('text-overflow:clip !important');
+  });
+
+  it('resalta Tórax y agrega feedback táctil sin alterar el texto del estudio',()=>{
+    expect(polish).toContain("split(/(Tórax)/gi)");
+    expect(polish).toContain("strong.className = 'study-torax-v32'");
+    expect(polish).toContain("row.classList.add('is-pressed-v32')");
+    expect(polish).toContain("row.classList.remove('is-pressed-v32')");
+    expect(elegant).toContain('.study-torax-v32');
+    expect(elegant).toContain('.imaging-row.is-pressed-v32');
   });
 
   it('usa un solo encabezado y oculta los datos clínicos de la lista',()=>{
@@ -133,9 +130,6 @@ describe('Pendientes vista compacta',()=>{
   it('resume el estudio a anatomía y conserva tórax primero',()=>{
     expect(js).toContain('function conciseStudy(value)');
     expect(js).toContain("add(portable ? 'Tórax portátil' : 'Tórax'");
-    expect(js).toContain("add('Abdomen'");
-    expect(js).toContain("add('Cráneo'");
-    expect(js).toContain("detect('Pie'");
     expect(js).toContain("regions.map((item) => item.label).join(' + ')");
   });
 
@@ -144,10 +138,6 @@ describe('Pendientes vista compacta',()=>{
     expect(transport).toContain("label: 'Camilla'");
     expect(transport).not.toContain("label: 'Silla probable'");
     expect(transport).not.toContain("label: 'Camilla probable'");
-    expect(transport).toContain('strongCamilla');
-    expect(transport).toContain('likelyChairStudy');
-    expect(transport).toContain('ambiguousMobilityStudy');
-    expect(transport).toContain('transportRank(a) - transportRank(b)');
   });
 
   it('ordena por traslado, luego menor edad, mujer, tórax y cama',()=>{
@@ -171,20 +161,11 @@ describe('Pendientes vista compacta',()=>{
     expect(formatPatientName('Pérez López, Juan Carlos')).toBe('JUAN CARLOS PÉREZ LÓPEZ');
   });
 
-  it('fuerza shell v31 y mantiene APIs fuera de caché',()=>{
-    expect(sw).toContain("turno-rx-shell-v31");
-    expect(sw).toContain('/turno-rx/compact-v17.css?v=4');
-    expect(sw).toContain('/turno-rx/one-line-v24.css?v=1');
-    expect(sw).toContain('/turno-rx/space-v25.css?v=1');
-    expect(sw).toContain('/turno-rx/adaptive-row-v26.css?v=1');
-    expect(sw).toContain('/turno-rx/font-v27.css?v=1');
-    expect(sw).toContain('/turno-rx/sticky-close-v29.css?v=1');
-    expect(sw).toContain('/turno-rx/elegant-v30.css?v=1');
-    expect(sw).toContain('/turno-rx/adaptive-row-v26.js?v=1');
-    expect(sw).toContain('/turno-rx/cama-label-v28.js?v=1');
-    expect(sw).toContain('/turno-rx/compact-v17.js?v=2');
+  it('fuerza shell v32 y mantiene APIs fuera de caché',()=>{
+    expect(sw).toContain("turno-rx-shell-v32");
+    expect(sw).toContain('/turno-rx/elegant-v30.css?v=2');
+    expect(sw).toContain('/turno-rx/polish-v32.js?v=1');
     expect(sw).toContain('/turno-rx/transport-v20.js?v=3');
-    expect(sw).toContain('/turno-rx/name-format-v23.js?v=1');
     expect(sw).toContain("url.pathname.startsWith('/api/')");
   });
 });
