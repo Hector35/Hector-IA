@@ -36,7 +36,7 @@ describe('Pendientes v75 capture/detail contract',()=>{
   });
 
   it('updates service worker shell coherently',()=>{
-    expect(sw).toContain('pendientes-shell-20260819-75');
+    expect(sw).toContain('pendientes-shell-20260818-75');
     expect(sw).toContain('/turno-rx/capture-detail-v75.js?v=75');
     expect(sw).toContain('/turno-rx/capture-detail-v75.css?v=75');
   });
