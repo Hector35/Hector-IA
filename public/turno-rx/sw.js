@@ -1,4 +1,4 @@
-// Pendientes v82 — coherent shell cache; network-first for current assets/navigation.
+// Pendientes v83 — coherent shell cache; network-first for current assets/navigation.
 // Historical inert markers kept only for legacy contract tests; they are not cached or executed:
 // Pendientes v72
 // const CACHE = 'pendientes-shell-20260818-7'
@@ -25,7 +25,7 @@
 // /turno-rx/stability-v65.css?v=65
 // /turno-rx/interaction-hotfix-v58.css?v=58
 // /turno-rx/capture-detail-v75.js?v=75
-const CACHE = 'pendientes-shell-20260819-82';
+const CACHE = 'pendientes-shell-20260819-83';
 const SHELL = [
   '/turno-rx/',
   '/turno-rx/index.html',
@@ -37,7 +37,7 @@ const SHELL = [
   '/turno-rx/floor-intelligence-v64.js?v=64',
   '/turno-rx/photo-dedupe-v68.js?v=70',
   '/turno-rx/capture-fix-v80.js?v=81',
-  '/turno-rx/patient-detail-history-v82.js?v=82',
+  '/turno-rx/patient-detail-history-v82.js?v=83',
   '/turno-rx/stability.js?v=20260818.1',
   '/turno-rx/manual-category-v72.js?v=72',
   '/turno-rx/e2e-v74.js?v=74',
@@ -72,51 +72,7 @@ const SHELL = [
   '/turno-rx/manifest.webmanifest',
   '/turno-rx/icon.svg'
 ];
-
-self.addEventListener('install', event => {
-  event.waitUntil(
-    caches.open(CACHE)
-      .then(cache => cache.addAll(SHELL))
-      .then(() => self.skipWaiting())
-  );
-});
-
-self.addEventListener('activate', event => {
-  event.waitUntil(
-    caches.keys()
-      .then(keys => Promise.all(
-        keys
-          .filter(key => (key.startsWith('turno-rx-') || key.startsWith('pendientes-shell-')) && key !== CACHE)
-          .map(key => caches.delete(key))
-      ))
-      .then(() => self.clients.claim())
-  );
-});
-
-self.addEventListener('message', event => {
-  if (event.data?.type === 'SKIP_WAITING') self.skipWaiting();
-});
-
-self.addEventListener('fetch', event => {
-  if (event.request.method !== 'GET') return;
-  const url = new URL(event.request.url);
-  if (url.origin !== self.location.origin || url.pathname.startsWith('/api/') || !url.pathname.startsWith('/turno-rx/')) return;
-
-  event.respondWith((async () => {
-    try {
-      const response = await fetch(event.request, { cache: 'no-store' });
-      if (response.ok) {
-        const copy = response.clone();
-        event.waitUntil(caches.open(CACHE).then(cache => cache.put(event.request, copy)));
-      }
-      return response;
-    } catch {
-      const cached = await caches.match(event.request, { ignoreSearch: false });
-      if (cached) return cached;
-      if (event.request.mode === 'navigate') {
-        return (await caches.match('/turno-rx/index.html')) || (await caches.match('/turno-rx/')) || Response.error();
-      }
-      return Response.error();
-    }
-  })());
-});
+self.addEventListener('install',event=>{event.waitUntil(caches.open(CACHE).then(cache=>cache.addAll(SHELL)).then(()=>self.skipWaiting()))});
+self.addEventListener('activate',event=>{event.waitUntil(caches.keys().then(keys=>Promise.all(keys.filter(key=>(key.startsWith('turno-rx-')||key.startsWith('pendientes-shell-'))&&key!==CACHE).map(key=>caches.delete(key)))).then(()=>self.clients.claim()))});
+self.addEventListener('message',event=>{if(event.data?.type==='SKIP_WAITING')self.skipWaiting()});
+self.addEventListener('fetch',event=>{if(event.request.method!=='GET')return;const url=new URL(event.request.url);if(url.origin!==self.location.origin||url.pathname.startsWith('/api/')||!url.pathname.startsWith('/turno-rx/'))return;event.respondWith((async()=>{try{const response=await fetch(event.request,{cache:'no-store'});if(response.ok){const copy=response.clone();event.waitUntil(caches.open(CACHE).then(cache=>cache.put(event.request,copy)))}return response}catch{const cached=await caches.match(event.request,{ignoreSearch:false});if(cached)return cached;if(event.request.mode==='navigate')return(await caches.match('/turno-rx/index.html'))||(await caches.match('/turno-rx/'))||Response.error();return Response.error()}})())});
