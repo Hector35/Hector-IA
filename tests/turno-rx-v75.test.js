@@ -8,15 +8,15 @@ const index=read('public/turno-rx/index.html');
 const sw=read('public/turno-rx/sw.js');
 const css=read('public/turno-rx/capture-detail-v75.css');
 
-describe('Pendientes v75/v80 capture/detail contract',()=>{
-  it('loads v80 capture before v75 detail and both before the legacy stability capture controller',()=>{
-    const v80=index.indexOf('capture-fix-v80.js?v=80');
+describe('Pendientes v75/v81 capture/detail contract',()=>{
+  it('loads v81 capture revision before v75 detail and both before the legacy stability capture controller',()=>{
+    const v81=index.indexOf('capture-fix-v80.js?v=81');
     const v75=index.indexOf('capture-detail-v75.js?v=75');
     const stability=index.indexOf('stability.js?v=20260818.1');
-    expect(v80).toBeGreaterThan(-1);
-    expect(v75).toBeGreaterThan(v80);
+    expect(v81).toBeGreaterThan(-1);
+    expect(v75).toBeGreaterThan(v81);
     expect(stability).toBeGreaterThan(v75);
-    expect(index).not.toContain('capture-fix-v79.js?v=79');
+    expect(index).not.toContain('capture-fix-v80.js?v=80');
     expect(index).toContain('capture-detail-v75.css?v=78');
   });
 
@@ -56,11 +56,21 @@ describe('Pendientes v75/v80 capture/detail contract',()=>{
     expect(guard).toContain('Dos camas distintas con el mismo estudio son pacientes distintos');
   });
 
-  it('reconciles a re-photographed imaging request semantically without using Realizado as a blocker',()=>{
-    expect(guard).toContain('function sameImagingRequest(a,b)');
+  it('requires strong visible identity before reconciling different photos from the same bed and study',()=>{
+    expect(guard).toContain('function sameImagingIdentity(a,b)');
+    expect(guard).toContain('if(aFolio&&bFolio)return aFolio===bFolio');
+    expect(guard).toContain('if(aName&&bName)return sameName(aName,bName)');
+    expect(guard).toContain('if(aDate&&bDate&&aTime&&bTime)return aDate===bDate&&aTime===bTime');
+    expect(guard).toContain('aText.length>=20&&bText.length>=20&&aText===bText');
+    expect(guard).toContain('if(aBed&&bBed&&aBed!==bBed)return false');
+    expect(guard).toContain('return sameImagingIdentity(a,b)&&Boolean(aTarget||bTarget||aBed||bBed)');
+    expect(guard).not.toContain('aBed===bBed&&namesCompatible');
+    expect(guard).toContain('Dos solicitudes distintas de la misma cama y mismo estudio NO se fusionan');
+  });
+
+  it('does not use Realizado as a semantic reconciliation blocker',()=>{
     expect(guard).toContain("plain(r.status)!=='realizado'");
     expect(guard).toContain('sameImagingRequest(r,incoming)');
-    expect(guard).toContain('aBed===bBed&&namesCompatible');
   });
 
   it('can rescan a clearly identified Piso board even when the total is missing',()=>{
@@ -100,9 +110,9 @@ describe('Pendientes v75/v80 capture/detail contract',()=>{
   });
 
   it('updates service worker shell coherently',()=>{
-    expect(sw).toContain('pendientes-shell-20260819-80');
-    expect(sw).toContain('/turno-rx/capture-fix-v80.js?v=80');
-    expect(sw).not.toContain('/turno-rx/capture-fix-v79.js?v=79');
+    expect(sw).toContain('pendientes-shell-20260819-81');
+    expect(sw).toContain('/turno-rx/capture-fix-v80.js?v=81');
+    expect(sw).not.toContain('/turno-rx/capture-fix-v80.js?v=80');
     expect(sw).toContain('/turno-rx/capture-detail-v75.js?v=75');
     expect(sw).toContain('/turno-rx/capture-detail-v75.css?v=78');
   });
