@@ -2,7 +2,7 @@ import { syncRowsFromStorageAndRender, canonicalOrigin, normalizeAge, normalizeS
 
 const STORAGE_KEY='pendientes-table-v2';
 const SHIFT_KEY='pendientes-shift-v1';
-const BUILD='80';
+const BUILD='81';
 const DB_NAME='pendientes-boleta-images-v1';
 const STORE='images';
 const MAX_IMAGE_BYTES=8*1024*1024;
@@ -35,6 +35,7 @@ IMAGENOLOGÍA:
 - requestingDoctor, folio, requestDate, requestTime, service, originService, transferNotes, diagnóstico y cualquier otro dato visible deben conservarse.
 - Si una boleta solicita modalidades distintas, devuelve un objeto por modalidad compartiendo la metadata visible.
 - Dos camas distintas con el mismo estudio son pacientes distintos aunque el nombre no sea legible.
+- Dos solicitudes distintas de la misma cama y mismo estudio NO se fusionan entre fotografías sin una identidad visible fuerte (folio, nombre compatible, fecha+hora o texto de boleta inequívocamente igual).
 
 TRASLADO:
 - Es una estimación operativa conservadora, no una orden médica.
@@ -120,13 +121,22 @@ function dedupePatients(patients){
   }
   return out.map(x=>x.p);
 }
+function sameImagingIdentity(a,b){
+  const aFolio=plain(a?.folio),bFolio=plain(b?.folio);
+  if(aFolio&&bFolio)return aFolio===bFolio;
+  const aName=clean(a?.name),bName=clean(b?.name);
+  if(aName&&bName)return sameName(aName,bName);
+  const aDate=plain(a?.requestDate),bDate=plain(b?.requestDate),aTime=plain(a?.requestTime),bTime=plain(b?.requestTime);
+  if(aDate&&bDate&&aTime&&bTime)return aDate===bDate&&aTime===bTime;
+  const aText=plain(a?.recognizedText),bText=plain(b?.recognizedText);
+  return aText.length>=20&&bText.length>=20&&aText===bText;
+}
 function sameImagingRequest(a,b){
   if(categoryOf(a)==='Piso'||categoryOf(a)!==categoryOf(b))return false;
   const aBed=canonicalOrigin(a?.bed),bBed=canonicalOrigin(b?.bed),aTarget=plain(a?.target),bTarget=plain(b?.target);
   if(aTarget&&bTarget&&aTarget!==bTarget)return false;
-  const namesCompatible=!clean(a?.name)||!clean(b?.name)||sameName(a?.name,b?.name);
-  if(aBed&&bBed)return aBed===bBed&&namesCompatible;
-  return !aBed&&!bBed&&sameName(a?.name,b?.name)&&Boolean(aTarget||bTarget);
+  if(aBed&&bBed&&aBed!==bBed)return false;
+  return sameImagingIdentity(a,b)&&Boolean(aTarget||bTarget||aBed||bBed);
 }
 function commitPatients(patients,fp,shiftId,imageAvailable){
   const list=currentRows();let added=0,updated=0,partials=0,skipped=0;
@@ -201,4 +211,4 @@ document.addEventListener('change',e=>{if(e.target.id!=='galleryInput'&&e.target
 window.addEventListener('pendientes:v80-updated',()=>queueMicrotask(()=>document.documentElement.dataset.pendientesBuild=BUILD));
 document.documentElement.dataset.pendientesBuild=BUILD;
 
-export { dedupePatients, floorRecognitionStats, sameImagingRequest };
+export { dedupePatients, floorRecognitionStats, sameImagingRequest, sameImagingIdentity };
