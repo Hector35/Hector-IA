@@ -1,17 +1,17 @@
-/* Pendientes v75 — visible polish + boleta detail */
-html[data-pendientes-build="75"] body{background:
+/* Pendientes detail + visible polish. Runtime build number must not disable styling. */
+html[data-pendientes-build] body{background:
   radial-gradient(circle at 18% -8%,rgba(59,130,246,.18),transparent 30%),
   radial-gradient(circle at 92% 10%,rgba(99,102,241,.12),transparent 28%),
   #080f1d!important}
-html[data-pendientes-build="75"] .topbar{background:linear-gradient(180deg,rgba(8,15,29,.96),rgba(8,15,29,.82))!important;border-bottom:1px solid rgba(148,163,184,.10)!important}
-html[data-pendientes-build="75"] .brand-dot{box-shadow:0 0 0 5px rgba(59,130,246,.10),0 0 24px rgba(59,130,246,.48)!important}
-html[data-pendientes-build="75"] .capture-icon-btn,html[data-pendientes-build="75"] .shift-btn{background:linear-gradient(180deg,rgba(30,41,59,.95),rgba(15,23,42,.95))!important;border:1px solid rgba(148,163,184,.16)!important;box-shadow:0 8px 22px rgba(0,0,0,.18)!important}
-html[data-pendientes-build="75"] .category-tabs{background:linear-gradient(180deg,rgba(8,15,29,.92),rgba(8,15,29,.78))!important;backdrop-filter:blur(18px)!important}
-html[data-pendientes-build="75"] .category-tab{border:1px solid rgba(148,163,184,.12)!important;background:rgba(15,23,42,.76)!important;transition:transform .14s ease,background .14s ease,border-color .14s ease!important}
-html[data-pendientes-build="75"] .category-tab.is-active{background:linear-gradient(180deg,rgba(37,99,235,.34),rgba(30,64,175,.20))!important;border-color:rgba(96,165,250,.35)!important;box-shadow:0 8px 24px rgba(37,99,235,.16)!important}
-html[data-pendientes-build="75"] .patient-row{background:linear-gradient(180deg,rgba(24,39,60,.96),rgba(17,28,46,.96))!important}
-html[data-pendientes-build="75"] .patient-row:nth-child(even){background:linear-gradient(180deg,rgba(29,45,68,.96),rgba(20,32,51,.96))!important}
-html[data-pendientes-build="75"] .patient-row:active{filter:brightness(1.08)}
+html[data-pendientes-build] .topbar{background:linear-gradient(180deg,rgba(8,15,29,.96),rgba(8,15,29,.82))!important;border-bottom:1px solid rgba(148,163,184,.10)!important}
+html[data-pendientes-build] .brand-dot{box-shadow:0 0 0 5px rgba(59,130,246,.10),0 0 24px rgba(59,130,246,.48)!important}
+html[data-pendientes-build] .capture-icon-btn,html[data-pendientes-build] .shift-btn{background:linear-gradient(180deg,rgba(30,41,59,.95),rgba(15,23,42,.95))!important;border:1px solid rgba(148,163,184,.16)!important;box-shadow:0 8px 22px rgba(0,0,0,.18)!important}
+html[data-pendientes-build] .category-tabs{background:linear-gradient(180deg,rgba(8,15,29,.92),rgba(8,15,29,.78))!important;backdrop-filter:blur(18px)!important}
+html[data-pendientes-build] .category-tab{border:1px solid rgba(148,163,184,.12)!important;background:rgba(15,23,42,.76)!important;transition:transform .14s ease,background .14s ease,border-color .14s ease!important}
+html[data-pendientes-build] .category-tab.is-active{background:linear-gradient(180deg,rgba(37,99,235,.34),rgba(30,64,175,.20))!important;border-color:rgba(96,165,250,.35)!important;box-shadow:0 8px 24px rgba(37,99,235,.16)!important}
+html[data-pendientes-build] .patient-row{background:linear-gradient(180deg,rgba(24,39,60,.96),rgba(17,28,46,.96))!important}
+html[data-pendientes-build] .patient-row:nth-child(even){background:linear-gradient(180deg,rgba(29,45,68,.96),rgba(20,32,51,.96))!important}
+html[data-pendientes-build] .patient-row:active{filter:brightness(1.08)}
 .v75-backdrop{position:fixed;inset:0;z-index:180;background:rgba(2,6,23,.72);backdrop-filter:blur(10px);display:flex;align-items:flex-end;justify-content:center;padding-top:max(12px,env(safe-area-inset-top))}
 .v75-sheet{width:min(100%,760px);max-height:94vh;overflow:auto;background:linear-gradient(180deg,#13233a 0%,#0b1728 100%);border:1px solid rgba(148,163,184,.16);border-bottom:0;border-radius:28px 28px 0 0;padding:8px 14px max(18px,env(safe-area-inset-bottom));box-shadow:0 -28px 80px rgba(0,0,0,.52)}
 .v75-handle{width:46px;height:5px;border-radius:999px;background:rgba(226,232,240,.16);margin:3px auto 12px}
@@ -36,4 +36,4 @@ html[data-pendientes-build="75"] .patient-row:active{filter:brightness(1.08)}
 .v75-toast{position:fixed;z-index:240;left:50%;transform:translateX(-50%);bottom:max(16px,calc(12px + env(safe-area-inset-bottom)));width:min(calc(100% - 28px),520px);padding:12px 14px;border-radius:15px;border:1px solid rgba(96,165,250,.20);background:rgba(13,26,45,.97);color:#eef6ff;box-shadow:0 18px 50px rgba(0,0,0,.42);font-size:13px;font-weight:700;text-align:center;backdrop-filter:blur(18px)}
 .v75-toast.success{border-color:rgba(78,214,165,.30)}.v75-toast.warning{border-color:rgba(242,199,109,.32);color:#fde7ad}
 @media(max-width:520px){.v75-fields{grid-template-columns:1fr}.v75-sheet{border-radius:24px 24px 0 0}.v75-photo{max-height:34vh}.v75-photo img{max-height:34vh}}
-@media(prefers-reduced-motion:reduce){html[data-pendientes-build="75"] .category-tab{transition:none!important}}
+@media(prefers-reduced-motion:reduce){html[data-pendientes-build] .category-tab{transition:none!important}}
