@@ -23,6 +23,7 @@
 // /turno-rx/row-actions-v61.js?v=61
 // /turno-rx/stability-v65.js?v=65
 // /turno-rx/stability-v65.css?v=65
+// /turno-rx/interaction-hotfix-v58.css?v=58
 const CACHE = 'pendientes-shell-20260818-75';
 const SHELL = [
   '/turno-rx/',
