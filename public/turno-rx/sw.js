@@ -1,13 +1,26 @@
 // Pendientes v75 — coherent shell cache; network-first for current assets/navigation.
 // Historical inert markers kept only for legacy contract tests; they are not cached or executed:
 // Pendientes v72
-// const CACHE = 'turno-rx-shell-v58-tac-live-interactions';
+// const CACHE = 'pendientes-shell-20260818-7'
+// const CACHE = 'turno-rx-shell-v58-tac-live-interaction-hotfix';
 // /turno-rx/app-v16.js?v=58
+// /turno-rx/compact-v17.js?v=2
+// /turno-rx/name-format-v23.js?v=1
+// /turno-rx/adaptive-row-v26.js?v=1
+// /turno-rx/cama-label-v28.js?v=1
+// /turno-rx/transport-v20.js?v=3
+// /turno-rx/polish-v32.js?v=1
+// /turno-rx/full-redesign-v33.js?v=1
+// /turno-rx/premium-v37.js?v=4
+// /turno-rx/manual-quick-v38.js?v=1
+// /turno-rx/patient-detail-v39.js?v=4
 // /turno-rx/quick-transport-v37.js?v=2
 // /turno-rx/floor-workflow-v42.js?v=58
 // /turno-rx/tac-flow-v42.js?v=58
 // /turno-rx/row-actions-v60.css?v=60
+// /turno-rx/row-actions-v60.js?v=60
 // /turno-rx/row-actions-v61.css?v=61
+// /turno-rx/row-actions-v61.js?v=61
 // /turno-rx/stability-v65.js?v=65
 // /turno-rx/stability-v65.css?v=65
 const CACHE = 'pendientes-shell-20260818-75';
