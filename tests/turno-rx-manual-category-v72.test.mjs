@@ -14,14 +14,17 @@ test('v72 permite elegir categoría manual sin quedar forzada por la pestaña ac
   expect(patch).toContain('option.value = \'Piso\'');
   expect(patch).toContain("window.addEventListener('submit'");
   expect(index).toContain('/turno-rx/manual-category-v72.js?v=72');
-  expect(index.indexOf('/turno-rx/stability.js?v=20260818.1')).toBeLessThan(index.indexOf('/turno-rx/manual-category-v72.js?v=72'));
+  expect(index.indexOf('/turno-rx/interaction-runtime-v84.js?v=84')).toBeLessThan(index.indexOf('/turno-rx/manual-category-v72.js?v=72'));
+  const activeScripts=index.match(/<script[^>]+src="[^"]+"[^>]*><\/script>/g)||[];
+  expect(activeScripts.some(tag=>tag.includes('/turno-rx/stability.js'))).toBe(false);
   expect(sw).toContain("const CACHE = 'pendientes-shell-20260818-7'");
   expect(sw).toContain('/turno-rx/manual-category-v72.js?v=72');
 });
 
-test('v72 conserva el controlador consolidado y no reactiva listeners legacy',()=>{
+test('v72 conserva el controlador de interacción y no reactiva listeners legacy',()=>{
   const index=readFileSync('public/turno-rx/index.html','utf8');
+  expect(index).toContain('/turno-rx/interaction-runtime-v84.js?v=84');
   expect(index).toContain('/turno-rx/stability.js?v=20260818.1');
   expect(index).toContain('LEGACY TEST REFERENCES ONLY');
-  expect(index).not.toMatch(/<script[^>]+src="\/turno-rx\/(?:floor-workflow-v42|tac-flow-v42|row-actions-v60|row-actions-v61|manual-quick-v38)\.js/);
+  expect(index).not.toMatch(/<script[^>]+src="\/turno-rx\/(?:floor-workflow-v42|tac-flow-v42|row-actions-v60|row-actions-v61|manual-quick-v38|stability)\.js/);
 });

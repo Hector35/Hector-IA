@@ -4,22 +4,26 @@ import { describe, expect, it } from 'vitest';
 const read=(path)=>readFileSync(new URL(`../${path}`,import.meta.url),'utf8');
 const detail=read('public/turno-rx/patient-detail-history-v82.js');
 const legacyDetail=read('public/turno-rx/capture-detail-v75.js');
+const legacyStability=read('public/turno-rx/stability.js');
+const interactions=read('public/turno-rx/interaction-runtime-v84.js');
 const guard=read('public/turno-rx/capture-fix-v80.js');
 const index=read('public/turno-rx/index.html');
 const sw=read('public/turno-rx/sw.js');
 const css=read('public/turno-rx/capture-detail-v75.css');
 
-describe('Pendientes v83 capture/detail/history contract',()=>{
-  it('loads v81 capture owner before v83 detail/history and does not execute v75 capture',()=>{
+describe('Pendientes v84 capture/detail/history/interaction contract',()=>{
+  it('loads one capture owner, v83 detail/history, and interaction-only v84 runtime',()=>{
     const v81=index.indexOf('capture-fix-v80.js?v=81');
     const v83=index.indexOf('patient-detail-history-v82.js?v=83');
-    const stability=index.indexOf('stability.js?v=20260818.1');
+    const v84=index.indexOf('interaction-runtime-v84.js?v=84');
     expect(v81).toBeGreaterThan(-1);
     expect(v83).toBeGreaterThan(v81);
-    expect(stability).toBeGreaterThan(v83);
+    expect(v84).toBeGreaterThan(v83);
     const activeScripts=index.match(/<script[^>]+src="[^"]+"[^>]*><\/script>/g)||[];
     expect(activeScripts.some(tag=>tag.includes('capture-detail-v75.js'))).toBe(false);
+    expect(activeScripts.some(tag=>tag.includes('/turno-rx/stability.js'))).toBe(false);
     expect(index).toContain('capture-detail-v75.js?v=75');
+    expect(index).toContain('stability.js?v=20260818.1');
     expect(index).toContain('capture-detail-v75.css?v=78');
   });
 
@@ -33,9 +37,25 @@ describe('Pendientes v83 capture/detail/history contract',()=>{
     expect(detail).toContain('pendientes-shift-history-v1');
   });
 
-  it('keeps the old v75 capture code inert rather than deleting its historical source',()=>{
+  it('keeps v84 interaction runtime capture-free while preserving gestures',()=>{
+    expect(interactions).not.toContain('VISION_PROMPT');
+    expect(interactions).not.toContain("fetch('/api/turno-rx/vision'");
+    expect(interactions).not.toContain("addEventListener('change'");
+    expect(interactions).not.toContain('12*1024*1024');
+    expect(interactions).toContain("addEventListener('pointerdown'");
+    expect(interactions).toContain("addEventListener('pointermove'");
+    expect(interactions).toContain("addEventListener('pointerup'");
+    expect(interactions).toContain("setStatus(g.id,'Realizado')");
+    expect(interactions).toContain("setStatus(g.id,'Pendiente')");
+    expect(interactions).toContain('transportCycle');
+    expect(interactions).toContain("document.getElementById('cameraInput')?.click()");
+  });
+
+  it('keeps legacy capture sources inert rather than deleting historical source',()=>{
     expect(legacyDetail).toContain('VISION_PROMPT');
+    expect(legacyStability).toContain('VISION_PROMPT');
     expect(index).not.toContain('<script type="module" src="/turno-rx/capture-detail-v75.js?v=75"></script>');
+    expect(index).not.toContain('<script type="module" src="/turno-rx/stability.js?v=20260818.1"></script>');
   });
 
   it('preserves rich boleta metadata and original image reference',()=>{
@@ -144,10 +164,12 @@ describe('Pendientes v83 capture/detail/history contract',()=>{
   });
 
   it('updates service worker shell coherently',()=>{
-    expect(sw).toContain('pendientes-shell-20260819-83');
+    expect(sw).toContain('pendientes-shell-20260819-84');
     expect(sw).toContain('/turno-rx/capture-fix-v80.js?v=81');
     expect(sw).toContain('/turno-rx/patient-detail-history-v82.js?v=83');
+    expect(sw).toContain('/turno-rx/interaction-runtime-v84.js?v=84');
     expect(sw).not.toContain("'/turno-rx/capture-detail-v75.js?v=75'");
+    expect(sw).not.toContain("'/turno-rx/stability.js?v=20260818.1'");
     expect(sw).toContain('/turno-rx/capture-detail-v75.css?v=78');
   });
 });
