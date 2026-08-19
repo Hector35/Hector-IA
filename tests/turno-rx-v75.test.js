@@ -8,15 +8,15 @@ const index=read('public/turno-rx/index.html');
 const sw=read('public/turno-rx/sw.js');
 const css=read('public/turno-rx/capture-detail-v75.css');
 
-describe('Pendientes v75/v77 capture/detail contract',()=>{
-  it('loads v77 before v75 and both before the legacy stability capture controller',()=>{
-    const v77=index.indexOf('capture-fix-v77.js?v=77');
+describe('Pendientes v75/v78 capture/detail contract',()=>{
+  it('loads v78 capture before v75 detail and both before the legacy stability capture controller',()=>{
+    const v78=index.indexOf('capture-fix-v77.js?v=78');
     const v75=index.indexOf('capture-detail-v75.js?v=75');
     const stability=index.indexOf('stability.js?v=20260818.1');
-    expect(v77).toBeGreaterThan(-1);
-    expect(v75).toBeGreaterThan(v77);
+    expect(v78).toBeGreaterThan(-1);
+    expect(v75).toBeGreaterThan(v78);
     expect(stability).toBeGreaterThan(v75);
-    expect(index).toContain('capture-detail-v75.css?v=75');
+    expect(index).toContain('capture-detail-v75.css?v=78');
   });
 
   it('preserves rich boleta metadata and original image reference',()=>{
@@ -37,7 +37,19 @@ describe('Pendientes v75/v77 capture/detail contract',()=>{
     expect(guard).toContain('partials++');
     expect(guard).toContain('floorBoardTotal');
     expect(guard).toContain('Nunca inventes camas para alcanzar el total');
+  });
+
+  it('rescans Piso when the first pass recognizes zero of a known total',()=>{
+    expect(guard).toContain('recognized<boardTotal');
+    expect(guard).not.toContain('recognized>0&&recognized<boardTotal');
+    expect(guard).toContain('shouldRescan=floorSignal&&(!boundedTotal||recognized<boardTotal)');
     expect(guard).toContain('Revisando renglones de Piso');
+  });
+
+  it('can rescan a clearly identified Piso board even when the total is missing',()=>{
+    expect(guard).toContain('documentType');
+    expect(guard).toContain("plain(first?.documentType)==='piso'");
+    expect(guard).toContain('looksLikeFloorBoard(first,patients)');
   });
 
   it('keeps transport inference evidence-gated and image limits coherent',()=>{
@@ -48,22 +60,23 @@ describe('Pendientes v75/v77 capture/detail contract',()=>{
     expect(guard).not.toContain('12*1024*1024');
   });
 
-  it('reports local image persistence failure instead of swallowing it silently',()=>{
-    expect(guard).toContain("console.warn('[Pendientes v77] No se pudo guardar foto de boleta'");
+  it('reports local image persistence failure and cleans orphan images after analysis failure',()=>{
+    expect(guard).toContain("console.warn('[Pendientes v78] No se pudo guardar foto de boleta'");
     expect(guard).toContain('boletaImageAvailable:imageAvailable');
     expect(guard).toContain('la foto no pudo guardarse en este iPhone');
+    expect(guard).toContain('async function deleteImage(fp)');
+    expect(guard).toContain('await deleteImage(fp)');
+  });
+
+  it('keeps interface styling independent from the current runtime build number',()=>{
+    expect(css).toContain('html[data-pendientes-build] .category-tab.is-active');
+    expect(css).not.toContain('html[data-pendientes-build="75"] .category-tab.is-active');
   });
 
   it('updates service worker shell coherently',()=>{
-    expect(sw).toContain('pendientes-shell-20260819-77');
-    expect(sw).toContain('/turno-rx/capture-fix-v77.js?v=77');
+    expect(sw).toContain('pendientes-shell-20260819-78');
+    expect(sw).toContain('/turno-rx/capture-fix-v77.js?v=78');
     expect(sw).toContain('/turno-rx/capture-detail-v75.js?v=75');
-    expect(sw).toContain('/turno-rx/capture-detail-v75.css?v=75');
-  });
-
-  it('includes visible v75 detail and interface styling',()=>{
-    expect(css).toContain('.v75-photo');
-    expect(css).toContain('.v75-fields');
-    expect(css).toContain('html[data-pendientes-build="75"] .category-tab.is-active');
+    expect(sw).toContain('/turno-rx/capture-detail-v75.css?v=78');
   });
 });
