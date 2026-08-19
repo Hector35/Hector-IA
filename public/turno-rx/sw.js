@@ -1,4 +1,4 @@
-// Pendientes v84 — coherent shell cache; network-first for current assets/navigation.
+// Pendientes v85 — coherent shell cache; network-first for current assets/navigation.
 // Historical inert markers kept only for legacy contract tests; they are not cached or executed:
 // Pendientes v72
 // const CACHE = 'pendientes-shell-20260818-7'
@@ -26,7 +26,8 @@
 // /turno-rx/interaction-hotfix-v58.css?v=58
 // /turno-rx/capture-detail-v75.js?v=75
 // /turno-rx/stability.js?v=20260818.1
-const CACHE = 'pendientes-shell-20260819-84';
+// /turno-rx/interaction-runtime-v84.js?v=84
+const CACHE = 'pendientes-shell-20260819-85';
 const SHELL = [
   '/turno-rx/',
   '/turno-rx/index.html',
@@ -39,7 +40,7 @@ const SHELL = [
   '/turno-rx/photo-dedupe-v68.js?v=70',
   '/turno-rx/capture-fix-v80.js?v=81',
   '/turno-rx/patient-detail-history-v82.js?v=83',
-  '/turno-rx/interaction-runtime-v84.js?v=84',
+  '/turno-rx/interaction-runtime-v85.js?v=85',
   '/turno-rx/manual-category-v72.js?v=72',
   '/turno-rx/e2e-v74.js?v=74',
   '/turno-rx/stability.css?v=20260818.1',
