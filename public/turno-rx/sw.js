@@ -2,6 +2,7 @@
 // Historical inert markers kept only for legacy contract tests; they are not cached or executed:
 // Pendientes v72
 // const CACHE = 'pendientes-shell-20260818-7'
+// const CACHE = 'pendientes-shell-20260819-84'
 // const CACHE = 'turno-rx-shell-v58-tac-live-interaction-hotfix';
 // /turno-rx/app-v16.js?v=58
 // /turno-rx/compact-v17.js?v=2
