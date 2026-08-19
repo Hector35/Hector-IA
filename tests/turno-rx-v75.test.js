@@ -9,24 +9,25 @@ const index=read('public/turno-rx/index.html');
 const sw=read('public/turno-rx/sw.js');
 const css=read('public/turno-rx/capture-detail-v75.css');
 
-describe('Pendientes v82 capture/detail/history contract',()=>{
-  it('loads v81 capture owner before v82 detail/history and does not execute v75 capture',()=>{
+describe('Pendientes v83 capture/detail/history contract',()=>{
+  it('loads v81 capture owner before v83 detail/history and does not execute v75 capture',()=>{
     const v81=index.indexOf('capture-fix-v80.js?v=81');
-    const v82=index.indexOf('patient-detail-history-v82.js?v=82');
+    const v83=index.indexOf('patient-detail-history-v82.js?v=83');
     const stability=index.indexOf('stability.js?v=20260818.1');
     expect(v81).toBeGreaterThan(-1);
-    expect(v82).toBeGreaterThan(v81);
-    expect(stability).toBeGreaterThan(v82);
+    expect(v83).toBeGreaterThan(v81);
+    expect(stability).toBeGreaterThan(v83);
     const activeScripts=index.match(/<script[^>]+src="[^"]+"[^>]*><\/script>/g)||[];
     expect(activeScripts.some(tag=>tag.includes('capture-detail-v75.js'))).toBe(false);
     expect(index).toContain('capture-detail-v75.js?v=75');
     expect(index).toContain('capture-detail-v75.css?v=78');
   });
 
-  it('keeps v82 detail/history module capture-free',()=>{
+  it('keeps v83 detail/history module capture-free',()=>{
     expect(detail).not.toContain('VISION_PROMPT');
     expect(detail).not.toContain("addEventListener('change'");
     expect(detail).not.toContain('/api/turno-rx/vision');
+    expect(detail).toContain("const BUILD='83'");
     expect(detail).toContain('HISTORIAL · BOLETA');
     expect(detail).toContain('Foto original de la boleta');
     expect(detail).toContain('pendientes-shift-history-v1');
@@ -48,6 +49,15 @@ describe('Pendientes v82 capture/detail/history contract',()=>{
     expect(detail).toContain('boletaImageFingerprint||r.imageFingerprint');
     expect(detail).toContain('data-v82-history-row');
     expect(detail).toContain('openDetail(record,{historical:true})');
+  });
+
+  it('renders history lazily one shift at a time',()=>{
+    expect(detail).toContain('function renderShiftList(back,history)');
+    expect(detail).toContain('function renderShiftRows(back,history,hi)');
+    expect(detail).toContain('data-v83-history-shift');
+    expect(detail).toContain('data-v83-history-back');
+    expect(detail).toContain('renderShiftList(back,history)');
+    expect(detail).not.toContain('history.map((h,hi)=>{const when=');
   });
 
   it('uses floor origin/destination semantics instead of copying destination service to origin',()=>{
@@ -134,9 +144,9 @@ describe('Pendientes v82 capture/detail/history contract',()=>{
   });
 
   it('updates service worker shell coherently',()=>{
-    expect(sw).toContain('pendientes-shell-20260819-82');
+    expect(sw).toContain('pendientes-shell-20260819-83');
     expect(sw).toContain('/turno-rx/capture-fix-v80.js?v=81');
-    expect(sw).toContain('/turno-rx/patient-detail-history-v82.js?v=82');
+    expect(sw).toContain('/turno-rx/patient-detail-history-v82.js?v=83');
     expect(sw).not.toContain("'/turno-rx/capture-detail-v75.js?v=75'");
     expect(sw).toContain('/turno-rx/capture-detail-v75.css?v=78');
   });
