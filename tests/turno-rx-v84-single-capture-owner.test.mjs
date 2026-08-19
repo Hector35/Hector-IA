@@ -26,8 +26,6 @@ describe('Pendientes v86 runtime hardening',()=>{
   });
 
   it('neutralizes app-v16 direct gallery ownership without adding another vision engine',()=>{
-    // app-v16 still contains legacy code for compatibility, so v86 removes its bound listener
-    // by replacing galleryInput after every renderer pass. The modern owner listens on document.
     expect(core).toContain('handlePhotoInput');
     expect(hardening).toContain("document.getElementById('galleryInput')");
     expect(hardening).toContain('cloneNode(true)');
@@ -44,7 +42,7 @@ describe('Pendientes v86 runtime hardening',()=>{
 
   it('migrates legacy Piso destination services without destructive field projection',()=>{
     expect(hardening).toContain('function migrateLegacyFloorRow');
-    expect(hardening).toContain('destinationService:candidate');
+    expect(hardening).toContain('next.destinationService=candidate');
     expect(hardening).toContain("next.originService=''");
     expect(hardening).toContain('next.schemaVersion=Math.max');
     expect(hardening).toContain("['nefrologia',{floor:'Primero',block:'B'}]");
