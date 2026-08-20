@@ -6,7 +6,7 @@ test('v71 carga inteligencia de Piso antes del app activo sin mutar almacenamien
   const gesture=readFileSync('public/turno-rx/row-actions-v61.js','utf8');
   const index=readFileSync('public/turno-rx/index.html','utf8');
   const floorScript='<script src="/turno-rx/floor-intelligence-v64.js?v=64"></script>';
-  const appScript='<script type="module" src="/turno-rx/app-v16.js?v=65"></script>';
+  const appScript='<script type="module" src="/turno-rx/app-v16.js?v=87"></script>';
 
   expect(()=>new Function(floor)).not.toThrow();
   expect(()=>new Function(gesture)).not.toThrow();

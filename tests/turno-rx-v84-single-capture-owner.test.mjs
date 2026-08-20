@@ -11,26 +11,29 @@ const detail=readFileSync(new URL('../public/turno-rx/patient-detail-history-v82
 
 function activeModuleSources(html){return [...html.matchAll(/<script\s+type="module"\s+src="([^"]+)"/g)].map(m=>m[1]);}
 
-describe('Pendientes v86 runtime hardening',()=>{
+describe('Pendientes v87 operational hardening',()=>{
   it('loads hardening after the legacy renderer and before the modern capture owner',()=>{
     const modules=activeModuleSources(index);
-    const coreIndex=modules.indexOf('/turno-rx/app-v16.js?v=65');
-    const hardeningIndex=modules.indexOf('/turno-rx/runtime-hardening-v86.js?v=86');
-    const captureIndex=modules.indexOf('/turno-rx/capture-fix-v80.js?v=81');
+    const coreIndex=modules.indexOf('/turno-rx/app-v16.js?v=87');
+    const hardeningIndex=modules.indexOf('/turno-rx/runtime-hardening-v86.js?v=87');
+    const captureIndex=modules.indexOf('/turno-rx/capture-fix-v80.js?v=87');
     expect(coreIndex).toBeGreaterThanOrEqual(0);
     expect(hardeningIndex).toBeGreaterThan(coreIndex);
     expect(captureIndex).toBeGreaterThan(hardeningIndex);
-    expect(modules).toContain('/turno-rx/patient-detail-history-v82.js?v=83');
-    expect(modules).toContain('/turno-rx/interaction-runtime-v85.js?v=85');
+    expect(modules).toContain('/turno-rx/patient-detail-history-v82.js?v=87');
+    expect(modules).toContain('/turno-rx/interaction-runtime-v85.js?v=87');
     expect(modules).not.toContain('/turno-rx/stability.js?v=20260818.1');
   });
 
-  it('neutralizes app-v16 direct gallery ownership without adding another vision engine',()=>{
+  it('declares one gallery owner without replacing live DOM nodes',()=>{
     expect(core).toContain('handlePhotoInput');
+    expect(core).not.toContain("addEventListener('change',handlePhotoInput)");
+    expect(core).toContain("data-capture-owner','modern-v87'");
     expect(hardening).toContain("document.getElementById('galleryInput')");
-    expect(hardening).toContain('cloneNode(true)');
-    expect(hardening).toContain('input.replaceWith(clone)');
-    expect(hardening).toContain("clone.dataset.captureOwner='modern-v86'");
+    expect(hardening).not.toContain('cloneNode(true)');
+    expect(hardening).not.toContain('input.replaceWith');
+    expect(hardening).not.toContain('new MutationObserver');
+    expect(hardening).toContain("input.dataset.captureOwner='modern-v87'");
     expect(capture).toContain("fetch('/api/turno-rx/vision'");
     expect(hardening).not.toContain("fetch('/api/turno-rx/vision'");
     expect(hardening).not.toContain('VISION_PROMPT');
@@ -59,6 +62,9 @@ describe('Pendientes v86 runtime hardening',()=>{
     expect(interactions).toContain("setStatus(g.id,'Pendiente')");
     expect(interactions).toContain('transportCycle');
     expect(interactions).toContain("document.getElementById('cameraInput')?.click()");
+    expect(interactions).toContain("const seq=['Por definir','Silla','Camilla','No trasladar']");
+    expect(interactions).not.toContain("if(current==='No trasladar')return");
+    expect(interactions).not.toContain("write(STORAGE_KEY,[]);localStorage.setItem(ACTIVE_TAB_KEY,'RX');location.reload()");
   });
 
   it('keeps manual transport overrides consistent',()=>{
@@ -67,10 +73,35 @@ describe('Pendientes v86 runtime hardening',()=>{
     expect(interactions).toContain('transport:true,transportReason:true');
   });
 
-  it('keeps the service worker coherent with the v86 shell',()=>{
-    expect(sw).toContain("const CACHE = 'pendientes-shell-20260819-86'");
-    expect(sw).toContain("'/turno-rx/runtime-hardening-v86.js?v=86'");
-    expect(sw).toContain("'/turno-rx/interaction-runtime-v85.js?v=85'");
+  it('queues new photo selections while analysis is already running',()=>{
+    expect(capture).toContain('const pendingFiles=[]');
+    expect(capture).toContain('pendingFiles.push(...arr)');
+    expect(capture).toContain('batch.total+=arr.length');
+    expect(capture).toContain('while(pendingFiles.length)');
+    expect(capture).not.toContain('if(processing)return;const arr=');
+  });
+
+  it('removes old unconfirmed Piso OCR placeholders instead of counting them as patients',()=>{
+    expect(hardening).toContain("if(row?.captureReviewOnly&&!clean(row?.bed))");
+    expect(capture).toContain('review++');
+    expect(capture).not.toContain('list.unshift(partial)');
+  });
+
+  it('recovers explicit Piso origins and services from OCR row text',()=>{
+    expect(capture).toContain('function floorBedFromText(value)');
+    expect(capture).toContain('C(?:AMA)?\\s*#\\s*0*(\\d{1,3})');
+    expect(capture).toContain('(CE|UP|UI|UA)\\s*#?\\s*0*(\\d{1,3})');
+    expect(capture).toContain('function floorServiceFromText(value)');
+    expect(capture).toContain("return'Nefrología'");
+    expect(capture).toContain("return'Geriatría'");
+    expect(capture).toContain("return'Medicina Interna'");
+    expect(capture).toContain("category==='Piso'?floorBedFromText(recognizedText):''");
+  });
+
+  it('keeps the service worker coherent with the v87 shell',()=>{
+    expect(sw).toContain("const CACHE = 'pendientes-shell-20260820-87'");
+    expect(sw).toContain("'/turno-rx/runtime-hardening-v86.js?v=87'");
+    expect(sw).toContain("'/turno-rx/interaction-runtime-v85.js?v=87'");
     expect(sw).not.toMatch(/^\s*'\/turno-rx\/stability\.js\?v=20260818\.1',?\s*$/m);
     expect(sw).toContain("url.pathname.startsWith('/api/')");
     expect(sw).toContain("cache:'no-store'");

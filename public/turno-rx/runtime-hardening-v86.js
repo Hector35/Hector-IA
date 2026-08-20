@@ -1,9 +1,9 @@
-import { syncRowsFromStorageAndRender, normalizeCategory } from './app-v16.js?v=65';
+import { syncRowsFromStorageAndRender, normalizeCategory } from './app-v16.js?v=87';
 
-// Pendientes v86 — runtime hardening between the legacy renderer and the modern capture owner.
-// app-v16 still renders the shell/manual form, but its direct galleryInput listener is detached.
-// capture-fix-v80.js?v=81 remains the only effective photo-analysis owner.
-const BUILD='86';
+// Pendientes v87 — migration-only bridge between the legacy renderer and the
+// modern operational modules. The renderer now declares the modern capture
+// owner directly, so this file no longer replaces live DOM nodes.
+const BUILD='87';
 const STORAGE_KEY='pendientes-table-v2';
 
 const clean=value=>String(value??'').trim();
@@ -65,7 +65,16 @@ export function migrateLegacyFloorRow(row){
 export function migrateLegacyFloorRows(rows){
   if(!Array.isArray(rows))return {rows:[],changed:false};
   let changed=false;
-  const migrated=rows.map(row=>{const next=migrateLegacyFloorRow(row);if(next!==row)changed=true;return next;});
+  const migrated=[];
+  for(const row of rows){
+    // These rows were transient OCR review hints, never confirmed patients.
+    // Older builds persisted them and could create long lists of "Falta".
+    if(row?.captureReviewOnly&&!clean(row?.bed)){
+      changed=true;
+      continue;
+    }
+    const next=migrateLegacyFloorRow(row);if(next!==row)changed=true;migrated.push(next);
+  }
   return {rows:migrated,changed};
 }
 
@@ -84,32 +93,17 @@ function applyLegacyFloorMigration(){
 
 export function detachLegacyGalleryInput(){
   const input=document.getElementById('galleryInput');
-  if(!input||input.dataset.captureOwner==='modern-v86')return false;
-  const clone=input.cloneNode(true);
-  clone.dataset.captureOwner='modern-v86';
-  // Replacing the node removes app-v16's directly-bound handlePhotoInput listener.
-  // The modern capture owner listens on document capture, so it continues to receive changes.
-  input.replaceWith(clone);
+  if(!input||input.dataset.captureOwner==='modern-v87')return false;
+  input.dataset.captureOwner='modern-v87';
   return true;
 }
 
-let scheduled=false;
 function harden(){
   const app=document.getElementById('app');
   if(app)app.dataset.runtimeHardeningBuild=BUILD;
   detachLegacyGalleryInput();
 }
 
-const app=document.getElementById('app');
-if(app){
-  const observer=new MutationObserver(()=>{
-    if(scheduled)return;
-    scheduled=true;
-    queueMicrotask(()=>{scheduled=false;harden()});
-  });
-  observer.observe(app,{childList:true,subtree:true});
-}
-
 applyLegacyFloorMigration();
 harden();
-window.__pendientesRuntimeHardeningV86={detachLegacyGalleryInput,migrateLegacyFloorRow,migrateLegacyFloorRows};
+window.__pendientesRuntimeHardeningV87={detachLegacyGalleryInput,migrateLegacyFloorRow,migrateLegacyFloorRows};

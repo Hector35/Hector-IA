@@ -1,8 +1,8 @@
-import { syncRowsFromStorageAndRender, canonicalOrigin, normalizeAge, normalizeStudyDisplay } from './app-v16.js?v=65';
+import { syncRowsFromStorageAndRender, canonicalOrigin, normalizeAge, normalizeStudyDisplay } from './app-v16.js?v=87';
 
 const STORAGE_KEY='pendientes-table-v2';
 const SHIFT_KEY='pendientes-shift-v1';
-const BUILD='81';
+const BUILD='87';
 const DB_NAME='pendientes-boleta-images-v1';
 const STORE='images';
 const MAX_IMAGE_BYTES=8*1024*1024;
@@ -22,6 +22,7 @@ REGLAS GENERALES:
 PISO / PIZARRÓN:
 - Si existe un encabezado como "PISO = 11", floorBoardTotal=11. Ese número sirve SOLO como control de calidad; nunca crea pacientes ni autoriza inventarlos.
 - Lee cada renglón físico por separado, de arriba hacia abajo y en ambas columnas si existen.
+- En renglones como "C#11 NEFRO", "C#1 GASTRO" o "CE1 GERIA", C#11, C#1 y CE1 son la cama/área de origen y deben ir en bed; el texto restante es destinationService. No pierdas el número por el símbolo #.
 - Un paciente de Piso confirmado requiere cama/área real de origen. Si un renglón se ve pero la cama no es legible, devuelve UN objeto parcial category="Piso", bed vacío, recognizedText con lo visible y confidence.bed="low".
 - En pizarrones con columnas H y M, H=Hombre y M=Mujer según la columna física donde está el renglón.
 - bed es la cama/área actual. destination es la cama destino visible si existe.
@@ -51,7 +52,7 @@ OXÍGENO:
 
 const FLOOR_RESCAN_PROMPT=`Esta imagen contiene un pizarrón de pacientes que subirán a Piso. Haz una SEGUNDA lectura de control enfocada exclusivamente en renglones de Piso. Devuelve SOLO JSON válido:
 {"patients":[{"category":"Piso","handwrittenBed":"","formBed":"","bed":"","name":"","sex":"Mujer|Hombre|No visible","destination":"","destinationFloor":"","destinationBlock":"","destinationService":"","service":"","originService":"","recognizedText":"","confidence":{"bed":"high|medium|low","sex":"high|medium|low"},"transport":"Por definir","transportReason":""}]}.
-Reglas: el total del encabezado NO crea pacientes. Recorre cada renglón físico de ambas columnas. H=Hombre, M=Mujer por columna. Conserva CE/UP/UI literalmente. Si ves un renglón pero la cama no es legible, devuelve un parcial con bed vacío y recognizedText. Nunca inventes camas para alcanzar el total.`;
+Reglas: el total del encabezado NO crea pacientes. Recorre cada renglón físico de ambas columnas. H=Hombre, M=Mujer por columna. En "C#11 NEFRO", C#11 es bed y NEFRO es destinationService; conserva CE/UP/UI literalmente. Si ves un renglón pero la cama no es legible, devuelve un parcial con bed vacío y recognizedText. Nunca inventes camas para alcanzar el total.`;
 
 const clean=v=>String(v??'').trim();
 const plain=v=>clean(v).toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g,'').replace(/[^a-z0-9]+/g,' ').trim();
@@ -75,6 +76,24 @@ function normalizeBed(v){
   if(/^0*\d+$/.test(s))return String(Number(s));
   return raw;
 }
+function floorBedFromText(value){
+  const text=clean(value).toUpperCase().normalize('NFD').replace(/[\u0300-\u036f]/g,'');
+  let match=text.match(/\bC(?:AMA)?\s*#\s*0*(\d{1,3})\b/);
+  if(match)return String(Number(match[1]));
+  match=text.match(/\b(CE|UP|UI|UA)\s*#?\s*0*(\d{1,3})\b/);
+  if(match)return`${match[1]}${Number(match[2])}`;
+  return'';
+}
+function floorServiceFromText(value){
+  const text=plain(value);
+  if(/\bangio\b|\bcx vas\b|cirugia vascular/.test(text))return'Angiología y Cirugía Vascular';
+  if(/\bcx gral\b|cirugia general/.test(text))return'Cirugía General';
+  if(/\bnefro\b|nefrolog/.test(text))return'Nefrología';
+  if(/\bgastro\b|gastroenter/.test(text))return'Gastroenterología';
+  if(/\bgeria\b|geriatr/.test(text))return'Geriatría';
+  if(/\bm i\b|medicina interna/.test(text))return'Medicina Interna';
+  return'';
+}
 function normSex(v){const t=plain(v);if(['mujer','femenino','femenina','f'].includes(t))return'Mujer';if(['hombre','masculino','masculina','m','h'].includes(t))return'Hombre';return'No visible'}
 function categoryOf(p){const c=plain(p?.category),m=plain(p?.modality),t=plain(p?.target||p?.study);if(c==='piso')return'Piso';if(c==='tac'||m==='tac'||/\b(tac|tc|tomografia|angiotac)\b/.test(t))return'TAC';if(c==='usg'||c==='ultrasonido'||m==='ultrasonido'||/\b(usg|ultrasonido|ecografia)\b/.test(t))return'USG';if(c==='interconsulta')return'Interconsulta';if(c.includes('apoyo'))return'Apoyo para movimiento';return'RX'}
 function ageFromBirth(v){const s=clean(v);if(!/^\d{4}-\d{2}-\d{2}$/.test(s))return null;const d=new Date(`${s}T12:00:00`);if(Number.isNaN(d.getTime()))return null;const td=new Date();let a=td.getFullYear()-d.getFullYear();const md=td.getMonth()-d.getMonth();if(md<0||(md===0&&td.getDate()<d.getDate()))a--;return a>=0&&a<=130?a:null}
@@ -92,9 +111,9 @@ function transportOf(p,target){
 }
 
 function normalizeRow(p,fp,shiftId,{partial=false,imageAvailable=true}={}){
-  const category=categoryOf(p),bed=normalizeBed(p?.handwrittenBed)||normalizeBed(p?.formBed)||normalizeBed(p?.bed),rawTarget=clean(p?.target||p?.study||p?.destination),target=category==='Piso'?clean(p?.destination||rawTarget):normalizeStudyDisplay(rawTarget),[transport,transportReason]=transportOf(p,target);
+  const category=categoryOf(p),recognizedText=clean(p?.recognizedText),bed=normalizeBed(p?.handwrittenBed)||normalizeBed(p?.formBed)||normalizeBed(p?.bed)||(category==='Piso'?floorBedFromText(recognizedText):''),rawTarget=clean(p?.target||p?.study||p?.destination),target=category==='Piso'?clean(p?.destination||rawTarget):normalizeStudyDisplay(rawTarget),[transport,transportReason]=transportOf(p,target);
   const confidence=p?.confidence&&typeof p.confidence==='object'?p.confidence:{},reviewFields=Object.entries(confidence).filter(([,v])=>plain(v)==='low').map(([k])=>k);if(partial&&!reviewFields.includes('bed'))reviewFields.push('bed');
-  const row={...p,id:uid(),shiftId,category,bed,name:clean(p?.name),birthDate:clean(p?.birthDate),age:normalizeAge(p?.age)??ageFromBirth(p?.birthDate),sex:normSex(p?.sex),target,destination:category==='Piso'?clean(p?.destination||target):clean(p?.destination),destinationFloor:clean(p?.destinationFloor),destinationBlock:clean(p?.destinationBlock),destinationService:clean(p?.destinationService||((category==='Piso'&&!p?.originService)?p?.service:'')),modality:category==='TAC'?'TAC':category==='USG'?'Ultrasonido':category==='RX'?'Rayos X':clean(p?.modality)||'Otro',diagnosis:clean(p?.diagnosis),diagnosisMeaning:clean(p?.diagnosisMeaning),requestingDoctor:clean(p?.requestingDoctor||p?.doctor),folio:clean(p?.folio),service:category==='Piso'?clean(p?.originService):clean(p?.service),originService:clean(p?.originService),requestDate:clean(p?.requestDate),requestTime:clean(p?.requestTime),transferNotes:clean(p?.transferNotes),extraData:p?.extraData&&typeof p.extraData==='object'?p.extraData:{},recognizedText:clean(p?.recognizedText),transport,transportReason,oxygenProbable:Boolean(p?.oxygenProbable),oxygenReason:p?.oxygenProbable?clean(p?.oxygenReason):'',status:'Pendiente',imageFingerprint:fp,boletaImageFingerprint:fp,boletaImageAvailable:imageAvailable,confidence,needsReview:partial||reviewFields.length>0,reviewFields,captureReviewOnly:partial,manualOverrides:{},createdAt:now(),updatedAt:now()};
+  const row={...p,id:uid(),shiftId,category,bed,name:clean(p?.name),birthDate:clean(p?.birthDate),age:normalizeAge(p?.age)??ageFromBirth(p?.birthDate),sex:normSex(p?.sex),target,destination:category==='Piso'?clean(p?.destination||target):clean(p?.destination),destinationFloor:clean(p?.destinationFloor),destinationBlock:clean(p?.destinationBlock),destinationService:clean(p?.destinationService||((category==='Piso'&&!p?.originService)?p?.service:'')||(category==='Piso'?floorServiceFromText(recognizedText):'')),modality:category==='TAC'?'TAC':category==='USG'?'Ultrasonido':category==='RX'?'Rayos X':clean(p?.modality)||'Otro',diagnosis:clean(p?.diagnosis),diagnosisMeaning:clean(p?.diagnosisMeaning),requestingDoctor:clean(p?.requestingDoctor||p?.doctor),folio:clean(p?.folio),service:category==='Piso'?clean(p?.originService):clean(p?.service),originService:clean(p?.originService),requestDate:clean(p?.requestDate),requestTime:clean(p?.requestTime),transferNotes:clean(p?.transferNotes),extraData:p?.extraData&&typeof p.extraData==='object'?p.extraData:{},recognizedText,transport,transportReason,oxygenProbable:Boolean(p?.oxygenProbable),oxygenReason:p?.oxygenProbable?clean(p?.oxygenReason):'',status:'Pendiente',imageFingerprint:fp,boletaImageFingerprint:fp,boletaImageAvailable:imageAvailable,confidence,needsReview:partial||reviewFields.length>0,reviewFields,captureReviewOnly:partial,manualOverrides:{},createdAt:now(),updatedAt:now()};
   if(category==='Piso'){const mapped=inferredDestination(row);if(!row.destinationFloor)row.destinationFloor=mapped.destinationFloor||'';if(!row.destinationBlock)row.destinationBlock=mapped.destinationBlock||''}
   return row;
 }
@@ -139,16 +158,12 @@ function sameImagingRequest(a,b){
   return sameImagingIdentity(a,b)&&Boolean(aTarget||bTarget||aBed||bBed);
 }
 function commitPatients(patients,fp,shiftId,imageAvailable){
-  const list=currentRows();let added=0,updated=0,partials=0,skipped=0;
+  const list=currentRows();let added=0,updated=0,review=0,skipped=0;
   for(const p of dedupePatients(Array.isArray(patients)?patients:[])){
     const provisional=normalizeRow(p,fp,shiftId,{imageAvailable});
     if(provisional.category==='Piso'&&!provisional.bed){
       if(isHeaderOnly(p))continue;
-      if(provisional.name||provisional.destinationService||provisional.service||provisional.recognizedText){
-        const partial=normalizeRow(p,fp,shiftId,{partial:true,imageAvailable});
-        const duplicatePartial=list.find(r=>r.shiftId===shiftId&&r.captureReviewOnly&&r.imageFingerprint===fp&&plain(r.recognizedText)===plain(partial.recognizedText)&&plain(r.destinationService||r.service)===plain(partial.destinationService||partial.service));
-        if(!duplicatePartial){list.unshift(partial);partials++}
-      }
+      if(provisional.name||provisional.destinationService||provisional.service||provisional.recognizedText)review++;
       continue;
     }
     if(provisional.category!=='Piso'&&!provisional.bed&&!provisional.name&&!provisional.target)continue;
@@ -164,7 +179,7 @@ function commitPatients(patients,fp,shiftId,imageAvailable){
     }
     list.unshift(incoming);added++;
   }
-  write(STORAGE_KEY,list);syncRowsFromStorageAndRender();window.dispatchEvent(new CustomEvent('pendientes:v80-updated'));return{added,updated,partials,skipped};
+  write(STORAGE_KEY,list);syncRowsFromStorageAndRender();window.dispatchEvent(new CustomEvent('pendientes:v80-updated'));return{added,updated,review,skipped};
 }
 
 async function fingerprint(file){const buf=await file.arrayBuffer(),hash=await crypto.subtle.digest('SHA-256',buf);return[...new Uint8Array(hash)].map(b=>b.toString(16).padStart(2,'0')).join('')}
@@ -199,16 +214,44 @@ async function analyzeFile(file,index,total){
       try{const second=await callVision(file,FLOOR_RESCAN_PROMPT),extra=Array.isArray(second?.patients)?second.patients:[];patients=[...patients,...extra]}catch(e){console.warn('[Pendientes v80] Segunda lectura de Piso no disponible',e)}
     }
     const result=commitPatients(patients,fp,shift().id,imageAvailable);
-    if(imageAvailable&&result.added===0&&result.updated===0&&result.partials===0&&!referencesImage(fp))await deleteImage(fp);
+    if(imageAvailable&&result.added===0&&result.updated===0&&!referencesImage(fp))await deleteImage(fp);
     return result;
   }catch(e){if(imageAvailable&&!referencesImage(fp))await deleteImage(fp);throw e}
 }
 
 let processing=false;
-async function processFiles(files){if(processing)return;const arr=[...(files||[])];if(!arr.length)return;processing=true;let added=0,updated=0,errors=0,partials=0,skipped=0;for(let i=0;i<arr.length;i++){try{const r=await analyzeFile(arr[i],i,arr.length);added+=r.added;updated+=r.updated;partials+=r.partials;skipped+=r.skipped}catch(e){errors++;toast(e?.message||'No se pudo analizar una foto','warning')}}processing=false;setProgress('');toast(`${added} agregados${updated?` · ${updated} actualizados`:''}${partials?` · ${partials} por revisar`:''}${skipped?` · ${skipped} omitidos`:''}${errors?` · ${errors} error${errors===1?'':'es'}`:''}`,errors?'warning':'success')}
+const pendingFiles=[];
+let batch={total:0,processed:0,added:0,updated:0,errors:0,review:0,skipped:0};
+function resetBatch(){batch={total:0,processed:0,added:0,updated:0,errors:0,review:0,skipped:0}}
+async function drainFiles(){
+  if(processing)return;
+  processing=true;
+  try{
+    while(pendingFiles.length){
+      const file=pendingFiles.shift(),index=batch.processed;
+      try{const r=await analyzeFile(file,index,batch.total);batch.added+=r.added;batch.updated+=r.updated;batch.review+=r.review;batch.skipped+=r.skipped}
+      catch(e){batch.errors++;toast(e?.message||'No se pudo analizar una foto','warning')}
+      batch.processed++;
+      if(pendingFiles.length)setProgress(`${batch.processed} de ${batch.total} procesadas · ${pendingFiles.length} en espera…`);
+    }
+  }finally{
+    processing=false;
+    setProgress('');
+    const {added,updated,errors,review,skipped}=batch;
+    toast(`${added} agregados${updated?` · ${updated} actualizados`:''}${review?` · ${review} sin cama; vuelve a tomar la foto`:''}${skipped?` · ${skipped} omitidos`:''}${errors?` · ${errors} error${errors===1?'':'es'}`:''}`,errors||review?'warning':'success');
+    resetBatch();
+    if(pendingFiles.length){batch.total=pendingFiles.length;queueMicrotask(drainFiles)}
+  }
+}
+function processFiles(files){
+  const arr=[...(files||[])];if(!arr.length)return;
+  pendingFiles.push(...arr);batch.total+=arr.length;
+  if(processing)setProgress(`${batch.processed} de ${batch.total} procesadas · ${pendingFiles.length} en espera…`);
+  else void drainFiles();
+}
 
 document.addEventListener('change',e=>{if(e.target.id!=='galleryInput'&&e.target.id!=='cameraInput')return;e.preventDefault();e.stopImmediatePropagation();const files=e.target.files;e.target.value='';processFiles(files)},true);
 window.addEventListener('pendientes:v80-updated',()=>queueMicrotask(()=>document.documentElement.dataset.pendientesBuild=BUILD));
 document.documentElement.dataset.pendientesBuild=BUILD;
 
-export { dedupePatients, floorRecognitionStats, sameImagingRequest, sameImagingIdentity };
+export { dedupePatients, floorRecognitionStats, sameImagingRequest, sameImagingIdentity, floorBedFromText, floorServiceFromText, commitPatients, processFiles };
