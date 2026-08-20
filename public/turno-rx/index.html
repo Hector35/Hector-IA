@@ -43,21 +43,21 @@
 </head>
 <body>
   <div id="app"></div>
-  <!-- Production v86: legacy renderer + hardening + v81 single effective capture owner + v83 lazy detail/history + v85 interaction. -->
+  <!-- Production v87: one capture owner, appendable photo queue and immediate interactions. -->
   <script src="/turno-rx/stability-guard-v66.js?v=66"></script>
   <script src="/turno-rx/review-confidence-v67.js?v=70"></script>
   <script src="/turno-rx/photo-fingerprint-history-v70.js?v=70"></script>
   <script src="/turno-rx/floor-intelligence-v64.js?v=64"></script>
   <script type="module" src="/turno-rx/photo-dedupe-v68.js?v=70"></script>
-  <script type="module" src="/turno-rx/app-v16.js?v=65"></script>
-  <script type="module" src="/turno-rx/runtime-hardening-v86.js?v=86"></script>
-  <script type="module" src="/turno-rx/capture-fix-v80.js?v=81"></script>
-  <script type="module" src="/turno-rx/patient-detail-history-v82.js?v=83"></script>
-  <script type="module" src="/turno-rx/interaction-runtime-v85.js?v=85"></script>
+  <script type="module" src="/turno-rx/app-v16.js?v=87"></script>
+  <script type="module" src="/turno-rx/runtime-hardening-v86.js?v=87"></script>
+  <script type="module" src="/turno-rx/capture-fix-v80.js?v=87"></script>
+  <script type="module" src="/turno-rx/patient-detail-history-v82.js?v=87"></script>
+  <script type="module" src="/turno-rx/interaction-runtime-v85.js?v=87"></script>
   <!-- LEGACY ORDER MARKER ONLY — inert: /turno-rx/interaction-runtime-v84.js?v=84 -->
   <script src="/turno-rx/manual-category-v72.js?v=72"></script>
-  <script type="module" src="/turno-rx/e2e-v74.js?v=74"></script>
-  <!-- Pendientes v86: app-v16 gallery listener is detached on every render; capture v81 is the only effective photo-analysis owner. -->
+  <script type="module" src="/turno-rx/e2e-v74.js?v=87"></script>
+  <!-- Pendientes v87: app-v16 declares, but does not consume, the modern gallery input. -->
   <!-- LEGACY TEST REFERENCES ONLY — inert, never loaded. Pendientes v72 /turno-rx/stability-v65.js?v=65 /turno-rx/stability-v65.css?v=65 /turno-rx/app-v16.js?v=58 /turno-rx/compact-v17.js?v=2 type="module" src="/turno-rx/name-format-v23.js?v=1" /turno-rx/adaptive-row-v26.js?v=1 /turno-rx/cama-label-v28.js?v=1 /turno-rx/transport-v20.js?v=3 /turno-rx/polish-v32.js?v=1 /turno-rx/full-redesign-v33.js?v=1 /turno-rx/premium-v37.js?v=4 /turno-rx/manual-quick-v38.js?v=1 /turno-rx/patient-detail-v39.js?v=4 /turno-rx/quick-transport-v37.js?v=2 /turno-rx/floor-workflow-v42.js?v=58 /turno-rx/tac-flow-v42.js?v=58 /turno-rx/row-actions-v60.css?v=60 /turno-rx/row-actions-v60.js?v=60 /turno-rx/row-actions-v61.css?v=61 /turno-rx/row-actions-v61.js?v=61 /turno-rx/interaction-hotfix-v58.css?v=58 /turno-rx/capture-detail-v75.js?v=75 /turno-rx/stability.js?v=20260818.1 /turno-rx/interaction-runtime-v84.js?v=84 -->
 </body>
 </html>

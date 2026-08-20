@@ -5,20 +5,20 @@ const read=(path)=>readFileSync(new URL(`../${path}`,import.meta.url),'utf8');
 const detail=read('public/turno-rx/patient-detail-history-v82.js');
 const legacyDetail=read('public/turno-rx/capture-detail-v75.js');
 const legacyStability=read('public/turno-rx/stability.js');
-const interactions=read('public/turno-rx/interaction-runtime-v84.js');
+const interactions=read('public/turno-rx/interaction-runtime-v85.js');
 const guard=read('public/turno-rx/capture-fix-v80.js');
 const index=read('public/turno-rx/index.html');
 const sw=read('public/turno-rx/sw.js');
 const css=read('public/turno-rx/capture-detail-v75.css');
 
-describe('Pendientes v84 capture/detail/history/interaction contract',()=>{
-  it('loads one capture owner, v83 detail/history, and interaction-only v84 runtime',()=>{
-    const v81=index.indexOf('capture-fix-v80.js?v=81');
-    const v83=index.indexOf('patient-detail-history-v82.js?v=83');
-    const v84=index.indexOf('interaction-runtime-v84.js?v=84');
-    expect(v81).toBeGreaterThan(-1);
-    expect(v83).toBeGreaterThan(v81);
-    expect(v84).toBeGreaterThan(v83);
+describe('Pendientes v87 operational contract',()=>{
+  it('loads one capture owner, detail/history, and interaction runtime in order',()=>{
+    const captureIndex=index.indexOf('capture-fix-v80.js?v=87');
+    const detailIndex=index.indexOf('patient-detail-history-v82.js?v=87');
+    const interactionIndex=index.indexOf('interaction-runtime-v85.js?v=87');
+    expect(captureIndex).toBeGreaterThan(-1);
+    expect(detailIndex).toBeGreaterThan(captureIndex);
+    expect(interactionIndex).toBeGreaterThan(detailIndex);
     const activeScripts=index.match(/<script[^>]+src="[^"]+"[^>]*><\/script>/g)||[];
     expect(activeScripts.some(tag=>tag.includes('capture-detail-v75.js'))).toBe(false);
     expect(activeScripts.some(tag=>tag.includes('/turno-rx/stability.js'))).toBe(false);
@@ -27,11 +27,13 @@ describe('Pendientes v84 capture/detail/history/interaction contract',()=>{
     expect(index).toContain('capture-detail-v75.css?v=78');
   });
 
-  it('keeps v83 detail/history module capture-free',()=>{
+  it('keeps detail/history module capture-free and accessible',()=>{
     expect(detail).not.toContain('VISION_PROMPT');
     expect(detail).not.toContain("addEventListener('change'");
     expect(detail).not.toContain('/api/turno-rx/vision');
-    expect(detail).toContain("const BUILD='83'");
+    expect(detail).toContain("const BUILD='87'");
+    expect(detail).toContain('role="dialog" aria-modal="true"');
+    expect(detail).toContain("e.key!=='Escape'");
     expect(detail).toContain('HISTORIAL · BOLETA');
     expect(detail).toContain('Foto original de la boleta');
     expect(detail).toContain('pendientes-shift-history-v1');
@@ -87,9 +89,9 @@ describe('Pendientes v84 capture/detail/history/interaction contract',()=>{
     expect(guard).toContain("if(/medicina interna|\\bmi\\b/.test(s))return{destinationFloor:'Tercero',destinationBlock:'B'}");
   });
 
-  it('keeps partial Piso rows visible for review and never fabricates the board total',()=>{
-    expect(guard).toContain('captureReviewOnly:partial');
-    expect(guard).toContain('partials++');
+  it('does not persist partial Piso rows and never fabricates the board total',()=>{
+    expect(guard).toContain('review++');
+    expect(guard).not.toContain('list.unshift(partial)');
     expect(guard).toContain('floorBoardTotal');
     expect(guard).toContain('Nunca inventes camas para alcanzar el total');
   });
@@ -153,7 +155,7 @@ describe('Pendientes v84 capture/detail/history/interaction contract',()=>{
   it('reports persistence failure and cleans orphan images on both errors and zero-result success',()=>{
     expect(guard).toContain("console.warn('[Pendientes v80] No se pudo guardar foto de boleta'");
     expect(guard).toContain('async function deleteImage(fp)');
-    expect(guard).toContain('result.added===0&&result.updated===0&&result.partials===0');
+    expect(guard).toContain('result.added===0&&result.updated===0');
     expect(guard).toContain('!referencesImage(fp)');
     expect(guard).toContain('await deleteImage(fp)');
   });
@@ -164,10 +166,10 @@ describe('Pendientes v84 capture/detail/history/interaction contract',()=>{
   });
 
   it('updates service worker shell coherently',()=>{
-    expect(sw).toContain('pendientes-shell-20260819-84');
-    expect(sw).toContain('/turno-rx/capture-fix-v80.js?v=81');
-    expect(sw).toContain('/turno-rx/patient-detail-history-v82.js?v=83');
-    expect(sw).toContain('/turno-rx/interaction-runtime-v84.js?v=84');
+    expect(sw).toContain('pendientes-shell-20260820-87');
+    expect(sw).toContain('/turno-rx/capture-fix-v80.js?v=87');
+    expect(sw).toContain('/turno-rx/patient-detail-history-v82.js?v=87');
+    expect(sw).toContain('/turno-rx/interaction-runtime-v85.js?v=87');
     expect(sw).not.toContain("'/turno-rx/capture-detail-v75.js?v=75'");
     expect(sw).not.toContain("'/turno-rx/stability.js?v=20260818.1'");
     expect(sw).toContain('/turno-rx/capture-detail-v75.css?v=78');

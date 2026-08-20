@@ -1,4 +1,4 @@
-import { syncRowsFromStorageAndRender } from './app-v16.js?v=65';
+import { syncRowsFromStorageAndRender } from './app-v16.js?v=87';
 
 const BUILD = '2026.08.18.74';
 const MODALITY_FOR_TAB = {

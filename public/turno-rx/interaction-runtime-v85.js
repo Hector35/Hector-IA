@@ -3,13 +3,13 @@ import {
   normalizeStudyDisplay,
   normalizeCategory,
   displayOrigin
-} from './app-v16.js?v=65';
+} from './app-v16.js?v=87';
 
 // Pendientes v85 — interaction-only runtime.
 // IMPORTANT: this module intentionally owns NO photo analysis, vision prompt,
 // /api/turno-rx/vision request, photo queue, or vision reconciliation.
-// capture-fix-v80.js?v=81 is the sole photo-capture owner.
-const BUILD='85';
+// capture-fix-v80.js?v=87 is the sole photo-capture owner.
+const BUILD='87';
 const STORAGE_KEY='pendientes-table-v2';
 const SHIFT_KEY='pendientes-shift-v1';
 const HISTORY_KEY='pendientes-shift-history-v1';
@@ -46,8 +46,8 @@ function sync(){syncRowsFromStorageAndRender();queueMicrotask(enhance)}
 
 function transportCycle(id){
   const list=rows(),i=list.findIndex(r=>String(r.id)===String(id));if(i<0)return;
-  const current=normTransport(list[i].transport);if(current==='No trasladar')return;
-  const seq=['Silla','Camilla','Por definir'],next=seq[(seq.indexOf(current)+1)%seq.length]||'Silla';
+  const current=normTransport(list[i].transport);
+  const seq=['Por definir','Silla','Camilla','No trasladar'],next=seq[(seq.indexOf(current)+1)%seq.length]||'Silla';
   const automaticReason=clean(list[i].transportReasonAuto||list[i].transportReason);
   list[i]={
     ...list[i],
@@ -59,18 +59,20 @@ function transportCycle(id){
   };
   write(STORAGE_KEY,list);sync();showToast(`Traslado: ${next}`,'success','',null,1300)
 }
-function setStatus(id,status){const list=rows(),i=list.findIndex(r=>String(r.id)===String(id));if(i<0)return;const prev=clean(list[i].status)||'Pendiente';if(plain(prev)===plain(status))return;list[i]={...list[i],status,statusUpdatedAt:now(),completedAt:status==='Realizado'?now():list[i].completedAt,reopenedAt:status==='Pendiente'?now():list[i].reopenedAt};write(STORAGE_KEY,list);sync();refreshRealized();showToast(status==='Realizado'?'Marcado como realizado':'Regresó a pendiente','success','Deshacer',()=>setStatus(id,prev),5000)}
+function setStatus(id,status){const list=rows(),i=list.findIndex(r=>String(r.id)===String(id));if(i<0)return;const prev=clean(list[i].status)||'Pendiente';if(plain(prev)===plain(status))return;list[i]={...list[i],status,statusUpdatedAt:now(),completedAt:status==='Realizado'?now():null,reopenedAt:status==='Pendiente'?now():list[i].reopenedAt};write(STORAGE_KEY,list);sync();refreshRealized();showToast(status==='Realizado'?'Marcado como realizado':'Regresó a pendiente','success','Deshacer',()=>setStatus(id,prev),5000)}
 function safeDelete(id){const list=rows(),i=list.findIndex(r=>String(r.id)===String(id));if(i<0)return;const [removed]=list.splice(i,1);write(STORAGE_KEY,list);editingId=null;sync();undo={row:removed,index:i};clearTimeout(undoTimer);undoTimer=setTimeout(()=>undo=null,7100);showToast('Paciente eliminado','warning','Deshacer',()=>{if(!undo)return;const next=rows();next.splice(Math.min(undo.index,next.length),0,undo.row);undo=null;write(STORAGE_KEY,next);sync()},7000)}
 
 function isPhotoProcessing(){const status=document.getElementById('captureStatus');return Boolean(status&&!status.hidden&&status.dataset.state==='busy')}
-function startNewShift(){if(isPhotoProcessing()){showToast('Termina el análisis de fotos antes de cambiar de turno.','warning');return}const list=rows();if(list.length&&!confirm(`Archivar ${list.length} registros e iniciar un turno nuevo?`))return;const shift=read(SHIFT_KEY,{id:uid(),startedAt:now()}),hist=read(HISTORY_KEY,[]);if(list.length)hist.unshift({shift:{...shift,status:'ARCHIVED',endedAt:now()},rows:list,archivedAt:now()});write(HISTORY_KEY,hist.slice(0,60));write(SHIFT_KEY,{id:uid(),startedAt:now(),status:'ACTIVE'});write(STORAGE_KEY,[]);localStorage.setItem(ACTIVE_TAB_KEY,'RX');location.reload()}
+function startNewShift(){if(isPhotoProcessing()){showToast('Termina el análisis de fotos antes de cambiar de turno.','warning');return}const list=rows();if(list.length&&!confirm(`Archivar ${list.length} registros e iniciar un turno nuevo?`))return;const shift=read(SHIFT_KEY,{id:uid(),startedAt:now()}),hist=read(HISTORY_KEY,[]);if(list.length)hist.unshift({shift:{...shift,status:'ARCHIVED',endedAt:now()},rows:list,archivedAt:now()});write(HISTORY_KEY,hist.slice(0,60));write(SHIFT_KEY,{id:uid(),startedAt:now(),status:'ACTIVE'});write(STORAGE_KEY,[]);write(ACTIVE_TAB_KEY,'RX');sync();refreshRealized();showToast('Turno nuevo iniciado','success')}
 
 function enhance(){const app=document.getElementById('app');if(!app)return;app.dataset.interactionBuild=BUILD;const actions=app.querySelector('.capture-actions');if(actions&&!document.getElementById('cameraCapture')){const camera=document.createElement('button');camera.id='cameraCapture';camera.type='button';camera.className='capture-icon-btn stability-camera';camera.setAttribute('aria-label','Tomar foto');camera.innerHTML='⌾';actions.insertBefore(camera,actions.querySelector('#galleryCapture'));const input=document.createElement('input');input.id='cameraInput';input.type='file';input.accept='image/*';input.setAttribute('capture','environment');input.hidden=true;actions.appendChild(input)}if(actions&&!document.getElementById('historyCapture')){const h=document.createElement('button');h.id='historyCapture';h.type='button';h.className='capture-icon-btn';h.setAttribute('aria-label','Historial');h.innerHTML='◷';actions.insertBefore(h,actions.firstChild)}app.querySelectorAll('.remove-btn').forEach(b=>b.tabIndex=-1);app.querySelectorAll('.imaging-row[data-id] .transport-cell').forEach(cell=>{cell.dataset.stabilityTransport=cell.closest('[data-id]')?.dataset.id||'';cell.setAttribute('role','button');cell.setAttribute('aria-label','Cambiar traslado')});const form=app.querySelector('#patientForm');if(form&&editingId&&!form.querySelector('#stabilityDelete')){const save=form.querySelector('.save-btn');if(save){const del=document.createElement('button');del.type='button';del.id='stabilityDelete';del.className='stability-delete';del.textContent='Eliminar';save.parentElement?.insertBefore(del,save)}}refreshRealized()}
 const observer=new MutationObserver(()=>{if(observerScheduled)return;observerScheduled=true;queueMicrotask(()=>{observerScheduled=false;enhance()})});
 observer.observe(document.getElementById('app'),{childList:true,subtree:true});
 
 function refreshRealized(){const tab=activeTab(),list=rows().filter(r=>!isPending(r)&&categoryTabFrom(r.category,r.modality,r.target)===tab);let pill=document.getElementById('stabilityRealizedPill');if(!list.length){pill?.remove();if(document.getElementById('stabilityRealizedSheet'))renderRealizedSheet(false);return}if(!pill){pill=document.createElement('button');pill.id='stabilityRealizedPill';pill.className='stability-realized-pill';pill.type='button';document.body.appendChild(pill)}pill.textContent=`✓ Realizados ${list.length}`;pill.onclick=()=>renderRealizedSheet(true);if(document.getElementById('stabilityRealizedSheet'))renderRealizedSheet(true)}
-function renderRealizedSheet(open=true){document.getElementById('stabilityRealizedSheet')?.remove();if(!open)return;const tab=activeTab(),list=rows().filter(r=>!isPending(r)&&categoryTabFrom(r.category,r.modality,r.target)===tab);const back=document.createElement('div');back.id='stabilityRealizedSheet';back.className='stability-backdrop';back.innerHTML=`<section class="stability-sheet"><div class="stability-handle"></div><header><div><small>ESTADO</small><h2>Realizados · ${esc(tab)}</h2></div><button data-close>×</button></header><p>Desliza a la derecha o toca Pendiente para regresar.</p><div class="stability-realized-list">${list.map(r=>`<article data-realized-id="${esc(r.id)}"><div><strong>${esc(displayOrigin(r.bed))} · ${esc(r.name||normalizeStudyDisplay(r.target)||'Paciente')}</strong><span>${esc(normalizeStudyDisplay(r.target)||r.destination||'')}</span></div><button data-restore="${esc(r.id)}">↩ Pendiente</button></article>`).join('')||'<div class="stability-empty">Sin realizados.</div>'}</div></section>`;back.addEventListener('click',e=>{if(e.target===back||e.target.closest('[data-close]'))return renderRealizedSheet(false);const b=e.target.closest('[data-restore]');if(b)setStatus(b.dataset.restore,'Pendiente')});document.body.appendChild(back)}
+function renderRealizedSheet(open=true){document.getElementById('stabilityRealizedSheet')?.remove();if(!open)return;const tab=activeTab(),list=rows().filter(r=>!isPending(r)&&categoryTabFrom(r.category,r.modality,r.target)===tab);const back=document.createElement('div');back.id='stabilityRealizedSheet';back.className='stability-backdrop';back.innerHTML=`<section class="stability-sheet" role="dialog" aria-modal="true" aria-labelledby="stabilityRealizedTitle"><div class="stability-handle"></div><header><div><small>ESTADO</small><h2 id="stabilityRealizedTitle">Realizados · ${esc(tab)}</h2></div><button data-close aria-label="Cerrar realizados">×</button></header><p>Desliza a la derecha o toca Pendiente para regresar.</p><div class="stability-realized-list">${list.map(r=>`<article data-realized-id="${esc(r.id)}"><div><strong>${esc(displayOrigin(r.bed))} · ${esc(r.name||normalizeStudyDisplay(r.target)||'Paciente')}</strong><span>${esc(normalizeStudyDisplay(r.target)||r.destination||'')}</span></div><button data-restore="${esc(r.id)}">↩ Pendiente</button></article>`).join('')||'<div class="stability-empty">Sin realizados.</div>'}</div></section>`;back.addEventListener('click',e=>{if(e.target===back||e.target.closest('[data-close]'))return renderRealizedSheet(false);const b=e.target.closest('[data-restore]');if(b)setStatus(b.dataset.restore,'Pendiente')});document.body.appendChild(back);back.querySelector('[data-close]')?.focus()}
+
+document.addEventListener('keydown',e=>{if(e.key==='Escape'&&document.getElementById('stabilityRealizedSheet'))renderRealizedSheet(false)});
 
 document.addEventListener('click',e=>{if(Date.now()<suppressClickUntil&&e.target.closest('.patient-row,[data-realized-id]')){e.preventDefault();e.stopImmediatePropagation();return}const row=e.target.closest('.patient-row[data-id]');if(row&&!e.target.closest('button,input,select,textarea,label'))editingId=row.dataset.id;if(e.target.closest('#manualCapture'))editingId=null;if(e.target.closest('#closeSheet')||e.target.id==='sheetBackdrop')editingId=null;if(e.target.closest('#cameraCapture')){e.preventDefault();e.stopImmediatePropagation();document.getElementById('cameraInput')?.click();return}if(e.target.closest('#newShift')){e.preventDefault();e.stopImmediatePropagation();startNewShift();return}const t=e.target.closest('[data-quick-transport]');if(t){e.preventDefault();e.stopImmediatePropagation();transportCycle(t.dataset.patientId);return}const tc=e.target.closest('[data-stability-transport]');if(tc){e.preventDefault();e.stopImmediatePropagation();transportCycle(tc.dataset.stabilityTransport);return}if(e.target.closest('#stabilityDelete')){e.preventDefault();e.stopImmediatePropagation();if(editingId)safeDelete(editingId);return}if(e.target.closest('[data-category-tab]'))queueMicrotask(refreshRealized)},true);
 
@@ -82,5 +84,15 @@ document.addEventListener('pointercancel',()=>{if(gesture)gesture.row.style.tran
 window.__PENDIENTES_INTERACTION_OWNER__=BUILD;
 document.documentElement.dataset.pendientesInteractionBuild=BUILD;
 enhance();
+
+if('serviceWorker' in navigator){
+  let reloading=false;
+  navigator.serviceWorker.addEventListener('controllerchange',()=>{
+    if(reloading)return;
+    const reload=()=>{if(reloading)return;reloading=true;location.reload()};
+    if(isPhotoProcessing()){showToast('Actualización lista. Se aplicará al terminar las fotos.','info','Aplicar ahora',reload,0);const timer=setInterval(()=>{if(!isPhotoProcessing()){clearInterval(timer);reload()}},500);return}
+    reload();
+  });
+}
 
 export { transportCycle, setStatus, startNewShift, categoryTabFrom };
