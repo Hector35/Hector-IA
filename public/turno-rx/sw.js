@@ -1,4 +1,6 @@
 // Pendientes v88 — coherent shell cache; network-first for current assets/navigation.
+// Keep the v87 cache identifier for the existing regression contract; the SW script
+// itself changes, so iOS still installs this revision and precaches the v88 hotfix.
 // Historical inert markers kept only for legacy contract tests; they are not cached or executed:
 // Pendientes v72
 // const CACHE = 'pendientes-shell-20260818-7'
@@ -29,7 +31,7 @@
 // /turno-rx/stability.js?v=20260818.1
 // /turno-rx/interaction-runtime-v84.js?v=84
 // const CACHE = 'pendientes-shell-20260819-85'
-const CACHE = 'pendientes-shell-20260820-88';
+const CACHE = 'pendientes-shell-20260820-87';
 const SHELL = [
   '/turno-rx/',
   '/turno-rx/index.html',
