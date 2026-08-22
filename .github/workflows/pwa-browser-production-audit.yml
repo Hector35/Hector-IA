@@ -56,7 +56,7 @@ jobs:
         shell: bash
         run: |
           set -euo pipefail
-          npm install --no-save --ignore-scripts playwright@1.52.0
+          npm install --no-save --ignore-scripts playwright@1.62.1
           npx playwright install --with-deps chromium webkit
 
       - name: Create isolated authenticated browser session
