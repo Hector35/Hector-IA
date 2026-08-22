@@ -20,14 +20,16 @@ function manifests(dir:string):string[]{
  return out.sort();
 }
 
-describe('canonical PWA governance',()=>{
- it('defines exactly the three agreed installable PWAs',()=>{
+describe('intelligent PWA coordination',()=>{
+ it('records the three current canonical PWAs without treating them as immutable',()=>{
   expect(registry.installablePwas.map((pwa:any)=>pwa.id)).toEqual(['hector-os','hector-agent','pendientes']);
   expect(registry.installablePwas.map((pwa:any)=>pwa.canonicalPath)).toEqual(['/','/agent/','/turno-rx/']);
   expect(registry.installablePwas.find((pwa:any)=>pwa.id==='pendientes').protected).toBe(true);
+  expect(registry.coordination.mode).toBe('advisory');
+  expect(registry.coordination.sharedLedger).toContain('/issues/958');
  });
 
- it('classifies Bridge and Context Hub as shared services instead of new PWAs',()=>{
+ it('classifies Bridge and Context Hub as current shared services',()=>{
   const bridge=registry.sharedSurfaces.find((item:any)=>item.id==='hector-bridge');
   const context=registry.sharedSurfaces.find((item:any)=>item.id==='context-hub');
   expect(bridge.ownerPwa).toBe('hector-os');
@@ -37,7 +39,7 @@ describe('canonical PWA governance',()=>{
   expect(context.ownerPwa).toBe('hector-os');
  });
 
- it('keeps same-origin installable manifests limited to registered PWAs',()=>{
+ it('keeps current same-origin installable manifests mapped to registered PWAs',()=>{
   expect(manifests('public/')).toEqual(['agent/manifest.webmanifest','manifest.webmanifest','turno-rx/manifest.webmanifest']);
   for(const pwa of registry.installablePwas){
    const path=`public${pwa.manifest}`.replaceAll('//','/');
@@ -45,27 +47,41 @@ describe('canonical PWA governance',()=>{
   }
  });
 
- it('makes the registry mandatory context for humans and agents',()=>{
+ it('uses shared context to guide judgment rather than permission',()=>{
   const agents=read('AGENTS.md'),skills=read('worker/agent/skills.ts'),planner=read('worker/agent/planner.ts');
+  expect(agents).toContain('Shared Context Ledger');
+  expect(agents).toContain('not a permission system');
   expect(agents).toContain('config/pwa-registry.json');
-  expect(agents).toContain('exactly three canonical installable PWAs');
-  expect(skills).toContain('SURFACE_GOVERNANCE_CONTRACT');
-  expect(skills).toContain('Autorizar una función o corrección NO equivale');
-  expect(planner).toContain('SURFACE_GOVERNANCE_CONTRACT');
+  expect(skills).toContain('COORDINACIÓN INTELIGENTE DE SUPERFICIES');
+  expect(skills).toContain('No uses el registro, los claims ni el contexto compartido como permiso o freno');
+  expect(planner).toContain('Context Sync');
+  expect(planner).toContain('no son permisos ni frenos');
  });
 
- it('seeds the same decision into permanent shared system context',()=>{
-  const migration=read('migrations/0043_pwa_governance_context.sql');
-  expect(migration).toContain('pwa_canonical_registry');
-  expect(migration).toContain('pwa_creation_governance');
-  expect(migration).toContain('cross_agent_coordination');
-  expect(migration).toContain('config/pwa-registry.json');
+ it('updates permanent system context to an advisory cross-chat model',()=>{
+  const migration=read('migrations/0045_shared_context_intelligent_coordination.sql');
+  expect(migration).toContain('DROP INDEX IF EXISTS idx_coordination_claim_active_scope');
+  expect(migration).toContain('shared_context_operating_model');
+  expect(migration).toContain('GitHub issue #958');
+  expect(migration).toContain('Claims are not locks');
+  expect(migration).toContain('not an approval gate');
  });
 
- it('requires explicit new-PWA approval at the PWA Factory boundary',()=>{
+ it('removes the hard PWA approval gate and returns advisory coordination instead',()=>{
   const factory=read('worker/routes/pwa-factory.ts');
-  expect(factory).toContain('approvedNewPwa');
-  expect(factory).toContain('pwa_registry_reuse_required');
-  expect(factory).toContain('config/pwa-registry.json');
+  expect(factory).not.toContain('pwa_registry_reuse_required');
+  expect(factory).not.toContain('approvedNewPwa');
+  expect(factory).toContain('coordinationHint');
+  expect(factory).toContain('advisoryOnly:true');
+ });
+
+ it('hydrates model context from other conversations, sync commits and Context Hub',()=>{
+  const context=read('worker/lib/context.ts');
+  expect(context).toContain('crossConversationMessages');
+  expect(context).toContain('LIMIT 120');
+  expect(context).toContain('chat_sync_commits');
+  expect(context).toContain('context_hub_records');
+  expect(context).toContain('SEÑALES RELEVANTES DE OTROS CHATS/AGENTES');
+  expect(context).toContain('ESTADO COMPARTIDO DEL PROYECTO');
  });
 });
