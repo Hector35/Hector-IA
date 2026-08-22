@@ -7,11 +7,15 @@ const oidcPolicy={audience:'hector-os-self-improve',workflows:['self-improve.yml
 const repository='Hector35/Hector-IA';
 const allowedFiles=['worker/lib/openai.ts','worker/lib/context.ts','worker/routes/intelligence.ts','worker/lib/openai.test.ts','worker/lib/context.test.ts'];
 const fileSchema=z.object({path:z.string(),content:z.string().max(70000)});
-const schema=z.object({task:z.string().min(10).max(5000),files:z.array(fileSchema).min(1).max(5)});
+const schema=z.object({task:z.string().min(10).max(5000),files:z.array(fileSchema).min(1).max(5),evidence:z.string().max(16000).default('')});
 const proposalSchema=z.object({
   summary:z.string().min(1).max(3000),
   risk:z.literal('low'),
   hypothesis:z.string().max(3000).optional(),
+  failureSignature:z.string().max(1000).optional(),
+  measurement:z.object({baseline:z.string().max(1000),target:z.string().max(1000)}).optional(),
+  learnedRule:z.string().max(1200).optional(),
+  evidenceUsed:z.array(z.string().max(500)).max(20).optional(),
   acceptance:z.array(z.string().max(500)).max(20).optional(),
   changes:z.array(fileSchema).max(3)
 });
@@ -55,8 +59,8 @@ selfImprove.post('/proposal',async c=>{
     if(!parsed.success)return c.json({error:'Payload inválido'},400);
     for(const file of parsed.data.files)if(!allowedFiles.includes(file.path))return c.json({error:`Archivo no permitido: ${file.path}`},400);
     const source=parsed.data.files.map(x=>`\n===== ${x.path} =====\n${x.content}`).join('\n').slice(0,120000);
-    const instructions=`Eres el agente de ingeniería de Héctor OS. Inspecciona código real y propone una sola mejora conservadora y verificable.\n\nREGLAS INVIOLABLES\n- Solo modifica archivos de allowed_files.\n- Máximo 3 archivos y 18000 caracteres totales.\n- No borres archivos, no agregues dependencias y no modifiques autenticación, secretos, workflows, migraciones ni infraestructura.\n- Conserva compatibilidad de API.\n- Riesgo debe ser low.\n- Devuelve JSON puro con: {"summary":"...","risk":"low","hypothesis":"...","acceptance":["..."],"changes":[{"path":"...","content":"contenido completo"}]}.\n- Si no existe mejora segura, devuelve changes vacío.`;
-    const input=`TAREA\n${parsed.data.task}\n\nALLOWED_FILES\n${allowedFiles.join('\n')}\n\nCÓDIGO\n${source}`;
+    const instructions=`Eres el agente de ingeniería de Héctor OS. Mejora el sistema basándote en evidencia operativa real, no en intuiciones. Propón una sola mejora conservadora, medible y verificable.\n\nMÉTODO OBLIGATORIO\n1. Lee primero EVIDENCIA OPERATIVA y detecta una debilidad demostrada, una regresión, un fallo repetido o una capacidad todavía no verificada.\n2. Expresa una firma de fallo concreta y una métrica/criterio basal cuando la evidencia lo permita.\n3. Cambia solo lo mínimo necesario dentro de la jaula.\n4. Define criterios de aceptación falsables.\n5. Extrae una regla aprendida que evite repetir el mismo error.\n6. Si la evidencia no justifica una mejora segura, devuelve changes vacío.\n\nREGLAS INVIOLABLES\n- Solo modifica archivos de allowed_files.\n- Máximo 3 archivos y 18000 caracteres totales.\n- No borres archivos, no agregues dependencias y no modifiques autenticación, secretos, workflows, migraciones ni infraestructura.\n- Conserva compatibilidad de API.\n- Riesgo debe ser low.\n- No declares una capacidad verificada por existir en código o pasar unit tests: distingue código, CI y producción.\n- No inventes fallos, métricas ni evidencia.\n- Devuelve JSON puro con: {"summary":"...","risk":"low","hypothesis":"...","failureSignature":"...","measurement":{"baseline":"...","target":"..."},"learnedRule":"...","evidenceUsed":["..."],"acceptance":["..."],"changes":[{"path":"...","content":"contenido completo"}]}.`;
+    const input=`TAREA\n${parsed.data.task}\n\nEVIDENCIA OPERATIVA\n${parsed.data.evidence||'Sin evidencia adicional suministrada.'}\n\nALLOWED_FILES\n${allowedFiles.join('\n')}\n\nCÓDIGO\n${source}`;
     const response=await fetch('https://api.openai.com/v1/responses',{method:'POST',headers:{Authorization:`Bearer ${c.env.OPENAI_API_KEY}`,'Content-Type':'application/json'},body:JSON.stringify({model:c.env.OPENAI_MODEL_REASONING||'gpt-5.4',instructions,input,store:false,reasoning:{effort:'high'},max_output_tokens:30000})});
     const data=await response.json<any>();
     if(!response.ok)return c.json({error:data?.error?.message||'Error de OpenAI'},502);
@@ -85,11 +89,17 @@ selfImprove.post('/publish',async c=>{
       const current=await github(token,`/contents/${change.path}?ref=main`);
       await github(token,`/contents/${change.path}`,{method:'PUT',body:JSON.stringify({message:'feat(ai): autonomous guarded improvement',content:btoa(unescape(encodeURIComponent(change.content))),sha:current.sha,branch})});
     }
+    const m=parsed.data.proposal.measurement;
     const body=[
       '# Propuesta autónoma de Héctor OS','',
       `**Resumen:** ${parsed.data.proposal.summary}`,'',
       `**Hipótesis:** ${parsed.data.proposal.hypothesis||'No especificada'}`,'',
-      '**Verificación previa:** typecheck, pruebas y build exitosos en GitHub Actions.','',
+      `**Firma de fallo:** ${parsed.data.proposal.failureSignature||'No aplicable'}`,'',
+      `**Medición:** ${m?`baseline: ${m.baseline} → objetivo: ${m.target}`:'No especificada'}`,'',
+      `**Regla aprendida:** ${parsed.data.proposal.learnedRule||'No especificada'}`,'',
+      '**Evidencia usada:**',...(parsed.data.proposal.evidenceUsed?.length?parsed.data.proposal.evidenceUsed.map(x=>`- ${x}`):['- No especificada']),'',
+      '**Criterios de aceptación:**',...(parsed.data.proposal.acceptance?.length?parsed.data.proposal.acceptance.map(x=>`- ${x}`):['- Typecheck, pruebas y build deben pasar.']),'',
+      '**Verificación previa:** typecheck, pruebas y build exitosos en GitHub Actions. La verificación en producción sigue siendo una fase posterior al merge cuando aplique.','',
       '**Archivos:**',...parsed.data.proposal.changes.map(x=>`- \`${x.path}\``),'',
       `**Solicitado por:** ${claims.actor||'github-actions'}`
     ].join('\n');
