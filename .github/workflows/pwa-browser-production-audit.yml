@@ -56,7 +56,10 @@ jobs:
         shell: bash
         run: |
           set -euo pipefail
-          npm install --no-save --ignore-scripts playwright@1.62.1
+          # Pin WebKit 26.4 via Playwright 1.60.0. WebKit 26.5 has a known
+          # Playwright-only render-process crash regression (#41573) that is
+          # not reproducible in Safari 26.5.1 and can false-fail complex PWAs.
+          npm install --no-save --ignore-scripts playwright@1.60.0
           npx playwright install --with-deps chromium webkit
 
       - name: Create isolated authenticated browser session
