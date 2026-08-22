@@ -11,6 +11,15 @@ export type HectorAgentRuntimeGuard={
  consecutiveErrors:number;
 };
 
+export type HectorAgentRunnerControl={
+ isHectorAgent:boolean;
+ status:string;
+ paused:boolean;
+ autoEnabled:boolean;
+ lastError?:string|null;
+ limitReason?:string|null;
+};
+
 type GuardRow={
  goal_id:string;max_iterations:number;max_runtime_seconds:number;max_cost_usd:number;max_consecutive_errors:number;
  accumulated_runtime_ms:number;accumulated_cost_usd:number;consecutive_errors:number;
@@ -36,6 +45,13 @@ export function hectorAgentLimitReason(guard:HectorAgentRuntimeGuard,attemptCoun
  if(guard.accumulatedCostUsd>=guard.maxCostUsd)return `Presupuesto del objetivo alcanzado (${guard.maxCostUsd.toFixed(2)} USD)`;
  if(guard.consecutiveErrors>=guard.maxConsecutiveErrors)return `Límite de ${guard.maxConsecutiveErrors} errores consecutivos alcanzado`;
  return null;
+}
+
+export function hectorAgentRunnerControlReason(control:HectorAgentRunnerControl):string|null{
+ if(!control.isHectorAgent)return null;
+ if(control.paused||!control.autoEnabled)return 'Héctor Agent detenido por el usuario';
+ if(control.status==='blocked')return control.lastError||'Objetivo pausado o bloqueado desde Héctor Agent';
+ return control.limitReason||null;
 }
 
 export async function recordHectorAgentCycle(env:Bindings,workJobId:string,input:{durationMs:number;costUsd:number;failed:boolean}):Promise<HectorAgentRuntimeGuard|null>{
