@@ -1,0 +1,91 @@
+name: Agent resilience branch patcher once
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - '.github/workflows/agent-resilience-branch-patcher-once.yml'
+
+permissions:
+  contents: write
+
+jobs:
+  patch:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: feat/hector-agent-resilience-broker-v2-20260822
+          fetch-depth: 0
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+      - name: Wire resilience broker into current Agent runtime
+        shell: python
+        run: |
+          from pathlib import Path
+          route=Path('worker/routes/hector-agent.ts')
+          s=route.read_text()
+          im="import {workModeTitle} from '../lib/work-mode';"
+          il="import {hectorAgentResilience} from './hector-agent-resilience';"
+          if il not in s:
+              if im not in s: raise SystemExit('Agent import marker missing')
+              s=s.replace(im,im+'\n'+il,1)
+          mm="hectorAgent.use('*',requireAuth);"
+          ml="hectorAgent.route('/resilience',hectorAgentResilience);"
+          if ml not in s:
+              if mm not in s: raise SystemExit('Agent mount marker missing')
+              s=s.replace(mm,mm+'\n'+ml,1)
+          route.write_text(s)
+
+          index=Path('worker/index.ts')
+          s=index.read_text()
+          ri="import {blockHectorAgentJob,hectorAgentLimitReason,loadHectorAgentRuntimeGuard,recordHectorAgentCycle} from './lib/hector-agent-runtime';"
+          ii="import {completeResumeCheckpoints,saveResumeCheckpoint} from './lib/hector-agent-resilience';"
+          if ii not in s:
+              if ri not in s: raise SystemExit('Runtime import marker missing')
+              s=s.replace(ri,ri+'\n'+ii,1)
+          advanced="""    const advanced=await env.DB.prepare(\"UPDATE work_jobs SET status='queued',progress=?,result=?,last_error=NULL,next_retry_at=datetime('now',?),lease_token=NULL,lease_expires_at=NULL,heartbeat_at=CURRENT_TIMESTAMP,updated_at=CURRENT_TIMESTAMP WHERE id=? AND lease_token=?\").bind(progress,parsed.text,wait,job.id,leaseToken).run();
+    if(!advanced.meta.changes)return;
+"""
+          checkpoint="""    await saveResumeCheckpoint(env,{workJobId:job.id,reason:parsed.state==='waiting'?'external_dependency':'continuation',state:{result:parsed.text,attemptCount:job.attempt_count},status:parsed.state==='waiting'?'waiting_external':'ready',resumeAfter:new Date(Date.now()+delay*60_000).toISOString()});
+"""
+          if "reason:parsed.state==='waiting'?'external_dependency':'continuation'" not in s:
+              if advanced not in s: raise SystemExit('Waiting transition marker missing')
+              s=s.replace(advanced,advanced+checkpoint,1)
+          completed="""  const completed=await env.DB.prepare(\"UPDATE work_jobs SET status='completed',progress=100,result=?,last_error=NULL,lease_token=NULL,lease_expires_at=NULL,next_retry_at=NULL,heartbeat_at=CURRENT_TIMESTAMP,updated_at=CURRENT_TIMESTAMP WHERE id=? AND lease_token=?\").bind(out.text,job.id,leaseToken).run();if(!completed.meta.changes)return;
+"""
+          if 'await completeResumeCheckpoints(env,job.id);' not in s:
+              if completed not in s: raise SystemExit('Completion marker missing')
+              s=s.replace(completed,completed+'  await completeResumeCheckpoints(env,job.id);\n',1)
+          failure="""   if(failed.meta.changes){await event(env,job.id,`Error detectado; Modo Trabajo conservará el avance e intentará otra alternativa en ${retry.delaySeconds}s`,25);await recordExperience(env,{jobId:job.id,userId:job.user_id,objective:job.prompt,status:'queued',result:message,skills:plan.skills,attempts:job.attempt_count,durationMs:Date.now()-started});}
+"""
+          replacement="""   if(failed.meta.changes){await saveResumeCheckpoint(env,{workJobId:job.id,reason:'retry_after_error',state:{error:message,attemptCount:job.attempt_count},status:'ready',resumeAfter:new Date(Date.now()+retry.delaySeconds*1000).toISOString()});await event(env,job.id,`Error detectado; Modo Trabajo conservará el avance e intentará otra alternativa en ${retry.delaySeconds}s`,25);await recordExperience(env,{jobId:job.id,userId:job.user_id,objective:job.prompt,status:'queued',result:message,skills:plan.skills,attempts:job.attempt_count,durationMs:Date.now()-started});}
+"""
+          if "reason:'retry_after_error'" not in s:
+              if failure not in s: raise SystemExit('Failure transition marker missing')
+              s=s.replace(failure,replacement,1)
+          index.write_text(s)
+      - name: Verify branch
+        run: |
+          npm ci
+          npm run typecheck
+          npx vitest run tests/hector-agent-resilience.test.ts tests/hector-agent-runtime.test.ts tests/hector-agent-v1.test.ts
+          npm run build
+      - name: Commit target branch
+        run: |
+          git config user.name 'github-actions[bot]'
+          git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
+          git rm -f .github/workflows/agent-resilience-v2-wire-once.yml || true
+          git add worker/routes/hector-agent.ts worker/index.ts
+          git commit -m 'feat(agent): wire resilience broker into current runtime'
+          git push origin HEAD:feat/hector-agent-resilience-broker-v2-20260822
+      - name: Remove this temporary workflow from main
+        if: success()
+        run: |
+          git fetch origin main
+          git checkout -B main origin/main
+          git rm -f .github/workflows/agent-resilience-branch-patcher-once.yml
+          git commit -m 'chore: remove one-time resilience branch patcher'
+          git push origin HEAD:main
