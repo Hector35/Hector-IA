@@ -9,19 +9,17 @@ export type Skill={
 };
 
 export const SURFACE_GOVERNANCE_CONTRACT=`COORDINACIÓN CANÓNICA DE SUPERFICIES
-- Fuentes compartidas: config/pwa-registry.json, Context Hub, Context Sync, main/PRs abiertos y GitHub issue #958.
-- El estado actual tiene Héctor OS en /, Héctor Agent en /agent/ y Pendientes en /turno-rx/; el registro describe arquitectura actual y también la frontera explícita de autorización para ampliar el conjunto de PWAs instalables.
+- Fuentes compartidas: config/shared-decisions.json, config/pwa-registry.json, Context Hub, Context Sync, main/PRs abiertos y GitHub issue #958.
+- El estado actual tiene Héctor OS en /, Héctor Agent en /agent/ y Pendientes en /turno-rx/; el registro describe arquitectura actual, no un máximo rígido ni un permiso interno.
 - Héctor OS posee UI general, chat, herramientas compartidas y superficies Bridge/Context.
 - Héctor Agent posee objetivos, jobs autónomos, actividad y controles del agente.
 - Pendientes es la PWA clínica; no modifiques public/turno-rx/ para trabajo ajeno a Pendientes.
 - /bridge.html, /bridge-core.html, /api/hector-bridge, Context Hub y /mcp pertenecen a la misma capa compartida; no los conviertas en PWAs paralelas por falta de contexto.
 - Antes de crear o dividir una superficie, consulta contexto compartido y trabajo concurrente para evitar duplicación accidental.
-- Reutiliza una superficie cuando sea la solución más simple y limpia; refactoriza o reemplaza internamente cuando la evidencia técnica muestre una ventaja real.
-- Los claims de Context Sync son señales consultivas, no locks; no deben bloquear trabajo autorizado.
-- Hay exactamente tres PWAs instalables canónicas salvo autorización explícita de Héctor para otra.
-- Autorizar una función o corrección NO autoriza una nueva PWA.
-- Una nueva PWA instalable exige approvedNewPwa=true y approvalReason no vacío que documenten esa autorización explícita.
-- Si creas una nueva PWA instalable autorizada, actualiza el registro y usa scope/service worker/cache únicos.
+- Reutiliza una superficie cuando sea la solución más simple y limpia; refactoriza, reemplaza o crea/separa una nueva cuando la evidencia técnica muestre una ventaja real.
+- Los claims de Context Sync, el registro y las recomendaciones son señales consultivas, no locks ni permisos.
+- No inventes approvedNewPwa, approvalReason u otros tokens internos para decidir arquitectura dentro de un objetivo ya autorizado.
+- Si cambia el conjunto de PWAs instalables, actualiza el registro y usa scope/service worker/cache únicos.
 - Nunca solapes scopes de service worker ni propiedad de caches entre PWAs.`;
 
 export const CAPABILITY_STACK_CONTRACT=`STACK DE CAPACIDADES COMPARTIDAS
@@ -37,6 +35,7 @@ export const CAPABILITY_STACK_CONTRACT=`STACK DE CAPACIDADES COMPARTIDAS
 export const PWA_ENGINEERING_CONTRACT=`CONTRATO DE INGENIERÍA PWA
 ${SURFACE_GOVERNANCE_CONTRACT}
 - Convierte el objetivo en casos de uso, datos, pantallas, estados y criterios de aceptación antes de generar código.
+- Decide por evidencia si conviene extender una PWA actual, crear una superficie dentro de ella o separar una nueva PWA; coordinación no equivale a permiso.
 - Entrega una aplicación completa y ejecutable, no solo HTML de demostración ni una explicación.
 - Mantén manifest.webmanifest coherente: name, short_name, id, start_url, scope, display, theme_color, background_color e iconos.
 - Registra el service worker únicamente cuando la especificación habilite modo offline; define estrategia de caché, actualización y recuperación ante fallos.
@@ -45,6 +44,7 @@ ${SURFACE_GOVERNANCE_CONTRACT}
 - No incrustes secretos en el cliente. Todo privilegio, API privada o escritura sensible debe quedar en backend autenticado.
 - Ejecuta typecheck, pruebas y build; corrige fallos antes de afirmar que la PWA está terminada.
 - Verifica instalabilidad, navegación, estado offline, accesibilidad básica y viewport 390x844 mediante evidencia independiente.
+- Si creas una PWA nueva, registra ownership y scopes en config/pwa-registry.json dentro del mismo cambio.
 - Publica una versión trazable y conserva rollback. Propuesto no significa construido; construido no significa verificado.`;
 
 export const SKILLS:Skill[]=[
@@ -77,25 +77,25 @@ export const SKILLS:Skill[]=[
  },
  {
   id:'pwa-builder',
-  description:'Diseñar, extender, generar, versionar, probar y publicar PWAs instalables respetando coordinación consultiva y autorización explícita para nuevas PWAs.',
+  description:'Diseñar, extender, generar, versionar, probar y publicar PWAs instalables usando coordinación consultiva y decisión arquitectónica por evidencia.',
   triggers:['pwa','aplicacion web progresiva','aplicacion instalable','app instalable','app para iphone','instalar en iphone','service worker','manifest web','offline first','pantalla de inicio'],
   tools:['pwa-factory','github','runner','browser'],
   steps:[
    'Consultar contexto compartido, registro y trabajo concurrente antes de decidir arquitectura',
-   'Comparar extensión de una PWA actual frente a una superficie nueva por simplicidad, aislamiento y valor',
-   'No crear una nueva PWA instalable sin autorización explícita; autorizar una función o corrección no basta',
+   'Comparar extensión de una PWA actual frente a una superficie o PWA nueva por simplicidad, aislamiento, lifecycle, UX y mantenibilidad',
+   'Elegir la mejor arquitectura sin convertir el registro, claims o recomendaciones en permisos internos',
    'Convertir el objetivo en especificación funcional, modelo de datos y criterios observables',
    'Generar fuente completa con diseño responsive y accesible',
    'Configurar manifest, iconos, metadatos de iPhone y scopes sin solapamiento',
    'Implementar service worker con limpieza limitada a su propia familia de cache',
    'Ejecutar typecheck, pruebas y build reproducible',
    'Verificar instalación, navegación, offline y viewport iPhone con evidencia',
-   'Actualizar el registro si cambió la arquitectura autorizada y publicar handoff',
+   'Actualizar el registro si cambió la arquitectura y publicar handoff',
    'Publicar una versión trazable y conservar rollback'
   ],
   success:[
    'Decisión arquitectónica informada',
-   'Sin duplicación accidental ni creación no autorizada de otra PWA',
+   'Sin duplicación accidental ni permisos internos artificiales',
    'Fuente completa y versionada',
    'Manifest e instalación validados',
    'Service worker aislado',
