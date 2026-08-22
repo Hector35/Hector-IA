@@ -6,12 +6,17 @@ on:
     paths:
       - 'public/agent/**'
       - 'worker/routes/hector-agent.ts'
+      - 'worker/lib/hector-agent-runtime.ts'
+      - 'worker/index.ts'
+      - 'migrations/0040_hector_agent_runtime_limits.sql'
       - 'tests/hector-agent-v1.test.ts'
+      - 'tests/hector-agent-runtime.test.ts'
       - '.github/workflows/hector-agent-production-audit.yml'
   workflow_dispatch:
 
 permissions:
   contents: read
+  statuses: write
 
 concurrency:
   group: hector-agent-production-audit
@@ -27,6 +32,21 @@ jobs:
       CLOUDFLARE_ACCOUNT_ID: ${{ vars.CLOUDFLARE_ACCOUNT_ID }}
     steps:
       - uses: actions/checkout@v4
+
+      - name: Mark production audit pending
+        uses: actions/github-script@v7
+        with:
+          script: |
+            await github.rest.repos.createCommitStatus({
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              sha: context.sha,
+              state: 'pending',
+              context: 'hector-agent/production-audit',
+              description: 'Auditoría E2E de Héctor Agent en producción en curso',
+              target_url: `${context.serverUrl}/${context.repo.owner}/${context.repo.repo}/actions/runs/${context.runId}`
+            });
+
       - uses: actions/setup-node@v4
         with:
           node-version: 22
@@ -143,7 +163,7 @@ jobs:
           writeFileSync('/tmp/background-goal-id',bg.goal.id);
           NODE
 
-      - name: Verify background continuation without an open PWA
+      - name: Verify background continuation and hard budget without an open PWA
         env:
           TOKEN: ${{ steps.session.outputs.token }}
         shell: bash
@@ -153,17 +173,34 @@ jobs:
           node --input-type=module <<'NODE'
           const base=process.env.BASE_URL,token=process.env.TOKEN,id=process.env.GOAL_ID;
           const headers={Cookie:`hector_session=${token}`,'Content-Type':'application/json',Origin:base};
+          async function req(path,{method='GET',body,expect=200}={}){
+            const r=await fetch(base+path,{method,headers,body:body===undefined?undefined:JSON.stringify(body)});
+            const data=await r.json().catch(()=>({}));
+            if(r.status!==expect)throw new Error(`${method} ${path}: expected ${expect}, got ${r.status}: ${JSON.stringify(data)}`);
+            return data;
+          }
           let seen=false,last=null;
           for(let i=0;i<14;i++){
             await new Promise(resolve=>setTimeout(resolve,10000));
-            const r=await fetch(base+'/api/hector-agent/goals/'+id,{headers});
-            last=await r.json();
-            if(r.ok&&Number(last?.goal?.attemptCount||0)>=1){seen=true;break}
+            last=await req('/api/hector-agent/goals/'+id);
+            if(Number(last?.goal?.attemptCount||0)>=1){seen=true;break}
           }
-          await fetch(base+'/api/hector-agent/settings',{method:'PATCH',headers,body:JSON.stringify({paused:true,autoEnabled:false})});
           if(!seen)throw new Error('Background cron did not run in time: '+JSON.stringify(last));
           if(!(last.events||[]).some(e=>String(e.message||'').includes('ciclo 1 iniciado')))throw new Error('Background cycle event was not recorded');
           console.log('Background continuation verified with attemptCount=',last.goal.attemptCount);
+          if(last.goal.status!=='completed')await req('/api/hector-agent/goals/'+id+'/pause',{method:'POST'});
+
+          await req('/api/hector-agent/settings',{method:'PATCH',body:{autonomyMode:'supervised',maxIterations:3,maxRuntimeSeconds:600,maxCostUsd:0,maxConsecutiveErrors:2}});
+          const capped=await req('/api/hector-agent/goals',{method:'POST',body:{objective:'Valida que un objetivo con presupuesto cero sea bloqueado por el backend antes de usar inferencia pagada.'},expect:201});
+          let cappedDetail=null,blocked=false;
+          for(let i=0;i<10;i++){
+            await new Promise(resolve=>setTimeout(resolve,10000));
+            cappedDetail=await req('/api/hector-agent/goals/'+capped.goal.id);
+            if(cappedDetail?.goal?.status==='blocked'&&String(cappedDetail.goal.lastError||'').includes('Presupuesto')){blocked=true;break}
+          }
+          if(!blocked)throw new Error('Hard cost budget was not enforced: '+JSON.stringify(cappedDetail));
+          console.log('Hard cost budget verified:',cappedDetail.goal.lastError);
+          await req('/api/hector-agent/settings',{method:'PATCH',body:{paused:true,autoEnabled:false,maxCostUsd:1}});
           NODE
 
       - name: Cleanup isolated test data
@@ -186,3 +223,33 @@ jobs:
           SQL
             npx wrangler d1 execute hector-os-db --remote --file=/tmp/hector-agent-cleanup.sql
           fi
+
+      - name: Mark production audit success
+        if: success()
+        uses: actions/github-script@v7
+        with:
+          script: |
+            await github.rest.repos.createCommitStatus({
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              sha: context.sha,
+              state: 'success',
+              context: 'hector-agent/production-audit',
+              description: 'Héctor Agent E2E, cron y límites verificados en producción',
+              target_url: `${context.serverUrl}/${context.repo.owner}/${context.repo.repo}/actions/runs/${context.runId}`
+            });
+
+      - name: Mark production audit failure
+        if: failure()
+        uses: actions/github-script@v7
+        with:
+          script: |
+            await github.rest.repos.createCommitStatus({
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              sha: context.sha,
+              state: 'failure',
+              context: 'hector-agent/production-audit',
+              description: 'Falló la auditoría E2E de Héctor Agent en producción',
+              target_url: `${context.serverUrl}/${context.repo.owner}/${context.repo.repo}/actions/runs/${context.runId}`
+            });
