@@ -7,12 +7,12 @@ A chat, agent, Codex session or background worker must not treat its own transcr
 When the runtime can reach Héctor OS, use `/api/context-sync`:
 
 1. `POST /bootstrap` before substantial work to load shared decisions, recent commits, active work and overlapping activity.
-2. `POST /claim` to announce scope/intention. Claims are presence signals, never locks.
+2. `POST /claim` to announce scope/intention. Claims are presence signals, not locks.
 3. Compare overlapping work and choose intelligently: reuse, integrate, replace or deliberately diverge based on evidence.
 4. `POST /commit` after meaningful work with summary, decisions, actions, next steps, blockers and resources.
 5. `POST /release` when the announced scope is finished or abandoned.
 
-If Context Sync is not callable, inspect current `main`, open PRs, Context Hub/system context and issue #958. Missing local chat context never means no prior decision exists.
+If Context Sync is not callable, inspect current `main`, open PRs, `config/shared-decisions.json`, Context Hub/system context and issue #958. Missing local chat context never means no prior decision exists.
 
 **Shared context is intelligence infrastructure, not a permission system.** It should reduce accidental duplication without preventing a better implementation.
 
@@ -20,16 +20,16 @@ If Context Sync is not callable, inspect current `main`, open PRs, Context Hub/s
 
 Héctor has explicitly asked the system to search for viable technical alternatives and execute them without repeatedly asking permission for implementation choices. Therefore:
 
-- Do not invent internal approval gates, boolean permission flags or workflow locks merely to coordinate agents.
+- Do not invent internal approval gates, boolean permission flags or workflow locks merely to coordinate agents or make architecture choices inside an already authorized objective.
 - When one implementation fails, diagnose the failure and try another legitimate route when useful.
-- Existing architecture is evidence, not dogma. Prefer reuse when it is simpler/better; replace or split implementation when evidence supports it inside the authorized product boundaries.
+- Existing architecture is evidence, not dogma. Prefer reuse when it is simpler/better; replace, split or create a new surface when evidence supports it.
 - Continue independent work when one capability is unavailable instead of freezing the entire objective.
 - Mandatory external authorization/security/provider controls remain authoritative; do not route around them.
 - Never expose secrets. Use the Credential Broker, Worker secrets, OAuth/service identities or other provider-supported mechanisms.
 
 ## Current surfaces
 
-Read `config/pwa-registry.json` before changing app/page/manifest/service-worker ownership. It describes the current architecture:
+Read `config/shared-decisions.json` and `config/pwa-registry.json` before changing app/page/manifest/service-worker ownership. They describe current decisions and architecture:
 
 1. **Héctor OS** — `/` — general UI, chat, shared utilities, Bridge/Context surfaces.
 2. **Héctor Agent** — `/agent/` — autonomous goals, jobs, activity and Agent controls.
@@ -40,10 +40,10 @@ Read `config/pwa-registry.json` before changing app/page/manifest/service-worker
 ### Architecture rules
 
 - Reuse a registered owner when that is the cleanest solution; do not create a sibling because another chat lacked context.
-- Claims are advisory and do not lock implementation work, but changing the installable PWA set is a separate boundary and requires explicit user approval.
-- There are exactly three canonical installable PWAs unless Héctor explicitly authorizes another one. Authorization to implement a feature, correction or architectural improvement is not authorization to create a new installable PWA.
-- A new installable PWA requires `approvedNewPwa=true` plus a non-empty `approvalReason` that documents the explicit user authorization.
-- When creating an explicitly authorized new installable PWA, update the registry in the same change and use a unique, non-overlapping service-worker/cache scope.
+- Claims, registry entries and recommendations are advisory context, not locks or permission tokens.
+- The three current installable PWAs are the canonical architecture today, not a hard maximum.
+- A new surface/PWA may be created when it is technically justified by isolation, lifecycle, UX, maintainability or another concrete benefit. Do not require `approvedNewPwa`, `approvalReason` or another internal authorization flag for that architectural decision inside an already authorized objective.
+- When the installable PWA set changes, update the registry in the same change and use a unique, non-overlapping service-worker/cache scope.
 - Do not modify `public/turno-rx/` for unrelated work.
 - Backends, brokers, memory, credentials and tool registries should usually remain shared services rather than multiplying UI surfaces.
 
