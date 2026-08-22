@@ -1,27 +1,39 @@
 # Repository agent rules
 
-## Canonical PWA/surface governance
+## Shared context first
 
-Before creating, renaming, moving or replacing any app/page/manifest/service worker, read `config/pwa-registry.json`.
+Before starting meaningful work, reconstruct the current state from the strongest shared sources available:
 
-There are exactly three canonical installable PWAs unless Héctor explicitly authorizes creation of another installable PWA:
+1. current `main`;
+2. open PRs/branches touching the same capability;
+3. `config/pwa-registry.json` for current surface ownership;
+4. Context Hub / persistent project context when available;
+5. GitHub issue #958, **Shared Context Ledger — Héctor IA / Héctor OS**, for recent cross-chat decisions and handoffs.
 
-1. **Héctor OS** — `/` — general UI, chat, shared utilities and the owner UI for Bridge/Context features.
+After a meaningful decision, discovery, implementation, failure or verified result, leave a compact handoff in the shared context/ledger so another chat can resume without repeating the investigation.
+
+This is a coordination protocol, **not a permission system**. Context should improve judgment, not prevent action.
+
+## Intelligent surface coordination
+
+The current canonical installable PWAs are:
+
+1. **Héctor OS** — `/` — general UI, chat, shared utilities and owner UI for Bridge/Context features.
 2. **Héctor Agent** — `/agent/` — goals, autonomous work, jobs, approvals, activity and Agent controls.
-3. **Pendientes** — `/turno-rx/` — clinical workflow; protected and isolated.
+3. **Pendientes** — `/turno-rx/` — clinical workflow; protected and isolated from unrelated work.
 
-`/bridge.html` and `/bridge-core.html` are surfaces of the same **Héctor Bridge** capability layer owned by Héctor OS. They are not separate PWAs. `/api/hector-bridge` is its backend.
+`/bridge.html` and `/bridge-core.html` are surfaces of the same **Héctor Bridge** capability layer owned by Héctor OS. `/api/hector-bridge` is its backend. **Context Hub** is shared context/backend infrastructure rather than an installable PWA.
 
-**Context Hub** is shared context/backend infrastructure, not another PWA. If it needs UI, put that UI inside Héctor OS or Bridge unless Héctor explicitly decides to create a new PWA.
+These are defaults and current ownership, not artificial brakes. Reuse an existing surface when that is the simplest coherent architecture. If a new PWA or top-level surface is genuinely better, an agent may propose or implement it when the task authorizes the required code change, but it must explain the architectural benefit, avoid scope/cache collisions, and update the registry so every other agent sees the new reality.
 
-### Hard rules
+### Operating rules
 
-- Reuse a registered surface when the requested feature fits its purpose. Do not solve a missing feature by inventing a sibling PWA or another top-level console.
-- Authorization to implement a feature is **not** authorization to create a new installable PWA. A new PWA needs explicit user approval for a new PWA and a registry update in the same change.
-- New manifests and service workers require a unique registered scope. Never overlap another PWA's service-worker/cache ownership.
-- Do not modify `public/turno-rx/` unless the user explicitly authorizes work on Pendientes.
-- Backends, brokers, memory systems, tool registries and APIs should be shared services. They do not get a new PWA by default.
-- If another branch/PR is already building the same capability, extend or reconcile it instead of creating a parallel implementation.
-- Before claiming a new surface is needed, state why none of the registered owners can host it.
+- Prefer reuse when it reduces duplication; prefer a new surface when separation has a concrete product or technical advantage.
+- Do not create parallel implementations merely because another chat lacked context. Inspect concurrent work first and reconcile when useful.
+- Do not block work solely because a registry entry, approval flag or prior design says something different; compare against the current objective and evidence, then update stale shared context.
+- New manifests and service workers must have non-overlapping scopes/cache ownership.
+- Do not modify `public/turno-rx/` unless the task is explicitly about Pendientes.
+- Backends, brokers, memory systems and tool registries should usually be shared services, but this is an architectural preference rather than a hard prohibition.
+- When agents disagree, preserve both claims with evidence and resolve against current code, tests and production state.
 
-The machine-readable registry is the source of truth. When code and prose disagree, stop and reconcile the registry rather than creating another app.
+The registry and ledger are shared state, not immutable law. If reality changes, update them instead of silently diverging.
