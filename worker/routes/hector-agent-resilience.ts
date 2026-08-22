@@ -1,9 +1,11 @@
 import {Hono} from 'hono';
 import {z} from 'zod';
 import type {Bindings,Variables} from '../types';
+import {requireAuth} from '../lib/auth';
 import {credentialState,listCapabilityRoutes,markCapabilityRouteResult,checkpointForApproval} from '../lib/hector-agent-resilience';
 
 export const hectorAgentResilience=new Hono<{Bindings:Bindings;Variables:Variables}>();
+hectorAgentResilience.use('*',requireAuth);
 
 const secretRef=z.string().regex(/^(env|oauth|vault|connector):[A-Za-z0-9._\/-]{1,240}$/,'Usa una referencia segura; nunca guardes el secreto crudo');
 const credentialSchema=z.object({
