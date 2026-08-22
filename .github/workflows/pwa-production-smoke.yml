@@ -1,0 +1,83 @@
+name: PWA Production Smoke
+
+on:
+  workflow_run:
+    workflows: ["Deploy Production"]
+    types: [completed]
+
+permissions:
+  contents: read
+  statuses: write
+
+jobs:
+  smoke:
+    if: ${{ github.event.workflow_run.conclusion == 'success' }}
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - name: Marcar verificación PWA en curso
+        uses: actions/github-script@v7
+        with:
+          script: |
+            await github.rest.repos.createCommitStatus({
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              sha: context.payload.workflow_run.head_sha,
+              state: 'pending',
+              context: 'pwa/production-smoke',
+              description: 'Verificando shells y assets de producción',
+              target_url: `${context.serverUrl}/${context.repo.owner}/${context.repo.repo}/actions/runs/${context.runId}`
+            });
+
+      - name: Verificar PWAs publicadas
+        shell: bash
+        run: |
+          set -euo pipefail
+          BASE="https://hector-os.hectorhdzr035.workers.dev"
+
+          check() {
+            local path="$1"
+            local marker="$2"
+            local out
+            out="$(mktemp)"
+            local code
+            code="$(curl -sS -L -o "$out" -w '%{http_code}' "$BASE$path")"
+            test "$code" = "200"
+            grep -Fq "$marker" "$out"
+          }
+
+          curl -fsS "$BASE/health" | jq -e '.ok == true'
+          check "/agent/" "<title>Héctor Agent</title>"
+          check "/agent/app.js" "/api/hector-agent/dashboard"
+          check "/turno-rx/" "<title>Pendientes</title>"
+          check "/turno-rx/app-v16.js?v=87" "turno"
+
+      - name: Marcar verificación PWA correcta
+        if: success()
+        uses: actions/github-script@v7
+        with:
+          script: |
+            await github.rest.repos.createCommitStatus({
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              sha: context.payload.workflow_run.head_sha,
+              state: 'success',
+              context: 'pwa/production-smoke',
+              description: 'Héctor Agent y Pendientes responden con sus assets',
+              target_url: `${context.serverUrl}/${context.repo.owner}/${context.repo.repo}/actions/runs/${context.runId}`
+            });
+
+      - name: Marcar verificación PWA fallida
+        if: failure()
+        uses: actions/github-script@v7
+        with:
+          script: |
+            await github.rest.repos.createCommitStatus({
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              sha: context.payload.workflow_run.head_sha,
+              state: 'failure',
+              context: 'pwa/production-smoke',
+              description: 'Alguna PWA o asset de producción no respondió correctamente',
+              target_url: `${context.serverUrl}/${context.repo.owner}/${context.repo.repo}/actions/runs/${context.runId}`
+            });
