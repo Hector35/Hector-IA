@@ -1,7 +1,12 @@
 {
-  "version": 1,
+  "version": 2,
   "updated": "2026-08-22",
-  "principle": "Reuse a canonical surface before creating another app. A backend, tool, console or feature does not become a new PWA by default.",
+  "principle": "Use shared context to choose the best surface intelligently. Reuse canonical surfaces when that is simpler, but do not block a better architecture when a new surface has a concrete advantage.",
+  "coordination": {
+    "mode": "advisory",
+    "sharedLedger": "https://github.com/Hector35/Hector-IA/issues/958",
+    "rule": "Inspect current main, open PRs, Context Hub and the shared ledger before duplicating a capability. Shared state guides judgment; it does not act as a permission gate."
+  },
   "installablePwas": [
     {
       "id": "hector-os",
@@ -34,7 +39,7 @@
       "purpose": "Clinical Turno RX/Pendientes workflow.",
       "owns": ["piso", "rx", "tac", "usg", "clinical-local-data"],
       "protected": true,
-      "rule": "Do not modify unless the user explicitly authorizes work on Pendientes. Never move unrelated tools into this PWA."
+      "rule": "Keep unrelated work out of this PWA. Work explicitly targeting Pendientes may change it normally."
     }
   ],
   "sharedSurfaces": [
@@ -46,7 +51,7 @@
       "auxiliaryUi": ["/bridge-core.html"],
       "backend": "/api/hector-bridge",
       "status": "active",
-      "rule": "Bridge and Bridge Core are one capability layer. Do not create another Bridge PWA; consolidate new Bridge UI into Héctor OS/Bridge."
+      "rule": "Bridge and Bridge Core currently form one capability layer. Extend or split only when evidence shows a real architectural benefit."
     },
     {
       "id": "context-hub",
@@ -54,15 +59,15 @@
       "ownerPwa": "hector-os",
       "backend": "/api/context-hub",
       "status": "active",
-      "rule": "Context Hub is shared context infrastructure, not an installable PWA. Any UI belongs in Héctor OS or Bridge."
+      "rule": "Context Hub is the shared context layer. UI normally belongs in an existing owner surface, but a different architecture is allowed when justified and recorded."
     }
   ],
   "creationRules": [
-    "Before creating a PWA, inspect this registry and reuse an existing canonical surface when its purpose fits.",
-    "A new installable PWA requires explicit user authorization specifically to create a new PWA, not merely authorization to add a feature.",
-    "The same change that creates a new PWA must add it to this registry with a unique scope, manifest and service worker.",
-    "Pages, consoles, tools, APIs, brokers, memory layers and backend services attach to an existing owner PWA unless the user explicitly decides otherwise.",
-    "Never create overlapping service-worker scopes or cache ownership across registered PWAs.",
-    "Pendientes is protected and remains isolated from Héctor OS, Héctor Agent and Bridge work."
+    "Before creating a PWA, inspect shared context and existing surfaces so the decision is informed rather than accidental.",
+    "Reusing an existing surface is preferred when it is the simplest coherent solution; it is not mandatory when separation has a concrete advantage.",
+    "If a new installable PWA is created, update this registry in the same change so other agents immediately inherit the new architecture.",
+    "Never create overlapping service-worker scopes or cache ownership across PWAs.",
+    "Do not modify Pendientes for unrelated work.",
+    "Never use this registry as a hard permission gate. It is shared architectural state and must evolve when the system evolves."
   ]
 }
