@@ -1,5 +1,32 @@
-const CACHE='hector-agent-v1.1';
-const ASSETS=['./','./index.html','./styles.css','./app.js','./manifest.webmanifest'];
-self.addEventListener('install',event=>{event.waitUntil(caches.open(CACHE).then(cache=>cache.addAll(ASSETS)));self.skipWaiting()});
-self.addEventListener('activate',event=>{event.waitUntil(caches.keys().then(keys=>Promise.all(keys.filter(k=>k!==CACHE).map(k=>caches.delete(k)))));self.clients.claim()});
-self.addEventListener('fetch',event=>{const req=event.request,url=new URL(req.url);if(req.method!=='GET'||url.pathname.startsWith('/api/'))return;event.respondWith(fetch(req,{cache:'no-store'}).then(res=>{const copy=res.clone();caches.open(CACHE).then(cache=>cache.put(req,copy));return res}).catch(()=>caches.match(req).then(r=>r||caches.match('./index.html'))))});
+const CACHE='hector-agent-v1.2';
+const CACHE_PREFIX='hector-agent-';
+const ASSETS=['./styles.css','./app.js','./manifest.webmanifest'];
+
+self.addEventListener('install',event=>{
+  event.waitUntil(caches.open(CACHE).then(cache=>cache.addAll(ASSETS)).then(()=>self.skipWaiting()));
+});
+
+self.addEventListener('activate',event=>{
+  event.waitUntil(caches.keys().then(keys=>Promise.all(keys.filter(key=>key.startsWith(CACHE_PREFIX)&&key!==CACHE).map(key=>caches.delete(key)))).then(()=>self.clients.claim()));
+});
+
+self.addEventListener('fetch',event=>{
+  const req=event.request,url=new URL(req.url);
+  if(req.method!=='GET'||url.origin!==self.location.origin||url.pathname.startsWith('/api/'))return;
+  if(req.mode==='navigate'){
+    event.respondWith(fetch(req,{cache:'no-store'}));
+    return;
+  }
+  event.respondWith((async()=>{
+    try{
+      const res=await fetch(req,{cache:'no-store'});
+      if(res.ok){
+        const copy=res.clone();
+        event.waitUntil(caches.open(CACHE).then(cache=>cache.put(req,copy)));
+      }
+      return res;
+    }catch{
+      return await caches.match(req)||Response.error();
+    }
+  })());
+});
