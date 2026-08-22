@@ -4,6 +4,7 @@
   "main": "worker/secure-entry.ts",
   "compatibility_date": "2026-07-19",
   "observability": { "enabled": true },
+  "assets": { "binding": "ASSETS" },
   "triggers": { "crons": ["* * * * *"] },
   "vars": {
     "OPENAI_MODEL": "gpt-5.6-terra",
