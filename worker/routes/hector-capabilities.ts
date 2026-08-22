@@ -15,7 +15,7 @@ function publicHttps(value:string){
   try{
     const url=new URL(value);if(url.protocol!=='https:'||url.username||url.password)return null;
     const host=url.hostname.toLowerCase();
-    if(host==='localhost'||host.endsWith('.local')||host==='::1'||host.startsWith('127.')||host.startsWith('10.')||host.startsWith('192.168.'))return null;
+    if(host==='localhost'||host.endsWith('.local')||host==='::1'||host.startsWith('127.')||host.startsWith('10.')||host.startsWith('192.168.')||host.startsWith('169.254.'))return null;
     const match=host.match(/^172\.(\d+)\./);if(match&&Number(match[1])>=16&&Number(match[1])<=31)return null;
     return url;
   }catch{return null;}
@@ -35,7 +35,10 @@ function credentialHeaders(route:HectorAgentCapabilityRoute,credential:any,url:U
   const metadata=parseStoredJson<Record<string,unknown>>(credential?.credential?.metadata_json||'{}',{}),allowed=Array.isArray(metadata.allowedHosts)?metadata.allowedHosts.map(String):[];
   if(!allowed.includes(url.hostname))throw new Error(`policy: credential host ${url.hostname} is not in allowedHosts`);
   if(material&&typeof material==='object'&&material.headers&&typeof material.headers==='object')for(const [key,value] of Object.entries(material.headers))if(typeof value==='string')headers.set(key,value);
-  if(material&&typeof material==='object'&&typeof material.token==='string')headers.set(typeof material.header==='string'?material.header:'Authorization',`${typeof material.scheme==='string'?material.scheme:'Bearer'} ${material.token}`.trim());
+  if(material&&typeof material==='object'){
+    const token=typeof material.access_token==='string'?material.access_token:typeof material.token==='string'?material.token:null;
+    if(token){const header=typeof material.header==='string'?material.header:'Authorization',scheme=typeof material.token_type==='string'?material.token_type:typeof material.scheme==='string'?material.scheme:'Bearer';headers.set(header,header.toLowerCase()==='authorization'?`${scheme} ${token}`.trim():token);}
+  }
   return headers;
 }
 
