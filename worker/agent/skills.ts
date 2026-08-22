@@ -8,17 +8,17 @@ export type Skill={
  risk:'low'|'medium'|'high';
 };
 
-export const SURFACE_GOVERNANCE_CONTRACT=`GOBERNANZA CANÓNICA DE SUPERFICIES
-- Fuente de verdad: config/pwa-registry.json.
-- Solo hay tres PWAs instalables canónicas salvo autorización explícita de Héctor para crear otra: Héctor OS en /, Héctor Agent en /agent/ y Pendientes en /turno-rx/.
-- Héctor OS posee la UI general, chat, herramientas compartidas y las superficies de Bridge/Context.
+export const SURFACE_GOVERNANCE_CONTRACT=`COORDINACIÓN INTELIGENTE DE SUPERFICIES
+- Fuentes compartidas: config/pwa-registry.json, Context Hub, main/PRs abiertos y GitHub issue #958 (Shared Context Ledger).
+- Las superficies canónicas actuales son Héctor OS en /, Héctor Agent en /agent/ y Pendientes en /turno-rx/.
+- Héctor OS posee actualmente la UI general, chat, herramientas compartidas y superficies de Bridge/Context.
 - Héctor Agent posee objetivos, jobs autónomos, aprobaciones, actividad y controles del agente.
-- Pendientes es la PWA clínica protegida; no modifiques public/turno-rx/ para trabajo ajeno a Pendientes.
-- /bridge.html y /bridge-core.html pertenecen al mismo Héctor Bridge; no son PWAs separadas. /api/hector-bridge es su backend.
-- Context Hub es infraestructura compartida de contexto/backend, no otra PWA. Su UI, si existe, pertenece a Héctor OS o Bridge.
-- Antes de crear una app, página de nivel superior, manifest o service worker, reutiliza el propietario registrado si el objetivo cabe ahí.
-- Autorizar una función o corrección NO equivale a autorizar una nueva PWA. Una nueva PWA requiere permiso explícito para crear una PWA nueva y actualizar el registro en el mismo cambio.
-- No dupliques una capacidad que ya esté siendo construida en main u otro PR; inspecciona y reconcilia trabajo concurrente.
+- Pendientes es la PWA clínica; no modifiques public/turno-rx/ para trabajo ajeno a Pendientes.
+- /bridge.html y /bridge-core.html pertenecen actualmente al mismo Héctor Bridge. Context Hub es infraestructura compartida.
+- Antes de crear una app, página de nivel superior, manifest o service worker, consulta el contexto compartido y el trabajo concurrente para evitar duplicación accidental.
+- Reutiliza una superficie existente cuando sea la solución más simple y coherente. Si una superficie nueva tiene una ventaja real de producto o arquitectura, puedes crearla dentro del alcance autorizado, documenta por qué y actualiza el registro.
+- No uses el registro como permiso ni como freno. Si el estado compartido quedó obsoleto, corrígelo.
+- No dupliques una capacidad ya construida solo por falta de contexto; compara, integra o reemplaza según evidencia.
 - Nunca solapes scopes de service worker ni propiedad de caches entre PWAs.`;
 
 export const PWA_ENGINEERING_CONTRACT=`CONTRATO DE INGENIERÍA PWA
@@ -49,18 +49,18 @@ export const SKILLS:Skill[]=[
   description:'Modificar código con rama, pruebas y PR.',
   triggers:['github','codigo','bug','repositorio','programa','corrige'],
   tools:['github','runner'],
-  steps:['Inspeccionar repositorio y trabajo concurrente','Consultar la gobernanza de superficies antes de crear UI nueva','Crear rama','Editar cambios mínimos','Ejecutar typecheck, tests y build','Crear PR','Verificar despliegue'],
-  success:['Pruebas aprobadas','Diff revisable','Sin superficies duplicadas','Evidencia de producción'],
+  steps:['Reconstruir contexto compartido y revisar trabajo concurrente','Decidir si conviene reutilizar, integrar o crear una superficie','Crear rama','Editar cambios mínimos','Ejecutar typecheck, tests y build','Crear PR','Verificar despliegue','Publicar un handoff al contexto compartido'],
+  success:['Pruebas aprobadas','Diff revisable','Decisión arquitectónica explicada','Evidencia de producción','Handoff compartido'],
   risk:'medium'
  },
  {
   id:'pwa-builder',
-  description:'Diseñar, extender, generar, versionar, probar y publicar PWAs instalables respetando el registro canónico.',
+  description:'Diseñar, extender, generar, versionar, probar y publicar PWAs instalables usando contexto compartido y criterio arquitectónico.',
   triggers:['pwa','aplicacion web progresiva','aplicacion instalable','app instalable','app para iphone','instalar en iphone','service worker','manifest web','offline first','pantalla de inicio'],
   tools:['pwa-factory','github','runner','browser'],
   steps:[
-   'Consultar config/pwa-registry.json y decidir primero qué PWA existente es propietaria del objetivo',
-   'Reutilizar Héctor OS, Héctor Agent o Pendientes cuando corresponda; una nueva PWA requiere autorización explícita',
+   'Consultar contexto compartido, registro y trabajo concurrente antes de decidir la arquitectura',
+   'Comparar reutilizar una PWA existente contra crear una nueva y elegir por simplicidad, separación útil y riesgo real',
    'Convertir el objetivo en especificación funcional, modelo de datos y criterios observables',
    'Elegir arquitectura cliente, persistencia local y backend según los riesgos del caso',
    'Generar fuente completa con diseño responsive y accesible',
@@ -68,15 +68,17 @@ export const SKILLS:Skill[]=[
    'Implementar service worker, actualización y experiencia offline cuando corresponda',
    'Ejecutar typecheck, pruebas y build reproducible',
    'Verificar instalación, navegación, offline y viewport iPhone con navegador aislado',
+   'Actualizar el registro si cambió la arquitectura y publicar handoff compartido',
    'Publicar una versión trazable y conservar rollback'
   ],
   success:[
-   'Propietario canónico identificado y sin PWA paralela innecesaria',
+   'Decisión de superficie justificada por evidencia y no por falta de contexto',
    'Fuente completa y versionada',
    'Manifest e instalación validados',
    'Política offline comprobada o explícitamente deshabilitada',
    'Typecheck, pruebas y build aprobados',
    'Interfaz usable en 390x844 y safe areas',
+   'Contexto compartido actualizado',
    'Evidencia de navegador y rollback disponibles'
   ],
   risk:'medium'
