@@ -2,6 +2,8 @@ import {Hono} from 'hono';
 import {z} from 'zod';
 import type {Bindings} from '../types';
 import {verifyGitHubActionsToken} from '../lib/github-oidc';
+import {estimateModelCost} from '../lib/model-pricing';
+import {hectorAgentLimitReason,hectorAgentRunnerControlReason,loadHectorAgentRuntimeGuard,recordHectorAgentCycle} from '../lib/hector-agent-runtime';
 
 const audience='hector-os-agent-runner';
 const repository='Hector35/Hector-IA';
@@ -17,14 +19,74 @@ const proposal=z.object({summary:z.string().min(1).max(3000),risk:z.literal('low
 const statusSchema=z.object({jobId:z.string().uuid(),status:z.enum(['working','testing','repairing','completed','blocked']),progress:z.number().int().min(0).max(100),message:z.string().min(1).max(4000),result:z.string().max(20000).optional()});
 const publishSchema=z.object({jobId:z.string().uuid(),proposal,verification:z.object({typecheck:z.literal(true),tests:z.literal(true),build:z.literal(true)}),runId:z.string().regex(/^\d+$/),runAttempt:z.string().regex(/^\d+$/)});
 
+type RunnerControl={isHectorAgent:boolean;status:string;lastError:string|null;attemptCount:number;reason:string|null};
+
 export const runner=new Hono<{Bindings:Bindings}>();
 
 async function auth(c:any){const token=(c.req.header('Authorization')||'').replace(/^Bearer\s+/i,'').trim();if(!token)throw new Error('OIDC requerido');return verifyGitHubActionsToken(token,audience);}
 function validate(changes:Array<{path:string;content:string}>){let total=0;if(changes.length>6)throw new Error('Demasiados archivos');for(const x of changes){if(!allowedFiles.includes(x.path)||x.path.includes('..'))throw new Error(`Archivo no permitido: ${x.path}`);total+=x.content.length;}if(total>120000)throw new Error('Propuesta demasiado grande');}
 async function gh(token:string,path:string,init:RequestInit={}){const r=await fetch(`https://api.github.com/repos/${repository}${path}`,{...init,headers:{Authorization:`Bearer ${token}`,Accept:'application/vnd.github+json','User-Agent':'Hector-OS-Agent-Runner','Content-Type':'application/json',...(init.headers||{})}});const d=await r.json<any>().catch(()=>({}));if(!r.ok)throw new Error(`GitHub ${r.status}: ${d?.message||'error'}`);return d;}
 
-runner.post('/proposal',async c=>{try{await auth(c);const parsed=proposalRequest.safeParse(await c.req.json());if(!parsed.success)return c.json({error:'Payload inválido'},400);for(const f of parsed.data.files)if(!allowedFiles.includes(f.path))return c.json({error:`Archivo no permitido: ${f.path}`},400);const source=parsed.data.files.map(x=>`\n===== ${x.path} =====\n${x.content}`).join('\n').slice(0,260000);const instructions=`Eres el runner de ingeniería de Héctor OS. Resuelve una tarea real dentro del repositorio usando cambios mínimos, completos y verificables.\nREGLAS\n- Solo modifica archivos permitidos.\n- Máximo 6 archivos y 120000 caracteres.\n- No toques secretos, autenticación, workflows, migraciones ni infraestructura.\n- No borres archivos ni agregues dependencias.\n- Devuelve JSON puro: {"summary":"...","risk":"low","hypothesis":"...","acceptance":["..."],"changes":[{"path":"...","content":"archivo completo"}]}.\n- Si el intento anterior falló, corrige la causa indicada y cambia de estrategia.\n- Conserva compatibilidad de API y agrega o ajusta pruebas cuando sea posible.\n- En tareas PWA, conserva manifest, service worker, experiencia iPhone, verificación offline, build reproducible y rollback; no reduzcas la tarea a una maqueta HTML.`;const input=`JOB ${parsed.data.jobId}\nINTENTO ${parsed.data.attempt}/3\nTAREA\n${parsed.data.task}\n\nFALLO ANTERIOR\n${parsed.data.failure||'ninguno'}\n\nARCHIVOS PERMITIDOS\n${allowedFiles.join('\n')}\n\nCÓDIGO\n${source}`;const r=await fetch('https://api.openai.com/v1/responses',{method:'POST',headers:{Authorization:`Bearer ${c.env.OPENAI_API_KEY}`,'Content-Type':'application/json'},body:JSON.stringify({model:c.env.OPENAI_MODEL_REASONING||'gpt-5.4',instructions,input,store:false,reasoning:{effort:'high'},max_output_tokens:50000})});const data=await r.json<any>();if(!r.ok)return c.json({error:data?.error?.message||'Error de OpenAI'},502);const text=String(data.output_text||data.output?.flatMap((x:any)=>x.content||[]).map((x:any)=>x.text||'').join('')||'').trim();let raw:any;try{raw=JSON.parse(text)}catch{const m=text.match(/\{[\s\S]*\}/);if(!m)throw new Error('Respuesta no JSON');raw=JSON.parse(m[0]);}const safe=proposal.parse(raw);validate(safe.changes);return c.json(safe);}catch(e){return c.json({error:e instanceof Error?e.message:'Error'},401);}});
+async function runnerControl(env:Bindings,jobId:string):Promise<RunnerControl>{
+ const row=await env.DB.prepare(`SELECT w.status,w.last_error,w.attempt_count,g.id goal_id,COALESCE(s.paused,0) paused,COALESCE(s.auto_enabled,1) auto_enabled
+  FROM work_jobs w LEFT JOIN hector_agent_goals g ON g.work_job_id=w.id LEFT JOIN hector_agent_settings s ON s.user_id=g.user_id WHERE w.id=? LIMIT 1`).bind(jobId).first<any>();
+ if(!row)return{isHectorAgent:false,status:'missing',lastError:null,attemptCount:0,reason:'Trabajo no encontrado'};
+ const attemptCount=Number(row.attempt_count||0),isHectorAgent=Boolean(row.goal_id);
+ if(!isHectorAgent)return{isHectorAgent:false,status:String(row.status||''),lastError:row.last_error||null,attemptCount,reason:null};
+ const guard=await loadHectorAgentRuntimeGuard(env,jobId),limitReason=guard?hectorAgentLimitReason(guard,attemptCount,'before'):null;
+ const reason=hectorAgentRunnerControlReason({isHectorAgent:true,status:String(row.status||''),paused:Boolean(row.paused),autoEnabled:Boolean(row.auto_enabled),lastError:row.last_error||null,limitReason});
+ return{isHectorAgent:true,status:String(row.status||''),lastError:row.last_error||null,attemptCount,reason};
+}
 
-runner.post('/status',async c=>{try{await auth(c);const p=statusSchema.safeParse(await c.req.json());if(!p.success)return c.json({error:'Estado inválido'},400);const x=p.data;await c.env.DB.batch([c.env.DB.prepare('UPDATE work_jobs SET status=?,progress=?,result=COALESCE(?,result),heartbeat_at=CURRENT_TIMESTAMP,updated_at=CURRENT_TIMESTAMP WHERE id=?').bind(x.status,x.progress,x.result||null,x.jobId),c.env.DB.prepare('INSERT INTO work_events(id,job_id,message,progress) VALUES(?,?,?,?)').bind(crypto.randomUUID(),x.jobId,x.message,x.progress)]);return c.json({ok:true});}catch(e){return c.json({error:e instanceof Error?e.message:'Error'},401);}});
+async function blockRunnerHectorGoal(env:Bindings,jobId:string,reason:string,progress=0){
+ await env.DB.batch([
+  env.DB.prepare('UPDATE hector_agent_goals SET stop_reason=?,updated_at=CURRENT_TIMESTAMP WHERE work_job_id=?').bind(reason,jobId),
+  env.DB.prepare("UPDATE work_jobs SET status='blocked',last_error=?,next_retry_at=NULL,heartbeat_at=CURRENT_TIMESTAMP,updated_at=CURRENT_TIMESTAMP WHERE id=?").bind(reason,jobId),
+  env.DB.prepare('INSERT INTO work_events(id,job_id,message,progress) VALUES(?,?,?,?)').bind(crypto.randomUUID(),jobId,`Runner detenido de forma segura: ${reason}`,Math.max(0,Math.min(99,progress)))
+ ]);
+}
 
-runner.post('/publish',async c=>{try{await auth(c);const p=publishSchema.safeParse(await c.req.json());if(!p.success)return c.json({error:'Publicación inválida'},400);validate(p.data.proposal.changes);if(!p.data.proposal.changes.length)return c.json({published:false,reason:'Sin cambios'});const token=c.env.GITHUB_RUNNER_TOKEN?.trim();if(!token)return c.json({error:'GITHUB_RUNNER_TOKEN no configurado'},503);const main=await gh(token,'/git/ref/heads/main');const branch=`hector-agent/${p.data.jobId.slice(0,8)}-${p.data.runId}`;await gh(token,'/git/refs',{method:'POST',body:JSON.stringify({ref:`refs/heads/${branch}`,sha:main.object.sha})});for(const change of p.data.proposal.changes){const current=await gh(token,`/contents/${change.path}?ref=main`);await gh(token,`/contents/${change.path}`,{method:'PUT',body:JSON.stringify({message:'feat(agent): verified autonomous task',content:btoa(unescape(encodeURIComponent(change.content))),sha:current.sha,branch})});}const pr=await gh(token,'/pulls',{method:'POST',body:JSON.stringify({title:`Héctor OS agente: ${p.data.proposal.summary.slice(0,100)}`,head:branch,base:'main',body:`Trabajo ${p.data.jobId}\n\n${p.data.proposal.summary}\n\nVerificación: typecheck, tests y build exitosos.`})});await c.env.DB.batch([c.env.DB.prepare("UPDATE work_jobs SET status='completed',progress=100,result=?,heartbeat_at=CURRENT_TIMESTAMP,updated_at=CURRENT_TIMESTAMP WHERE id=?").bind(`PR verificado: ${pr.html_url}`,p.data.jobId),c.env.DB.prepare("INSERT INTO work_events(id,job_id,message,progress) VALUES(?,?,?,100)").bind(crypto.randomUUID(),p.data.jobId,`PR publicado: ${pr.html_url}`)]);return c.json({published:true,branch,prUrl:pr.html_url});}catch(e){return c.json({error:e instanceof Error?e.message:'Error'},502);}});
+async function beginRunnerCycle(env:Bindings,jobId:string){
+ const control=await runnerControl(env,jobId);if(control.reason||!control.isHectorAgent)return control;
+ const counter=await env.DB.prepare('UPDATE work_jobs SET attempt_count=attempt_count+1,heartbeat_at=CURRENT_TIMESTAMP,updated_at=CURRENT_TIMESTAMP WHERE id=? RETURNING attempt_count,progress').bind(jobId).first<{attempt_count:number;progress:number}>();
+ const attemptCount=Number(counter?.attempt_count||control.attemptCount+1),guard=await loadHectorAgentRuntimeGuard(env,jobId);
+ const limitReason=guard?hectorAgentLimitReason(guard,attemptCount,'before'):null;
+ if(limitReason){await blockRunnerHectorGoal(env,jobId,limitReason,Number(counter?.progress||0));return{...control,attemptCount,reason:limitReason};}
+ return{...control,attemptCount,reason:null};
+}
+
+async function finishRunnerCycle(env:Bindings,jobId:string,input:{durationMs:number;costUsd:number;failed:boolean;attemptCount:number}){
+ const guard=await recordHectorAgentCycle(env,jobId,{durationMs:input.durationMs,costUsd:input.costUsd,failed:input.failed});
+ if(!guard)return null;
+ const reason=input.failed?hectorAgentLimitReason(guard,input.attemptCount,'after'):hectorAgentLimitReason(guard,0,'before');
+ if(reason)await blockRunnerHectorGoal(env,jobId,reason);
+ return reason;
+}
+
+runner.post('/proposal',async c=>{
+ let cycle:RunnerControl|null=null,started=Date.now(),cycleCostUsd=0,recorded=false;
+ try{
+  await auth(c);const parsed=proposalRequest.safeParse(await c.req.json());if(!parsed.success)return c.json({error:'Payload inválido'},400);
+  for(const f of parsed.data.files)if(!allowedFiles.includes(f.path))return c.json({error:`Archivo no permitido: ${f.path}`},400);
+  cycle=await beginRunnerCycle(c.env,parsed.data.jobId);if(cycle.reason)return c.json({error:cycle.reason},409);
+  started=Date.now();
+  const source=parsed.data.files.map(x=>`\n===== ${x.path} =====\n${x.content}`).join('\n').slice(0,260000);
+  const instructions=`Eres el runner de ingeniería de Héctor OS. Resuelve una tarea real dentro del repositorio usando cambios mínimos, completos y verificables.\nREGLAS\n- Solo modifica archivos permitidos.\n- Máximo 6 archivos y 120000 caracteres.\n- No toques secretos, autenticación, workflows, migraciones ni infraestructura.\n- No borres archivos ni agregues dependencias.\n- Devuelve JSON puro: {"summary":"...","risk":"low","hypothesis":"...","acceptance":["..."],"changes":[{"path":"...","content":"archivo completo"}]}.\n- Si el intento anterior falló, corrige la causa indicada y cambia de estrategia.\n- Conserva compatibilidad de API y agrega o ajusta pruebas cuando sea posible.\n- En tareas PWA, conserva manifest, service worker, experiencia iPhone, verificación offline, build reproducible y rollback; no reduzcas la tarea a una maqueta HTML.`;
+  const input=`JOB ${parsed.data.jobId}\nINTENTO ${parsed.data.attempt}/3\nTAREA\n${parsed.data.task}\n\nFALLO ANTERIOR\n${parsed.data.failure||'ninguno'}\n\nARCHIVOS PERMITIDOS\n${allowedFiles.join('\n')}\n\nCÓDIGO\n${source}`;
+  const model=c.env.OPENAI_MODEL_REASONING||'gpt-5.4';
+  const r=await fetch('https://api.openai.com/v1/responses',{method:'POST',headers:{Authorization:`Bearer ${c.env.OPENAI_API_KEY}`,'Content-Type':'application/json'},body:JSON.stringify({model,instructions,input,store:false,reasoning:{effort:'high'},max_output_tokens:50000})});
+  const data=await r.json<any>();cycleCostUsd=estimateModelCost(data?.usage,model).costUsd;
+  if(!r.ok){if(cycle.isHectorAgent){recorded=true;const limit=await finishRunnerCycle(c.env,parsed.data.jobId,{durationMs:Date.now()-started,costUsd:cycleCostUsd,failed:true,attemptCount:cycle.attemptCount});if(limit)return c.json({error:limit},409);}return c.json({error:data?.error?.message||'Error de OpenAI'},502);}
+  const text=String(data.output_text||data.output?.flatMap((x:any)=>x.content||[]).map((x:any)=>x.text||'').join('')||'').trim();let raw:any;try{raw=JSON.parse(text)}catch{const m=text.match(/\{[\s\S]*\}/);if(!m)throw new Error('Respuesta no JSON');raw=JSON.parse(m[0]);}
+  const safe=proposal.parse(raw);validate(safe.changes);
+  if(cycle.isHectorAgent){recorded=true;const limit=await finishRunnerCycle(c.env,parsed.data.jobId,{durationMs:Date.now()-started,costUsd:cycleCostUsd,failed:false,attemptCount:cycle.attemptCount});if(limit)return c.json({error:limit},409);const revoked=await runnerControl(c.env,parsed.data.jobId);if(revoked.reason)return c.json({error:revoked.reason},409);}
+  return c.json(safe);
+ }catch(e){
+  if(cycle?.isHectorAgent&&!recorded){const limit=await finishRunnerCycle(c.env,cycle.isHectorAgent?String((await Promise.resolve(cycle))&&((c as any).req?.param?.('jobId')||'')):'',{durationMs:Date.now()-started,costUsd:cycleCostUsd,failed:true,attemptCount:cycle.attemptCount}).catch(()=>null);if(limit)return c.json({error:limit},409);}
+  return c.json({error:e instanceof Error?e.message:'Error'},401);
+ }
+});
+
+runner.post('/status',async c=>{try{await auth(c);const p=statusSchema.safeParse(await c.req.json());if(!p.success)return c.json({error:'Estado inválido'},400);const x=p.data;if(x.status!=='blocked'){const control=await runnerControl(c.env,x.jobId);if(control.reason)return c.json({error:control.reason},409);}await c.env.DB.batch([c.env.DB.prepare('UPDATE work_jobs SET status=?,progress=?,result=COALESCE(?,result),heartbeat_at=CURRENT_TIMESTAMP,updated_at=CURRENT_TIMESTAMP WHERE id=?').bind(x.status,x.progress,x.result||null,x.jobId),c.env.DB.prepare('INSERT INTO work_events(id,job_id,message,progress) VALUES(?,?,?,?)').bind(crypto.randomUUID(),x.jobId,x.message,x.progress)]);return c.json({ok:true});}catch(e){return c.json({error:e instanceof Error?e.message:'Error'},401);}});
+
+runner.post('/publish',async c=>{try{await auth(c);const p=publishSchema.safeParse(await c.req.json());if(!p.success)return c.json({error:'Publicación inválida'},400);validate(p.data.proposal.changes);if(!p.data.proposal.changes.length)return c.json({published:false,reason:'Sin cambios'});let control=await runnerControl(c.env,p.data.jobId);if(control.reason)return c.json({error:control.reason},409);const token=c.env.GITHUB_RUNNER_TOKEN?.trim();if(!token)return c.json({error:'GITHUB_RUNNER_TOKEN no configurado'},503);const main=await gh(token,'/git/ref/heads/main');control=await runnerControl(c.env,p.data.jobId);if(control.reason)return c.json({error:control.reason},409);const branch=`hector-agent/${p.data.jobId.slice(0,8)}-${p.data.runId}`;await gh(token,'/git/refs',{method:'POST',body:JSON.stringify({ref:`refs/heads/${branch}`,sha:main.object.sha})});for(const change of p.data.proposal.changes){control=await runnerControl(c.env,p.data.jobId);if(control.reason)return c.json({error:control.reason},409);const current=await gh(token,`/contents/${change.path}?ref=main`);await gh(token,`/contents/${change.path}`,{method:'PUT',body:JSON.stringify({message:'feat(agent): verified autonomous task',content:btoa(unescape(encodeURIComponent(change.content))),sha:current.sha,branch})});}control=await runnerControl(c.env,p.data.jobId);if(control.reason)return c.json({error:control.reason},409);const pr=await gh(token,'/pulls',{method:'POST',body:JSON.stringify({title:`Héctor OS agente: ${p.data.proposal.summary.slice(0,100)}`,head:branch,base:'main',body:`Trabajo ${p.data.jobId}\n\n${p.data.proposal.summary}\n\nVerificación: typecheck, tests y build exitosos.`})});await c.env.DB.batch([c.env.DB.prepare("UPDATE work_jobs SET status='completed',progress=100,result=?,heartbeat_at=CURRENT_TIMESTAMP,updated_at=CURRENT_TIMESTAMP WHERE id=?").bind(`PR verificado: ${pr.html_url}`,p.data.jobId),c.env.DB.prepare("INSERT INTO work_events(id,job_id,message,progress) VALUES(?,?,?,100)").bind(crypto.randomUUID(),p.data.jobId,`PR publicado: ${pr.html_url}`)]);return c.json({published:true,branch,prUrl:pr.html_url});}catch(e){return c.json({error:e instanceof Error?e.message:'Error'},502);}});
