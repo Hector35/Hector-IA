@@ -1,0 +1,67 @@
+{
+  "version": 1,
+  "updated": "2026-08-22",
+  "principle": "Reuse a canonical surface before creating another app. A backend, tool, console or feature does not become a new PWA by default.",
+  "installablePwas": [
+    {
+      "id": "hector-os",
+      "name": "Héctor OS",
+      "status": "active",
+      "canonicalPath": "/",
+      "manifest": "/manifest.webmanifest",
+      "serviceWorker": "/sw.js",
+      "purpose": "Main personal OS, chat, general controls, shared utilities and entry point.",
+      "owns": ["general-ui", "chat", "shared-tools", "bridge-ui", "context-ui"]
+    },
+    {
+      "id": "hector-agent",
+      "name": "Héctor Agent",
+      "status": "active",
+      "canonicalPath": "/agent/",
+      "aliases": ["/agent", "/hector-agent", "/hector-agent/"],
+      "manifest": "/agent/manifest.webmanifest",
+      "serviceWorker": "/agent/sw.js",
+      "purpose": "Autonomous goals, task execution, approvals, activity, checkpoints and Agent controls.",
+      "owns": ["autonomy-ui", "goals", "jobs", "approvals", "agent-memory-controls"]
+    },
+    {
+      "id": "pendientes",
+      "name": "Pendientes",
+      "status": "active-protected",
+      "canonicalPath": "/turno-rx/",
+      "manifest": "/turno-rx/manifest.webmanifest",
+      "serviceWorker": "/turno-rx/sw.js",
+      "purpose": "Clinical Turno RX/Pendientes workflow.",
+      "owns": ["piso", "rx", "tac", "usg", "clinical-local-data"],
+      "protected": true,
+      "rule": "Do not modify unless the user explicitly authorizes work on Pendientes. Never move unrelated tools into this PWA."
+    }
+  ],
+  "sharedSurfaces": [
+    {
+      "id": "hector-bridge",
+      "kind": "service-and-pages",
+      "ownerPwa": "hector-os",
+      "canonicalUi": "/bridge.html",
+      "auxiliaryUi": ["/bridge-core.html"],
+      "backend": "/api/hector-bridge",
+      "rule": "Bridge and Bridge Core are one capability layer. Do not create another Bridge PWA; consolidate new Bridge UI into Héctor OS/Bridge."
+    },
+    {
+      "id": "context-hub",
+      "kind": "backend-service",
+      "ownerPwa": "hector-os",
+      "backend": "/api/context-hub",
+      "status": "planned-or-integration-pending",
+      "rule": "Context Hub is shared context infrastructure, not an installable PWA. Any UI belongs in Héctor OS or Bridge."
+    }
+  ],
+  "creationRules": [
+    "Before creating a PWA, inspect this registry and reuse an existing canonical surface when its purpose fits.",
+    "A new installable PWA requires explicit user authorization specifically to create a new PWA, not merely authorization to add a feature.",
+    "The same change that creates a new PWA must add it to this registry with a unique scope, manifest and service worker.",
+    "Pages, consoles, tools, APIs, brokers, memory layers and backend services attach to an existing owner PWA unless the user explicitly decides otherwise.",
+    "Never create overlapping service-worker scopes or cache ownership across registered PWAs.",
+    "Pendientes is protected and remains isolated from Héctor OS, Héctor Agent and Bridge work."
+  ]
+}
