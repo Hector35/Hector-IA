@@ -79,7 +79,8 @@ jobs:
               failures:issues.filter(x=>x.title?.includes('FALLO')).length,
               noChanges:issues.filter(x=>x.title?.includes('SIN CAMBIOS')).length,
               productionVerified:issues.filter(x=>x.title?.includes('PRODUCCIÓN VERIFICADA')).length,
-              productionIncomplete:issues.filter(x=>x.title?.includes('PRODUCCIÓN INCOMPLETA')).length
+              productionIncomplete:issues.filter(x=>x.title?.includes('PRODUCCIÓN INCOMPLETA')).length,
+              prPending:issues.filter(x=>x.title?.includes('PR PENDIENTE')).length
             }
           };
           fs.writeFileSync('/tmp/self-improve-scorecard.json',JSON.stringify(scorecard,null,2));
@@ -192,10 +193,22 @@ jobs:
             cat /tmp/self-improve-published.json | tee /tmp/self-improve-error.txt >&2
             exit 1
           fi
-          PR_URL="$(jq -r '.prUrl // empty' /tmp/self-improve-published.json)"
-          test -n "$PR_URL"
-          echo "url=$PR_URL" >> "$GITHUB_OUTPUT"
-          echo "$PR_URL" >> "$GITHUB_STEP_SUMMARY"
+          MODE="$(jq -r 'if ((.prUrl // "") | length)>0 then "pr" elif .branchReady==true then "handoff" else "error" end' /tmp/self-improve-published.json)"
+          if [ "$MODE" = "error" ]; then
+            cat /tmp/self-improve-published.json | tee /tmp/self-improve-error.txt >&2
+            exit 1
+          fi
+          BRANCH="$(jq -r '.branch // empty' /tmp/self-improve-published.json)"
+          echo "mode=$MODE" >> "$GITHUB_OUTPUT"
+          echo "branch=$BRANCH" >> "$GITHUB_OUTPUT"
+          if [ "$MODE" = "pr" ]; then
+            PR_URL="$(jq -r '.prUrl' /tmp/self-improve-published.json)"
+            echo "url=$PR_URL" >> "$GITHUB_OUTPUT"
+            echo "$PR_URL" >> "$GITHUB_STEP_SUMMARY"
+          else
+            echo "Rama validada lista para handoff: $BRANCH" >> "$GITHUB_STEP_SUMMARY"
+            jq -r '.publicationError // "GitHub no permitió crear el PR con la credencial del Worker."' /tmp/self-improve-published.json >> "$GITHUB_STEP_SUMMARY"
+          fi
       - name: Publish success receipt and durable lesson
         if: success()
         shell: bash
@@ -205,8 +218,15 @@ jobs:
           cat /tmp/self-improve-scorecard.json >> /tmp/self-improve-receipt.md
           printf '\n```\n' >> /tmp/self-improve-receipt.md
           if [ "${{ steps.changes.outputs.changed }}" = "true" ]; then
-            printf '\n\n**PR validado localmente:** %s\n\n**Estado:** pendiente de revisión/merge y, cuando aplique, verificación posterior en producción.\n' "${{ steps.publish.outputs.url }}" >> /tmp/self-improve-receipt.md
-            gh issue create --title "[self-improve] PROPUESTA OK ${GITHUB_SHA::7}" --body-file /tmp/self-improve-receipt.md
+            if [ "${{ steps.publish.outputs.mode }}" = "pr" ]; then
+              printf '\n\n**PR validado localmente:** %s\n\n**Estado:** pendiente de revisión/merge y, cuando aplique, verificación posterior en producción.\n' "${{ steps.publish.outputs.url }}" >> /tmp/self-improve-receipt.md
+              gh issue create --title "[self-improve] PROPUESTA OK ${GITHUB_SHA::7}" --body-file /tmp/self-improve-receipt.md
+            else
+              printf '\n\n**Rama validada lista para PR:** `%s`\n\n**Estado:** el Worker no pudo abrir el PR con su credencial, pero la propuesta no se perdió. Debe abrirse el PR desde esta rama usando una integración GitHub con `pull_requests:write`.\n\n**Diagnóstico de publicación:**\n```\n' "${{ steps.publish.outputs.branch }}" >> /tmp/self-improve-receipt.md
+              jq -r '.publicationError // "No disponible"' /tmp/self-improve-published.json >> /tmp/self-improve-receipt.md
+              printf '\n```\n' >> /tmp/self-improve-receipt.md
+              gh issue create --title "[self-improve] PR PENDIENTE ${GITHUB_SHA::7}" --body-file /tmp/self-improve-receipt.md
+            fi
           else
             gh issue create --title "[self-improve] SIN CAMBIOS ${GITHUB_SHA::7}" --body-file /tmp/self-improve-receipt.md
           fi
