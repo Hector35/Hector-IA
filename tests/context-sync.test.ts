@@ -40,11 +40,12 @@ describe('cross-chat context synchronization',()=>{
   expect(route).toContain('Claims y registros informan decisiones; no bloquean trabajo paralelo');
  });
 
- it('mounts sync behind the existing security boundary without bypassing wrapped worker fallback',()=>{
+ it('mounts sync behind the existing security boundary and reuses the secured forwarded request on fallback',()=>{
   expect(secure).toContain("contextSyncApi.route('/api/context-sync',contextSync)");
   expect(secure).toContain("url.pathname.startsWith('/api/context-sync')");
   expect(secure).toContain('const forwarded=new Request(request,{headers});');
-  expect(secure).toContain('worker.fetch(new Request(request,{headers}),env,ctx)');
+  expect(secure).toContain('worker.fetch(forwarded,env,ctx)');
+  expect(secure).not.toContain('worker.fetch(new Request(request,{headers}),env,ctx)');
   expect(secure).toContain('cross_site_mutation_denied');
  });
 
