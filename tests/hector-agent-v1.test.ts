@@ -10,7 +10,7 @@ describe('Héctor Agent V1 audited contract',()=>{
  it('mantiene una PWA separada y versionada',()=>{
   expect(html).toContain('<title>Héctor Agent</title>');
   expect(html).toContain('name="hector-agent-version" content="v1.1-audit"');
-  expect(sw).toContain("hector-agent-v1.1");
+  expect(sw).toContain("hector-agent-v1.2");
  });
 
  it('impide saltarse la aprobación Manual con reanudar o ejecutar ahora',()=>{
