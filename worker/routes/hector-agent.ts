@@ -38,7 +38,7 @@ async function startApprovalStatus(env:Bindings,userId:string,goalId:string){
 
 async function ensureGoalMayStart(env:Bindings,userId:string,goalId:string){
  const approval=await startApprovalStatus(env,userId,goalId);
- if(approval==='pending')return{ok:false as const,error:'Este objetivo Manual requiere autorización antes de iniciar'};
+ if(approval==='pending')return{ok:false as const,error:'Este objetivo requiere autorización antes de iniciar'};
  if(approval==='rejected')return{ok:false as const,error:'El inicio de este objetivo fue rechazado; crea un objetivo nuevo para volver a intentarlo'};
  return{ok:true as const};
 }
@@ -46,6 +46,46 @@ async function ensureGoalMayStart(env:Bindings,userId:string,goalId:string){
 async function memoryContext(env:Bindings,userId:string){
  const rows=(await env.DB.prepare('SELECT kind,content FROM hector_agent_memory WHERE user_id=? ORDER BY updated_at DESC LIMIT 30').bind(userId).all<any>()).results as any[];
  return rows.length?rows.map(x=>`- [${x.kind}] ${x.content}`).join('\n'):'- Sin memoria persistente registrada todavía.';
+}
+
+function isProgrammingObjective(objective:string,skills:string[]){
+ if(skills.includes('pwa-builder'))return true;
+ if(!skills.includes('github-code'))return false;
+ const q=objective.normalize('NFD').replace(/[\u0300-\u036f]/g,'').toLowerCase();
+ return['github','repositorio','codigo','programacion','programar','bug','frontend','backend','worker','typescript','javascript','react','api','hector agent','hector os'].some(term=>q.includes(term));
+}
+
+function runnerTask(objective:string){
+ const clipped=objective.length>8800?`${objective.slice(0,8800)}\n[Objetivo truncado por límite del runner]`:objective;
+ return[
+  'HÉCTOR AGENT · TAREA DE PROGRAMACIÓN VERIFICABLE',
+  `OBJETIVO\n${clipped}`,
+  'ALCANCE\nTrabaja solo dentro de los archivos permitidos por el runner. Crea cambios mínimos, ejecuta typecheck, pruebas y build. Si todo pasa, crea una rama y un Pull Request verificable; no mezcles ni despliegues automáticamente.',
+  'SEGURIDAD\nRespeta pausa, detención, presupuesto, tiempo y límite de errores del objetivo. No modifiques secretos, workflows, migraciones ni infraestructura desde el runner.'
+ ].join('\n\n');
+}
+
+async function dispatchRunner(env:Bindings,jobId:string,objective:string,maxIterations:number){
+ const token=env.GITHUB_RUNNER_TOKEN?.trim();if(!token)throw new Error('GITHUB_RUNNER_TOKEN no configurado');
+ const r=await fetch('https://api.github.com/repos/Hector35/Hector-IA/actions/workflows/agent-code-runner.yml/dispatches',{method:'POST',headers:{Authorization:`Bearer ${token}`,Accept:'application/vnd.github+json','User-Agent':'Hector-Agent','Content-Type':'application/json'},body:JSON.stringify({ref:'main',inputs:{job_id:jobId,task:runnerTask(objective),max_attempts:String(Math.max(1,Math.min(3,maxIterations)))}})});
+ if(!r.ok){const d=await r.json<any>().catch(()=>({}));throw new Error(`No se pudo iniciar runner: ${r.status} ${d?.message||''}`.trim());}
+}
+
+async function blockProgrammingJob(env:Bindings,jobId:string,reason:string){
+ await env.DB.batch([
+  env.DB.prepare('UPDATE hector_agent_goals SET stop_reason=?,updated_at=CURRENT_TIMESTAMP WHERE work_job_id=?').bind(reason,jobId),
+  env.DB.prepare("UPDATE work_jobs SET status='blocked',last_error=?,next_retry_at=NULL,lease_token=NULL,lease_expires_at=NULL,heartbeat_at=CURRENT_TIMESTAMP,updated_at=CURRENT_TIMESTAMP WHERE id=?").bind(reason,jobId),
+  env.DB.prepare("INSERT INTO work_events(id,job_id,message,progress) SELECT ?,id,?,progress FROM work_jobs WHERE id=?").bind(crypto.randomUUID(),`Runner no pudo continuar: ${reason}`,jobId)
+ ]);
+}
+
+async function launchProgrammingJob(env:Bindings,jobId:string,objective:string,maxIterations:number,message:string){
+ await env.DB.batch([
+  env.DB.prepare("UPDATE work_jobs SET status='working',progress=CASE WHEN progress<5 THEN 5 ELSE progress END,next_retry_at=NULL,last_error=NULL,lease_token=NULL,lease_expires_at=NULL,heartbeat_at=CURRENT_TIMESTAMP,updated_at=CURRENT_TIMESTAMP WHERE id=?").bind(jobId),
+  env.DB.prepare('UPDATE hector_agent_goals SET stop_reason=NULL,updated_at=CURRENT_TIMESTAMP WHERE work_job_id=?').bind(jobId),
+  env.DB.prepare("INSERT INTO work_events(id,job_id,message,progress) SELECT ?,id,?,progress FROM work_jobs WHERE id=?").bind(crypto.randomUUID(),message,jobId)
+ ]);
+ try{await dispatchRunner(env,jobId,objective,maxIterations);}catch(e){const reason=e instanceof Error?e.message:'Error al iniciar runner';await blockProgrammingJob(env,jobId,reason);throw e;}
 }
 
 function phaseState(index:number,progress:number,status:string){
@@ -60,7 +100,7 @@ function phaseState(index:number,progress:number,status:string){
 function mapGoal(row:any){
  const plan=buildPlan(row.objective);
  return{
-  id:row.id,title:row.title,objective:row.objective,workJobId:row.work_job_id,status:row.status,progress:Number(row.progress||0),
+  id:row.id,title:row.title,objective:row.objective,workJobId:row.work_job_id,executionKind:row.kind||'work',status:row.status,progress:Number(row.progress||0),
   result:row.result||null,lastError:row.last_error||null,attemptCount:Number(row.attempt_count||0),maxAttempts:Number(row.max_attempts||0),
   runtimeSecondsUsed:Math.round(Number(row.accumulated_runtime_ms||0)/1000),costUsdUsed:Number(row.accumulated_cost_usd||0),consecutiveErrors:Number(row.consecutive_errors||0),stopReason:row.stop_reason||null,
   nextRetryAt:row.next_retry_at||null,createdAt:row.created_at,updatedAt:row.updated_at,
@@ -70,15 +110,16 @@ function mapGoal(row:any){
 
 hectorAgent.get('/dashboard',async c=>{
  const userId=c.get('userId'),cfg=await settings(c.env,userId);
- const goals=(await c.env.DB.prepare(`SELECT g.*,w.status,w.progress,w.result,w.last_error,w.attempt_count,w.max_attempts,w.next_retry_at,w.created_at,w.updated_at
+ const goals=(await c.env.DB.prepare(`SELECT g.*,w.kind,w.status,w.progress,w.result,w.last_error,w.attempt_count,w.max_attempts,w.next_retry_at,w.created_at,w.updated_at
   FROM hector_agent_goals g JOIN work_jobs w ON w.id=g.work_job_id WHERE g.user_id=? ORDER BY w.updated_at DESC LIMIT 25`).bind(userId).all<any>()).results as any[];
  const approvals=(await c.env.DB.prepare("SELECT * FROM hector_agent_approvals WHERE user_id=? AND status='pending' ORDER BY created_at DESC LIMIT 25").bind(userId).all<any>()).results;
  const memoryCount=await c.env.DB.prepare('SELECT COUNT(*) count FROM hector_agent_memory WHERE user_id=?').bind(userId).first<{count:number}>();
  const active=goals.find(x=>['queued','working','testing','repairing'].includes(x.status))||goals.find(x=>x.status==='blocked')||null;
+ const activeRunner=active?.kind==='programming'&&['working','testing','repairing'].includes(active?.status);
  return c.json({
   settings:{autonomyMode:cfg.autonomy_mode,paused:Boolean(cfg.paused),autoEnabled:Boolean(cfg.auto_enabled),maxIterations:cfg.max_iterations,maxRuntimeSeconds:cfg.max_runtime_seconds,maxCostUsd:cfg.max_cost_usd,maxConsecutiveErrors:cfg.max_consecutive_errors},
   activeGoal:active?mapGoal(active):null,goals:goals.map(mapGoal),approvals,memoryCount:Number(memoryCount?.count||0),
-  nextExecution:cfg.paused||!cfg.auto_enabled?null:(active?.next_retry_at||(['queued','working','testing','repairing'].includes(active?.status)?'≤ 1 min':null))
+  nextExecution:cfg.paused||!cfg.auto_enabled?null:(activeRunner?'runner activo':active?.next_retry_at||(['queued','working','testing','repairing'].includes(active?.status)?'≤ 1 min':null))
  });
 });
 
@@ -94,15 +135,19 @@ hectorAgent.patch('/settings',async c=>{
   await c.env.DB.prepare(`UPDATE work_jobs SET status='blocked',next_retry_at=NULL,last_error='Héctor Agent detenido por el usuario',lease_token=NULL,lease_expires_at=NULL,updated_at=CURRENT_TIMESTAMP
    WHERE id IN (SELECT work_job_id FROM hector_agent_goals WHERE user_id=?) AND status IN ('queued','working','testing','repairing')`).bind(userId).run();
  }else if(v.paused===false||v.autoEnabled===true){
-  const blocked=(await c.env.DB.prepare(`SELECT g.id,g.work_job_id FROM hector_agent_goals g JOIN work_jobs w ON w.id=g.work_job_id
+  const blocked=(await c.env.DB.prepare(`SELECT g.id,g.work_job_id,g.objective,w.kind FROM hector_agent_goals g JOIN work_jobs w ON w.id=g.work_job_id
    WHERE g.user_id=? AND w.status='blocked' AND w.last_error='Héctor Agent detenido por el usuario'`).bind(userId).all<any>()).results as any[];
   for(const row of blocked){
-   const gate=await ensureGoalMayStart(c.env,userId,row.id);
-   if(!gate.ok)continue;
-   await c.env.DB.batch([
-    c.env.DB.prepare("UPDATE work_jobs SET status='queued',next_retry_at=CURRENT_TIMESTAMP,last_error=NULL,lease_token=NULL,lease_expires_at=NULL,updated_at=CURRENT_TIMESTAMP WHERE id=?").bind(row.work_job_id),
-    c.env.DB.prepare("INSERT INTO work_events(id,job_id,message,progress) SELECT ?,id,'Héctor Agent reanudado globalmente; objetivo devuelto a la cola',progress FROM work_jobs WHERE id=?").bind(crypto.randomUUID(),row.work_job_id)
-   ]);
+   const gate=await ensureGoalMayStart(c.env,userId,row.id);if(!gate.ok)continue;
+   if(row.kind==='programming'){
+    try{await launchProgrammingJob(c.env,row.work_job_id,row.objective,updated.max_iterations,'Héctor Agent reanudado globalmente; runner de código despachado');}catch{}
+   }else{
+    await c.env.DB.batch([
+     c.env.DB.prepare("UPDATE work_jobs SET status='queued',next_retry_at=CURRENT_TIMESTAMP,last_error=NULL,lease_token=NULL,lease_expires_at=NULL,updated_at=CURRENT_TIMESTAMP WHERE id=?").bind(row.work_job_id),
+     c.env.DB.prepare('UPDATE hector_agent_goals SET stop_reason=NULL,updated_at=CURRENT_TIMESTAMP WHERE work_job_id=?').bind(row.work_job_id),
+     c.env.DB.prepare("INSERT INTO work_events(id,job_id,message,progress) SELECT ?,id,'Héctor Agent reanudado globalmente; objetivo devuelto a la cola',progress FROM work_jobs WHERE id=?").bind(crypto.randomUUID(),row.work_job_id)
+    ]);
+   }
   }
  }
  return c.json({ok:true,settings:{autonomyMode:updated.autonomy_mode,paused:Boolean(updated.paused),autoEnabled:Boolean(updated.auto_enabled),maxIterations:updated.max_iterations,maxRuntimeSeconds:updated.max_runtime_seconds,maxCostUsd:updated.max_cost_usd,maxConsecutiveErrors:updated.max_consecutive_errors}});
@@ -110,10 +155,9 @@ hectorAgent.patch('/settings',async c=>{
 
 hectorAgent.post('/goals',async c=>{
  const parsed=goalSchema.safeParse(await c.req.json());if(!parsed.success)return c.json({error:'Describe un objetivo de al menos 10 caracteres'},400);
- const userId=c.get('userId'),cfg=await settings(c.env,userId);
- if(cfg.paused||!cfg.auto_enabled)return c.json({error:'Héctor Agent está detenido. Reanúdalo antes de crear un objetivo.'},409);
- const objective=parsed.data.objective,goalId=crypto.randomUUID(),jobId=crypto.randomUUID(),title=workModeTitle(objective),plan=buildPlan(objective);
- const manual=cfg.autonomy_mode==='manual',status=manual?'blocked':'queued',persistentMemory=await memoryContext(c.env,userId);
+ const userId=c.get('userId'),cfg=await settings(c.env,userId);if(cfg.paused||!cfg.auto_enabled)return c.json({error:'Héctor Agent está detenido. Reanúdalo antes de crear un objetivo.'},409);
+ const objective=parsed.data.objective,goalId=crypto.randomUUID(),jobId=crypto.randomUUID(),title=workModeTitle(objective),plan=buildPlan(objective),programming=isProgrammingObjective(objective,plan.skills);
+ const manual=cfg.autonomy_mode==='manual',requiresStartApproval=manual||(programming&&cfg.autonomy_mode==='supervised'),status=requiresStartApproval?'blocked':'queued',persistentMemory=await memoryContext(c.env,userId);
  const prompt=[
   'HÉCTOR AGENT V1',`OBJETIVO FINAL\n${objective}`,
   `MODO DE AUTONOMÍA\n${cfg.autonomy_mode}`,
@@ -122,20 +166,28 @@ hectorAgent.post('/goals',async c=>{
   'PLAN BASE',...plan.phases.map((p,i)=>`${i+1}. ${p.name}: ${p.goal}`),
   'REGLAS\n- Registra acciones concretas y evidencia.\n- Diagnostica antes de repetir un fallo.\n- No realices despliegues, borrados, cambios destructivos, pagos ni acciones de alto impacto sin aprobación explícita.\n- Si una dependencia externa impide avanzar, usa WORK_STATE: waiting.\n- Solo usa WORK_STATE: complete cuando el objetivo esté verificado.'
  ].join('\n\n');
+ const waitMessage=requiresStartApproval?(programming&&!manual?'Esperando autorización supervisada para iniciar runner de código':'Esperando aprobación manual'):null;
  const statements=[
   c.env.DB.prepare("INSERT INTO work_jobs(id,user_id,kind,title,prompt,status,progress,heartbeat_at,reasoning_level,autonomy_mode,allow_web,max_attempts,last_error) VALUES(?,?,?,?,?,?,0,CURRENT_TIMESTAMP,'high','continuous',1,?,?)")
-   .bind(jobId,userId,'work',`Agent · ${title}`,prompt,status,cfg.max_iterations,manual?'Esperando aprobación manual':null),
+   .bind(jobId,userId,programming?'programming':'work',`Agent · ${title}`,prompt,status,cfg.max_iterations,waitMessage),
   c.env.DB.prepare('INSERT INTO hector_agent_goals(id,user_id,work_job_id,title,objective) VALUES(?,?,?,?,?)').bind(goalId,userId,jobId,title,objective),
-  c.env.DB.prepare('INSERT INTO work_events(id,job_id,message,progress) VALUES(?,?,?,0)').bind(crypto.randomUUID(),jobId,manual?'Objetivo creado; esperando aprobación manual para iniciar':`Objetivo creado en modo ${cfg.autonomy_mode}; plan de ${plan.phases.length} fases generado`)
+  c.env.DB.prepare('INSERT INTO work_events(id,job_id,message,progress) VALUES(?,?,?,0)').bind(crypto.randomUUID(),jobId,requiresStartApproval?(programming&&!manual?'Objetivo de programación creado; esperando autorización supervisada':'Objetivo creado; esperando aprobación manual'):programming?'Objetivo de programación creado; runner verificado seleccionado':`Objetivo creado en modo ${cfg.autonomy_mode}; plan de ${plan.phases.length} fases generado`)
  ];
- if(manual)statements.push(c.env.DB.prepare("INSERT INTO hector_agent_approvals(id,user_id,goal_id,action,reason,resources_json,risk,expected_result,status) VALUES(?,?,?,?,?,?,'low',?,'pending')")
-  .bind(crypto.randomUUID(),userId,goalId,'start_goal','El modo Manual exige aprobación antes de ejecutar el objetivo',JSON.stringify([`work_job:${jobId}`]),'Iniciar la primera iteración del objetivo'));
+ if(requiresStartApproval){
+  const risk=programming?'medium':'low',reason=programming&&!manual?'El modo Supervisado exige autorización antes de escribir una rama y abrir un Pull Request':'El modo Manual exige aprobación antes de ejecutar el objetivo';
+  const resources=programming?[`work_job:${jobId}`,'github:Hector35/Hector-IA','github:branch+pull_request']:[`work_job:${jobId}`];
+  const expected=programming?'Iniciar un runner aislado; solo si typecheck, pruebas y build pasan, crear una rama y Pull Request sin mezclar ni desplegar':'Iniciar la primera iteración del objetivo';
+  statements.push(c.env.DB.prepare("INSERT INTO hector_agent_approvals(id,user_id,goal_id,action,reason,resources_json,risk,expected_result,status) VALUES(?,?,?,?,?,?,?,?,'pending')")
+   .bind(crypto.randomUUID(),userId,goalId,'start_goal',reason,JSON.stringify(resources),risk,expected));
+ }
  await c.env.DB.batch(statements);
- return c.json({goal:{id:goalId,title,status,progress:0,tasks:plan.phases.map((p,i)=>({id:`${goalId}:${i}`,name:p.name,goal:p.goal,status:i===0&&!manual?'working':'pending'}))}},201);
+ let createdStatus=status;
+ if(programming&&!requiresStartApproval){try{await launchProgrammingJob(c.env,jobId,objective,cfg.max_iterations,'Runner editar-probar-corregir despachado automáticamente dentro de los límites del objetivo');createdStatus='working';}catch{createdStatus='blocked';}}
+ return c.json({goal:{id:goalId,title,status:createdStatus,progress:createdStatus==='working'?5:0,tasks:plan.phases.map((p,i)=>({id:`${goalId}:${i}`,name:p.name,goal:p.goal,status:i===0&&!requiresStartApproval&&createdStatus!=='blocked'?'working':'pending'}))}},201);
 });
 
 hectorAgent.get('/goals/:id',async c=>{
- const row=await c.env.DB.prepare(`SELECT g.*,w.status,w.progress,w.result,w.last_error,w.attempt_count,w.max_attempts,w.next_retry_at,w.created_at,w.updated_at
+ const row=await c.env.DB.prepare(`SELECT g.*,w.kind,w.status,w.progress,w.result,w.last_error,w.attempt_count,w.max_attempts,w.next_retry_at,w.created_at,w.updated_at
   FROM hector_agent_goals g JOIN work_jobs w ON w.id=g.work_job_id WHERE g.id=? AND g.user_id=?`).bind(c.req.param('id'),c.get('userId')).first<any>();
  if(!row)return c.json({error:'Objetivo no encontrado'},404);
  const events=(await c.env.DB.prepare('SELECT id,message,progress,created_at FROM work_events WHERE job_id=? ORDER BY created_at DESC LIMIT 150').bind(row.work_job_id).all<any>()).results;
@@ -148,6 +200,7 @@ hectorAgent.post('/goals/:id/pause',async c=>{
  if(row.status==='completed')return c.json({error:'El objetivo ya está completado'},409);
  await c.env.DB.batch([
   c.env.DB.prepare("UPDATE work_jobs SET status='blocked',next_retry_at=NULL,last_error='Pausado desde Héctor Agent',lease_token=NULL,lease_expires_at=NULL,updated_at=CURRENT_TIMESTAMP WHERE id=?").bind(row.work_job_id),
+  c.env.DB.prepare('UPDATE hector_agent_goals SET stop_reason=\'Pausado desde Héctor Agent\',updated_at=CURRENT_TIMESTAMP WHERE work_job_id=?').bind(row.work_job_id),
   c.env.DB.prepare("INSERT INTO work_events(id,job_id,message,progress) SELECT ?,id,'Objetivo pausado por el usuario',progress FROM work_jobs WHERE id=?").bind(crypto.randomUUID(),row.work_job_id)
  ]);
  return c.json({ok:true});
@@ -155,12 +208,16 @@ hectorAgent.post('/goals/:id/pause',async c=>{
 
 hectorAgent.post('/goals/:id/resume',async c=>{
  const userId=c.get('userId'),cfg=await settings(c.env,userId);if(cfg.paused||!cfg.auto_enabled)return c.json({error:'Héctor Agent está detenido globalmente'},409);
- const row=await c.env.DB.prepare('SELECT g.id,g.work_job_id,w.status FROM hector_agent_goals g JOIN work_jobs w ON w.id=g.work_job_id WHERE g.id=? AND g.user_id=?')
+ const row=await c.env.DB.prepare('SELECT g.id,g.work_job_id,g.objective,w.kind,w.status FROM hector_agent_goals g JOIN work_jobs w ON w.id=g.work_job_id WHERE g.id=? AND g.user_id=?')
   .bind(c.req.param('id'),userId).first<any>();if(!row)return c.json({error:'Objetivo no encontrado'},404);
  if(row.status==='completed')return c.json({error:'El objetivo ya está completado'},409);
  const gate=await ensureGoalMayStart(c.env,userId,row.id);if(!gate.ok)return c.json({error:gate.error},409);
+ if(row.kind==='programming'){
+  try{await launchProgrammingJob(c.env,row.work_job_id,row.objective,cfg.max_iterations,'Objetivo reanudado; runner de código despachado');return c.json({ok:true,execution:'runner_dispatched'});}catch(e){return c.json({error:e instanceof Error?e.message:'No se pudo reanudar el runner'},502);}
+ }
  await c.env.DB.batch([
   c.env.DB.prepare("UPDATE work_jobs SET status='queued',next_retry_at=CURRENT_TIMESTAMP,last_error=NULL,lease_token=NULL,lease_expires_at=NULL,updated_at=CURRENT_TIMESTAMP WHERE id=?").bind(row.work_job_id),
+  c.env.DB.prepare('UPDATE hector_agent_goals SET stop_reason=NULL,updated_at=CURRENT_TIMESTAMP WHERE work_job_id=?').bind(row.work_job_id),
   c.env.DB.prepare("INSERT INTO work_events(id,job_id,message,progress) SELECT ?,id,'Objetivo reanudado; listo para la siguiente ejecución',progress FROM work_jobs WHERE id=?").bind(crypto.randomUUID(),row.work_job_id)
  ]);
  return c.json({ok:true});
@@ -168,10 +225,14 @@ hectorAgent.post('/goals/:id/resume',async c=>{
 
 hectorAgent.post('/goals/:id/run-now',async c=>{
  const userId=c.get('userId'),cfg=await settings(c.env,userId);if(cfg.paused||!cfg.auto_enabled)return c.json({error:'Héctor Agent está detenido globalmente'},409);
- const row=await c.env.DB.prepare('SELECT g.id,g.work_job_id,w.status FROM hector_agent_goals g JOIN work_jobs w ON w.id=g.work_job_id WHERE g.id=? AND g.user_id=?')
+ const row=await c.env.DB.prepare('SELECT g.id,g.work_job_id,g.objective,w.kind,w.status FROM hector_agent_goals g JOIN work_jobs w ON w.id=g.work_job_id WHERE g.id=? AND g.user_id=?')
   .bind(c.req.param('id'),userId).first<any>();if(!row)return c.json({error:'Objetivo no encontrado'},404);
  if(row.status==='completed')return c.json({error:'El objetivo ya está completado'},409);
  const gate=await ensureGoalMayStart(c.env,userId,row.id);if(!gate.ok)return c.json({error:gate.error},409);
+ if(row.kind==='programming'){
+  if(['working','testing','repairing'].includes(row.status))return c.json({ok:true,execution:'runner_active'});
+  try{await launchProgrammingJob(c.env,row.work_job_id,row.objective,cfg.max_iterations,'Ejecución de código priorizada; runner despachado');return c.json({ok:true,execution:'runner_dispatched'});}catch(e){return c.json({error:e instanceof Error?e.message:'No se pudo iniciar el runner'},502);}
+ }
  if(!['working','testing','repairing'].includes(row.status)){
   await c.env.DB.prepare("UPDATE work_jobs SET status='queued',next_retry_at=CURRENT_TIMESTAMP,last_error=NULL,lease_token=NULL,lease_expires_at=NULL,updated_at=CURRENT_TIMESTAMP WHERE id=?").bind(row.work_job_id).run();
  }
@@ -187,11 +248,15 @@ hectorAgent.post('/approvals/:id/approve',async c=>{
   .bind(c.req.param('id'),userId).first<any>();if(!approval)return c.json({error:'Aprobación no encontrada o ya resuelta'},404);
  const cfg=await settings(c.env,userId);if(cfg.paused||!cfg.auto_enabled)return c.json({error:'Héctor Agent está detenido globalmente; reanúdalo antes de autorizar'},409);
  if(approval.action==='start_goal'&&approval.goal_id){
-  const row=await c.env.DB.prepare('SELECT work_job_id FROM hector_agent_goals WHERE id=? AND user_id=?').bind(approval.goal_id,userId).first<{work_job_id:string}>();
+  const row=await c.env.DB.prepare('SELECT g.work_job_id,g.objective,w.kind FROM hector_agent_goals g JOIN work_jobs w ON w.id=g.work_job_id WHERE g.id=? AND g.user_id=?').bind(approval.goal_id,userId).first<any>();
   if(!row)return c.json({error:'Objetivo no encontrado'},404);
+  await c.env.DB.prepare("UPDATE hector_agent_approvals SET status='approved',decided_at=CURRENT_TIMESTAMP WHERE id=?").bind(approval.id).run();
+  if(row.kind==='programming'){
+   try{await launchProgrammingJob(c.env,row.work_job_id,row.objective,cfg.max_iterations,'Inicio autorizado; runner editar-probar-corregir despachado');return c.json({ok:true,execution:'runner_dispatched'});}catch(e){return c.json({error:`Autorizado, pero el runner no pudo iniciar: ${e instanceof Error?e.message:'error'}`},502);}
+  }
   await c.env.DB.batch([
-   c.env.DB.prepare("UPDATE hector_agent_approvals SET status='approved',decided_at=CURRENT_TIMESTAMP WHERE id=?").bind(approval.id),
    c.env.DB.prepare("UPDATE work_jobs SET status='queued',next_retry_at=CURRENT_TIMESTAMP,last_error=NULL,lease_token=NULL,lease_expires_at=NULL,updated_at=CURRENT_TIMESTAMP WHERE id=?").bind(row.work_job_id),
+   c.env.DB.prepare('UPDATE hector_agent_goals SET stop_reason=NULL,updated_at=CURRENT_TIMESTAMP WHERE work_job_id=?').bind(row.work_job_id),
    c.env.DB.prepare("INSERT INTO work_events(id,job_id,message,progress) SELECT ?,id,'Inicio manual autorizado; objetivo listo para ejecutar',progress FROM work_jobs WHERE id=?").bind(crypto.randomUUID(),row.work_job_id)
   ]);
   return c.json({ok:true});
@@ -206,7 +271,7 @@ hectorAgent.post('/approvals/:id/reject',async c=>{
  await c.env.DB.prepare("UPDATE hector_agent_approvals SET status='rejected',decided_at=CURRENT_TIMESTAMP WHERE id=?").bind(approval.id).run();
  if(approval.action==='start_goal'&&approval.goal_id){
   const row=await c.env.DB.prepare('SELECT work_job_id FROM hector_agent_goals WHERE id=? AND user_id=?').bind(approval.goal_id,userId).first<{work_job_id:string}>();
-  if(row)await c.env.DB.prepare("UPDATE work_jobs SET status='blocked',next_retry_at=NULL,last_error='Inicio manual rechazado por el usuario',updated_at=CURRENT_TIMESTAMP WHERE id=?").bind(row.work_job_id).run();
+  if(row)await c.env.DB.prepare("UPDATE work_jobs SET status='blocked',next_retry_at=NULL,last_error='Inicio rechazado por el usuario',updated_at=CURRENT_TIMESTAMP WHERE id=?").bind(row.work_job_id).run();
  }
  return c.json({ok:true});
 });
