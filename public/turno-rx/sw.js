@@ -33,6 +33,7 @@
 // const CACHE = 'pendientes-shell-20260819-85'
 // const CACHE = 'pendientes-shell-20260820-87'
 // const CACHE = 'pendientes-shell-20260822-89'
+// '/turno-rx/runtime-preflight-v89.js?v=89'
 const CACHE = 'pendientes-shell-20260822-90';
 const SHELL = [
   '/turno-rx/',
