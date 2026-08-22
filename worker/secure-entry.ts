@@ -4,6 +4,7 @@ import type {Bindings,Variables} from './types';
 import {hectorBridge} from './routes/hector-bridge';
 import {hectorAccess} from './routes/hector-access';
 import {hectorCapabilities} from './routes/hector-capabilities';
+import {hectorMemory} from './routes/hector-memory';
 import {hectorMcp} from './routes/hector-mcp';
 import {contextHub} from './routes/context-hub';
 import {contextSync} from './routes/context-sync';
@@ -16,6 +17,8 @@ const accessApi=new Hono<{Bindings:Bindings;Variables:Variables}>();
 accessApi.route('/api/hector-bridge/access',hectorAccess);
 const capabilitiesApi=new Hono<{Bindings:Bindings;Variables:Variables}>();
 capabilitiesApi.route('/api/hector-bridge/capabilities',hectorCapabilities);
+const memoryApi=new Hono<{Bindings:Bindings;Variables:Variables}>();
+memoryApi.route('/api/hector-bridge/memory',hectorMemory);
 const mcpApi=new Hono<{Bindings:Bindings;Variables:Variables}>();
 mcpApi.route('/mcp',hectorMcp);
 const contextHubApi=new Hono<{Bindings:Bindings;Variables:Variables}>();
@@ -82,13 +85,15 @@ export default {
     ?await accessApi.fetch(forwarded,env,ctx)
     :url.pathname.startsWith('/api/hector-bridge/capabilities')
      ?await capabilitiesApi.fetch(forwarded,env,ctx)
-     :url.pathname.startsWith('/api/hector-bridge')
-      ?await bridgeApi.fetch(forwarded,env,ctx)
-      :url.pathname.startsWith('/api/context-hub')
-       ?await contextHubApi.fetch(forwarded,env,ctx)
-       :url.pathname.startsWith('/api/context-sync')
-        ?await contextSyncApi.fetch(forwarded,env,ctx)
-        :await worker.fetch(forwarded,env,ctx);
+     :url.pathname.startsWith('/api/hector-bridge/memory')
+      ?await memoryApi.fetch(forwarded,env,ctx)
+      :url.pathname.startsWith('/api/hector-bridge')
+       ?await bridgeApi.fetch(forwarded,env,ctx)
+       :url.pathname.startsWith('/api/context-hub')
+        ?await contextHubApi.fetch(forwarded,env,ctx)
+        :url.pathname.startsWith('/api/context-sync')
+         ?await contextSyncApi.fetch(forwarded,env,ctx)
+         :await worker.fetch(forwarded,env,ctx);
   return securedResponse(response,url.pathname,requestId);
  },
  scheduled:worker.scheduled
