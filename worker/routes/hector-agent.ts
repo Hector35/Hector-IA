@@ -4,9 +4,11 @@ import type {Bindings,Variables} from '../types';
 import {requireAuth} from '../lib/auth';
 import {buildPlan} from '../agent/planner';
 import {workModeTitle} from '../lib/work-mode';
+import {hectorAgentResilience} from './hector-agent-resilience';
 
 export const hectorAgent=new Hono<{Bindings:Bindings;Variables:Variables}>();
 hectorAgent.use('*',requireAuth);
+hectorAgent.route('/resilience',hectorAgentResilience);
 
 type Settings={
  user_id:string;autonomy_mode:'manual'|'supervised'|'autonomous';paused:number;auto_enabled:number;
