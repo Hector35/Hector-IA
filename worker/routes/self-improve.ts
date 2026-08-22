@@ -26,6 +26,8 @@ const publishSchema=z.object({
   runAttempt:z.string().regex(/^\d+$/)
 });
 
+type GitHubCallError=Error&{status?:number;path?:string;method?:string};
+
 export const selfImprove=new Hono<{Bindings:Bindings}>();
 
 async function authenticate(c:any){
@@ -43,12 +45,16 @@ function validateChanges(changes:Array<{path:string;content:string}>){
   if(total>18000)throw new Error('Propuesta demasiado grande');
 }
 async function github(token:string,path:string,init:RequestInit={}){
+  const method=String(init.method||'GET').toUpperCase();
   const response=await fetch(`https://api.github.com/repos/${repository}${path}`,{
     ...init,
     headers:{Authorization:`Bearer ${token}`,Accept:'application/vnd.github+json','User-Agent':'Hector-OS-Self-Improve','Content-Type':'application/json',...(init.headers||{})}
   });
   const data=await response.json<any>().catch(()=>({}));
-  if(!response.ok)throw new Error(`GitHub ${response.status}: ${data?.message||'error'}`);
+  if(!response.ok){
+    const error=new Error(`GitHub ${method} ${path} ${response.status}: ${data?.message||'error'}`) as GitHubCallError;
+    error.status=response.status;error.path=path;error.method=method;throw error;
+  }
   return data;
 }
 
@@ -84,9 +90,15 @@ selfImprove.post('/publish',async c=>{
     if(!token)return c.json({error:'GITHUB_RUNNER_TOKEN no configurado'},503);
     const main=await github(token,'/git/ref/heads/main');
     const branch=`hector-self-improve/${parsed.data.runId}-${parsed.data.runAttempt}`;
-    await github(token,'/git/refs',{method:'POST',body:JSON.stringify({ref:`refs/heads/${branch}`,sha:main.object.sha})});
+    try{
+      await github(token,'/git/refs',{method:'POST',body:JSON.stringify({ref:`refs/heads/${branch}`,sha:main.object.sha})});
+    }catch(error){
+      const e=error as GitHubCallError;
+      if(e.status!==422)throw error;
+    }
     for(const change of parsed.data.proposal.changes){
-      const current=await github(token,`/contents/${change.path}?ref=main`);
+      const branchRef=encodeURIComponent(branch);
+      const current=await github(token,`/contents/${change.path}?ref=${branchRef}`);
       await github(token,`/contents/${change.path}`,{method:'PUT',body:JSON.stringify({message:'feat(ai): autonomous guarded improvement',content:btoa(unescape(encodeURIComponent(change.content))),sha:current.sha,branch})});
     }
     const m=parsed.data.proposal.measurement;
@@ -103,7 +115,12 @@ selfImprove.post('/publish',async c=>{
       '**Archivos:**',...parsed.data.proposal.changes.map(x=>`- \`${x.path}\``),'',
       `**Solicitado por:** ${claims.actor||'github-actions'}`
     ].join('\n');
-    const pr=await github(token,'/pulls',{method:'POST',body:JSON.stringify({title:'Héctor OS: propuesta autónoma de mejora',head:branch,base:'main',body})});
-    return c.json({published:true,branch,prNumber:pr.number,prUrl:pr.html_url});
+    try{
+      const pr=await github(token,'/pulls',{method:'POST',body:JSON.stringify({title:'Héctor OS: propuesta autónoma de mejora',head:branch,base:'main',body})});
+      return c.json({published:true,branch,prNumber:pr.number,prUrl:pr.html_url});
+    }catch(error){
+      const message=error instanceof Error?error.message:'Error desconocido al crear PR';
+      return c.json({published:false,branchReady:true,branch,publicationError:message,recovery:'La rama validada quedó lista; un cliente GitHub con permiso pull_requests:write puede abrir el PR sin regenerar la propuesta.'});
+    }
   }catch(error){return c.json({error:error instanceof Error?error.message:'Error al publicar mejora'},502);}
 });
