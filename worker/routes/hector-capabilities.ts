@@ -5,6 +5,10 @@ import {requireAuth} from '../lib/auth';
 import {executeCapabilityWithFallback,classifyCapabilityFailure,type RouteExecutionResult} from '../lib/capability-router';
 import {isSafeContextEndpoint,normalizeCapability,parseStoredJson} from '../lib/context-hub';
 import type {HectorAgentCapabilityRoute} from '../lib/hector-agent-resilience';
+import {contextHub} from './context-hub';
+import {contextSync} from './context-sync';
+import {hectorBridge} from './hector-bridge';
+import {hectorAgentResilience} from './hector-agent-resilience';
 
 export const hectorCapabilities=new Hono<{Bindings:Bindings;Variables:Variables}>();
 hectorCapabilities.use('*',requireAuth);
@@ -42,13 +46,28 @@ function credentialHeaders(route:HectorAgentCapabilityRoute,credential:any,url:U
   return headers;
 }
 
+function localTarget(pathname:string){
+  if(pathname==='/api/context-hub'||pathname.startsWith('/api/context-hub/'))return{prefix:'/api/context-hub',app:contextHub};
+  if(pathname==='/api/context-sync'||pathname.startsWith('/api/context-sync/'))return{prefix:'/api/context-sync',app:contextSync};
+  if(pathname==='/api/hector-agent/resilience'||pathname.startsWith('/api/hector-agent/resilience/'))return{prefix:'/api/hector-agent/resilience',app:hectorAgentResilience};
+  if((pathname==='/api/hector-bridge'||pathname.startsWith('/api/hector-bridge/'))&&!pathname.startsWith('/api/hector-bridge/capabilities'))return{prefix:'/api/hector-bridge',app:hectorBridge};
+  return null;
+}
+
+async function invokeLocal(c:any,endpoint:string,input:unknown):Promise<RouteExecutionResult>{
+  const sourceUrl=new URL(endpoint,c.req.url),target=localTarget(sourceUrl.pathname);
+  if(!target)return{ok:false,error:`capability_missing: no local adapter for ${sourceUrl.pathname}`,failureClass:'capability_missing'};
+  sourceUrl.pathname=sourceUrl.pathname.slice(target.prefix.length)||'/';
+  const response=await (target.app as any).fetch(new Request(sourceUrl.toString(),{method:'POST',headers:forwardedHeaders(c),body:JSON.stringify(input??{})}),c.env,c.executionCtx);
+  const text=await response.text(),payload=(()=>{try{return text?JSON.parse(text):{ok:response.ok}}catch{return{text:text.slice(0,12000)}}})();
+  return response.ok?{ok:true,value:payload,evidence:{httpStatus:response.status,endpoint,dispatch:'local-hono'}}:{ok:false,error:(payload as any)?.error||`HTTP ${response.status}`,status:response.status,evidence:{endpoint,dispatch:'local-hono'}};
+}
+
 async function invokeRoute(c:any,route:HectorAgentCapabilityRoute,credential:any,input:unknown):Promise<RouteExecutionResult>{
   if(!route.endpoint_ref)return{ok:false,error:'capability_missing: route has no endpoint',failureClass:'capability_missing'};
   if(route.route_kind==='worker'||route.route_kind==='deterministic'){
     if(!isSafeContextEndpoint(route.endpoint_ref))return{ok:false,error:'policy: unsafe same-origin endpoint',failureClass:'policy'};
-    const url=new URL(route.endpoint_ref,c.req.url),headers=forwardedHeaders(c),response=await fetch(url.toString(),{method:'POST',headers,body:JSON.stringify(input??{}),redirect:'manual',cache:'no-store'});
-    const text=await response.text(),payload=(()=>{try{return JSON.parse(text)}catch{return{text:text.slice(0,12000)}}})();
-    return response.ok?{ok:true,value:payload,evidence:{httpStatus:response.status,endpoint:route.endpoint_ref}}:{ok:false,error:(payload as any)?.error||`HTTP ${response.status}`,status:response.status,evidence:{endpoint:route.endpoint_ref}};
+    return invokeLocal(c,route.endpoint_ref,input);
   }
   if(route.route_kind==='api'){
     const url=publicHttps(route.endpoint_ref);if(!url)return{ok:false,error:'policy: external API endpoint must be public HTTPS',failureClass:'policy'};
