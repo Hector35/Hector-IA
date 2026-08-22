@@ -52,12 +52,16 @@ export function selectEmbeddingBackfill(rows:MemoryRow[],lexical:string[],limit=
 export function rankSemanticMemories(query:number[],items:SemanticCandidate[],minimumScore=MIN_SEMANTIC_SCORE,limit=MAX_SEMANTIC_MEMORIES){
   const candidates=new Map<string,SemanticCandidate>();
   for(const item of items)candidates.set(item.id,item);
-  return [...candidates.values()]
+  const ranked=[...candidates.values()]
     .map(x=>({content:x.content,score:cosineSimilarity(query,x.vector)}))
     .filter(x=>x.score>=minimumScore)
-    .sort((a,b)=>b.score-a.score)
-    .slice(0,Math.max(0,limit))
-    .map(x=>x.content);
+    .sort((a,b)=>b.score-a.score);
+  const uniqueByContent=new Map<string,string>();
+  for(const candidate of ranked){
+    const key=candidate.content.trim().replace(/\s+/g,' ').toLowerCase();
+    if(!uniqueByContent.has(key))uniqueByContent.set(key,candidate.content);
+  }
+  return [...uniqueByContent.values()].slice(0,Math.max(0,limit));
 }
 
 async function embedMany(env:Bindings,inputs:string[]){
