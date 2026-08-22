@@ -1,11 +1,11 @@
 {
   "version": 5,
   "updated": "2026-08-22",
-  "principle": "Use shared context and the registry as architectural intelligence: coordinate, reuse when sensible, and create or split surfaces when evidence justifies it without internal permission gates.",
+  "principle": "Use shared context to coordinate work without blocking parallel progress, while preserving explicit user approval for changes to the installable PWA set.",
   "coordination": {
     "mode": "advisory",
     "sharedLedger": "https://github.com/Hector35/Hector-IA/issues/958",
-    "rule": "Inspect current main, open PRs, Context Hub and the shared ledger before duplicating a capability. Claims and registry entries are advisory context, not locks or permission tokens."
+    "rule": "Inspect current main, open PRs, Context Hub and the shared ledger before duplicating a capability. Claims are advisory presence signals, not locks."
   },
   "installablePwas": [
     {
@@ -65,12 +65,12 @@
   ],
   "creationRules": [
     "Before creating or splitting a surface, inspect shared context and concurrent work so the decision is informed rather than accidental.",
-    "The three listed PWAs are the current canonical architecture, not a hard maximum.",
-    "Prefer extending an existing owner when that is simpler, but create or split a PWA when isolation, lifecycle, UX or maintainability evidence makes it the better design.",
-    "Do not require approvedNewPwa, approvalReason or another internal permission token merely to make an architectural decision inside an already authorized objective.",
-    "If the installable PWA set changes, update this registry in the same change with a unique path, manifest and service worker.",
+    "There are exactly three canonical installable PWAs unless Héctor explicitly authorizes creation of another installable PWA.",
+    "Authorization to implement a feature is not authorization to create a new installable PWA.",
+    "A new installable PWA requires approvedNewPwa=true and a non-empty approvalReason documenting the explicit user authorization.",
+    "The same change that creates a new installable PWA must update this registry with a unique path, manifest and service worker.",
     "Never create overlapping service-worker scopes or cache ownership across PWAs.",
     "Do not modify Pendientes for unrelated work.",
-    "Claims, registry entries and shared-context records are advisory coordination signals and must not block otherwise authorized work."
+    "Claims and shared-context records remain advisory coordination signals and must not block otherwise authorized work."
   ]
 }
