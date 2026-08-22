@@ -1,0 +1,154 @@
+name: PWA Browser Production Audit
+
+on:
+  workflow_run:
+    workflows: ["Deploy Production"]
+    types: [completed]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  statuses: write
+
+concurrency:
+  group: pwa-browser-production-audit
+  cancel-in-progress: true
+
+jobs:
+  browser-e2e:
+    if: github.event_name == 'workflow_dispatch' || github.event.workflow_run.conclusion == 'success'
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    env:
+      BASE_URL: https://hector-os.hectorhdzr035.workers.dev
+      AUDITED_SHA: ${{ github.event.workflow_run.head_sha || github.sha }}
+      CLOUDFLARE_API_TOKEN_RAW: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+      CLOUDFLARE_ACCOUNT_ID: ${{ vars.CLOUDFLARE_ACCOUNT_ID }}
+      BROWSER_AUDIT_DIR: /tmp/pwa-browser-audit
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ github.event.workflow_run.head_sha || github.sha }}
+
+      - name: Mark browser audit pending
+        uses: actions/github-script@v7
+        with:
+          script: |
+            await github.rest.repos.createCommitStatus({
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              sha: process.env.AUDITED_SHA,
+              state: 'pending',
+              context: 'pwa/browser-production-audit',
+              description: 'WebKit iPhone + Chromium PWA E2E en curso',
+              target_url: `${context.serverUrl}/${context.repo.owner}/${context.repo.repo}/actions/runs/${context.runId}`
+            });
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+
+      - name: Install repository dependencies
+        run: npm ci
+
+      - name: Install Playwright browser engines
+        shell: bash
+        run: |
+          set -euo pipefail
+          npm install --no-save --ignore-scripts playwright@1.52.0
+          npx playwright install --with-deps chromium webkit
+
+      - name: Create isolated authenticated browser session
+        id: session
+        shell: bash
+        run: |
+          set -euo pipefail
+          CLEAN_TOKEN="$(printf %s "$CLOUDFLARE_API_TOKEN_RAW" | tr -d '[:space:]')"
+          test -n "$CLEAN_TOKEN"
+          test -n "$CLOUDFLARE_ACCOUNT_ID"
+          echo "::add-mask::$CLEAN_TOKEN"
+          export CLOUDFLARE_API_TOKEN="$CLEAN_TOKEN"
+          npx wrangler d1 execute hector-os-db --remote --command="SELECT id FROM users WHERE email='chatgpt-test@hectoros.invalid' LIMIT 1" --json > /tmp/browser-user.json
+          USER_ID="$(node --input-type=module <<'NODE'
+          import {readFileSync} from 'node:fs';
+          const payload=JSON.parse(readFileSync('/tmp/browser-user.json','utf8'));
+          const groups=Array.isArray(payload)?payload:[payload];
+          const row=groups.flatMap(group=>Array.isArray(group?.results)?group.results:[])[0];
+          if(!row?.id)throw new Error('ChatGPT test account not found in production D1');
+          process.stdout.write(row.id);
+          NODE
+          )"
+          SESSION_JSON="$(node --input-type=module <<'NODE'
+          import {createHash,randomBytes,randomUUID} from 'node:crypto';
+          const token=randomBytes(32).toString('base64url');
+          console.log(JSON.stringify({token,hash:createHash('sha256').update(token).digest('hex'),id:randomUUID()}));
+          NODE
+          )"
+          SESSION_TOKEN="$(node -e "const x=JSON.parse(process.argv[1]);process.stdout.write(x.token)" "$SESSION_JSON")"
+          SESSION_HASH="$(node -e "const x=JSON.parse(process.argv[1]);process.stdout.write(x.hash)" "$SESSION_JSON")"
+          SESSION_ID="$(node -e "const x=JSON.parse(process.argv[1]);process.stdout.write(x.id)" "$SESSION_JSON")"
+          echo "::add-mask::$SESSION_TOKEN"
+          npx wrangler d1 execute hector-os-db --remote --command="INSERT INTO sessions(id,user_id,token_hash,expires_at,last_seen_at,user_agent) VALUES('$SESSION_ID','$USER_ID','$SESSION_HASH',datetime('now','+30 minutes'),CURRENT_TIMESTAMP,'pwa-browser-production-audit')" >/dev/null
+          {
+            echo "user_id=$USER_ID"
+            echo "session_id=$SESSION_ID"
+            echo "token=$SESSION_TOKEN"
+          } >> "$GITHUB_OUTPUT"
+
+      - name: Exercise canonical PWAs in real browser engines
+        env:
+          SESSION_TOKEN: ${{ steps.session.outputs.token }}
+        run: node scripts/pwa-browser-audit.mjs
+
+      - name: Upload browser evidence
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: pwa-browser-evidence-${{ env.AUDITED_SHA }}
+          path: /tmp/pwa-browser-audit/
+          if-no-files-found: warn
+          retention-days: 30
+
+      - name: Cleanup isolated session
+        if: always()
+        env:
+          SESSION_ID: ${{ steps.session.outputs.session_id }}
+        shell: bash
+        run: |
+          set +e
+          CLEAN_TOKEN="$(printf %s "$CLOUDFLARE_API_TOKEN_RAW" | tr -d '[:space:]')"
+          if [ -n "$CLEAN_TOKEN" ] && [ -n "${SESSION_ID:-}" ]; then
+            export CLOUDFLARE_API_TOKEN="$CLEAN_TOKEN"
+            npx wrangler d1 execute hector-os-db --remote --command="DELETE FROM sessions WHERE id='$SESSION_ID'" >/dev/null
+          fi
+
+      - name: Mark browser audit success
+        if: success()
+        uses: actions/github-script@v7
+        with:
+          script: |
+            await github.rest.repos.createCommitStatus({
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              sha: process.env.AUDITED_SHA,
+              state: 'success',
+              context: 'pwa/browser-production-audit',
+              description: '3 PWAs verificadas en WebKit iPhone + Chromium/SW/offline',
+              target_url: `${context.serverUrl}/${context.repo.owner}/${context.repo.repo}/actions/runs/${context.runId}`
+            });
+
+      - name: Mark browser audit failure
+        if: failure()
+        uses: actions/github-script@v7
+        with:
+          script: |
+            await github.rest.repos.createCommitStatus({
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              sha: process.env.AUDITED_SHA,
+              state: 'failure',
+              context: 'pwa/browser-production-audit',
+              description: 'Falló WebKit iPhone o Chromium PWA E2E; revisar evidencia',
+              target_url: `${context.serverUrl}/${context.repo.owner}/${context.repo.repo}/actions/runs/${context.runId}`
+            });
