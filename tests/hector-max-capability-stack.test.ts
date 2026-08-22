@@ -89,13 +89,15 @@ describe('Héctor maximum capability stack',()=>{
   expect(worker).toContain("status='completed'");
  });
 
- it('preserves explicit user approval for expanding the installable PWA set',()=>{
-  const factory=read('worker/routes/pwa-factory.ts'),registry=read('config/pwa-registry.json');
-  expect(factory).toContain('approvedNewPwa');
-  expect(factory).toContain('approvalReason');
-  expect(factory).toContain('pwa_registry_reuse_required');
+ it('keeps PWA coordination intelligent and nonblocking',()=>{
+  const factory=read('worker/routes/pwa-factory.ts'),registry=read('config/pwa-registry.json'),agents=read('AGENTS.md');
+  expect(factory).not.toContain('approvedNewPwa');
+  expect(factory).not.toContain('approvalReason');
+  expect(factory).not.toContain('pwa_registry_reuse_required');
   expect(factory).toContain('coordinationHint');
-  expect(registry).toContain('exactly three canonical installable PWAs');
-  expect(registry).toContain('approvedNewPwa=true');
+  expect(factory).toContain('architectureDecision');
+  expect(registry).toContain('not a hard maximum');
+  expect(registry).toContain('Do not require approvedNewPwa');
+  expect(agents).toContain('not a permission system');
  });
 });
