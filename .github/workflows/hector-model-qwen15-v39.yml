@@ -1,0 +1,90 @@
+name: Hector model Qwen15 v39 training
+on:
+  pull_request:
+    branches: [main]
+    paths:
+      - 'model/hector-asi/data/qwen15-sft-v5.jsonl'
+      - 'model/hector-asi/data/qwen15-sft-v6-supplement.jsonl'
+      - 'model/hector-asi/evals/qwen15-validation-v39.jsonl'
+      - 'model/hector-asi/evals/qwen15-held-out-v5.jsonl'
+      - 'model/hector-asi/evals/qwen15-held-out-v6-supplement.jsonl'
+      - 'model/hector-asi/train_qwen15_v39.py'
+      - '.github/workflows/hector-model-qwen15-v39.yml'
+  workflow_dispatch:
+permissions:
+  contents: read
+jobs:
+  train-qwen15-v39:
+    runs-on: ubuntu-latest
+    timeout-minutes: 360
+    env:
+      HF_HUB_DISABLE_TELEMETRY: '1'
+      TOKENIZERS_PARALLELISM: 'false'
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+      - name: Compile trainer and validate JSONL structure
+        run: |
+          python -m py_compile model/hector-asi/train_qwen15_v39.py
+          python - <<'PY'
+          import json
+          from pathlib import Path
+          paths=[
+            'model/hector-asi/data/qwen15-sft-v5.jsonl',
+            'model/hector-asi/data/qwen15-sft-v6-supplement.jsonl',
+            'model/hector-asi/evals/qwen15-validation-v39.jsonl',
+            'model/hector-asi/evals/qwen15-held-out-v5.jsonl',
+            'model/hector-asi/evals/qwen15-held-out-v6-supplement.jsonl',
+          ]
+          for path in paths:
+            rows=[json.loads(line) for line in Path(path).read_text().splitlines() if line.strip()]
+            assert rows and all(row.get('verification',{}).get('verified') is True for row in rows)
+          print('trainer and data structure: OK')
+          PY
+      - name: Install pinned CPU stack
+        run: |
+          python -m pip install --upgrade pip
+          python -m pip install --index-url https://download.pytorch.org/whl/cpu 'torch==2.7.1'
+          python -m pip install 'transformers==4.53.2' 'peft==0.16.0' 'accelerate==1.8.1' 'safetensors==0.5.3'
+      - name: Train two response-weighted replicas
+        run: |
+          for replica in a b; do
+            python model/hector-asi/train_qwen15_v39.py \
+              --train-files model/hector-asi/data/qwen15-sft-v5.jsonl model/hector-asi/data/qwen15-sft-v6-supplement.jsonl \
+              --validation-files model/hector-asi/evals/qwen15-validation-v39.jsonl \
+              --test-files model/hector-asi/evals/qwen15-held-out-v5.jsonl model/hector-asi/evals/qwen15-held-out-v6-supplement.jsonl \
+              --experiment-id hector-asi-qwen15-v39 \
+              --output-dir artifacts/hector-asi-qwen15-v39-$replica \
+              --epochs 4 --max-length 112 --lr 3e-5 --seed 35 --context-weight 0.25
+          done
+      - name: Verify reproducibility and sealed-test gate
+        run: |
+          python - <<'PY'
+          import hashlib,json
+          from pathlib import Path
+          roots=[Path('artifacts/hector-asi-qwen15-v39-a'),Path('artifacts/hector-asi-qwen15-v39-b')]
+          def sha(p):return hashlib.sha256(p.read_bytes()).hexdigest()
+          metrics=[json.loads((r/'metrics.json').read_text()) for r in roots];hashes=[sha(r/'adapter'/'adapter_model.safetensors') for r in roots]
+          m=metrics[0];x=m['results'];s=m['selection'];d=m['dataset'];h=m['hyperparameters']
+          summary={'adapterSha256':hashes[0],'byteIdenticalReplicas':hashes[0]==hashes[1],'bestEpoch':s['bestEpoch'],'baseHiddenTestLoss':x['baseHiddenTestLoss'],'candidateHiddenTestLoss':x['candidateHiddenTestLoss'],'relativeHiddenTestImprovement':x['relativeHiddenTestImprovement'],'adapterBytes':x['adapterBytes'],'trainExamples':d['trainExamples'],'validationExamples':d['validationExamples'],'hiddenTestExamples':d['hiddenTestExamples'],'contextTokenWeight':h['contextTokenWeight'],'assistantTokenWeight':h['assistantTokenWeight']}
+          (roots[0]/'reproducibility.json').write_text(json.dumps(summary,indent=2)+'\n');print(json.dumps(summary,indent=2))
+          assert hashes[0]==hashes[1]
+          for m,r in zip(metrics,roots):
+            x=m['results'];s=m['selection'];d=m['dataset'];h=m['hyperparameters']
+            assert x['weightsGenerated'] and x['parameterDeltaL2']>0
+            assert s['hiddenTestUsedForSelection'] is False and 1<=s['bestEpoch']<=4
+            assert d['trainExamples']==40 and d['validationExamples']==8 and d['hiddenTestExamples']==20
+            assert h['contextTokenWeight']==.25 and h['assistantTokenWeight']==1.0
+            assert x['candidateHiddenTestLoss']<x['baseHiddenTestLoss'] and x['relativeHiddenTestImprovement']>=.03
+            assert x['adapterBytes']>30000000 and (r/'SHA256SUMS').is_file()
+          PY
+      - name: Upload immutable adapter and evidence
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: hector-asi-qwen15-v39-${{ github.run_id }}
+          path: artifacts/hector-asi-qwen15-v39-a
+          if-no-files-found: error
+          retention-days: 90
