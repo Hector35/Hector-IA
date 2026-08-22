@@ -2,40 +2,59 @@
 
 ## Shared context / cross-chat coordination
 
-A chat, agent, Codex session or background worker must not treat its own transcript as the source of truth. Shared durable state lives in Héctor Context Hub, D1/R2, the current GitHub repository state and the append-only **Shared Context Ledger** in GitHub issue #958.
+A chat, agent, Codex session or background worker must not treat its own transcript as the source of truth. Shared durable state lives in Héctor Context Hub, D1/R2, current GitHub state and the append-only **Shared Context Ledger** in GitHub issue #958.
 
-When the runtime has access to Héctor OS authentication, use the cross-chat sync protocol under `/api/context-sync`:
+When the runtime can reach Héctor OS, use `/api/context-sync`:
 
 1. `POST /bootstrap` before substantial work to load shared decisions, recent commits, active work and overlapping activity.
-2. `POST /claim` to announce the scope/intention of parallel work. Claims are presence signals, not locks; another session may work on the same scope when that is useful.
-3. Compare active claims, decisions and implementations before creating a sibling solution. Reuse, integrate, replace or deliberately diverge based on evidence.
-4. `POST /commit` after meaningful work with summary, decisions, actions, next steps, blockers and resources so future sessions can resume it.
-5. `POST /release` when a claimed scope is finished or intentionally abandoned.
+2. `POST /claim` to announce scope/intention. Claims are presence signals, never locks.
+3. Compare overlapping work and choose intelligently: reuse, integrate, replace or deliberately diverge based on evidence.
+4. `POST /commit` after meaningful work with summary, decisions, actions, next steps, blockers and resources.
+5. `POST /release` when the announced scope is finished or abandoned.
 
-If the runtime cannot call Context Sync directly, inspect current `main`, open PRs, `system_context`, Context Hub records and GitHub issue #958 before starting overlapping work. Never assume missing local chat context means the project has no prior decision.
+If Context Sync is not callable, inspect current `main`, open PRs, Context Hub/system context and issue #958. Missing local chat context never means no prior decision exists.
 
-This coordination protocol is not a permission system. Claims are advisory and must not freeze useful parallel work.
+**Shared context is intelligence infrastructure, not a permission system.** It should reduce accidental duplication without preventing a better implementation.
 
-## Canonical PWA/surface governance
+## Autonomy and alternatives
 
-Before creating, renaming, moving or replacing any app/page/manifest/service worker, read `config/pwa-registry.json` and compare it against the current task and current code.
+Héctor has explicitly asked the system to search for viable technical alternatives and execute them without repeatedly asking permission for implementation choices. Therefore:
 
-There are exactly three canonical installable PWAs unless Héctor explicitly authorizes creation of another installable PWA:
+- Do not invent internal approval gates, boolean permission flags or workflow locks merely to coordinate agents.
+- When one implementation fails, diagnose the failure and try another legitimate route when useful.
+- Existing architecture is evidence, not dogma. Prefer reuse when it is simpler/better; replace or split when evidence supports it.
+- Continue independent work when one capability is unavailable instead of freezing the entire objective.
+- Mandatory external authorization/security/provider controls remain authoritative; do not route around them.
+- Never expose secrets. Use the Credential Broker, Worker secrets, OAuth/service identities or other provider-supported mechanisms.
 
-1. **Héctor OS** — `/` — general UI, chat, shared utilities and the owner UI for Bridge/Context features.
-2. **Héctor Agent** — `/agent/` — goals, autonomous work, jobs, approvals, activity and Agent controls.
-3. **Pendientes** — `/turno-rx/` — clinical workflow; protected from unrelated work.
+## Current surfaces
 
-`/bridge.html` and `/bridge-core.html` are surfaces of the same **Héctor Bridge** capability layer owned by Héctor OS. `/api/hector-bridge` is its backend. **Context Hub** is shared context/backend infrastructure, not another installable PWA.
+Read `config/pwa-registry.json` before changing app/page/manifest/service-worker ownership. It describes the current architecture:
 
-### Hard PWA rules
+1. **Héctor OS** — `/` — general UI, chat, shared utilities, Bridge/Context surfaces.
+2. **Héctor Agent** — `/agent/` — autonomous goals, jobs, activity and Agent controls.
+3. **Pendientes** — `/turno-rx/` — clinical workflow; isolated from unrelated work.
 
-- Reuse a registered surface when the requested feature fits its purpose. Do not invent a sibling PWA merely because another chat lacked context.
-- Authorization to implement a feature is **not** authorization to create a new installable PWA.
-- A new installable PWA requires explicit user authorization specifically for a new PWA, plus a registry update in the same change.
-- PWA Factory must enforce that boundary with `approvedNewPwa=true` and a non-empty `approvalReason`.
-- New manifests and service workers require unique non-overlapping scopes/cache ownership.
-- Do not modify `public/turno-rx/` unless the task is explicitly about Pendientes.
-- Backends, brokers, memory systems and tool registries should attach to an existing owner surface by default rather than becoming new PWAs.
+`/bridge.html`, `/bridge-core.html`, `/api/hector-bridge`, Context Hub and `/mcp` are parts of the shared Héctor capability layer, not separate PWAs.
 
-The distinction is intentional: **cross-chat claims are advisory; changing the canonical installable PWA set requires explicit user approval.** Shared context can evolve as reality changes, but it cannot silently reinterpret a feature request as permission to create another PWA.
+### Architecture rules
+
+- Reuse a registered owner when that is the cleanest solution; do not create a sibling because another chat lacked context.
+- A new surface/PWA may be created when it is technically justified. It does **not** require `approvedNewPwa`, `approvalReason` or another internal permission token.
+- When creating a new installable PWA, update the registry in the same change and use a unique, non-overlapping service-worker/cache scope.
+- Do not modify `public/turno-rx/` for unrelated work.
+- Backends, brokers, memory, credentials and tool registries should usually remain shared services rather than multiplying UI surfaces.
+
+## Maximum-capability architecture
+
+Prefer one connected stack instead of parallel subsystems:
+
+`ChatGPT/API/MCP -> Héctor Bridge -> Context Hub + Context Sync -> Capability Router -> Credential Broker -> tools/providers -> verification/evidence -> durable state`
+
+- Remote MCP endpoint: `/mcp`.
+- Machine-token provisioning: `/api/hector-bridge/access/tokens`.
+- Encrypted credential metadata/material: `/api/hector-bridge/access/credentials`.
+- Universal fallback execution: `/api/hector-bridge/capabilities/execute`.
+- Capability observability: `/api/hector-bridge/capabilities/traces`.
+
+Before adding another broker, memory system, router or agent control plane, extend these shared layers unless there is a concrete architectural reason not to.
