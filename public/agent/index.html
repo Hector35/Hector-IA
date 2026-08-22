@@ -1,0 +1,94 @@
+<!doctype html>
+<html lang="es">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover" />
+  <meta name="theme-color" content="#07111f" />
+  <title>Héctor Agent</title>
+  <link rel="manifest" href="./manifest.webmanifest" />
+  <link rel="apple-touch-icon" href="../icons/apple-touch-icon.png" />
+  <link rel="stylesheet" href="./styles.css" />
+</head>
+<body>
+  <div class="app-shell">
+    <header class="topbar">
+      <div>
+        <p class="eyebrow">AUTONOMOUS CONTROL CENTER</p>
+        <h1>Héctor Agent</h1>
+      </div>
+      <div class="status-pill" id="globalStatus"><span class="dot"></span><span>Conectando</span></div>
+    </header>
+
+    <main>
+      <section class="hero card">
+        <div class="hero-copy">
+          <span class="section-kicker">Estado</span>
+          <h2 id="heroTitle">Sin objetivo activo</h2>
+          <p id="heroSubtitle">El agente está listo para recibir un objetivo.</p>
+          <div class="progress-track"><div class="progress-bar" id="progressBar"></div></div>
+          <div class="hero-meta">
+            <span id="progressLabel">0%</span>
+            <span id="nextExecution">Próxima ejecución: —</span>
+          </div>
+        </div>
+        <div class="hero-actions">
+          <button class="primary" id="runNowBtn">▶ Ejecutar ahora</button>
+          <button class="secondary" id="pauseBtn">Pausar</button>
+          <button class="danger" id="stopBtn">■ DETENER AGENTE</button>
+        </div>
+      </section>
+
+      <nav class="tabs" aria-label="Secciones">
+        <button class="tab active" data-tab="home">Inicio</button>
+        <button class="tab" data-tab="goals">Objetivos</button>
+        <button class="tab" data-tab="tasks">Tareas</button>
+        <button class="tab" data-tab="activity">Actividad</button>
+        <button class="tab" data-tab="approvals">Aprobaciones <span class="badge" id="approvalBadge">0</span></button>
+        <button class="tab" data-tab="memory">Memoria</button>
+      </nav>
+
+      <section class="tab-panel active" id="homePanel">
+        <div class="grid two">
+          <article class="card compact">
+            <span class="section-kicker">Autonomía</span>
+            <div class="segmented" id="autonomyControl">
+              <button data-mode="manual">Manual</button>
+              <button data-mode="supervised">Supervisado</button>
+              <button data-mode="autonomous">Autónomo</button>
+            </div>
+            <p class="muted" id="autonomyHelp"></p>
+          </article>
+          <article class="card compact stats-grid">
+            <div><span class="stat-value" id="goalCount">0</span><span class="stat-label">Objetivos</span></div>
+            <div><span class="stat-value" id="memoryCount">0</span><span class="stat-label">Memorias</span></div>
+            <div><span class="stat-value" id="attemptCount">0</span><span class="stat-label">Ciclos</span></div>
+            <div><span class="stat-value" id="limitLabel">20</span><span class="stat-label">Límite</span></div>
+          </article>
+        </div>
+
+        <article class="card">
+          <div class="section-title-row"><div><span class="section-kicker">Nuevo objetivo</span><h3>Dile qué debe conseguir</h3></div></div>
+          <textarea id="goalInput" rows="5" placeholder="Ej. Revisa Pendientes, encuentra errores, corrígelos, pruébalos y dime qué hiciste."></textarea>
+          <div class="composer-footer"><span class="muted">El agente generará un plan y continuará en backend.</span><button class="primary" id="createGoalBtn">Crear objetivo</button></div>
+        </article>
+      </section>
+
+      <section class="tab-panel" id="goalsPanel"><div class="panel-list" id="goalsList"></div></section>
+      <section class="tab-panel" id="tasksPanel"><div class="panel-list" id="tasksList"></div></section>
+      <section class="tab-panel" id="activityPanel"><div class="panel-list timeline" id="activityList"></div></section>
+      <section class="tab-panel" id="approvalsPanel"><div class="panel-list" id="approvalsList"></div></section>
+      <section class="tab-panel" id="memoryPanel">
+        <article class="card compact memory-form">
+          <select id="memoryKind"><option value="fact">Hecho</option><option value="decision">Decisión</option><option value="preference">Preferencia</option><option value="project">Proyecto</option><option value="error">Error</option><option value="solution">Solución</option></select>
+          <input id="memoryInput" placeholder="Añadir memoria…" />
+          <button class="primary" id="addMemoryBtn">Guardar</button>
+        </article>
+        <div class="panel-list" id="memoryList"></div>
+      </section>
+    </main>
+
+    <div class="toast" id="toast" role="status"></div>
+  </div>
+  <script type="module" src="./app.js"></script>
+</body>
+</html>
