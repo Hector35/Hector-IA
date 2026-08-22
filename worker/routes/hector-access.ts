@@ -3,7 +3,7 @@ import {z} from 'zod';
 import type {Bindings,Variables} from '../types';
 import {authHasScope,requireAuth} from '../lib/auth';
 import {sha256} from '../lib/crypto';
-import {credentialBrokerAvailable,storeCredentialMaterial} from '../lib/credential-broker';
+import {credentialBrokerAvailable,storeCredentialMaterial,tryRefreshCredential} from '../lib/credential-broker';
 
 export const hectorAccess=new Hono<{Bindings:Bindings;Variables:Variables}>();
 hectorAccess.use('*',requireAuth);
@@ -19,7 +19,7 @@ function sessionOnly(c:any){return c.get('authMethod')==='session';}
 function randomToken(){const bytes=crypto.getRandomValues(new Uint8Array(32));let binary='';for(const value of bytes)binary+=String.fromCharCode(value);return`htr_${btoa(binary).replace(/\+/g,'-').replace(/\//g,'_').replace(/=+$/,'')}`;}
 function publicCredential(row:any){return{id:row.id,provider:row.provider,authType:row.auth_type,secretRef:String(row.secret_ref||'').startsWith('encrypted:')?'encrypted':row.secret_ref,scopes:JSON.parse(row.scopes_json||'[]'),status:row.status,refreshable:Boolean(row.refreshable),expiresAt:row.expires_at,lastVerifiedAt:row.last_verified_at,metadata:JSON.parse(row.metadata_json||'{}'),createdAt:row.created_at,updatedAt:row.updated_at};}
 
-hectorAccess.get('/status',c=>c.json({ok:true,machineTokens:true,credentialBroker:{encrypted:credentialBrokerAvailable(c.env),keySource:c.env.HECTOR_CREDENTIAL_KEY?'HECTOR_CREDENTIAL_KEY':c.env.REMOTE_CONTROL_TOKEN?'REMOTE_CONTROL_TOKEN fallback':'unconfigured'},authMethod:c.get('authMethod'),scopes:c.get('authScopes')||[]}));
+hectorAccess.get('/status',c=>c.json({ok:true,machineTokens:true,credentialBroker:{encrypted:credentialBrokerAvailable(c.env),oauthRefresh:true,keySource:c.env.HECTOR_CREDENTIAL_KEY?'HECTOR_CREDENTIAL_KEY':c.env.REMOTE_CONTROL_TOKEN?'REMOTE_CONTROL_TOKEN fallback':'unconfigured'},authMethod:c.get('authMethod'),scopes:c.get('authScopes')||[]}));
 
 hectorAccess.get('/tokens',async c=>{
   if(!sessionOnly(c)&&!authHasScope(c,'bridge'))return c.json({error:'Scope bridge requerido'},403);
@@ -54,10 +54,16 @@ hectorAccess.post('/credentials',async c=>{
   if(v.secret!==undefined&&!credentialBrokerAvailable(c.env))return c.json({error:'El almacenamiento cifrado no está configurado. Define HECTOR_CREDENTIAL_KEY o REMOTE_CONTROL_TOKEN como secreto del Worker.'},503);
   const secretRef=v.secret!==undefined?`encrypted:${id}`:(v.secretRef||'none');
   await c.env.DB.prepare(`INSERT INTO hector_agent_credentials(id,user_id,provider,auth_type,secret_ref,scopes_json,status,refreshable,expires_at,metadata_json,last_verified_at)
-    VALUES(?,?,?,?,?,?,'ready',?,?,?,?,CURRENT_TIMESTAMP)`).bind(id,c.get('userId'),v.provider,v.authType,secretRef,JSON.stringify(v.scopes),Number(v.refreshable),v.expiresAt,JSON.stringify(v.metadata)).run();
+    VALUES(?,?,?,?,?,?,'ready',?,?,?,CURRENT_TIMESTAMP)`).bind(id,c.get('userId'),v.provider,v.authType,secretRef,JSON.stringify(v.scopes),Number(v.refreshable),v.expiresAt,JSON.stringify(v.metadata)).run();
   if(v.secret!==undefined)await storeCredentialMaterial(c.env,c.get('userId'),id,v.secret);
   const row=await c.env.DB.prepare('SELECT * FROM hector_agent_credentials WHERE id=? AND user_id=?').bind(id,c.get('userId')).first<any>();
   return c.json({credential:publicCredential(row),secretStored:v.secret!==undefined},201);
+});
+
+hectorAccess.post('/credentials/:id/refresh',async c=>{
+  if(!sessionOnly(c))return c.json({error:'El refresh manual solo se inicia desde una sesión interactiva autenticada'},403);
+  const result=await tryRefreshCredential(c.env,c.get('userId'),c.req.param('id'),true);
+  return c.json({ok:result.refreshed,...result},result.refreshed?200:409);
 });
 
 hectorAccess.delete('/credentials/:id',async c=>{
