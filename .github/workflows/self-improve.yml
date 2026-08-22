@@ -14,20 +14,25 @@ name: Hector OS Self Improve
       - scripts/self-improve.mjs
       - worker/routes/self-improve.ts
       - .github/workflows/self-improve.yml
+  workflow_run:
+    workflows: ["Context platform production audit"]
+    types: [completed]
 
 permissions:
   contents: read
   issues: write
   actions: read
   statuses: read
+  pull-requests: read
   id-token: write
 
 concurrency:
-  group: hector-os-self-improve
+  group: hector-os-self-improve-${{ github.event_name }}
   cancel-in-progress: false
 
 jobs:
   improve:
+    if: github.event_name != 'workflow_run'
     runs-on: ubuntu-latest
     timeout-minutes: 25
     env:
@@ -45,12 +50,44 @@ jobs:
           cache: npm
       - id: install
         run: npm ci
-      - name: Collect recent operating evidence
+      - name: Collect recent operating evidence and scorecard
         id: evidence
         shell: bash
         run: |
           set +e
+          gh run list --limit 30 --json databaseId,name,status,conclusion,event,headSha,createdAt,updatedAt,url > /tmp/self-improve-runs.json 2>/tmp/self-improve-runs.err || echo '[]' > /tmp/self-improve-runs.json
+          gh issue list --state open --limit 20 --search '"[self-improve]" in:title' --json number,title,updatedAt,url,body > /tmp/self-improve-issues-open.json 2>/tmp/self-improve-issues-open.err || echo '[]' > /tmp/self-improve-issues-open.json
+          gh issue list --state closed --limit 20 --search '"[self-improve]" in:title' --json number,title,updatedAt,url,body > /tmp/self-improve-issues-closed.json 2>/tmp/self-improve-issues-closed.err || echo '[]' > /tmp/self-improve-issues-closed.json
+          node --input-type=module <<'NODE'
+          import fs from 'node:fs';
+          const read=(p,fallback=[])=>{try{return JSON.parse(fs.readFileSync(p,'utf8'))}catch{return fallback}};
+          const runs=read('/tmp/self-improve-runs.json');
+          const issues=[...read('/tmp/self-improve-issues-open.json'),...read('/tmp/self-improve-issues-closed.json')];
+          const completed=runs.filter(x=>x.status==='completed');
+          const pct=xs=>xs.length?Number((100*xs.filter(x=>x.conclusion==='success').length/xs.length).toFixed(1)):null;
+          const byName=name=>completed.filter(x=>x.name===name);
+          const last=name=>runs.find(x=>x.name===name)||null;
+          const scorecard={
+            generatedAt:new Date().toISOString(),
+            recentCompletedRuns:completed.length,
+            workflowSuccessRatePct:pct(completed),
+            deploy:{sample:byName('Deploy Production').length,successRatePct:pct(byName('Deploy Production')),last:last('Deploy Production')?.conclusion||last('Deploy Production')?.status||null},
+            contextAudit:{sample:byName('Context platform production audit').length,successRatePct:pct(byName('Context platform production audit')),last:last('Context platform production audit')?.conclusion||last('Context platform production audit')?.status||null},
+            pwaSmoke:{sample:byName('PWA Production Smoke').length,successRatePct:pct(byName('PWA Production Smoke')),last:last('PWA Production Smoke')?.conclusion||last('PWA Production Smoke')?.status||null},
+            selfImproveReceipts:{
+              proposalsOk:issues.filter(x=>x.title?.includes('PROPUESTA OK')).length,
+              failures:issues.filter(x=>x.title?.includes('FALLO')).length,
+              noChanges:issues.filter(x=>x.title?.includes('SIN CAMBIOS')).length,
+              productionVerified:issues.filter(x=>x.title?.includes('PRODUCCIÓN VERIFICADA')).length,
+              productionIncomplete:issues.filter(x=>x.title?.includes('PRODUCCIÓN INCOMPLETA')).length
+            }
+          };
+          fs.writeFileSync('/tmp/self-improve-scorecard.json',JSON.stringify(scorecard,null,2));
+          NODE
           {
+            echo '=== SELF-IMPROVEMENT SCORECARD ==='
+            cat /tmp/self-improve-scorecard.json
+            echo
             echo '=== RECENT COMMITS ==='
             git log -n 14 --pretty=format:'%h %ad %s' --date=iso-strict
             echo
@@ -58,14 +95,15 @@ jobs:
             gh api "repos/${GITHUB_REPOSITORY}/commits/${GITHUB_SHA}/status" --jq '{state:.state,statuses:[.statuses[]|{context,state,description,target_url}]}'
             echo
             echo '=== RECENT WORKFLOW RUNS ==='
-            gh run list --limit 20 --json databaseId,name,status,conclusion,event,headSha,createdAt,updatedAt,url
+            cat /tmp/self-improve-runs.json
             echo
             echo '=== RECENT SELF-IMPROVE ISSUES OPEN ==='
-            gh issue list --state open --limit 8 --search '"[self-improve]" in:title' --json number,title,updatedAt,url,body
+            cat /tmp/self-improve-issues-open.json
             echo
             echo '=== RECENT SELF-IMPROVE ISSUES CLOSED ==='
-            gh issue list --state closed --limit 8 --search '"[self-improve]" in:title' --json number,title,updatedAt,url,body
+            cat /tmp/self-improve-issues-closed.json
           } > /tmp/self-improve-evidence-raw.txt 2>/tmp/self-improve-evidence-errors.txt
+          cat /tmp/self-improve-runs.err /tmp/self-improve-issues-open.err /tmp/self-improve-issues-closed.err >> /tmp/self-improve-evidence-errors.txt 2>/dev/null || true
           node --input-type=module <<'NODE'
           import fs from 'node:fs';
           const raw=fs.existsSync('/tmp/self-improve-evidence-raw.txt')?fs.readFileSync('/tmp/self-improve-evidence-raw.txt','utf8'):'';
@@ -163,6 +201,9 @@ jobs:
         shell: bash
         run: |
           cp /tmp/self-improve-report.md /tmp/self-improve-receipt.md
+          printf '\n\n## Scorecard observado antes del cambio\n\n```json\n' >> /tmp/self-improve-receipt.md
+          cat /tmp/self-improve-scorecard.json >> /tmp/self-improve-receipt.md
+          printf '\n```\n' >> /tmp/self-improve-receipt.md
           if [ "${{ steps.changes.outputs.changed }}" = "true" ]; then
             printf '\n\n**PR validado localmente:** %s\n\n**Estado:** pendiente de revisión/merge y, cuando aplique, verificación posterior en producción.\n' "${{ steps.publish.outputs.url }}" >> /tmp/self-improve-receipt.md
             gh issue create --title "[self-improve] PROPUESTA OK ${GITHUB_SHA::7}" --body-file /tmp/self-improve-receipt.md
@@ -176,3 +217,104 @@ jobs:
           REASON="$(tail -n 14 /tmp/self-improve-error.txt 2>/dev/null | sed -E 's/(sk-[A-Za-z0-9_-]+)/[REDACTED]/g' | head -c 1800 || true)"
           BODY="El ciclo autónomo falló de forma segura. No se modificó main ni producción.\n\nResultados:\n- evidencia: ${{ steps.evidence.outcome }}\n- OIDC: ${{ steps.oidc.outcome }}\n- propuesta: ${{ steps.proposal.outcome }}\n- agente: ${{ steps.agent.outcome }}\n- typecheck: ${{ steps.typecheck.outcome }}\n- pruebas: ${{ steps.tests.outcome }}\n- build: ${{ steps.build.outcome }}\n- publicación: ${{ steps.publish.outcome }}\n\nDiagnóstico sanitizado:\n\`\`\`\n${REASON:-Sin detalle disponible}\n\`\`\`\n\nLa siguiente ejecución debe tratar este fallo como evidencia y no repetir ciegamente la misma estrategia."
           gh issue create --title "[self-improve] FALLO ${GITHUB_SHA::7}" --body "$BODY"
+
+  verify-production-feedback:
+    if: github.event_name == 'workflow_run' && github.event.workflow_run.conclusion == 'success'
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    env:
+      GH_TOKEN: ${{ github.token }}
+      AUDITED_SHA: ${{ github.event.workflow_run.head_sha }}
+    steps:
+      - name: Identify whether this deploy came from autonomous self-improvement
+        id: origin
+        shell: bash
+        run: |
+          set -euo pipefail
+          gh api -H 'Accept: application/vnd.github+json' "repos/${GITHUB_REPOSITORY}/commits/${AUDITED_SHA}/pulls" > /tmp/self-improve-associated-prs.json
+          node --input-type=module <<'NODE' >> "$GITHUB_OUTPUT"
+          import fs from 'node:fs';
+          const prs=JSON.parse(fs.readFileSync('/tmp/self-improve-associated-prs.json','utf8'));
+          const pr=prs.find(x=>x.title==='Héctor OS: propuesta autónoma de mejora');
+          if(!pr){console.log('relevant=false');process.exit(0)}
+          console.log('relevant=true');
+          console.log(`pr_number=${pr.number}`);
+          console.log(`pr_url=${pr.html_url}`);
+          NODE
+      - name: Wait for production evidence on the audited SHA
+        if: steps.origin.outputs.relevant == 'true'
+        id: verify
+        shell: bash
+        run: |
+          set -euo pipefail
+          for attempt in $(seq 1 12); do
+            gh api "repos/${GITHUB_REPOSITORY}/commits/${AUDITED_SHA}/status" > /tmp/self-improve-prod-status.json
+            RESULT="$(node --input-type=module <<'NODE'
+          import fs from 'node:fs';
+          const data=JSON.parse(fs.readFileSync('/tmp/self-improve-prod-status.json','utf8'));
+          const map=Object.fromEntries((data.statuses||[]).map(x=>[x.context,x.state]));
+          const wanted=['deploy/production','pwa/production-smoke','context-platform/production-audit'];
+          const states=Object.fromEntries(wanted.map(k=>[k,map[k]||'missing']));
+          const complete=wanted.every(k=>['success','failure','error'].includes(states[k]));
+          process.stdout.write(JSON.stringify({states,complete,verified:wanted.every(k=>states[k]==='success')}));
+          NODE
+          )"
+            echo "$RESULT" > /tmp/self-improve-prod-result.json
+            COMPLETE="$(jq -r '.complete' /tmp/self-improve-prod-result.json)"
+            if [ "$COMPLETE" = "true" ]; then break; fi
+            sleep 5
+          done
+          VERIFIED="$(jq -r '.verified' /tmp/self-improve-prod-result.json)"
+          echo "verified=$VERIFIED" >> "$GITHUB_OUTPUT"
+          echo "states=$(jq -c '.states' /tmp/self-improve-prod-result.json)" >> "$GITHUB_OUTPUT"
+      - name: Publish durable production feedback
+        if: steps.origin.outputs.relevant == 'true'
+        shell: bash
+        env:
+          PR_NUMBER: ${{ steps.origin.outputs.pr_number }}
+          PR_URL: ${{ steps.origin.outputs.pr_url }}
+          VERIFIED: ${{ steps.verify.outputs.verified }}
+          STATES: ${{ steps.verify.outputs.states }}
+        run: |
+          set -euo pipefail
+          SHORT="${AUDITED_SHA:0:7}"
+          if [ "$VERIFIED" = "true" ]; then
+            LABEL='PRODUCCIÓN VERIFICADA'
+            RESULT='La propuesta superó despliegue, smoke PWA y auditoría E2E de Context Hub sobre el mismo SHA.'
+          else
+            LABEL='PRODUCCIÓN INCOMPLETA'
+            RESULT='La propuesta llegó a producción pero no todas las puertas de evidencia quedaron en success; el próximo ciclo debe tratarlo como fallo/incompleto.'
+          fi
+          EXISTING="$(gh issue list --state all --limit 100 --search "${SHORT} in:title [self-improve]" --json number,title --jq ".[] | select(.title | contains(\"${SHORT}\")) | .number" | head -n1 || true)"
+          if [ -n "$EXISTING" ]; then
+            echo "Ya existe recibo de producción #$EXISTING para $SHORT" >> "$GITHUB_STEP_SUMMARY"
+            exit 0
+          fi
+          gh pr view "$PR_NUMBER" --json body,title,url > /tmp/self-improve-origin-pr.json
+          RULE="$(node --input-type=module <<'NODE'
+          import fs from 'node:fs';
+          const pr=JSON.parse(fs.readFileSync('/tmp/self-improve-origin-pr.json','utf8'));
+          const m=String(pr.body||'').match(/\*\*Regla aprendida:\*\*\s*([^\n]+)/i);
+          process.stdout.write(m?.[1]?.trim()||'No especificada en la propuesta.');
+          NODE
+          )"
+          cat > /tmp/self-improve-production-receipt.md <<EOF
+          # Feedback de producción para automejora
+
+          **PR de origen:** ${PR_URL}
+
+          **SHA desplegado:** ${AUDITED_SHA}
+
+          **Resultado:** ${RESULT}
+
+          **Estados:**
+          \`\`\`json
+          ${STATES}
+          \`\`\`
+
+          **Regla aprendida heredada:** ${RULE}
+
+          Este recibo es evidencia durable. Los siguientes ciclos de self-improve deben consumirlo antes de proponer otro cambio y no confundir CI con verificación de producción.
+          EOF
+          gh issue create --title "[self-improve] ${LABEL} ${SHORT}" --body-file /tmp/self-improve-production-receipt.md
+          cat /tmp/self-improve-production-receipt.md >> "$GITHUB_STEP_SUMMARY"
