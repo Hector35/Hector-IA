@@ -63,3 +63,26 @@ CREATE INDEX IF NOT EXISTS idx_hector_agent_checkpoints_resume
 ON hector_agent_resume_checkpoints(user_id,status,resume_after,updated_at DESC);
 CREATE INDEX IF NOT EXISTS idx_hector_agent_checkpoints_goal
 ON hector_agent_resume_checkpoints(goal_id,updated_at DESC);
+
+CREATE TRIGGER IF NOT EXISTS trg_hector_agent_approval_resume
+AFTER UPDATE OF status ON hector_agent_approvals
+WHEN OLD.status='pending' AND NEW.status='approved'
+BEGIN
+  UPDATE hector_agent_resume_checkpoints
+  SET status='resumed',resumed_at=CURRENT_TIMESTAMP,updated_at=CURRENT_TIMESTAMP
+  WHERE approval_id=NEW.id AND status='waiting_approval';
+
+  UPDATE work_jobs
+  SET status='queued',next_retry_at=CURRENT_TIMESTAMP,last_error=NULL,lease_token=NULL,lease_expires_at=NULL,updated_at=CURRENT_TIMESTAMP
+  WHERE id IN (SELECT work_job_id FROM hector_agent_resume_checkpoints WHERE approval_id=NEW.id)
+    AND status!='completed';
+END;
+
+CREATE TRIGGER IF NOT EXISTS trg_hector_agent_approval_cancel
+AFTER UPDATE OF status ON hector_agent_approvals
+WHEN OLD.status='pending' AND NEW.status='rejected'
+BEGIN
+  UPDATE hector_agent_resume_checkpoints
+  SET status='cancelled',updated_at=CURRENT_TIMESTAMP
+  WHERE approval_id=NEW.id AND status='waiting_approval';
+END;
