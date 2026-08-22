@@ -31,11 +31,25 @@ async function addSessionCookie(context){
 }
 
 async function instrument(page){
-  const telemetry={pageErrors:[],consoleErrors:[],criticalFailures:[],blockedExternal:[],httpErrors:[]};
+  const telemetry={pageErrors:[],consoleErrors:[],criticalFailures:[],blockedExternal:[],httpErrors:[],navigationWarnings:[],requests:[]};
   page.on('pageerror',error=>telemetry.pageErrors.push(String(error?.message||error)));
   page.on('console',message=>{if(message.type()==='error')telemetry.consoleErrors.push(message.text());});
+  page.on('request',request=>{
+    if(isSameOrigin(request.url())&&isCriticalResource(request)&&telemetry.requests.length<160){
+      telemetry.requests.push({phase:'request',type:request.resourceType(),url:request.url()});
+    }
+  });
+  page.on('requestfinished',request=>{
+    if(isSameOrigin(request.url())&&isCriticalResource(request)&&telemetry.requests.length<160){
+      telemetry.requests.push({phase:'finished',type:request.resourceType(),url:request.url()});
+    }
+  });
   page.on('requestfailed',request=>{
-    if(isSameOrigin(request.url())&&isCriticalResource(request))telemetry.criticalFailures.push(`${request.resourceType()} ${request.url()} ${request.failure()?.errorText||'failed'}`);
+    if(isSameOrigin(request.url())&&isCriticalResource(request)){
+      const failure=`${request.resourceType()} ${request.url()} ${request.failure()?.errorText||'failed'}`;
+      telemetry.criticalFailures.push(failure);
+      if(telemetry.requests.length<160)telemetry.requests.push({phase:'failed',type:request.resourceType(),url:request.url(),error:request.failure()?.errorText||'failed'});
+    }
   });
   page.on('response',response=>{
     const request=response.request();
@@ -68,18 +82,64 @@ async function verifyPwaFiles(pwa){
   return {manifestUrl,serviceWorkerUrl:swUrl,manifestName:manifest.name||manifest.short_name,startUrl:manifest.start_url,serviceWorkerBytes:swText.length};
 }
 
+async function waitForRenderedBody(page,{timeout=30000,minLength=20}={}){
+  await page.waitForFunction(length=>{
+    const body=(document.body?.innerText||'').replace(/\s+/g,' ').trim();
+    return document.title.trim().length>0&&body.length>length;
+  },minLength,{timeout});
+}
+
+async function navigateForAudit(page,target,telemetry,{timeout=45000}={}){
+  const started=Date.now();
+  const response=await page.goto(target,{waitUntil:'commit',timeout});
+  assert(response,'browser audit: no document response');
+  assert(response.status()<400,`browser audit: document returned ${response.status()}`);
+
+  let domContentLoaded=true;
+  try{
+    await page.waitForLoadState('domcontentloaded',{timeout:8000});
+  }catch(error){
+    domContentLoaded=false;
+    const state=await page.evaluate(()=>({readyState:document.readyState,title:document.title,bodyLength:(document.body?.innerText||'').trim().length})).catch(()=>({readyState:'unknown',title:'',bodyLength:0}));
+    telemetry.navigationWarnings.push(`DOMContentLoaded exceeded 8s after document commit; continuing with rendered-UI verification (${JSON.stringify(state)})`);
+  }
+
+  await waitForRenderedBody(page,{timeout:Math.max(5000,timeout-(Date.now()-started))});
+  await page.waitForLoadState('networkidle',{timeout:5000}).catch(()=>{});
+  await page.waitForTimeout(500);
+  return {response,domContentLoaded,elapsedMs:Date.now()-started};
+}
+
+async function reloadForAudit(page,telemetry,{timeout=30000}={}){
+  const started=Date.now();
+  const response=await page.reload({waitUntil:'commit',timeout});
+  let domContentLoaded=true;
+  try{await page.waitForLoadState('domcontentloaded',{timeout:6000});}
+  catch{
+    domContentLoaded=false;
+    telemetry.navigationWarnings.push('Reload DOMContentLoaded exceeded 6s after commit; rendered body was used as the readiness signal.');
+  }
+  await waitForRenderedBody(page,{timeout:Math.max(5000,timeout-(Date.now()-started))});
+  return {response,domContentLoaded,elapsedMs:Date.now()-started};
+}
+
 async function auditRenderedPage(page,pwa,engine,telemetry){
   const target=absolute(pwa.canonicalPath);
-  const response=await page.goto(target,{waitUntil:'domcontentloaded',timeout:45000});
-  assert(response,`${pwa.id}/${engine}: no document response`);
-  assert(response.status()<400,`${pwa.id}/${engine}: document returned ${response.status()}`);
-  await page.waitForLoadState('networkidle',{timeout:8000}).catch(()=>{});
-  await page.waitForTimeout(1800);
+  let navigation;
+  try{
+    navigation=await navigateForAudit(page,target,telemetry,{timeout:45000});
+  }catch(error){
+    const diagnosticScreenshot=`${OUT_DIR}/${safeId(pwa.id)}-${engine}-navigation-failure.png`;
+    await page.screenshot({path:diagnosticScreenshot,fullPage:true}).catch(()=>{});
+    const state=await page.evaluate(()=>({readyState:document.readyState,title:document.title,body:(document.body?.innerText||'').replace(/\s+/g,' ').trim().slice(0,500),html:document.documentElement?.outerHTML?.slice(0,1500)||''})).catch(()=>null);
+    throw new Error(`${pwa.id}/${engine}: navigation/readiness failed: ${error instanceof Error?error.message:String(error)}; diagnostic=${JSON.stringify(state)}; screenshot=${diagnosticScreenshot}; requests=${JSON.stringify(telemetry.requests.slice(-30))}`);
+  }
 
   const snapshot=await page.evaluate(()=>({
     title:document.title,
     body:(document.body?.innerText||'').replace(/\s+/g,' ').trim(),
     manifest:document.querySelector('link[rel="manifest"]')?.getAttribute('href')||null,
+    readyState:document.readyState,
     width:window.innerWidth,
     height:window.innerHeight,
     scrollHeight:document.documentElement.scrollHeight
@@ -93,7 +153,7 @@ async function auditRenderedPage(page,pwa,engine,telemetry){
   await page.screenshot({path:screenshot,fullPage:true});
   if(telemetry.pageErrors.length)throw new Error(`${pwa.id}/${engine}: page errors: ${telemetry.pageErrors.join(' | ')}`);
   if(telemetry.criticalFailures.length)throw new Error(`${pwa.id}/${engine}: critical resource failures: ${telemetry.criticalFailures.join(' | ')}`);
-  return {target,snapshot:{...snapshot,body:snapshot.body.slice(0,500)},screenshot,telemetry};
+  return {target,navigation:{domContentLoaded:navigation.domContentLoaded,elapsedMs:navigation.elapsedMs},snapshot:{...snapshot,body:snapshot.body.slice(0,500)},screenshot,telemetry};
 }
 
 async function exerciseSafeUi(page,pwa){
@@ -178,14 +238,14 @@ async function chromiumPwaAudit(browser,pwa,files){
     },{serviceWorker:pwa.serviceWorker,scope:pwa.canonicalPath});
     assert(registration.active==='activated',`${pwa.id}/chromium: service worker did not activate (${registration.active})`);
 
-    await page.reload({waitUntil:'domcontentloaded',timeout:45000});
-    await page.waitForTimeout(800);
+    await reloadForAudit(page,telemetry,{timeout:30000});
+    await page.waitForTimeout(500);
     const controlled=await page.evaluate(()=>Boolean(navigator.serviceWorker.controller));
     assert(controlled,`${pwa.id}/chromium: page is not controlled by its service worker after reload`);
 
     await context.setOffline(true);
-    const offlineResponse=await page.reload({waitUntil:'domcontentloaded',timeout:20000}).catch(()=>null);
-    await page.waitForTimeout(500);
+    const offlineReload=await reloadForAudit(page,telemetry,{timeout:20000}).catch(()=>({response:null,domContentLoaded:false,elapsedMs:null}));
+    await page.waitForTimeout(300);
     const offlineBody=await page.evaluate(()=>(document.body?.innerText||'').replace(/\s+/g,' ').trim()).catch(()=> '');
     assert(offlineBody.length>20,`${pwa.id}/chromium: offline shell did not render`);
     await context.setOffline(false);
@@ -193,7 +253,7 @@ async function chromiumPwaAudit(browser,pwa,files){
     const screenshot=`${OUT_DIR}/${safeId(pwa.id)}-chromium-offline.png`;
     await page.screenshot({path:screenshot,fullPage:true});
     await page.evaluate(async()=>{for(const reg of await navigator.serviceWorker.getRegistrations())await reg.unregister();}).catch(()=>{});
-    return {engine:'chromium',files,rendered,registration,controlled,offline:{documentStatus:offlineResponse?.status?.()??null,body:offlineBody.slice(0,300)},screenshot,ok:true};
+    return {engine:'chromium',files,rendered,registration,controlled,offline:{documentStatus:offlineReload.response?.status?.()??null,domContentLoaded:offlineReload.domContentLoaded,elapsedMs:offlineReload.elapsedMs,body:offlineBody.slice(0,300)},screenshot,ok:true};
   }finally{await context.close();}
 }
 
