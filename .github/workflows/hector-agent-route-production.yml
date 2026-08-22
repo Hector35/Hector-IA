@@ -1,0 +1,59 @@
+name: Hector Agent route production
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - 'worker/secure-entry.ts'
+      - 'public/sw.js'
+      - 'public/agent/sw.js'
+      - 'tests/hector-agent-routing.test.ts'
+      - '.github/workflows/hector-agent-route-production.yml'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  statuses: write
+
+jobs:
+  route-smoke:
+    runs-on: ubuntu-latest
+    timeout-minutes: 12
+    env:
+      BASE_URL: https://hector-os.hectorhdzr035.workers.dev
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+      - run: npm ci
+      - name: Routing contract tests
+        run: npx vitest run tests/hector-agent-routing.test.ts
+      - name: Wait for production deploy and verify both entry points
+        shell: bash
+        run: |
+          set -euo pipefail
+          for i in $(seq 1 60); do
+            AGENT_HEADERS="$(mktemp)"
+            AGENT_BODY="$(mktemp)"
+            ALIAS_HEADERS="$(mktemp)"
+            ALIAS_BODY="$(mktemp)"
+            curl -sS -D "$AGENT_HEADERS" -o "$AGENT_BODY" "$BASE_URL/agent/" || true
+            curl -sS -L -D "$ALIAS_HEADERS" -o "$ALIAS_BODY" "$BASE_URL/hector-agent" || true
+            if grep -qi 'X-Hector-Agent-Version: 20260822-4' "$AGENT_HEADERS" \
+              && grep -q '<title>Héctor Agent</title>' "$AGENT_BODY" \
+              && grep -q '<title>Héctor Agent</title>' "$ALIAS_BODY" \
+              && ! grep -q '<title>Pendientes</title>' "$AGENT_BODY" \
+              && ! grep -q '<title>Pendientes</title>' "$ALIAS_BODY"; then
+              curl -fsS "$BASE_URL/agent/app.js" >/dev/null
+              curl -fsS "$BASE_URL/agent/styles.css" >/dev/null
+              curl -fsS "$BASE_URL/agent/manifest.webmanifest" >/dev/null
+              echo 'Hector Agent routing is correct in production.'
+              exit 0
+            fi
+            rm -f "$AGENT_HEADERS" "$AGENT_BODY" "$ALIAS_HEADERS" "$ALIAS_BODY"
+            sleep 10
+          done
+          echo 'Hector Agent production routes did not become healthy in time.' >&2
+          exit 1
