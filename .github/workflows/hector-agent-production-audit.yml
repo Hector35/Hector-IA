@@ -1,0 +1,188 @@
+name: Hector Agent production audit
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - 'public/agent/**'
+      - 'worker/routes/hector-agent.ts'
+      - 'tests/hector-agent-v1.test.ts'
+      - '.github/workflows/hector-agent-production-audit.yml'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: hector-agent-production-audit
+  cancel-in-progress: true
+
+jobs:
+  e2e:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    env:
+      BASE_URL: https://hector-os.hectorhdzr035.workers.dev
+      CLOUDFLARE_API_TOKEN_RAW: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+      CLOUDFLARE_ACCOUNT_ID: ${{ vars.CLOUDFLARE_ACCOUNT_ID }}
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+      - run: npm ci
+
+      - name: Wait for audited production shell
+        shell: bash
+        run: |
+          set -euo pipefail
+          for i in $(seq 1 48); do
+            BODY="$(curl -fsS "$BASE_URL/agent/" || true)"
+            if printf '%s' "$BODY" | grep -q 'hector-agent-version" content="v1.1-audit"'; then
+              echo "Audited shell is live"
+              exit 0
+            fi
+            sleep 10
+          done
+          echo "Audited Hector Agent shell did not appear in production" >&2
+          exit 1
+
+      - name: Create isolated production test session
+        id: session
+        shell: bash
+        run: |
+          set -euo pipefail
+          CLEAN_TOKEN="$(printf %s "$CLOUDFLARE_API_TOKEN_RAW" | tr -d '[:space:]')"
+          test -n "$CLEAN_TOKEN"
+          test -n "$CLOUDFLARE_ACCOUNT_ID"
+          echo "::add-mask::$CLEAN_TOKEN"
+          export CLOUDFLARE_API_TOKEN="$CLEAN_TOKEN"
+          npx wrangler d1 execute hector-os-db --remote --command="SELECT id FROM users WHERE email='chatgpt-test@hectoros.invalid' LIMIT 1" --json > /tmp/agent-user.json
+          USER_ID="$(node --input-type=module <<'NODE'
+          import {readFileSync} from 'node:fs';
+          const payload=JSON.parse(readFileSync('/tmp/agent-user.json','utf8'));
+          const groups=Array.isArray(payload)?payload:[payload];
+          const row=groups.flatMap(group=>Array.isArray(group?.results)?group.results:[])[0];
+          if(!row?.id)throw new Error('Test account not found in D1');
+          process.stdout.write(row.id);
+          NODE
+          )"
+          SESSION_JSON="$(node --input-type=module <<'NODE'
+          import {createHash,randomBytes,randomUUID} from 'node:crypto';
+          const token=randomBytes(32).toString('base64url');
+          console.log(JSON.stringify({token,hash:createHash('sha256').update(token).digest('hex'),id:randomUUID()}));
+          NODE
+          )"
+          TOKEN="$(node -e "const x=JSON.parse(process.argv[1]);process.stdout.write(x.token)" "$SESSION_JSON")"
+          HASH="$(node -e "const x=JSON.parse(process.argv[1]);process.stdout.write(x.hash)" "$SESSION_JSON")"
+          SESSION_ID="$(node -e "const x=JSON.parse(process.argv[1]);process.stdout.write(x.id)" "$SESSION_JSON")"
+          echo "::add-mask::$TOKEN"
+          npx wrangler d1 execute hector-os-db --remote --command="INSERT INTO sessions(id,user_id,token_hash,expires_at,last_seen_at,user_agent) VALUES('$SESSION_ID','$USER_ID','$HASH',datetime('now','+20 minutes'),CURRENT_TIMESTAMP,'hector-agent-production-audit')" >/tmp/agent-session.log
+          {
+            echo "user_id=$USER_ID"
+            echo "session_id=$SESSION_ID"
+            echo "token=$TOKEN"
+          } >> "$GITHUB_OUTPUT"
+
+      - name: Exercise Hector Agent controls
+        env:
+          TOKEN: ${{ steps.session.outputs.token }}
+        shell: bash
+        run: |
+          set -euo pipefail
+          node --input-type=module <<'NODE'
+          import {writeFileSync} from 'node:fs';
+          const base=process.env.BASE_URL,token=process.env.TOKEN;
+          async function req(path,{method='GET',body,expect=200}={}){
+            const r=await fetch(base+path,{method,headers:{Cookie:`hector_session=${token}`,'Content-Type':'application/json',Origin:base},body:body===undefined?undefined:JSON.stringify(body)});
+            const data=await r.json().catch(()=>({}));
+            if(r.status!==expect)throw new Error(`${method} ${path}: expected ${expect}, got ${r.status}: ${JSON.stringify(data)}`);
+            return data;
+          }
+
+          await req('/api/hector-agent/dashboard');
+          await req('/api/hector-agent/settings',{method:'PATCH',body:{autonomyMode:'manual',paused:false,autoEnabled:true,maxIterations:6,maxRuntimeSeconds:600,maxCostUsd:1,maxConsecutiveErrors:3}});
+
+          const memory=await req('/api/hector-agent/memory',{method:'POST',body:{kind:'fact',content:'memoria e2e inicial'},expect:201});
+          await req('/api/hector-agent/memory/'+memory.id,{method:'PATCH',body:{content:'memoria e2e corregida'}});
+          const memories=await req('/api/hector-agent/memory');
+          if(!memories.items.some(x=>x.id===memory.id&&x.content==='memoria e2e corregida'))throw new Error('Memory edit did not persist');
+          await req('/api/hector-agent/memory/'+memory.id,{method:'DELETE'});
+
+          const manual=await req('/api/hector-agent/goals',{method:'POST',body:{objective:'Verifica el flujo Manual de Hector Agent sin realizar acciones externas.'},expect:201});
+          await req('/api/hector-agent/goals/'+manual.goal.id+'/run-now',{method:'POST',expect:409});
+          await req('/api/hector-agent/goals/'+manual.goal.id+'/resume',{method:'POST',expect:409});
+          let dashboard=await req('/api/hector-agent/dashboard');
+          const approval=dashboard.approvals.find(x=>x.goal_id===manual.goal.id);
+          if(!approval)throw new Error('Manual approval was not created');
+          await req('/api/hector-agent/approvals/'+approval.id+'/approve',{method:'POST'});
+          await req('/api/hector-agent/goals/'+manual.goal.id+'/pause',{method:'POST'});
+          await req('/api/hector-agent/goals/'+manual.goal.id+'/resume',{method:'POST'});
+          const queued=await req('/api/hector-agent/goals/'+manual.goal.id+'/run-now',{method:'POST'});
+          if(queued.execution!=='queued_for_cron')throw new Error('Run now did not report queued_for_cron');
+
+          await req('/api/hector-agent/settings',{method:'PATCH',body:{paused:true,autoEnabled:false}});
+          dashboard=await req('/api/hector-agent/dashboard');
+          if(!dashboard.settings.paused||dashboard.settings.autoEnabled)throw new Error('Global stop did not persist');
+          await req('/api/hector-agent/settings',{method:'PATCH',body:{paused:false,autoEnabled:true}});
+          await req('/api/hector-agent/goals/'+manual.goal.id+'/pause',{method:'POST'});
+
+          await req('/api/hector-agent/settings',{method:'PATCH',body:{autonomyMode:'supervised'}});
+          dashboard=await req('/api/hector-agent/dashboard');
+          if(dashboard.settings.autonomyMode!=='supervised')throw new Error('Supervised mode did not persist');
+          await req('/api/hector-agent/settings',{method:'PATCH',body:{autonomyMode:'autonomous'}});
+          dashboard=await req('/api/hector-agent/dashboard');
+          if(dashboard.settings.autonomyMode!=='autonomous')throw new Error('Autonomous mode did not persist');
+          await req('/api/hector-agent/settings',{method:'PATCH',body:{autonomyMode:'manual'}});
+          dashboard=await req('/api/hector-agent/dashboard');
+          if(dashboard.settings.autonomyMode!=='manual')throw new Error('Manual mode did not persist');
+
+          await req('/api/hector-agent/settings',{method:'PATCH',body:{autonomyMode:'supervised'}});
+          const bg=await req('/api/hector-agent/goals',{method:'POST',body:{objective:'Confirma en un ciclo breve que el procesamiento de fondo funciona. No uses web ni herramientas externas y finaliza cuando este verificado.'},expect:201});
+          writeFileSync('/tmp/background-goal-id',bg.goal.id);
+          NODE
+
+      - name: Verify background continuation without an open PWA
+        env:
+          TOKEN: ${{ steps.session.outputs.token }}
+        shell: bash
+        run: |
+          set -euo pipefail
+          export GOAL_ID="$(cat /tmp/background-goal-id)"
+          node --input-type=module <<'NODE'
+          const base=process.env.BASE_URL,token=process.env.TOKEN,id=process.env.GOAL_ID;
+          const headers={Cookie:`hector_session=${token}`,'Content-Type':'application/json',Origin:base};
+          let seen=false,last=null;
+          for(let i=0;i<14;i++){
+            await new Promise(resolve=>setTimeout(resolve,10000));
+            const r=await fetch(base+'/api/hector-agent/goals/'+id,{headers});
+            last=await r.json();
+            if(r.ok&&Number(last?.goal?.attemptCount||0)>=1){seen=true;break}
+          }
+          await fetch(base+'/api/hector-agent/settings',{method:'PATCH',headers,body:JSON.stringify({paused:true,autoEnabled:false})});
+          if(!seen)throw new Error('Background cron did not run in time: '+JSON.stringify(last));
+          if(!(last.events||[]).some(e=>String(e.message||'').includes('ciclo 1 iniciado')))throw new Error('Background cycle event was not recorded');
+          console.log('Background continuation verified with attemptCount=',last.goal.attemptCount);
+          NODE
+
+      - name: Cleanup isolated test data
+        if: always()
+        env:
+          USER_ID: ${{ steps.session.outputs.user_id }}
+          SESSION_ID: ${{ steps.session.outputs.session_id }}
+        shell: bash
+        run: |
+          set +e
+          CLEAN_TOKEN="$(printf %s "$CLOUDFLARE_API_TOKEN_RAW" | tr -d '[:space:]')"
+          export CLOUDFLARE_API_TOKEN="$CLEAN_TOKEN"
+          if [ -n "${USER_ID:-}" ]; then
+            cat >/tmp/hector-agent-cleanup.sql <<SQL
+          PRAGMA foreign_keys=ON;
+          DELETE FROM work_jobs WHERE id IN (SELECT work_job_id FROM hector_agent_goals WHERE user_id='${USER_ID}');
+          DELETE FROM hector_agent_memory WHERE user_id='${USER_ID}';
+          DELETE FROM hector_agent_settings WHERE user_id='${USER_ID}';
+          DELETE FROM sessions WHERE id='${SESSION_ID}';
+          SQL
+            npx wrangler d1 execute hector-os-db --remote --file=/tmp/hector-agent-cleanup.sql
+          fi
