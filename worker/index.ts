@@ -18,6 +18,7 @@ import {operationalNotifications} from './routes/operational-notifications';
 import {planDriftIncidents} from './routes/plan-drift-incidents';
 import {workMode} from './routes/work-mode';
 import {hectorAgent} from './routes/hector-agent';
+import {hectorAgentResilience} from './routes/hector-agent-resilience';
 import {systemInfo} from './routes/system';
 import {actionAuthority} from './routes/action-authority';
 import {control} from './routes/control';
@@ -43,12 +44,13 @@ import {buildPlan} from './agent/planner';
 import {recordExperience} from './agent/learning';
 import {canRetry,JOB_LEASE_SECONDS,retryDelaySeconds} from './lib/job-reliability';
 import {blockHectorAgentJob,hectorAgentLimitReason,loadHectorAgentRuntimeGuard,recordHectorAgentCycle} from './lib/hector-agent-runtime';
+import {completeResumeCheckpoints,saveResumeCheckpoint} from './lib/hector-agent-resilience';
 import {hasCustomModelEndpoint,hasQueuedCustomInference} from './lib/custom-model-runtime';
 import {CHAT_CHAMPION,chatChampionEvidence} from './lib/chat-champion';
 
 const app=new Hono<{Bindings:Bindings;Variables:Variables}>();
 app.use('*',bridgeSecurity);
-app.route('/control/v1',control);app.route('/generated',generated);app.route('/self-improve/v1',selfImprove);app.route('/runner/v1',runner);app.route('/runner/v1',pwaRunnerStatus);app.route('/evidence/v1',evidence);app.route('/api/auth',auth);app.route('/api/agent',agent);app.route('/api/intelligence',selfModel);app.route('/api/intelligence/budget',cognitiveBudget);app.route('/api/intelligence/benchmark',intelligenceBenchmark);app.route('/api/intelligence/plan-incidents',planDriftIncidents);app.route('/api/intelligence',openaiCoach);app.route('/api/intelligence',qwen397Chat);app.route('/api/intelligence',kimiChat);app.route('/api/intelligence',modelChat);app.route('/api/intelligence',intelligence);app.route('/api/notifications',operationalNotifications);app.route('/api/work-mode',workMode);app.route('/api/hector-agent',hectorAgent);app.route('/api/system',systemInfo);app.route('/api/action-authority',actionAuthority);app.route('/api/delegations',delegations);app.route('/api/projects',projectGovernance);app.route('/api/projects',projects);app.route('/api/pwa-factory',pwaFactory);app.route('/api/conversations',conversations);app.route('/api/chat-agents',chatAgents);app.route('/api/work-evidence',workEvidence);app.route('/api/memory',memoryStatus);app.route('/api/provider-health',providerHealth);app.route('/api/response-traces',responseTraces);app.route('/api/schedules',schedules);app.route('/api',qwen397Vision);app.route('/api',intelligence);app.route('/api',openInteraction);app.route('/api',api);
+app.route('/control/v1',control);app.route('/generated',generated);app.route('/self-improve/v1',selfImprove);app.route('/runner/v1',runner);app.route('/runner/v1',pwaRunnerStatus);app.route('/evidence/v1',evidence);app.route('/api/auth',auth);app.route('/api/agent',agent);app.route('/api/intelligence',selfModel);app.route('/api/intelligence/budget',cognitiveBudget);app.route('/api/intelligence/benchmark',intelligenceBenchmark);app.route('/api/intelligence/plan-incidents',planDriftIncidents);app.route('/api/intelligence',openaiCoach);app.route('/api/intelligence',qwen397Chat);app.route('/api/intelligence',kimiChat);app.route('/api/intelligence',modelChat);app.route('/api/intelligence',intelligence);app.route('/api/notifications',operationalNotifications);app.route('/api/work-mode',workMode);app.route('/api/hector-agent',hectorAgent);app.route('/api/hector-agent/resilience',hectorAgentResilience);app.route('/api/system',systemInfo);app.route('/api/action-authority',actionAuthority);app.route('/api/delegations',delegations);app.route('/api/projects',projectGovernance);app.route('/api/projects',projects);app.route('/api/pwa-factory',pwaFactory);app.route('/api/conversations',conversations);app.route('/api/chat-agents',chatAgents);app.route('/api/work-evidence',workEvidence);app.route('/api/memory',memoryStatus);app.route('/api/provider-health',providerHealth);app.route('/api/response-traces',responseTraces);app.route('/api/schedules',schedules);app.route('/api',qwen397Vision);app.route('/api',intelligence);app.route('/api',openInteraction);app.route('/api',api);
 app.get('/health',c=>c.json({ok:true,service:c.env.APP_NAME,customModel:{runtime:CHAT_CHAMPION.runtimeId,mode:hasCustomModelEndpoint(c.env)?'endpoint':hasQueuedCustomInference(c.env)?'github-actions':'unavailable',...chatChampionEvidence()}}));app.all('*',c=>c.env.ASSETS.fetch(c.req.raw));
 
 async function event(env:Bindings,jobId:string,message:string,progress:number){await env.DB.prepare('INSERT INTO work_events(id,job_id,message,progress) VALUES(?,?,?,?)').bind(crypto.randomUUID(),jobId,message,progress).run();}
@@ -98,6 +100,7 @@ async function processNext(env:Bindings){
     const delay=parsed.state==='waiting'?parsed.retryAfterMinutes:2,progress=Math.min(95,15+Number(job.attempt_count||1)*4),wait=`+${delay} minutes`;
     const advanced=await env.DB.prepare("UPDATE work_jobs SET status='queued',progress=?,result=?,last_error=NULL,next_retry_at=datetime('now',?),lease_token=NULL,lease_expires_at=NULL,heartbeat_at=CURRENT_TIMESTAMP,updated_at=CURRENT_TIMESTAMP WHERE id=? AND lease_token=?").bind(progress,parsed.text,wait,job.id,leaseToken).run();
     if(!advanced.meta.changes)return;
+    await saveResumeCheckpoint(env,{workJobId:job.id,reason:parsed.state==='waiting'?'external_dependency':'continuation',state:{result:parsed.text,attemptCount:job.attempt_count},status:parsed.state==='waiting'?'waiting_external':'ready',resumeAfter:new Date(Date.now()+delay*60_000).toISOString()});
     await recordUsage(env,job,out,u,executionPlan,verification,parsed.state==='waiting'?'work-mode-waiting':'work-mode-cycle');
     await event(env,job.id,parsed.state==='waiting'?`Dependencia externa detectada. Espera controlada de ${delay} minuto${delay===1?'':'s'} antes de reintentar.`:parsed.explicit?'El objetivo todavía no está completo. Iniciará otro ciclo con el progreso actual.':'No se recibió confirmación verificable de cierre. El trabajo continuará automáticamente.',progress);
     return;
@@ -106,6 +109,7 @@ async function processNext(env:Bindings){
   }
   await event(env,job.id,'Resultado obtenido; verificando criterios y limitaciones',80);
   const completed=await env.DB.prepare("UPDATE work_jobs SET status='completed',progress=100,result=?,last_error=NULL,lease_token=NULL,lease_expires_at=NULL,next_retry_at=NULL,heartbeat_at=CURRENT_TIMESTAMP,updated_at=CURRENT_TIMESTAMP WHERE id=? AND lease_token=?").bind(out.text,job.id,leaseToken).run();if(!completed.meta.changes)return;
+  await completeResumeCheckpoints(env,job.id);
   await env.DB.batch([env.DB.prepare("INSERT INTO work_events(id,job_id,message,progress) VALUES(?,?,?,100)").bind(crypto.randomUUID(),job.id,continuous?'Modo Trabajo completó y verificó el objetivo':'Resultado guardado bajo plan cognitivo verificado')]);
   await recordUsage(env,job,out,u,executionPlan,verification,continuous?'work-mode-completed':job.schedule_id?'scheduled-work-planned':'background-work-planned');
   await recordExperience(env,{jobId:job.id,userId:job.user_id,objective:job.prompt,status:'completed',result:out.text,skills:plan.skills,attempts:job.attempt_count,durationMs:Date.now()-started});
@@ -116,7 +120,7 @@ async function processNext(env:Bindings){
    const limitReason=failureGuard?hectorAgentLimitReason(failureGuard,job.attempt_count,'after'):null;
    if(limitReason){const blocked=await blockHectorAgentJob(env,{workJobId:job.id,leaseToken,reason:limitReason,result:message});if(blocked.meta.changes){await event(env,job.id,`Error detectado y límite alcanzado: ${limitReason}`,25);await recordExperience(env,{jobId:job.id,userId:job.user_id,objective:job.prompt,status:'blocked',result:`${limitReason}: ${message}`,skills:plan.skills,attempts:job.attempt_count,durationMs:Date.now()-started});}return;}
    const retry=workModeFailureTransition(job.attempt_count),failed=await env.DB.prepare(`UPDATE work_jobs SET status='queued',last_error=?,next_retry_at=datetime('now','+${retry.delaySeconds} seconds'),lease_token=NULL,lease_expires_at=NULL,heartbeat_at=CURRENT_TIMESTAMP,updated_at=CURRENT_TIMESTAMP WHERE id=? AND lease_token=?`).bind(message,job.id,leaseToken).run();
-   if(failed.meta.changes){await event(env,job.id,`Error detectado; Modo Trabajo conservará el avance e intentará otra alternativa en ${retry.delaySeconds}s`,25);await recordExperience(env,{jobId:job.id,userId:job.user_id,objective:job.prompt,status:'queued',result:message,skills:plan.skills,attempts:job.attempt_count,durationMs:Date.now()-started});}
+   if(failed.meta.changes){await saveResumeCheckpoint(env,{workJobId:job.id,reason:'retry_after_error',state:{error:message,attemptCount:job.attempt_count},status:'ready',resumeAfter:new Date(Date.now()+retry.delaySeconds*1000).toISOString()});await event(env,job.id,`Error detectado; Modo Trabajo conservará el avance e intentará otra alternativa en ${retry.delaySeconds}s`,25);await recordExperience(env,{jobId:job.id,userId:job.user_id,objective:job.prompt,status:'queued',result:message,skills:plan.skills,attempts:job.attempt_count,durationMs:Date.now()-started});}
    return;
   }
   const retry=canRetry(job.attempt_count,job.max_attempts),delay=retryDelaySeconds(job.attempt_count),status=retry?'queued':'blocked',nextRetry=retry?`datetime('now','+${delay} seconds')`:'NULL';
