@@ -1,0 +1,176 @@
+name: Context platform production audit
+
+on:
+  workflow_run:
+    workflows: ["Deploy Production"]
+    types: [completed]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  statuses: write
+
+concurrency:
+  group: context-platform-production-audit
+  cancel-in-progress: true
+
+jobs:
+  e2e:
+    if: github.event_name == 'workflow_dispatch' || github.event.workflow_run.conclusion == 'success'
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    env:
+      BASE_URL: https://hector-os.hectorhdzr035.workers.dev
+      CLOUDFLARE_API_TOKEN_RAW: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+      CLOUDFLARE_ACCOUNT_ID: ${{ vars.CLOUDFLARE_ACCOUNT_ID }}
+      AUDITED_SHA: ${{ github.event.workflow_run.head_sha || github.sha }}
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ github.event.workflow_run.head_sha || github.sha }}
+
+      - name: Mark audit pending
+        uses: actions/github-script@v7
+        with:
+          script: |
+            const sha=process.env.AUDITED_SHA;
+            await github.rest.repos.createCommitStatus({owner:context.repo.owner,repo:context.repo.repo,sha,state:'pending',context:'context-platform/production-audit',description:'Context Hub + Cross-Chat Sync E2E en curso',target_url:`${context.serverUrl}/${context.repo.owner}/${context.repo.repo}/actions/runs/${context.runId}`});
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+      - run: npm ci
+
+      - name: Create isolated production session
+        id: session
+        shell: bash
+        run: |
+          set -euo pipefail
+          CLEAN_TOKEN="$(printf %s "$CLOUDFLARE_API_TOKEN_RAW" | tr -d '[:space:]')"
+          test -n "$CLEAN_TOKEN"; test -n "$CLOUDFLARE_ACCOUNT_ID"
+          echo "::add-mask::$CLEAN_TOKEN"
+          export CLOUDFLARE_API_TOKEN="$CLEAN_TOKEN"
+          npx wrangler d1 execute hector-os-db --remote --command="SELECT id FROM users WHERE email='chatgpt-test@hectoros.invalid' LIMIT 1" --json > /tmp/context-user.json
+          USER_ID="$(node --input-type=module <<'NODE'
+          import {readFileSync} from 'node:fs';
+          const p=JSON.parse(readFileSync('/tmp/context-user.json','utf8'));const groups=Array.isArray(p)?p:[p];const row=groups.flatMap(g=>Array.isArray(g?.results)?g.results:[])[0];if(!row?.id)throw new Error('Test account missing');process.stdout.write(row.id);
+          NODE
+          )"
+          SESSION_JSON="$(node --input-type=module <<'NODE'
+          import {createHash,randomBytes,randomUUID} from 'node:crypto';const token=randomBytes(32).toString('base64url');console.log(JSON.stringify({token,hash:createHash('sha256').update(token).digest('hex'),id:randomUUID()}));
+          NODE
+          )"
+          TOKEN="$(node -e "const x=JSON.parse(process.argv[1]);process.stdout.write(x.token)" "$SESSION_JSON")"
+          HASH="$(node -e "const x=JSON.parse(process.argv[1]);process.stdout.write(x.hash)" "$SESSION_JSON")"
+          SESSION_ID="$(node -e "const x=JSON.parse(process.argv[1]);process.stdout.write(x.id)" "$SESSION_JSON")"
+          echo "::add-mask::$TOKEN"
+          npx wrangler d1 execute hector-os-db --remote --command="INSERT INTO sessions(id,user_id,token_hash,expires_at,last_seen_at,user_agent) VALUES('$SESSION_ID','$USER_ID','$HASH',datetime('now','+20 minutes'),CURRENT_TIMESTAMP,'context-platform-production-audit')" >/dev/null
+          { echo "user_id=$USER_ID"; echo "session_id=$SESSION_ID"; echo "token=$TOKEN"; } >> "$GITHUB_OUTPUT"
+
+      - name: Verify authentication boundary
+        shell: bash
+        run: |
+          set -euo pipefail
+          code="$(curl -sS -o /tmp/unauth.json -w '%{http_code}' "$BASE_URL/api/context-sync/status")"
+          test "$code" = "401"
+
+      - name: Exercise Cross-Chat Sync and Context Hub
+        id: audit
+        env:
+          TOKEN: ${{ steps.session.outputs.token }}
+        shell: bash
+        run: |
+          set -euo pipefail
+          node --input-type=module <<'NODE'
+          import {randomUUID} from 'node:crypto';
+          import {writeFileSync} from 'node:fs';
+          const base=process.env.BASE_URL,token=process.env.TOKEN,marker=`CTX_E2E_${Date.now()}_${randomUUID().slice(0,8)}`;
+          const headers={Cookie:`hector_session=${token}`,'Content-Type':'application/json',Origin:base};
+          async function req(path,{method='GET',body,expect=200}={}){const r=await fetch(base+path,{method,headers,body:body===undefined?undefined:JSON.stringify(body)});const text=await r.text();let data={};try{data=JSON.parse(text)}catch{}if(r.status!==expect)throw new Error(`${method} ${path}: expected ${expect}, got ${r.status}: ${text}`);return data;}
+          const a=`audit-a-${marker}`,b=`audit-b-${marker}`,scope=`capability-audit-${marker.toLowerCase()}`;
+          const bootA=await req('/api/context-sync/bootstrap',{method:'POST',body:{chatRef:a,client:'production-audit',topic:'Capability audit',query:marker}});
+          if(bootA.protocol!=='hector-cross-chat-sync'||bootA.version!==2||bootA.coordination?.mode!=='advisory')throw new Error('Bootstrap protocol mismatch');
+          const claimA=await req('/api/context-sync/claim',{method:'POST',body:{chatRef:a,client:'production-audit',scope,intent:'audit path A',ttlMinutes:10},expect:201});
+          const claimB=await req('/api/context-sync/claim',{method:'POST',body:{chatRef:b,client:'production-audit',scope,intent:'audit path B',ttlMinutes:10},expect:201});
+          if(!claimB.advisory||!Array.isArray(claimB.overlaps)||!claimB.overlaps.some(x=>x.external_chat_ref===a))throw new Error('Advisory overlap not visible');
+          const commit=await req('/api/context-sync/commit',{method:'POST',body:{chatRef:a,client:'production-audit',topic:'Capability audit',summary:`${marker} shared commit`,decisions:[`${marker} decision`],actions:['cross-chat write'],nextSteps:['bootstrap in second chat'],blockers:[],resources:['production audit']},expect:201});
+          if(!commit.visibleToFutureSessions)throw new Error('Commit not marked future-visible');
+          const bootB=await req('/api/context-sync/bootstrap',{method:'POST',body:{chatRef:b,client:'production-audit',topic:'Capability audit',query:marker}});
+          if(!bootB.coordination?.recentCommits?.some(x=>String(x.summary).includes(marker)))throw new Error('Second chat cannot see first chat commit');
+          const status=await req('/api/context-sync/status');
+          if(status.coordinationMode!=='advisory'||status.commitCount<1)throw new Error('Sync status invalid');
+
+          const manifest=await req('/api/context-hub/manifest');
+          const caps=new Set((manifest.operations||[]).map(x=>x.capability));
+          for(const cap of ['context.remember','context.recall','context.current_state','context.history','context.search_everything','context.capabilities','context.resume','context.snapshot'])if(!caps.has(cap))throw new Error(`Missing builtin ${cap}`);
+          const remembered=await req('/api/context-hub/remember',{method:'POST',body:{recordType:'fact',subject:'Production capability audit',content:`${marker} remembered fact`,confidence:1,tags:['audit','temporary'],sourceType:'production-audit'},expect:201});
+          const memoryId=remembered?.item?.id;if(!memoryId)throw new Error('remember did not return id');
+          const recalled=await req('/api/context-hub/recall',{method:'POST',body:{query:marker,limit:20}});
+          if(!recalled.items?.some(x=>String(x.content).includes(marker)))throw new Error('recall cannot recover remembered fact');
+          const searched=await req('/api/context-hub/search-everything',{method:'POST',body:{query:marker,limit:50}});
+          if(!JSON.stringify(searched).includes(marker))throw new Error('search-everything cannot find marker');
+          await req('/api/context-hub/current-state');await req('/api/context-hub/history?limit=40');
+          const capabilities=await req('/api/context-hub/capabilities');if(!capabilities)throw new Error('capabilities empty');
+          const executed=await req('/api/context-hub/execute',{method:'POST',body:{capability:'context.current_state',input:{}}});if(executed.status!=='completed')throw new Error('builtin execute did not complete');
+
+          const snapshot=await req('/api/context-hub/snapshots',{method:'POST',body:{name:`${marker}.txt`,content:`${marker} R2 snapshot`,summary:`${marker} snapshot`,tags:['audit','temporary']},expect:201});
+          if(!snapshot.fileId||!snapshot.recordId)throw new Error('snapshot missing ids');
+
+          const tool=await req('/api/context-hub/tools',{method:'POST',body:{capability:`audit.${marker.toLowerCase()}`,title:'Temporary audit tool',description:'Temporary same-origin approval/resume audit',handlerType:'http_same_origin',endpointRef:'/api/context-hub/current-state',httpMethod:'GET',priority:1,risk:'low',requiresApproval:true,enabled:true,inputSchema:{},metadata:{audit:true}},expect:201});
+          const toolId=tool?.tool?.id;if(!toolId)throw new Error('tool registry create failed');
+          const waiting=await req('/api/context-hub/execute',{method:'POST',body:{capability:tool.tool.capability,toolId,input:{}},expect:202});
+          if(waiting.status!=='WAITING_FOR_USER_APPROVAL'||!waiting.approvalId||!waiting.runId)throw new Error('Approval Gateway not engaged');
+          await req(`/api/hector-agent/approvals/${waiting.approvalId}/approve`,{method:'POST'});
+          const resumed=await req('/api/context-hub/resume',{method:'POST',body:{runId:waiting.runId}});if(resumed.status!=='completed')throw new Error('resume did not complete approved run');
+          await req(`/api/context-hub/tools/${toolId}`,{method:'DELETE'});
+          await req('/api/context-sync/release',{method:'POST',body:{chatRef:a,claimId:claimA.claimId}});
+          await req('/api/context-sync/release',{method:'POST',body:{chatRef:b,claimId:claimB.claimId}});
+          writeFileSync('/tmp/context-audit-cleanup.json',JSON.stringify({marker,memoryId,fileId:snapshot.fileId,recordId:snapshot.recordId,a,b}));
+          console.log(JSON.stringify({marker,crossChat:true,memory:true,search:true,execute:true,snapshot:true,approvalResume:true}));
+          NODE
+
+      - name: Cleanup isolated audit data
+        if: always()
+        env:
+          USER_ID: ${{ steps.session.outputs.user_id }}
+          SESSION_ID: ${{ steps.session.outputs.session_id }}
+        shell: bash
+        run: |
+          set +e
+          CLEAN_TOKEN="$(printf %s "$CLOUDFLARE_API_TOKEN_RAW" | tr -d '[:space:]')"; export CLOUDFLARE_API_TOKEN="$CLEAN_TOKEN"
+          if [ -s /tmp/context-audit-cleanup.json ] && [ -n "${USER_ID:-}" ]; then
+            MARKER="$(node -e "const x=require('/tmp/context-audit-cleanup.json');process.stdout.write(x.marker)")"
+            FILE_ID="$(node -e "const x=require('/tmp/context-audit-cleanup.json');process.stdout.write(x.fileId||'')")"
+            cat >/tmp/context-clean.sql <<SQL
+          PRAGMA foreign_keys=ON;
+          DELETE FROM context_hub_tool_runs WHERE user_id='${USER_ID}' AND (input_json LIKE '%${MARKER}%' OR metadata_json LIKE '%${MARKER}%');
+          DELETE FROM hector_agent_approvals WHERE user_id='${USER_ID}' AND reason LIKE '%context%';
+          DELETE FROM context_hub_tools WHERE user_id='${USER_ID}' AND metadata_json LIKE '%audit%';
+          DELETE FROM context_hub_records WHERE user_id='${USER_ID}' AND (content LIKE '%${MARKER}%' OR subject LIKE '%${MARKER}%');
+          DELETE FROM memories WHERE user_id='${USER_ID}' AND content LIKE '%${MARKER}%';
+          DELETE FROM files WHERE user_id='${USER_ID}' AND name LIKE '${MARKER}%';
+          DELETE FROM coordination_claims WHERE user_id='${USER_ID}' AND scope LIKE 'capability-audit-%';
+          DELETE FROM chat_sync_commits WHERE user_id='${USER_ID}' AND summary LIKE '%${MARKER}%';
+          DELETE FROM chat_sync_sessions WHERE user_id='${USER_ID}' AND external_chat_ref LIKE 'audit-%${MARKER}%';
+          DELETE FROM sessions WHERE id='${SESSION_ID}';
+          SQL
+            npx wrangler d1 execute hector-os-db --remote --file=/tmp/context-clean.sql || true
+            if [ -n "$FILE_ID" ]; then npx wrangler r2 object delete "hector-os-files/context-hub/${USER_ID}/${FILE_ID}" --remote || true; fi
+          elif [ -n "${SESSION_ID:-}" ]; then
+            npx wrangler d1 execute hector-os-db --remote --command="DELETE FROM sessions WHERE id='${SESSION_ID}'" || true
+          fi
+
+      - name: Mark audit success
+        if: success()
+        uses: actions/github-script@v7
+        with:
+          script: |
+            await github.rest.repos.createCommitStatus({owner:context.repo.owner,repo:context.repo.repo,sha:process.env.AUDITED_SHA,state:'success',context:'context-platform/production-audit',description:'Cross-Chat, memoria, R2, tools, approval y resume verificados',target_url:`${context.serverUrl}/${context.repo.owner}/${context.repo.repo}/actions/runs/${context.runId}`});
+
+      - name: Mark audit failure
+        if: failure()
+        uses: actions/github-script@v7
+        with:
+          script: |
+            await github.rest.repos.createCommitStatus({owner:context.repo.owner,repo:context.repo.repo,sha:process.env.AUDITED_SHA,state:'failure',context:'context-platform/production-audit',description:'Falló auditoría E2E de contexto/capacidades',target_url:`${context.serverUrl}/${context.repo.owner}/${context.repo.repo}/actions/runs/${context.runId}`});
