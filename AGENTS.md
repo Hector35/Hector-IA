@@ -40,8 +40,10 @@ Read `config/pwa-registry.json` before changing app/page/manifest/service-worker
 ### Architecture rules
 
 - Reuse a registered owner when that is the cleanest solution; do not create a sibling because another chat lacked context.
-- A new surface/PWA may be created when it is technically justified. It does **not** require `approvedNewPwa`, `approvalReason` or another internal permission token.
-- When creating a new installable PWA, update the registry in the same change and use a unique, non-overlapping service-worker/cache scope.
+- Claims are advisory and do not lock implementation work, but changing the installable PWA set is a separate boundary and requires explicit user approval.
+- There are exactly three canonical installable PWAs unless Héctor explicitly authorizes another one. Authorization to implement a feature, correction or architectural improvement is not authorization to create a new installable PWA.
+- A new installable PWA requires `approvedNewPwa=true` plus a non-empty `approvalReason` that documents the explicit user authorization.
+- When creating an explicitly authorized new installable PWA, update the registry in the same change and use a unique, non-overlapping service-worker/cache scope.
 - Do not modify `public/turno-rx/` for unrelated work.
 - Backends, brokers, memory, credentials and tool registries should usually remain shared services rather than multiplying UI surfaces.
 
