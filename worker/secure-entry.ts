@@ -60,10 +60,9 @@ export default {
    }
   }
   const headers=new Headers(request.headers);headers.set('X-Request-ID',requestId);
-  const forwarded=new Request(request,{headers});
   const response=url.pathname.startsWith('/api/hector-bridge')
-   ?await bridgeApi.fetch(forwarded,env,ctx)
-   :await worker.fetch(forwarded,env,ctx);
+   ?await bridgeApi.fetch(new Request(request,{headers}),env,ctx)
+   :await worker.fetch(new Request(request,{headers}),env,ctx);
   return securedResponse(response,url.pathname,requestId);
  },
  scheduled:worker.scheduled
