@@ -9,7 +9,45 @@
   ];
 
   const clean=value=>String(value??'').trim();
+  const plain=value=>clean(value).toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g,'').replace(/[^a-z0-9]+/g,' ').trim();
   const parse=(raw,fallback)=>{try{const value=JSON.parse(raw||'');return value??fallback}catch{return fallback}};
+
+  function pisoDestination(value){
+    const text=clean(value).toUpperCase().replace(/\s+/g,' ');
+    const match=text.match(/^(?:CAMA(?: DE PISO)?\s*)?#?\s*(\d{1,3})$/);
+    if(!match)return null;
+    const n=Number(match[1]);
+    if(n>=1&&n<=44)return{floor:'Primero',block:'B'};
+    if(n<=88)return{floor:'Segundo',block:'B'};
+    if(n<=132)return{floor:'Tercero',block:'B'};
+    if(n<=165)return{floor:'Segundo',block:'A'};
+    if(n<=198)return{floor:'Tercero',block:'A'};
+    if(n<=231)return{floor:'Quinto',block:'A'};
+    return null;
+  }
+
+  // Repair legacy rows before app-v16 performs its first render. The old fallback
+  // grouped 166-189 and 190-204; authoritative Clínica 7 ranges are 166-198 and
+  // 199-231. Skip any field the user explicitly corrected manually.
+  try{
+    const current=parse(localStorage?.getItem?.(STORAGE_KEY),null);
+    if(Array.isArray(current)){
+      let changed=false;
+      const repaired=current.map(row=>{
+        const category=plain(row?.category),candidate=clean(row?.destination||row?.target);
+        const mapped=pisoDestination(candidate);
+        const legacyFloor=!category&&Boolean(mapped);
+        if(!mapped||(!legacyFloor&&category!=='piso'))return row;
+        const overrides=row?.manualOverrides||{};
+        let next=row;
+        if(overrides.destinationFloor!==true&&clean(row?.destinationFloor)!==mapped.floor){next={...next,destinationFloor:mapped.floor};changed=true}
+        if(overrides.destinationBlock!==true&&clean(row?.destinationBlock).toUpperCase()!==mapped.block){next={...next,destinationBlock:mapped.block};changed=true}
+        if(category==='piso'&&!clean(row?.destination)){next={...next,destination:candidate};changed=true}
+        return next;
+      });
+      if(changed)localStorage.setItem(STORAGE_KEY,JSON.stringify(repaired));
+    }
+  }catch(error){console.warn('[Pendientes v89] No se pudo normalizar Piso antes del primer render',error)}
 
   // Capture/reconciliation may revisit a row after the user corrected it manually.
   // Preserve the extra fields that capture-fix does not protect itself. Manual form
