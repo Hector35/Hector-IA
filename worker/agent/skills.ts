@@ -91,30 +91,44 @@ export const SKILLS:Skill[]=[
   description:'Abrir una URL conocida y verificar interfaz o contenido.',
   triggers:['abre','pagina','url','interfaz','produccion','captura'],
   tools:['browser'],
-  steps:['Abrir entorno aislado','Navegar a URL','Comprobar elementos y errores','Guardar evidencia'],
-  success:['Página cargada','Criterios visibles verificados'],
+  steps:['Validar URL permitida','Abrir con navegador aislado','Esperar carga','Capturar evidencia','Reportar errores visibles'],
+  success:['HTTP correcto','Captura o reporte generado'],
   risk:'low'
  },
  {
-  id:'database',
-  description:'Inspeccionar y modificar datos estructurados.',
-  triggers:['base de datos','d1','sql','tabla','registro'],
+  id:'memory-curation',
+  description:'Guardar, actualizar o invalidar memoria estructurada.',
+  triggers:['recuerda','olvida','preferencia','memoria'],
   tools:['d1'],
-  steps:['Identificar esquema','Consultar antes de escribir','Aplicar mutación mínima','Releer y verificar'],
-  success:['Estado final comprobado'],
-  risk:'high'
+  steps:['Clasificar dato','Determinar vigencia y confianza','Detectar contradicciones','Guardar o invalidar'],
+  success:['Memoria trazable','Sin duplicados contradictorios'],
+  risk:'medium'
  },
  {
-  id:'cloudflare',
-  description:'Desplegar o auditar Cloudflare Workers y recursos.',
-  triggers:['cloudflare','worker','d1','r2','deploy','despliegue'],
-  tools:['cloudflare'],
-  steps:['Inspeccionar configuración','Validar secretos y bindings','Ejecutar despliegue','Smoke test'],
-  success:['Despliegue saludable','Rollback conocido'],
-  risk:'high'
+  id:'self-analysis',
+  description:'Autoevaluar capacidades, fallos y siguiente mejora.',
+  triggers:['autoanaliza','limitaciones','que falta','mejorate','problemas'],
+  tools:['evals','d1'],
+  steps:['Ejecutar pruebas','Leer errores recientes','Agrupar fallos repetidos','Priorizar por impacto','Generar prompt de mejora'],
+  success:['Puntuación reproducible','Problemas concretos'],
+  risk:'low'
  }
 ];
 
-export function normalizeSkillText(value:string){return value.normalize('NFD').replace(/[\u0300-\u036f]/g,'').toLowerCase();}
-export function selectSkills(prompt:string){const p=normalizeSkillText(prompt);return SKILLS.filter(s=>s.triggers.some(t=>p.includes(normalizeSkillText(t)))).slice(0,4);}
-export function renderSkills(skills:Skill[]){return skills.map(s=>`SKILL ${s.id}\nObjetivo: ${s.description}\nPasos: ${s.steps.map((x,i)=>`${i+1}. ${x}`).join(' ')}\nÉxito: ${s.success.join('; ')}\nRiesgo: ${s.risk}`).join('\n\n');}
+function normalize(value:string){
+ return value.normalize('NFD').replace(/[\u0300-\u036f]/g,'').toLowerCase();
+}
+
+export function selectSkills(input:string,limit=4){
+ const q=normalize(input);
+ return SKILLS
+  .map(skill=>({skill,score:skill.triggers.reduce((n,trigger)=>n+(q.includes(normalize(trigger))?1:0),0)}))
+  .filter(item=>item.score>0)
+  .sort((a,b)=>b.score-a.score)
+  .slice(0,limit)
+  .map(item=>item.skill);
+}
+
+export function renderSkills(skills:Skill[]){
+ return skills.map(skill=>`SKILL ${skill.id}\nObjetivo: ${skill.description}\nHerramientas: ${skill.tools.join(', ')}\nPasos:\n${skill.steps.map((step,index)=>`${index+1}. ${step}`).join('\n')}\nÉxito:\n${skill.success.map(item=>`- ${item}`).join('\n')}\nRiesgo: ${skill.risk}`).join('\n\n');
+}
