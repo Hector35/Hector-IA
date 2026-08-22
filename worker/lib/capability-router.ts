@@ -7,10 +7,10 @@ export type RouteExecutionResult<T=unknown>={ok:true;value:T;evidence?:Record<st
 
 export function classifyCapabilityFailure(input:{status?:number|null;error?:string|null;code?:string|null}):CapabilityFailureClass{
   const status=Number(input.status||0),text=`${input.code||''} ${input.error||''}`.toLowerCase();
+  if(/policy|prohibited|security boundary|cross_site_mutation_denied|not allowed by provider|permission denied by policy/.test(text))return'policy';
   if(status===429||/rate.?limit|too many requests|quota temporarily/.test(text))return'rate_limit';
   if(status===401||status===403||/credential|token|oauth|unauthor|forbidden|expired|refresh_required/.test(text))return'credential';
   if(status===404||/not found|missing tool|capability.*missing|no existe una ruta|unsupported adapter/.test(text))return'capability_missing';
-  if(/policy|prohibited|security boundary|cross_site_mutation_denied|not allowed by provider/.test(text))return'policy';
   if(status>=500||status===408||/timeout|temporar|network|fetch failed|unavailable|connection/.test(text))return'temporary';
   return'permanent';
 }
@@ -34,7 +34,7 @@ export async function executeCapabilityWithFallback<T>(env:Bindings,input:{userI
     await trace(env,{id:traceId,userId:input.userId,requestId:input.requestId,source:input.source||'bridge',capability:input.capability,route,status:'started'});
     let credential:Awaited<ReturnType<typeof resolveCredential>>;
     try{credential=route.credential_id?await resolveCredential(env,input.userId,route.credential_id):{usable:true as const,state:'not_required' as const,credential:null,material:null};}
-    catch(e){credential={usable:false as const,state:'blocked' as const,credential:null,material:null};}
+    catch{credential={usable:false as const,state:'blocked' as const,credential:null,material:null};}
     if(!credential.usable){
       const failureClass:'credential'='credential',error=`Credencial no utilizable: ${credential.state}`;
       attempts.push({routeId:route.id,provider:route.provider,ok:false,failureClass,error});
