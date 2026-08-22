@@ -40,7 +40,7 @@ describe('Héctor maximum capability stack',()=>{
   expect(classifyCapabilityFailure({status:503,error:'unavailable'})).toBe('temporary');
   expect(classifyCapabilityFailure({status:401,error:'token expired'})).toBe('credential');
   expect(classifyCapabilityFailure({status:404,error:'missing tool'})).toBe('capability_missing');
-  expect(classifyCapabilityFailure({status:403,error:'policy prohibited'})).toBe('credential');
+  expect(classifyCapabilityFailure({status:403,error:'policy prohibited'})).toBe('policy');
   expect(classifyCapabilityFailure({error:'blocked by provider policy'})).toBe('policy');
   expect(mayFallback('temporary')).toBe(true);
   expect(mayFallback('rate_limit')).toBe(true);
