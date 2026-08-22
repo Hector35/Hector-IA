@@ -1,7 +1,6 @@
 (() => {
   // Pendientes v89 — categoría manual autoritativa y coherencia de Piso.
   const STORAGE_KEY='pendientes-table-v2';
-  const TAB_FOR_VALUE={'Rayos X':'RX','TAC':'TAC','Ultrasonido':'USG','Piso':'Piso'};
   const VALUE_FOR_TAB={RX:'Rayos X',TAC:'TAC',USG:'Ultrasonido',Piso:'Piso'};
   const MANUAL_FIELDS=['bed','name','age','sex','target','category','modality','diagnosis','diagnosisMeaning','transport','transportReason','oxygenProbable','oxygenReason'];
   let editingId=null;
@@ -32,6 +31,12 @@
   function floorDestination(value){
     const text=clean(value).toUpperCase().replace(/\s+/g,' '),match=text.match(/^(?:CAMA(?: DE PISO)?\s*)?#?\s*(\d{1,3})$/);if(!match)return null;
     const n=Number(match[1]);if(n>=1&&n<=44)return{floor:'Primero',block:'B'};if(n<=88)return{floor:'Segundo',block:'B'};if(n<=132)return{floor:'Tercero',block:'B'};if(n<=165)return{floor:'Segundo',block:'A'};if(n<=198)return{floor:'Tercero',block:'A'};if(n<=231)return{floor:'Quinto',block:'A'};return null;
+  }
+  function originKey(value){
+    let text=clean(value).toUpperCase().replace(/^C\/\s*(?=CE\s*\d+)/,'').replace(/[\s#]+/g,'');if(!text)return'';
+    let match=text.match(/^(CE|UP|UI)0*(\d+)$/);if(match)return`${match[1]}:${Number(match[2])}`;
+    match=text.match(/^(?:UA|C|CAMA)?0*(\d+)$/);if(match)return`N:${Number(match[1])}`;
+    return text;
   }
   function categoryData(selected){
     if(selected==='Piso')return{category:'Piso',modality:'Otro'};
@@ -70,6 +75,10 @@
     if(changed){localStorage.setItem(STORAGE_KEY,JSON.stringify(migrated));if(render)document.dispatchEvent(new CustomEvent('pendientes:status-changed'))}
     return changed;
   }
+  function showPisoConflict(bed){
+    const error=document.getElementById('formError');if(error){error.hidden=false;error.textContent=`La cama ${bed} ya tiene otro paciente a Piso en este turno. Revisa antes de guardar.`}
+    document.getElementById('bed')?.focus();
+  }
 
   window.addEventListener('click',event=>{
     const row=event.target.closest?.('.patient-row[data-id]');
@@ -82,6 +91,11 @@
     if(event.target?.id!=='patientForm')return;
     const select=ensureCategorySelect(),selected=select?.value||VALUE_FOR_TAB[activeTab()]||'Rayos X';
     const beforeRows=readRows(),beforeIds=new Set(beforeRows.map(row=>String(row.id))),editId=editingId,before=editId?beforeRows.find(row=>String(row.id)===String(editId)):null;
+    if(selected==='Piso'){
+      const bed=clean(event.target.querySelector('#bed')?.value),key=originKey(bed);
+      const conflict=key&&beforeRows.find(row=>String(row.id)!==String(editId||'')&&plain(row.status)!=='realizado'&&plain(row.category)==='piso'&&originKey(row.bed)===key);
+      if(conflict){event.preventDefault();event.stopImmediatePropagation();showPisoConflict(bed);return}
+    }
     globalThis.__PENDIENTES_MANUAL_WRITE__=true;
     queueMicrotask(()=>{
       try{
@@ -102,6 +116,6 @@
   const root=document.getElementById('app');if(root)observer.observe(root,{childList:true,subtree:true});
   window.addEventListener('pendientes:v80-updated',()=>migrateFloorRows({render:true}));
   window.addEventListener('pageshow',()=>migrateFloorRows({render:true}));
-  migrateFloorRows();ensureCategorySelect();
+  migrateFloorRows({render:true});ensureCategorySelect();
   document.documentElement.dataset.pendientesManualBuild='89';
 })();
