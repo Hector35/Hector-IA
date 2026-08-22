@@ -1,5 +1,19 @@
 # Repository agent rules
 
+## Shared context / cross-chat coordination
+
+A chat, agent, Codex session or background worker must not treat its own transcript as the source of truth. Shared durable state lives in Héctor Context Hub, D1/R2 and the current GitHub repository state.
+
+When the runtime has access to Héctor OS authentication, use the cross-chat sync protocol under `/api/context-sync`:
+
+1. `POST /bootstrap` before substantial work to load shared decisions, recent commits, active work and claims.
+2. `POST /claim` before starting a parallel implementation or taking ownership of a shared scope.
+3. Reuse an existing claim/decision/implementation instead of creating a sibling solution when another session owns the scope.
+4. `POST /commit` after meaningful work with summary, decisions, actions, next steps, blockers and resources so future sessions can resume it.
+5. `POST /release` when a claimed scope is finished or intentionally abandoned.
+
+If the runtime cannot call Context Sync directly, inspect current `main`, open PRs, `system_context`, Context Hub records and this repository before starting overlapping work. Never assume missing local chat context means the project has no prior decision.
+
 ## Canonical PWA/surface governance
 
 Before creating, renaming, moving or replacing any app/page/manifest/service worker, read `config/pwa-registry.json`.
