@@ -40,7 +40,7 @@ const SHELL = [
   '/turno-rx/app-v16.js?v=87',
   '/turno-rx/progressive-photo-queue-v45.js',
   '/turno-rx/stability-guard-v66.js?v=66',
-  '/turno-rx/runtime-preflight-v89.js?v=89',
+  '/turno-rx/runtime-preflight-v89.js?v=90',
   '/turno-rx/review-confidence-v67.js?v=70',
   '/turno-rx/photo-fingerprint-history-v70.js?v=70',
   '/turno-rx/floor-intelligence-v64.js?v=64',
