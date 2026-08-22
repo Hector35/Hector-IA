@@ -46,16 +46,21 @@ describe('Pendientes stability guard v66',()=>{
     expect(saved.reviewFields).toEqual(['bed']);
   });
 
-  it('se carga antes del controlador consolidado y forma parte del shell offline',()=>{
+  it('se carga antes del preflight y controlador consolidado y forma parte del shell offline v89',()=>{
     const index=readFileSync('public/turno-rx/index.html','utf8');
     const sw=readFileSync('public/turno-rx/sw.js','utf8');
-    expect(index.indexOf('stability-guard-v66.js?v=66')).toBeGreaterThan(-1);
-    expect(index.indexOf('stability-guard-v66.js?v=66')).toBeLessThan(index.indexOf('stability.js?v=20260818.1'));
-    expect(sw).toContain("const CACHE = 'pendientes-shell-20260818-7'");
+    const guardIndex=index.indexOf('stability-guard-v66.js?v=66');
+    const preflightIndex=index.indexOf('runtime-preflight-v89.js?v=89');
+    const appIndex=index.indexOf('app-v16.js?v=87');
+    expect(guardIndex).toBeGreaterThan(-1);
+    expect(preflightIndex).toBeGreaterThan(guardIndex);
+    expect(appIndex).toBeGreaterThan(preflightIndex);
+    expect(sw).toContain("const CACHE = 'pendientes-shell-20260822-89'");
     expect(sw).toContain('/turno-rx/stability-guard-v66.js?v=66');
+    expect(sw).toContain('/turno-rx/runtime-preflight-v89.js?v=89');
     expect(sw).toContain('/turno-rx/review-confidence-v67.js?v=70');
     expect(sw).toContain('/turno-rx/photo-fingerprint-history-v70.js?v=70');
     expect(sw).toContain('/turno-rx/photo-dedupe-v68.js?v=70');
-    expect(sw).toContain('/turno-rx/manual-category-v72.js?v=72');
+    expect(sw).toContain('/turno-rx/manual-category-v72.js?v=89');
   });
 });
