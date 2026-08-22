@@ -106,14 +106,19 @@ export async function loadContextPack(env:Bindings,userId:string,conversationId:
   const db=env.DB;
   const [systemRows,memoryRows,summaryRow,priorRows,recentRows,crossRows,workRows,updateRows,hubRows,syncRows]=await Promise.all([
     db.prepare("SELECT category,content FROM system_context WHERE active=1 ORDER BY priority DESC,context_key").all<{category:string;content:string}>(),
-    db.prepare("SELECT m.id,m.content,e.model,e.dimensions,e.vector_json FROM memories m LEFT JOIN memory_embeddings e ON e.memory_id=m.id WHERE m.user_id=? ORDER BY m.importance DESC,m.updated_at DESC LIMIT 150").bind(userId).all<MemoryRow>(),
+    db.prepare(`SELECT m.id,m.content,e.model,e.dimensions,e.vector_json
+      FROM memories m
+      LEFT JOIN memory_embeddings e ON e.memory_id=m.id
+      LEFT JOIN context_hub_records chr ON chr.memory_id=m.id
+      WHERE m.user_id=? AND (chr.id IS NULL OR chr.status='active')
+      ORDER BY m.importance DESC,m.updated_at DESC LIMIT 150`).bind(userId).all<MemoryRow>(),
     conversationId?db.prepare("SELECT summary FROM conversation_summaries WHERE conversation_id=? AND user_id=?").bind(conversationId,userId).first<{summary:string}>():Promise.resolve(null),
     db.prepare("SELECT summary FROM conversation_summaries WHERE user_id=? AND (? IS NULL OR conversation_id<>?) ORDER BY updated_at DESC LIMIT 30").bind(userId,conversationId||null,conversationId||null).all<{summary:string}>(),
     conversationId?db.prepare("SELECT role,content FROM messages WHERE conversation_id=? AND conversation_id IN (SELECT id FROM conversations WHERE user_id=?) ORDER BY created_at DESC LIMIT 16").bind(conversationId,userId).all<ContextMessage>():Promise.resolve({results:[]} as any),
     db.prepare("SELECT m.role,m.content FROM messages m JOIN conversations c ON c.id=m.conversation_id WHERE c.user_id=? AND (? IS NULL OR m.conversation_id<>?) ORDER BY m.created_at DESC LIMIT 120").bind(userId,conversationId||null,conversationId||null).all<ContextMessage>(),
     db.prepare("SELECT kind,status,progress,result FROM work_jobs WHERE user_id=? ORDER BY updated_at DESC LIMIT 8").bind(userId).all<any>(),
     db.prepare("SELECT request_text,status FROM update_requests WHERE user_id=? ORDER BY created_at DESC LIMIT 6").bind(userId).all<any>(),
-    db.prepare("SELECT record_type,subject,content,confidence,updated_at FROM context_hub_records WHERE user_id=? AND status='active' AND record_type IN ('state','project','task','decision','preference','error','solution') AND (valid_until IS NULL OR valid_until>CURRENT_TIMESTAMP) ORDER BY updated_at DESC LIMIT 60").bind(userId).all<any>(),
+    db.prepare("SELECT record_type,subject,content,confidence,updated_at FROM context_hub_records WHERE user_id=? AND status='active' AND record_type IN ('state','project','task','decision','preference') AND (valid_until IS NULL OR valid_until>CURRENT_TIMESTAMP) ORDER BY updated_at DESC LIMIT 60").bind(userId).all<any>(),
     db.prepare(`SELECT cc.summary,cc.decisions_json,cc.actions_json,cc.next_steps_json,cc.blockers_json,cc.resources_json,cc.created_at,s.external_chat_ref,s.client,s.topic
       FROM chat_sync_commits cc JOIN chat_sync_sessions s ON s.id=cc.session_id WHERE cc.user_id=? ORDER BY cc.created_at DESC LIMIT 40`).bind(userId).all<any>()
   ]);
