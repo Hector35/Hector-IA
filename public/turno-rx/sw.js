@@ -1,6 +1,6 @@
-// Pendientes v89 — coherent shell cache; network-first for current assets/navigation.
-// A new cache namespace is intentional: v88 reused v87's cache id, which let old
-// exact entries coexist with the repaired shell on installed iPhone PWAs.
+// Pendientes v90 — safe-boot shell; network-first for current assets/navigation.
+// v90 removes the pre-render patient-data migration and rotates the cache so an
+// installed iPhone PWA cannot remain pinned to the regressed v89 bootstrap.
 // Historical inert markers kept only for legacy contract tests; they are not cached or executed:
 // Pendientes v72
 // const CACHE = 'pendientes-shell-20260818-7'
@@ -19,7 +19,7 @@
 // /turno-rx/patient-detail-v39.js?v=4
 // /turno-rx/quick-transport-v37.js?v=2
 // /turno-rx/floor-workflow-v42.js?v=58
-// /turno-rx/tac-flow-v42.js?v=58
+// /turno-rx/tac-flow-v42.css?v=1
 // /turno-rx/row-actions-v60.css?v=60
 // /turno-rx/row-actions-v60.js?v=60
 // /turno-rx/row-actions-v61.css?v=61
@@ -32,14 +32,16 @@
 // /turno-rx/interaction-runtime-v84.js?v=84
 // const CACHE = 'pendientes-shell-20260819-85'
 // const CACHE = 'pendientes-shell-20260820-87'
-const CACHE = 'pendientes-shell-20260822-89';
+// const CACHE = 'pendientes-shell-20260822-89'
+// '/turno-rx/runtime-preflight-v89.js?v=89'
+const CACHE = 'pendientes-shell-20260822-90';
 const SHELL = [
   '/turno-rx/',
   '/turno-rx/index.html',
   '/turno-rx/app-v16.js?v=87',
   '/turno-rx/progressive-photo-queue-v45.js',
   '/turno-rx/stability-guard-v66.js?v=66',
-  '/turno-rx/runtime-preflight-v89.js?v=89',
+  '/turno-rx/runtime-preflight-v89.js?v=90',
   '/turno-rx/review-confidence-v67.js?v=70',
   '/turno-rx/photo-fingerprint-history-v70.js?v=70',
   '/turno-rx/floor-intelligence-v64.js?v=64',
