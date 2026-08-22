@@ -4,7 +4,7 @@ import {readFileSync} from 'node:fs';
 const index=readFileSync('public/turno-rx/index.html','utf8');
 const source=readFileSync('public/turno-rx/app-v16.js','utf8');
 const css=readFileSync('public/turno-rx/category-tabs-v49.css','utf8');
-const stability=readFileSync('public/turno-rx/stability.js','utf8');
+const interactions=readFileSync('public/turno-rx/interaction-runtime-v85.js','utf8');
 const sw=readFileSync('public/turno-rx/sw.js','utf8');
 
 const localStorage={
@@ -53,26 +53,28 @@ test('restaura pestaña y aplica prioridad Piso, RX, TAC, USG',()=>{
   expect(app.preferredCategoryTab([{category:'Piso',status:'Pendiente'}])).toBe('USG');
 });
 
-test('integra pestañas con el runtime consolidado, cola progresiva y gesto único',()=>{
+test('integra pestañas con el runtime v89, cola progresiva y gesto único',()=>{
   expect(index).toMatch(/category-tabs-v49\.css\?v=1/);
   expect(index).toMatch(/app-v16\.js\?v=87/);
   expect(index).toMatch(/stability-guard-v66\.js\?v=66/);
+  expect(index).toMatch(/runtime-preflight-v89\.js\?v=89/);
   expect(index).toMatch(/review-confidence-v67\.js\?v=70/);
   expect(index).toMatch(/photo-fingerprint-history-v70\.js\?v=70/);
   expect(index).toMatch(/photo-dedupe-v68\.js\?v=70/);
-  expect(index).toMatch(/stability\.js\?v=20260818\.1/);
-  expect(index).toMatch(/manual-category-v72\.js\?v=72/);
-  expect(sw).toMatch(/pendientes-shell-20260818-7/);
+  expect(index).toMatch(/interaction-runtime-v85\.js\?v=89/);
+  expect(index).toMatch(/manual-category-v72\.js\?v=89/);
+  expect(sw).toMatch(/pendientes-shell-20260822-89/);
   expect(sw).toMatch(/category-tabs-v49\.css\?v=1/);
   expect(sw).toMatch(/stability-guard-v66\.js\?v=66/);
+  expect(sw).toMatch(/runtime-preflight-v89\.js\?v=89/);
   expect(sw).toMatch(/review-confidence-v67\.js\?v=70/);
   expect(sw).toMatch(/photo-fingerprint-history-v70\.js\?v=70/);
   expect(sw).toMatch(/photo-dedupe-v68\.js\?v=70/);
-  expect(sw).toMatch(/stability\.js\?v=20260818\.1/);
-  expect(sw).toMatch(/manual-category-v72\.js\?v=72/);
+  expect(sw).toMatch(/interaction-runtime-v85\.js\?v=89/);
+  expect(sw).toMatch(/manual-category-v72\.js\?v=89/);
   expect(source).toMatch(/unseenCategoryTabs/);expect(source).toMatch(/renderPhotoQueue\(\)/);
   expect(css).toMatch(/min-height:44px/);
-  expect(stability).toContain("document.addEventListener('pointerdown'");
-  expect(stability).toContain("setStatus(g.id,'Realizado')");
-  expect(stability).toContain("setStatus(g.id,'Pendiente')");
+  expect(interactions).toContain("document.addEventListener('pointerdown'");
+  expect(interactions).toContain("setStatus(g.id,'Realizado')");
+  expect(interactions).toContain("setStatus(g.id,'Pendiente')");
 });
