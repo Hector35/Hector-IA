@@ -21,6 +21,15 @@ describe('interactive PWA browser production audit',()=>{
     expect(runner).toContain('context.setOffline(true)');
   });
 
+  it('treats rendered UI as the readiness signal after document commit',()=>{
+    expect(runner).toContain("waitUntil:'commit'");
+    expect(runner).toContain('waitForRenderedBody');
+    expect(runner).toContain('navigationWarnings');
+    expect(runner).toContain('DOMContentLoaded exceeded 8s after document commit');
+    expect(runner).toContain('navigation-failure.png');
+    expect(runner).not.toContain("page.goto(target,{waitUntil:'domcontentloaded'");
+  });
+
   it('derives surfaces from the canonical registry instead of inventing another PWA',()=>{
     for(const pwa of registry.installablePwas){
       expect(runner).not.toContain(`canonicalPath:'${pwa.canonicalPath}'`);
