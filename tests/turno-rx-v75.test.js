@@ -11,11 +11,11 @@ const index=read('public/turno-rx/index.html');
 const sw=read('public/turno-rx/sw.js');
 const css=read('public/turno-rx/capture-detail-v75.css');
 
-describe('Pendientes v87 operational contract',()=>{
+describe('Pendientes v89 operational contract',()=>{
   it('loads one capture owner, detail/history, and interaction runtime in order',()=>{
     const captureIndex=index.indexOf('capture-fix-v80.js?v=87');
-    const detailIndex=index.indexOf('patient-detail-history-v82.js?v=87');
-    const interactionIndex=index.indexOf('interaction-runtime-v85.js?v=87');
+    const detailIndex=index.indexOf('patient-detail-history-v82.js?v=89');
+    const interactionIndex=index.indexOf('interaction-runtime-v85.js?v=89');
     expect(captureIndex).toBeGreaterThan(-1);
     expect(detailIndex).toBeGreaterThan(captureIndex);
     expect(interactionIndex).toBeGreaterThan(detailIndex);
@@ -31,15 +31,16 @@ describe('Pendientes v87 operational contract',()=>{
     expect(detail).not.toContain('VISION_PROMPT');
     expect(detail).not.toContain("addEventListener('change'");
     expect(detail).not.toContain('/api/turno-rx/vision');
-    expect(detail).toContain("const BUILD='87'");
+    expect(detail).toContain("const BUILD='89'");
     expect(detail).toContain('role="dialog" aria-modal="true"');
     expect(detail).toContain("e.key!=='Escape'");
     expect(detail).toContain('HISTORIAL · BOLETA');
     expect(detail).toContain('Foto original de la boleta');
     expect(detail).toContain('pendientes-shift-history-v1');
+    expect(detail).toContain("createObjectStore(STORE,{keyPath:'fp'})");
   });
 
-  it('keeps v84 interaction runtime capture-free while preserving gestures',()=>{
+  it('keeps interaction runtime capture-free while preserving gestures and drawer',()=>{
     expect(interactions).not.toContain('VISION_PROMPT');
     expect(interactions).not.toContain("fetch('/api/turno-rx/vision'");
     expect(interactions).not.toContain("addEventListener('change'");
@@ -50,6 +51,8 @@ describe('Pendientes v87 operational contract',()=>{
     expect(interactions).toContain("setStatus(g.id,'Realizado')");
     expect(interactions).toContain("setStatus(g.id,'Pendiente')");
     expect(interactions).toContain('transportCycle');
+    expect(interactions).toContain('openSideMenu');
+    expect(interactions).toContain('closeSideMenu');
     expect(interactions).toContain("document.getElementById('cameraInput')?.click()");
   });
 
@@ -166,10 +169,12 @@ describe('Pendientes v87 operational contract',()=>{
   });
 
   it('updates service worker shell coherently',()=>{
-    expect(sw).toContain('pendientes-shell-20260820-87');
+    expect(sw).toContain('pendientes-shell-20260822-89');
     expect(sw).toContain('/turno-rx/capture-fix-v80.js?v=87');
-    expect(sw).toContain('/turno-rx/patient-detail-history-v82.js?v=87');
-    expect(sw).toContain('/turno-rx/interaction-runtime-v85.js?v=87');
+    expect(sw).toContain('/turno-rx/runtime-preflight-v89.js?v=89');
+    expect(sw).toContain('/turno-rx/patient-detail-history-v82.js?v=89');
+    expect(sw).toContain('/turno-rx/interaction-runtime-v85.js?v=89');
+    expect(sw).toContain('/turno-rx/runtime-v89.css?v=89');
     expect(sw).not.toContain("'/turno-rx/capture-detail-v75.js?v=75'");
     expect(sw).not.toContain("'/turno-rx/stability.js?v=20260818.1'");
     expect(sw).toContain('/turno-rx/capture-detail-v75.css?v=78');

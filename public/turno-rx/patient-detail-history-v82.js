@@ -2,15 +2,15 @@ const STORAGE_KEY='pendientes-table-v2';
 const HISTORY_KEY='pendientes-shift-history-v1';
 const DB_NAME='pendientes-boleta-images-v1';
 const STORE='images';
-const BUILD='87';
+const BUILD='89';
 
 const clean=v=>String(v??'').trim();
 const esc=v=>String(v??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
 function read(key,fallback){try{const raw=localStorage.getItem(key);return raw?JSON.parse(raw):fallback}catch{return fallback}}
 function currentRows(){const rows=read(STORAGE_KEY,[]);return Array.isArray(rows)?rows:[]}
 function historyRows(){const rows=read(HISTORY_KEY,[]);return Array.isArray(rows)?rows:[]}
-function db(){return new Promise((resolve,reject)=>{const req=indexedDB.open(DB_NAME,1);req.onupgradeneeded=()=>{const d=req.result;if(!d.objectStoreNames.contains(STORE))d.createObjectStore(STORE)};req.onsuccess=()=>resolve(req.result);req.onerror=()=>reject(req.error)})}
-async function loadImage(fp){if(!clean(fp))return null;try{const d=await db();return await new Promise((resolve,reject)=>{const tx=d.transaction(STORE,'readonly'),req=tx.objectStore(STORE).get(fp);req.onsuccess=()=>resolve(req.result||null);req.onerror=()=>reject(req.error)})}catch{return null}}
+function db(){return new Promise((resolve,reject)=>{const req=indexedDB.open(DB_NAME,1);req.onupgradeneeded=()=>{const d=req.result;if(!d.objectStoreNames.contains(STORE))d.createObjectStore(STORE,{keyPath:'fp'})};req.onsuccess=()=>resolve(req.result);req.onerror=()=>reject(req.error)})}
+async function loadImage(fp){if(!clean(fp))return null;let d=null;try{d=await db();return await new Promise((resolve,reject)=>{const tx=d.transaction(STORE,'readonly'),req=tx.objectStore(STORE).get(fp);req.onsuccess=()=>resolve(req.result||null);req.onerror=()=>reject(req.error)})}catch{return null}finally{try{d?.close()}catch{}}}
 const EXTRA_LABELS={region:'Región',withcontrast:'Con contraste',requesttime:'Hora de solicitud',requestdate:'Fecha de solicitud',transfernotes:'Notas de traslado',recognizedtext:'Texto reconocido',category:'Categoría',service:'Servicio',originservice:'Servicio de origen',destinationservice:'Servicio destino'};
 const labelKey=value=>clean(value).toLowerCase().replace(/[^a-z0-9áéíóúñ]+/g,'');
 const formatValue=value=>typeof value==='boolean'?(value?'Sí':'No'):Array.isArray(value)?value.join(', '):value&&typeof value==='object'?Object.entries(value).map(([k,v])=>`${k}: ${formatValue(v)}`).join(' · '):value;
