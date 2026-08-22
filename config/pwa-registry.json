@@ -1,11 +1,11 @@
 {
-  "version": 3,
+  "version": 4,
   "updated": "2026-08-22",
-  "principle": "Use shared context to coordinate work without blocking parallel progress, while preserving explicit user approval for changes to the installable PWA set.",
+  "principle": "Use shared context to make informed architectural decisions. Reuse is preferred when it is better, but the registry is context, not an internal permission gate.",
   "coordination": {
     "mode": "advisory",
     "sharedLedger": "https://github.com/Hector35/Hector-IA/issues/958",
-    "rule": "Inspect current main, open PRs, Context Hub and the shared ledger before duplicating a capability. Claims are advisory presence signals, not locks."
+    "rule": "Inspect current main, open PRs, Context Hub and the shared ledger before duplicating a capability. Claims and recommendations are evidence, never locks."
   },
   "installablePwas": [
     {
@@ -50,8 +50,9 @@
       "canonicalUi": "/bridge.html",
       "auxiliaryUi": ["/bridge-core.html"],
       "backend": "/api/hector-bridge",
+      "remoteMcp": "/mcp",
       "status": "active",
-      "rule": "Bridge and Bridge Core are one shared capability layer owned by Héctor OS."
+      "rule": "Bridge, Bridge Core, Context tools and remote MCP are one shared capability layer owned by Héctor OS."
     },
     {
       "id": "context-hub",
@@ -64,12 +65,11 @@
   ],
   "creationRules": [
     "Before creating or splitting a surface, inspect shared context and concurrent work so the decision is informed rather than accidental.",
-    "There are exactly three canonical installable PWAs unless Héctor explicitly authorizes creation of another installable PWA.",
-    "Authorization to implement a feature is not authorization to create a new installable PWA.",
-    "A new installable PWA requires approvedNewPwa=true and a non-empty approvalReason documenting the explicit user authorization.",
+    "Prefer an existing owner when it is the simplest clean architecture; do not duplicate by ignorance.",
+    "A new PWA or surface may be created without an internal approval token when evidence shows that separation is technically better.",
     "The same change that creates a new installable PWA must update this registry with a unique path, manifest and service worker.",
     "Never create overlapping service-worker scopes or cache ownership across PWAs.",
     "Do not modify Pendientes for unrelated work.",
-    "Claims and shared-context records remain advisory coordination signals and must not block otherwise authorized work."
+    "Claims, registry entries and shared-context records are advisory coordination signals and must not become permission gates."
   ]
 }
