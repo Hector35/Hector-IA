@@ -29,7 +29,7 @@ describe('agent skills',()=>{
   expect(context).toContain('STACK DE CAPACIDADES COMPARTIDAS');
   expect(context).toContain('/mcp');
   expect(context).toContain('Credential Broker');
-  expect(context).toContain('claims de Context Sync son señales consultivas, no locks');
+  expect(context).toContain('señales consultivas, no locks ni permisos');
   expect(context).toContain('no son locks ni permisos');
  });
 
@@ -38,17 +38,16 @@ describe('agent skills',()=>{
   expect(ids).toContain('capability-routing');
  });
 
- it('mantiene coordinación consultiva sin confundirla con autorización para una nueva PWA',()=>{
+ it('trata la arquitectura PWA como decisión informada, no como permiso interno',()=>{
   const context=renderAgentContext('Construye una PWA para iPhone con service worker');
   expect(context).toContain('CONTRATO DE INGENIERÍA PWA');
   expect(context).toContain('config/pwa-registry.json');
-  expect(context).toContain('Autorizar una función o corrección NO autoriza una nueva PWA');
-  expect(context).toContain('approvedNewPwa=true');
-  expect(context).toContain('approvalReason');
+  expect(context).toContain('no un máximo rígido ni un permiso interno');
+  expect(context).toContain('No inventes approvedNewPwa');
   expect(context).toContain('manifest.webmanifest');
   expect(context).toContain('viewport 390x844');
   expect(context).toContain('rollback');
-  expect(context).toContain('autorización explícita');
+  expect(context).toContain('decisión arquitectónica por evidencia');
  });
 
  it('no activa PWA para una tarea analítica sin relación',()=>{
