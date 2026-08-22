@@ -38,15 +38,17 @@ describe('agent skills',()=>{
   expect(ids).toContain('capability-routing');
  });
 
- it('permite decidir una PWA por evidencia sin token de permiso interno',()=>{
+ it('mantiene coordinación consultiva sin confundirla con autorización para una nueva PWA',()=>{
   const context=renderAgentContext('Construye una PWA para iPhone con service worker');
   expect(context).toContain('CONTRATO DE INGENIERÍA PWA');
   expect(context).toContain('config/pwa-registry.json');
-  expect(context).toContain('sin introducir un gate interno de permiso');
+  expect(context).toContain('Autorizar una función o corrección NO autoriza una nueva PWA');
+  expect(context).toContain('approvedNewPwa=true');
+  expect(context).toContain('approvalReason');
   expect(context).toContain('manifest.webmanifest');
   expect(context).toContain('viewport 390x844');
   expect(context).toContain('rollback');
-  expect(context).not.toContain('requiere autorización explícita del usuario');
+  expect(context).toContain('autorización explícita');
  });
 
  it('no activa PWA para una tarea analítica sin relación',()=>{
