@@ -1,0 +1,97 @@
+name: Agent resilience v2 once
+
+on:
+  push:
+    branches: [feat/hector-agent-resilience-v2-20260822]
+    paths:
+      - '.github/workflows/agent-resilience-v2-once.yml'
+
+permissions:
+  contents: write
+
+jobs:
+  port:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: feat/hector-agent-resilience-v2-20260822
+          fetch-depth: 0
+      - name: Port resilience files from validated branch
+        run: |
+          git fetch origin feat/hector-agent-resilience-broker-20260822
+          git show origin/feat/hector-agent-resilience-broker-20260822:migrations/0041_hector_agent_resilience.sql > migrations/0041_hector_agent_resilience.sql
+          git show origin/feat/hector-agent-resilience-broker-20260822:worker/lib/hector-agent-resilience.ts > worker/lib/hector-agent-resilience.ts
+          git show origin/feat/hector-agent-resilience-broker-20260822:worker/routes/hector-agent-resilience.ts > worker/routes/hector-agent-resilience.ts
+          git show origin/feat/hector-agent-resilience-broker-20260822:tests/hector-agent-resilience.test.ts > tests/hector-agent-resilience.test.ts
+      - name: Wire resilience into latest main without replacing runner changes
+        shell: python
+        run: |
+          from pathlib import Path
+
+          route = Path('worker/routes/hector-agent.ts')
+          s = route.read_text()
+          import_marker = "import {workModeTitle} from '../lib/work-mode';"
+          import_line = "import {hectorAgentResilience} from './hector-agent-resilience';"
+          if import_line not in s:
+              if import_marker not in s:
+                  raise SystemExit('hector-agent import marker missing')
+              s = s.replace(import_marker, import_marker + "\n" + import_line, 1)
+          mount_marker = "hectorAgent.use('*',requireAuth);"
+          mount_line = "hectorAgent.route('/resilience',hectorAgentResilience);"
+          if mount_line not in s:
+              if mount_marker not in s:
+                  raise SystemExit('hector-agent mount marker missing')
+              s = s.replace(mount_marker, mount_marker + "\n" + mount_line, 1)
+          route.write_text(s)
+
+          index = Path('worker/index.ts')
+          s = index.read_text()
+          runtime_import = "import {blockHectorAgentJob,hectorAgentLimitReason,loadHectorAgentRuntimeGuard,recordHectorAgentCycle} from './lib/hector-agent-runtime';"
+          resilience_import = "import {completeResumeCheckpoints,saveResumeCheckpoint} from './lib/hector-agent-resilience';"
+          if resilience_import not in s:
+              if runtime_import not in s:
+                  raise SystemExit('runtime import marker missing')
+              s = s.replace(runtime_import, runtime_import + "\n" + resilience_import, 1)
+
+          transition = """    const advanced=await env.DB.prepare(\"UPDATE work_jobs SET status='queued',progress=?,result=?,last_error=NULL,next_retry_at=datetime('now',?),lease_token=NULL,lease_expires_at=NULL,heartbeat_at=CURRENT_TIMESTAMP,updated_at=CURRENT_TIMESTAMP WHERE id=? AND lease_token=?\").bind(progress,parsed.text,wait,job.id,leaseToken).run();
+    if(!advanced.meta.changes)return;
+"""
+          checkpoint = transition + "    await saveResumeCheckpoint(env,{workJobId:job.id,reason:parsed.state==='waiting'?'external_dependency':'continuation',state:{result:parsed.text,attemptCount:job.attempt_count},status:parsed.state==='waiting'?'waiting_external':'ready',resumeAfter:new Date(Date.now()+delay*60_000).toISOString()});\n"
+          if "reason:parsed.state==='waiting'?'external_dependency':'continuation'" not in s:
+              if transition not in s:
+                  raise SystemExit('queue transition marker missing')
+              s = s.replace(transition, checkpoint, 1)
+
+          completed = "const completed=await env.DB.prepare(\"UPDATE work_jobs SET status='completed',progress=100,result=?,last_error=NULL,lease_token=NULL,lease_expires_at=NULL,next_retry_at=NULL,heartbeat_at=CURRENT_TIMESTAMP,updated_at=CURRENT_TIMESTAMP WHERE id=? AND lease_token=?\").bind(out.text,job.id,leaseToken).run();if(!completed.meta.changes)return;"
+          if "await completeResumeCheckpoints(env,job.id);" not in s:
+              if completed not in s:
+                  raise SystemExit('completion marker missing')
+              s = s.replace(completed, completed + "\n  await completeResumeCheckpoints(env,job.id);", 1)
+
+          failure = "if(failed.meta.changes){await event(env,job.id,`Error detectado; Modo Trabajo conservará el avance e intentará otra alternativa en ${retry.delaySeconds}s`,25);await recordExperience(env,{jobId:job.id,userId:job.user_id,objective:job.prompt,status:'queued',result:message,skills:plan.skills,attempts:job.attempt_count,durationMs:Date.now()-started});}"
+          failure_new = "if(failed.meta.changes){await saveResumeCheckpoint(env,{workJobId:job.id,reason:'retry_after_error',state:{error:message,attemptCount:job.attempt_count},status:'ready',resumeAfter:new Date(Date.now()+retry.delaySeconds*1000).toISOString()});await event(env,job.id,`Error detectado; Modo Trabajo conservará el avance e intentará otra alternativa en ${retry.delaySeconds}s`,25);await recordExperience(env,{jobId:job.id,userId:job.user_id,objective:job.prompt,status:'queued',result:message,skills:plan.skills,attempts:job.attempt_count,durationMs:Date.now()-started});}"
+          if "reason:'retry_after_error'" not in s:
+              if failure not in s:
+                  raise SystemExit('failure marker missing')
+              s = s.replace(failure, failure_new, 1)
+          index.write_text(s)
+
+          Path('.github/workflows/agent-resilience-v2-once.yml').unlink()
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+      - name: Verify full integration
+        run: |
+          npm ci
+          npm run typecheck
+          npx vitest run tests/hector-agent-resilience.test.ts tests/hector-agent-runtime.test.ts tests/hector-agent-v1.test.ts
+          npm run build
+      - name: Commit integrated resilience layer
+        run: |
+          git config user.name 'github-actions[bot]'
+          git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
+          git add migrations/0041_hector_agent_resilience.sql worker/lib/hector-agent-resilience.ts worker/routes/hector-agent-resilience.ts worker/routes/hector-agent.ts worker/index.ts tests/hector-agent-resilience.test.ts .github/workflows/agent-resilience-v2-once.yml
+          git commit -m 'feat(agent): add resilience broker on latest main'
+          git push origin HEAD:feat/hector-agent-resilience-v2-20260822
