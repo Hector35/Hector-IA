@@ -34,21 +34,22 @@ describe('Héctor Agent resilience broker',()=>{
   expect(credentialState({...base,refreshable:0},Date.parse('2026-08-22T12:00:00Z'))).toEqual({usable:false,state:'expired'});
  });
 
- it('never stores raw credentials in the resilience API contract',()=>{
+ it('never stores raw credentials and requires normal Agent authentication',()=>{
   const routeSource=readFileSync('worker/routes/hector-agent-resilience.ts','utf8');
   expect(routeSource).toContain("/^(env|oauth|vault|connector):");
   expect(routeSource).toContain('secretStored:false');
+  expect(routeSource).toContain("hectorAgentResilience.use('*',requireAuth)");
   expect(routeSource).not.toContain('passwordSchema');
  });
 
  it('wires approval checkpoints and runtime resume persistence',()=>{
   const migration=readFileSync('migrations/0041_hector_agent_resilience.sql','utf8');
   const index=readFileSync('worker/index.ts','utf8');
-  const agent=readFileSync('worker/routes/hector-agent.ts','utf8');
   expect(migration).toContain('trg_hector_agent_approval_resume');
   expect(migration).toContain("status='resumed'");
   expect(index).toContain('saveResumeCheckpoint');
   expect(index).toContain('completeResumeCheckpoints');
-  expect(agent).toContain("hectorAgent.route('/resilience',hectorAgentResilience)");
+  expect(index).toContain("app.route('/api/hector-agent/resilience',hectorAgentResilience)");
+  expect(index.indexOf("app.route('/api/hector-agent/resilience',hectorAgentResilience)")).toBeLessThan(index.indexOf("app.route('/api/hector-agent',hectorAgent)"));
  });
 });
