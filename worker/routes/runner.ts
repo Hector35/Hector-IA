@@ -46,7 +46,7 @@ async function blockRunnerHectorGoal(env:Bindings,jobId:string,reason:string,pro
  ]);
 }
 
-async function beginRunnerCycle(env:Bindings,jobId:string){
+async function beginRunnerCycle(env:Bindings,jobId:string):Promise<RunnerControl>{
  const control=await runnerControl(env,jobId);if(control.reason||!control.isHectorAgent)return control;
  const counter=await env.DB.prepare('UPDATE work_jobs SET attempt_count=attempt_count+1,heartbeat_at=CURRENT_TIMESTAMP,updated_at=CURRENT_TIMESTAMP WHERE id=? RETURNING attempt_count,progress').bind(jobId).first<{attempt_count:number;progress:number}>();
  const attemptCount=Number(counter?.attempt_count||control.attemptCount+1),guard=await loadHectorAgentRuntimeGuard(env,jobId);
@@ -64,25 +64,29 @@ async function finishRunnerCycle(env:Bindings,jobId:string,input:{durationMs:num
 }
 
 runner.post('/proposal',async c=>{
- let cycle:RunnerControl|null=null,started=Date.now(),cycleCostUsd=0,recorded=false;
+ let cycle:RunnerControl|null=null,jobId:string|null=null,started=Date.now(),cycleCostUsd=0,recorded=false;
  try{
   await auth(c);const parsed=proposalRequest.safeParse(await c.req.json());if(!parsed.success)return c.json({error:'Payload inválido'},400);
+  jobId=parsed.data.jobId;
   for(const f of parsed.data.files)if(!allowedFiles.includes(f.path))return c.json({error:`Archivo no permitido: ${f.path}`},400);
-  cycle=await beginRunnerCycle(c.env,parsed.data.jobId);if(cycle.reason)return c.json({error:cycle.reason},409);
+  cycle=await beginRunnerCycle(c.env,jobId);if(cycle.reason)return c.json({error:cycle.reason},409);
   started=Date.now();
   const source=parsed.data.files.map(x=>`\n===== ${x.path} =====\n${x.content}`).join('\n').slice(0,260000);
   const instructions=`Eres el runner de ingeniería de Héctor OS. Resuelve una tarea real dentro del repositorio usando cambios mínimos, completos y verificables.\nREGLAS\n- Solo modifica archivos permitidos.\n- Máximo 6 archivos y 120000 caracteres.\n- No toques secretos, autenticación, workflows, migraciones ni infraestructura.\n- No borres archivos ni agregues dependencias.\n- Devuelve JSON puro: {"summary":"...","risk":"low","hypothesis":"...","acceptance":["..."],"changes":[{"path":"...","content":"archivo completo"}]}.\n- Si el intento anterior falló, corrige la causa indicada y cambia de estrategia.\n- Conserva compatibilidad de API y agrega o ajusta pruebas cuando sea posible.\n- En tareas PWA, conserva manifest, service worker, experiencia iPhone, verificación offline, build reproducible y rollback; no reduzcas la tarea a una maqueta HTML.`;
-  const input=`JOB ${parsed.data.jobId}\nINTENTO ${parsed.data.attempt}/3\nTAREA\n${parsed.data.task}\n\nFALLO ANTERIOR\n${parsed.data.failure||'ninguno'}\n\nARCHIVOS PERMITIDOS\n${allowedFiles.join('\n')}\n\nCÓDIGO\n${source}`;
+  const input=`JOB ${jobId}\nINTENTO ${parsed.data.attempt}/3\nTAREA\n${parsed.data.task}\n\nFALLO ANTERIOR\n${parsed.data.failure||'ninguno'}\n\nARCHIVOS PERMITIDOS\n${allowedFiles.join('\n')}\n\nCÓDIGO\n${source}`;
   const model=c.env.OPENAI_MODEL_REASONING||'gpt-5.4';
   const r=await fetch('https://api.openai.com/v1/responses',{method:'POST',headers:{Authorization:`Bearer ${c.env.OPENAI_API_KEY}`,'Content-Type':'application/json'},body:JSON.stringify({model,instructions,input,store:false,reasoning:{effort:'high'},max_output_tokens:50000})});
   const data=await r.json<any>();cycleCostUsd=estimateModelCost(data?.usage,model).costUsd;
-  if(!r.ok){if(cycle.isHectorAgent){recorded=true;const limit=await finishRunnerCycle(c.env,parsed.data.jobId,{durationMs:Date.now()-started,costUsd:cycleCostUsd,failed:true,attemptCount:cycle.attemptCount});if(limit)return c.json({error:limit},409);}return c.json({error:data?.error?.message||'Error de OpenAI'},502);}
+  if(!r.ok){
+   if(cycle.isHectorAgent){recorded=true;const limit=await finishRunnerCycle(c.env,jobId,{durationMs:Date.now()-started,costUsd:cycleCostUsd,failed:true,attemptCount:cycle.attemptCount});if(limit)return c.json({error:limit},409);}
+   return c.json({error:data?.error?.message||'Error de OpenAI'},502);
+  }
   const text=String(data.output_text||data.output?.flatMap((x:any)=>x.content||[]).map((x:any)=>x.text||'').join('')||'').trim();let raw:any;try{raw=JSON.parse(text)}catch{const m=text.match(/\{[\s\S]*\}/);if(!m)throw new Error('Respuesta no JSON');raw=JSON.parse(m[0]);}
   const safe=proposal.parse(raw);validate(safe.changes);
-  if(cycle.isHectorAgent){recorded=true;const limit=await finishRunnerCycle(c.env,parsed.data.jobId,{durationMs:Date.now()-started,costUsd:cycleCostUsd,failed:false,attemptCount:cycle.attemptCount});if(limit)return c.json({error:limit},409);const revoked=await runnerControl(c.env,parsed.data.jobId);if(revoked.reason)return c.json({error:revoked.reason},409);}
+  if(cycle.isHectorAgent){recorded=true;const limit=await finishRunnerCycle(c.env,jobId,{durationMs:Date.now()-started,costUsd:cycleCostUsd,failed:false,attemptCount:cycle.attemptCount});if(limit)return c.json({error:limit},409);const revoked=await runnerControl(c.env,jobId);if(revoked.reason)return c.json({error:revoked.reason},409);}
   return c.json(safe);
  }catch(e){
-  if(cycle?.isHectorAgent&&!recorded){const limit=await finishRunnerCycle(c.env,cycle.isHectorAgent?String((await Promise.resolve(cycle))&&((c as any).req?.param?.('jobId')||'')):'',{durationMs:Date.now()-started,costUsd:cycleCostUsd,failed:true,attemptCount:cycle.attemptCount}).catch(()=>null);if(limit)return c.json({error:limit},409);}
+  if(cycle?.isHectorAgent&&jobId&&!recorded){const limit=await finishRunnerCycle(c.env,jobId,{durationMs:Date.now()-started,costUsd:cycleCostUsd,failed:true,attemptCount:cycle.attemptCount}).catch(()=>null);if(limit)return c.json({error:limit},409);}
   return c.json({error:e instanceof Error?e.message:'Error'},401);
  }
 });
