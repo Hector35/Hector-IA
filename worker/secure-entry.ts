@@ -10,7 +10,7 @@ import {contextHub} from './routes/context-hub';
 import {contextSync} from './routes/context-sync';
 import {evaluateSecurityBoundary,isProtectedMutation,normalizeRequestId} from './lib/security-boundary';
 
-const HECTOR_AGENT_VERSION='20260822-4';
+const HECTOR_AGENT_VERSION='20260822-5';
 const bridgeApi=new Hono<{Bindings:Bindings;Variables:Variables}>();
 bridgeApi.route('/api/hector-bridge',hectorBridge);
 const accessApi=new Hono<{Bindings:Bindings;Variables:Variables}>();
