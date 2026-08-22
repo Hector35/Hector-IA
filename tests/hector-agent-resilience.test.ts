@@ -44,11 +44,10 @@ describe('Héctor Agent resilience broker',()=>{
  it('wires approval checkpoints and runtime resume persistence',()=>{
   const migration=readFileSync('migrations/0041_hector_agent_resilience.sql','utf8');
   const index=readFileSync('worker/index.ts','utf8');
-  const agent=readFileSync('worker/routes/hector-agent.ts','utf8');
   expect(migration).toContain('trg_hector_agent_approval_resume');
   expect(migration).toContain("status='resumed'");
   expect(index).toContain('saveResumeCheckpoint');
   expect(index).toContain('completeResumeCheckpoints');
-  expect(agent).toContain("hectorAgent.route('/resilience',hectorAgentResilience)");
+  expect(index).toContain("app.route('/api/hector-agent/resilience',hectorAgentResilience)");
  });
 });
