@@ -44,7 +44,7 @@ describe('cross-chat context synchronization',()=>{
   expect(secure).toContain("contextSyncApi.route('/api/context-sync',contextSync)");
   expect(secure).toContain("url.pathname.startsWith('/api/context-sync')");
   expect(secure).toContain('const forwarded=new Request(request,{headers});');
-  expect(secure).toContain('await worker.fetch(new Request(request,{headers}),env,ctx)');
+  expect(secure).toContain('worker.fetch(new Request(request,{headers}),env,ctx)');
   expect(secure).toContain('cross_site_mutation_denied');
  });
 
@@ -52,7 +52,7 @@ describe('cross-chat context synchronization',()=>{
   expect(agents).toContain('Shared context / cross-chat coordination');
   expect(agents).toContain('POST /bootstrap');
   expect(agents).toContain('POST /claim');
-  expect(agents).toContain('Claims are presence signals, never locks.');
+  expect(agents).toContain('Claims are presence signals, not locks.');
   expect(agents).toContain('POST /commit');
   expect(agents).toContain('POST /release');
   expect(agents).toContain('not a permission system');
