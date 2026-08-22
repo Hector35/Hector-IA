@@ -8,11 +8,12 @@ const hardening=readFileSync(new URL('../public/turno-rx/runtime-hardening-v86.j
 const capture=readFileSync(new URL('../public/turno-rx/capture-fix-v80.js',import.meta.url),'utf8');
 const interactions=readFileSync(new URL('../public/turno-rx/interaction-runtime-v85.js',import.meta.url),'utf8');
 const detail=readFileSync(new URL('../public/turno-rx/patient-detail-history-v82.js',import.meta.url),'utf8');
+const preflight=readFileSync(new URL('../public/turno-rx/runtime-preflight-v89.js',import.meta.url),'utf8');
 
 function activeModuleSources(html){return [...html.matchAll(/<script\s+type="module"\s+src="([^"]+)"/g)].map(m=>m[1]);}
 
-describe('Pendientes v87 operational hardening',()=>{
-  it('loads hardening after the legacy renderer and before the modern capture owner',()=>{
+describe('Pendientes v89 operational hardening',()=>{
+  it('loads hardening, single capture owner, and v89 interaction layers in order',()=>{
     const modules=activeModuleSources(index);
     const coreIndex=modules.indexOf('/turno-rx/app-v16.js?v=87');
     const hardeningIndex=modules.indexOf('/turno-rx/runtime-hardening-v86.js?v=87');
@@ -20,8 +21,9 @@ describe('Pendientes v87 operational hardening',()=>{
     expect(coreIndex).toBeGreaterThanOrEqual(0);
     expect(hardeningIndex).toBeGreaterThan(coreIndex);
     expect(captureIndex).toBeGreaterThan(hardeningIndex);
-    expect(modules).toContain('/turno-rx/patient-detail-history-v82.js?v=87');
-    expect(modules).toContain('/turno-rx/interaction-runtime-v85.js?v=87');
+    expect(modules).toContain('/turno-rx/patient-detail-history-v82.js?v=89');
+    expect(modules).toContain('/turno-rx/interaction-runtime-v85.js?v=89');
+    expect(index).toContain('/turno-rx/runtime-preflight-v89.js?v=89');
     expect(modules).not.toContain('/turno-rx/stability.js?v=20260818.1');
   });
 
@@ -54,7 +56,7 @@ describe('Pendientes v87 operational hardening',()=>{
     expect(hardening).toContain('const next={...row}');
   });
 
-  it('preserves iPhone interaction responsibilities',()=>{
+  it('preserves iPhone interaction responsibilities and the three-state transport cycle',()=>{
     expect(interactions).toContain("addEventListener('pointerdown'");
     expect(interactions).toContain("addEventListener('pointermove'");
     expect(interactions).toContain("addEventListener('pointerup'");
@@ -62,8 +64,9 @@ describe('Pendientes v87 operational hardening',()=>{
     expect(interactions).toContain("setStatus(g.id,'Pendiente')");
     expect(interactions).toContain('transportCycle');
     expect(interactions).toContain("document.getElementById('cameraInput')?.click()");
-    expect(interactions).toContain("const seq=['Por definir','Silla','Camilla','No trasladar']");
-    expect(interactions).not.toContain("if(current==='No trasladar')return");
+    expect(interactions).toContain("seq=['Por definir','Silla','Camilla']");
+    expect(interactions).toContain("Estudio portátil: no trasladar");
+    expect(interactions).not.toContain("'Camilla','No trasladar'");
     expect(interactions).not.toContain("write(STORAGE_KEY,[]);localStorage.setItem(ACTIVE_TAB_KEY,'RX');location.reload()");
   });
 
@@ -98,10 +101,21 @@ describe('Pendientes v87 operational hardening',()=>{
     expect(capture).toContain("category==='Piso'?floorBedFromText(recognizedText):''");
   });
 
-  it('keeps the service worker coherent with the v87 shell',()=>{
-    expect(sw).toContain("const CACHE = 'pendientes-shell-20260820-87'");
+  it('protects manual reconciliation fields and repairs old keyless image stores',()=>{
+    expect(preflight).toContain('GUARDED_MANUAL_FIELDS');
+    expect(preflight).toContain("'category','modality','diagnosis','diagnosisMeaning'");
+    expect(preflight).toContain("'oxygenProbable','oxygenReason'");
+    expect(preflight).toContain('IDBObjectStore.prototype.put');
+    expect(preflight).toContain("dbName===DB_NAME&&this.name===IMAGE_STORE&&keyless");
+    expect(detail).toContain("createObjectStore(STORE,{keyPath:'fp'})");
+  });
+
+  it('keeps the service worker coherent with the v89 shell',()=>{
+    expect(sw).toContain("const CACHE = 'pendientes-shell-20260822-89'");
+    expect(sw).toContain("'/turno-rx/runtime-preflight-v89.js?v=89'");
     expect(sw).toContain("'/turno-rx/runtime-hardening-v86.js?v=87'");
-    expect(sw).toContain("'/turno-rx/interaction-runtime-v85.js?v=87'");
+    expect(sw).toContain("'/turno-rx/interaction-runtime-v85.js?v=89'");
+    expect(sw).toContain("'/turno-rx/manual-category-v72.js?v=89'");
     expect(sw).not.toMatch(/^\s*'\/turno-rx\/stability\.js\?v=20260818\.1',?\s*$/m);
     expect(sw).toContain("url.pathname.startsWith('/api/')");
     expect(sw).toContain("cache:'no-store'");
