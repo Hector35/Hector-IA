@@ -62,6 +62,7 @@ function mapGoal(row:any){
  return{
   id:row.id,title:row.title,objective:row.objective,workJobId:row.work_job_id,status:row.status,progress:Number(row.progress||0),
   result:row.result||null,lastError:row.last_error||null,attemptCount:Number(row.attempt_count||0),maxAttempts:Number(row.max_attempts||0),
+  runtimeSecondsUsed:Math.round(Number(row.accumulated_runtime_ms||0)/1000),costUsdUsed:Number(row.accumulated_cost_usd||0),consecutiveErrors:Number(row.consecutive_errors||0),stopReason:row.stop_reason||null,
   nextRetryAt:row.next_retry_at||null,createdAt:row.created_at,updatedAt:row.updated_at,
   tasks:plan.phases.map((phase,index)=>({id:`${row.id}:${index}`,name:phase.name,goal:phase.goal,evidence:phase.evidence,status:phaseState(index,Number(row.progress||0),row.status)}))
  };
