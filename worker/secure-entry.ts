@@ -1,5 +1,5 @@
 import worker from './index';
-import type {Bindings,Variables} from './types';
+import type {Bindings} from './types';
 import {evaluateSecurityBoundary,isProtectedMutation,normalizeRequestId} from './lib/security-boundary';
 
 function securedResponse(response:Response,pathname:string,requestId:string){
