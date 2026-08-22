@@ -1,4 +1,4 @@
-const CACHE='hector-agent-v1.3';
+const CACHE='hector-agent-v1.2';
 const CACHE_PREFIX='hector-agent-';
 const ASSETS=['./','./styles.css','./app.js','./manifest.webmanifest'];
 
