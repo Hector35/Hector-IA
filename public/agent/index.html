@@ -4,7 +4,7 @@
   <meta charset="utf-8" />
   <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover" />
   <meta name="theme-color" content="#07111f" />
-  <meta name="hector-agent-version" content="v1.1-audit" />
+  <meta name="hector-agent-version" content="v1.2-telemetry" />
   <title>Héctor Agent</title>
   <link rel="manifest" href="./manifest.webmanifest" />
   <link rel="apple-touch-icon" href="../icons/apple-touch-icon.png" />
@@ -62,8 +62,10 @@
           <article class="card compact stats-grid">
             <div><span class="stat-value" id="goalCount">0</span><span class="stat-label">Objetivos</span></div>
             <div><span class="stat-value" id="memoryCount">0</span><span class="stat-label">Memorias</span></div>
-            <div><span class="stat-value" id="attemptCount">0</span><span class="stat-label">Ciclos</span></div>
-            <div><span class="stat-value" id="limitLabel">20</span><span class="stat-label">Límite</span></div>
+            <div><span class="stat-value" id="attemptCount">0/20</span><span class="stat-label">Ciclos / límite</span></div>
+            <div><span class="stat-value" id="runtimeUsed">0s</span><span class="stat-label">Tiempo usado</span></div>
+            <div><span class="stat-value" id="costUsed">$0.000</span><span class="stat-label">Costo usado</span></div>
+            <div><span class="stat-value" id="errorCount">0/4</span><span class="stat-label">Errores seguidos</span></div>
           </article>
         </div>
 
