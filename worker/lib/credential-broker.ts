@@ -12,7 +12,7 @@ function parseJson<T>(value:string|null|undefined,fallback:T):T{try{return value
 function publicHttps(value:string){
   try{
     const url=new URL(value);if(url.protocol!=='https:'||url.username||url.password)return null;
-    const host=url.hostname.toLowerCase();if(host==='localhost'||host.endsWith('.local')||host==='::1'||host.startsWith('127.')||host.startsWith('10.')||host.startsWith('192.168.'))return null;
+    const host=url.hostname.toLowerCase();if(host==='localhost'||host.endsWith('.local')||host==='::1'||host.startsWith('127.')||host.startsWith('10.')||host.startsWith('192.168.')||host.startsWith('169.254.'))return null;
     const match=host.match(/^172\.(\d+)\./);if(match&&Number(match[1])>=16&&Number(match[1])<=31)return null;return url;
   }catch{return null;}
 }
@@ -71,10 +71,10 @@ export async function tryRefreshCredential(env:Bindings,userId:string,credential
   const controller=new AbortController(),timer=setTimeout(()=>controller.abort(),20000);
   try{
     const response=await fetch(endpoint.toString(),{method:'POST',headers:{'Content-Type':'application/x-www-form-urlencoded','Accept':'application/json'},body:form.toString(),redirect:'manual',signal:controller.signal});
-    const data=await response.json<Record<string,unknown>>().catch(()=>({}));
+    const data:Record<string,unknown>=await response.json<Record<string,unknown>>().catch(()=>({} as Record<string,unknown>));
     if(!response.ok){await env.DB.prepare("UPDATE hector_agent_credentials SET status='refresh_required',updated_at=CURRENT_TIMESTAMP WHERE id=? AND user_id=?").bind(credentialId,userId).run();return{refreshed:false,reason:`refresh_http_${response.status}`};}
     if(typeof data.access_token!=='string'||!data.access_token)return{refreshed:false,reason:'refresh_missing_access_token'};
-    const merged={...material,...data,refresh_token:typeof data.refresh_token==='string'?data.refresh_token:refreshToken},expiresIn=Number(data.expires_in||0),expiresAt=Number.isFinite(expiresIn)&&expiresIn>0?new Date(Date.now()+Math.max(0,expiresIn-30)*1000).toISOString():null;
+    const merged:Record<string,unknown>={...material,...data,refresh_token:typeof data.refresh_token==='string'?data.refresh_token:refreshToken},expiresIn=Number(data.expires_in||0),expiresAt=Number.isFinite(expiresIn)&&expiresIn>0?new Date(Date.now()+Math.max(0,expiresIn-30)*1000).toISOString():null;
     await storeCredentialMaterial(env,userId,credentialId,merged);
     await env.DB.prepare("UPDATE hector_agent_credentials SET status='ready',expires_at=?,last_verified_at=CURRENT_TIMESTAMP,updated_at=CURRENT_TIMESTAMP WHERE id=? AND user_id=?").bind(expiresAt,credentialId,userId).run();
     return{refreshed:true,expiresAt};
