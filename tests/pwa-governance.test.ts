@@ -20,25 +20,22 @@ function manifests(dir:string):string[]{
  return out.sort();
 }
 
-describe('PWA architecture with advisory cross-chat coordination',()=>{
- it('records the three current installable PWAs without turning the registry into permission law',()=>{
+describe('canonical PWA governance with advisory cross-chat coordination',()=>{
+ it('defines exactly the three authorized installable PWAs',()=>{
   expect(registry.installablePwas.map((pwa:any)=>pwa.id)).toEqual(['hector-os','hector-agent','pendientes']);
   expect(registry.installablePwas.map((pwa:any)=>pwa.canonicalPath)).toEqual(['/','/agent/','/turno-rx/']);
   expect(registry.installablePwas.find((pwa:any)=>pwa.id==='pendientes').protected).toBe(true);
-  expect(registry.principle).toContain('not an internal permission gate');
  });
 
- it('keeps coordination advisory and permits evidence-based architectural change',()=>{
+ it('keeps cross-chat coordination advisory without weakening the PWA boundary',()=>{
   expect(registry.coordination.mode).toBe('advisory');
   expect(registry.coordination.sharedLedger).toContain('/issues/958');
-  const rules=registry.creationRules.join(' ');
-  expect(rules).toContain('new PWA or surface may be created');
-  expect(rules).toContain('without an internal approval token');
-  expect(rules).toContain('advisory coordination signals');
-  expect(rules).not.toContain('approvedNewPwa=true');
+  expect(registry.creationRules.join(' ')).toContain('exactly three canonical installable PWAs');
+  expect(registry.creationRules.join(' ')).toContain('approvedNewPwa=true');
+  expect(registry.creationRules.join(' ')).toContain('Claims and shared-context records remain advisory');
  });
 
- it('classifies Bridge, MCP and Context Hub as shared capabilities rather than extra PWAs',()=>{
+ it('classifies Bridge, MCP and Context Hub as shared services rather than extra PWAs',()=>{
   const bridge=registry.sharedSurfaces.find((item:any)=>item.id==='hector-bridge');
   const context=registry.sharedSurfaces.find((item:any)=>item.id==='context-hub');
   expect(bridge.ownerPwa).toBe('hector-os');
@@ -49,7 +46,7 @@ describe('PWA architecture with advisory cross-chat coordination',()=>{
   expect(context.ownerPwa).toBe('hector-os');
  });
 
- it('keeps current same-origin installable manifests registered and isolated',()=>{
+ it('keeps same-origin installable manifests limited to the registered three',()=>{
   expect(manifests('public/')).toEqual(['agent/manifest.webmanifest','manifest.webmanifest','turno-rx/manifest.webmanifest']);
   for(const pwa of registry.installablePwas){
    const path=`public${pwa.manifest}`.replaceAll('//','/');
@@ -57,32 +54,31 @@ describe('PWA architecture with advisory cross-chat coordination',()=>{
   }
  });
 
- it('teaches agents that context informs decisions but does not grant or deny internal permission',()=>{
+ it('teaches agents the distinction between advisory claims and explicit PWA authorization',()=>{
   const agents=read('AGENTS.md'),skills=read('worker/agent/skills.ts');
-  expect(agents).toContain('Shared context is intelligence infrastructure, not a permission system');
-  expect(agents).toContain('Do not invent internal approval gates');
-  expect(agents).toContain('does **not** require `approvedNewPwa`');
+  expect(agents).toContain('Claims are presence signals, never locks');
+  expect(agents).toContain('requires explicit user approval');
   expect(skills).toContain('COORDINACIÓN CANÓNICA DE SUPERFICIES');
-  expect(skills).toContain('No exijas approvedNewPwa');
+  expect(skills).toContain('Autorizar una función o corrección NO autoriza una nueva PWA');
   expect(skills).toContain('claims de Context Sync son señales consultivas, no locks');
  });
 
- it('supersedes the historical hard-gate context without deleting migration history',()=>{
+ it('keeps migration 0047 aligned with the explicit PWA boundary while adding capability persistence',()=>{
   const oldMigration=read('migrations/0046_restore_explicit_pwa_approval.sql');
   const newMigration=read('migrations/0047_max_capability_stack.sql');
   expect(oldMigration).toContain('approvedNewPwa=true');
-  expect(newMigration).toContain('supersedes the hard PWA gate wording');
-  expect(newMigration).toContain('Do not require approvedNewPwa');
+  expect(newMigration).toContain('approvedNewPwa=true');
+  expect(newMigration).toContain('explicit user authorization');
   expect(newMigration).toContain('owner_autonomy_nonblocking');
  });
 
- it('does not enforce an internal PWA approval token at PWA Factory',()=>{
+ it('enforces explicit new-PWA approval at the PWA Factory boundary',()=>{
   const factory=read('worker/routes/pwa-factory.ts');
+  expect(factory).toContain('approvedNewPwa');
+  expect(factory).toContain('approvalReason');
+  expect(factory).toContain('pwa_registry_reuse_required');
+  expect(factory).toContain('pwa_explicit_approval_reason_required');
   expect(factory).toContain('coordinationHint');
-  expect(factory).toContain('advisoryOnly:true');
-  expect(factory).not.toContain('approvedNewPwa');
-  expect(factory).not.toContain('approvalReason');
-  expect(factory).not.toContain('pwa_registry_reuse_required');
   expect(factory).toContain("k.startsWith(PREFIX)&&k!==CACHE");
  });
 
