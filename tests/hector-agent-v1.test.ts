@@ -20,6 +20,16 @@ describe('Héctor Agent V1 audited contract',()=>{
   expect(route).toContain("execution:'queued_for_cron'");
  });
 
+ it('resuelve aprobaciones de herramientas externas sin acoplarlas al estado global del Agent',()=>{
+  const generic=route.indexOf("if(approval.action!=='start_goal'||!approval.goal_id)");
+  const settingsGate=route.indexOf('const cfg=await settings(c.env,userId)',generic);
+  expect(generic).toBeGreaterThan(-1);
+  expect(settingsGate).toBeGreaterThan(generic);
+  expect(route.slice(generic,settingsGate)).toContain("execution:'approval_recorded'");
+  expect(route.slice(generic,settingsGate)).toContain("status='approved'");
+  expect(route.slice(generic,settingsGate)).toContain("user_id=? AND status='pending'");
+ });
+
  it('detiene y reanuda trabajos reales del backend',()=>{
   expect(route).toContain("last_error='Héctor Agent detenido por el usuario'");
   expect(route).toContain('Héctor Agent reanudado globalmente; objetivo devuelto a la cola');
