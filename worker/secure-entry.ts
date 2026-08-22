@@ -93,7 +93,7 @@ export default {
         ?await contextHubApi.fetch(forwarded,env,ctx)
         :url.pathname.startsWith('/api/context-sync')
          ?await contextSyncApi.fetch(forwarded,env,ctx)
-         :await worker.fetch(forwarded,env,ctx);
+         :await worker.fetch(new Request(request,{headers}),env,ctx);
   return securedResponse(response,url.pathname,requestId);
  },
  scheduled:worker.scheduled
