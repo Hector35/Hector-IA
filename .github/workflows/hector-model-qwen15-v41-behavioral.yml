@@ -1,0 +1,67 @@
+name: Hector model Qwen15 v41 behavioral evaluation
+on:
+  pull_request:
+    branches: [main]
+    paths:
+      - 'model/hector-asi/evals/qwen15-behavioral-v41.jsonl'
+      - 'model/hector-asi/training/evaluate_qwen15_v41_behavioral.py'
+      - '.github/workflows/hector-model-qwen15-v41-behavioral.yml'
+  workflow_dispatch:
+permissions:
+  contents: read
+  actions: read
+jobs:
+  evaluate-qwen15-v41:
+    runs-on: ubuntu-latest
+    timeout-minutes: 60
+    env:
+      V15_ARTIFACT_ID: '8551187584'
+      V41_ARTIFACT_ID: '8560331055'
+      V15_SHA: 'ef9d36b288e100bbcddbab475758699416908627a59206c9a82f60ce711d66dc'
+      V41_SHA: '31bead5f59982d8e321517fd235b81f992f83d2e3792a55690c2a841ff0e28f8'
+      V15_DIR: /tmp/hector-v15/adapter
+      V41_DIR: /tmp/hector-v41/adapter
+      EVAL_OUTPUT: /tmp/qwen15-v41-behavioral.json
+      HF_HOME: /home/runner/.cache/huggingface
+      TOKENIZERS_PARALLELISM: 'false'
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+      - name: Validate sealed evaluation
+        run: |
+          python -m py_compile model/hector-asi/training/evaluate_qwen15_v41_behavioral.py
+          test "$(wc -l < model/hector-asi/evals/qwen15-behavioral-v41.jsonl)" -eq 18
+      - name: Install pinned CPU stack
+        run: |
+          python -m pip install --disable-pip-version-check --index-url https://download.pytorch.org/whl/cpu torch==2.7.1
+          python -m pip install --disable-pip-version-check accelerate==1.8.1 huggingface_hub==0.34.4 peft==0.16.0 safetensors==0.5.3 transformers==4.53.2
+      - name: Download and verify immutable adapters
+        env:
+          GH_TOKEN: ${{ github.token }}
+        shell: bash
+        run: |
+          set -euo pipefail
+          for spec in "v15:$V15_ARTIFACT_ID:$V15_SHA:$V15_DIR" "v41:$V41_ARTIFACT_ID:$V41_SHA:$V41_DIR"; do
+            IFS=: read -r name id expected dest <<< "$spec"
+            mkdir -p "/tmp/$name-artifact" "$(dirname "$dest")"
+            curl --fail --location --retry 4 -H "Authorization: Bearer $GH_TOKEN" -H "Accept: application/vnd.github+json" "https://api.github.com/repos/${GITHUB_REPOSITORY}/actions/artifacts/${id}/zip" -o "/tmp/$name.zip"
+            unzip -q "/tmp/$name.zip" -d "/tmp/$name-artifact"
+            file="$(find "/tmp/$name-artifact" -type f -path '*/adapter/adapter_model.safetensors' -print -quit)"
+            test -n "$file"; test "$(sha256sum "$file" | awk '{print $1}')" = "$expected"
+            cp -a "$(dirname "$file")" "$dest"
+            test "$(stat -c%s "$dest/adapter_model.safetensors")" -eq 73911112
+          done
+      - name: Compare active v15 versus v41
+        run: python model/hector-asi/training/evaluate_qwen15_v41_behavioral.py
+      - name: Upload complete evidence
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: hector-asi-qwen15-v41-behavioral-${{ github.run_id }}
+          path: /tmp/qwen15-v41-behavioral.json
+          if-no-files-found: error
+          retention-days: 90
+      - name: Enforce promotion gate
+        run: jq -e '.gates.eligibleForPromotion == true' "$EVAL_OUTPUT"
