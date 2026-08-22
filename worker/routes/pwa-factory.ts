@@ -12,13 +12,19 @@ const createSchema=z.object({
   description:z.string().max(500).optional(),
   themeColor:z.string().regex(/^#[0-9a-fA-F]{6}$/).default('#111827'),
   backgroundColor:z.string().regex(/^#[0-9a-fA-F]{6}$/).default('#ffffff'),
-  offline:z.boolean().default(true),
-  approvedNewPwa:z.boolean().default(false),
-  approvalReason:z.string().trim().min(8).max(500).optional()
+  offline:z.boolean().default(true)
 });
 
 function slugify(value:string){return value.normalize('NFD').replace(/[\u0300-\u036f]/g,'').toLowerCase().replace(/[^a-z0-9]+/g,'-').replace(/^-|-$/g,'').slice(0,48)||`pwa-${Date.now()}`;}
+function normalize(value:string){return value.normalize('NFD').replace(/[\u0300-\u036f]/g,'').toLowerCase();}
 function esc(value:string){return value.replace(/\\/g,'\\\\').replace(/`/g,'\\`').replace(/\$\{/g,'\\${');}
+
+function coordinationHint(name:string,objective:string){
+ const q=normalize(`${name} ${objective}`);
+ if(['piso','rayos x','rx','tac','usg','paciente','camilla','silla'].some(x=>q.includes(x)))return{recommendedOwner:'pendientes',canonicalPath:'/turno-rx/',reason:'El objetivo parece clínico y se relaciona con el flujo Pendientes.',advisoryOnly:true};
+ if(['agente','agent','autonom','objetivo','job','aprobacion','approval','checkpoint'].some(x=>q.includes(x)))return{recommendedOwner:'hector-agent',canonicalPath:'/agent/',reason:'El objetivo parece pertenecer a autonomía, jobs u objetivos del agente.',advisoryOnly:true};
+ return{recommendedOwner:'hector-os',canonicalPath:'/',reason:'No se detectó una especialización fuerte; Héctor OS es la superficie general actual.',advisoryOnly:true};
+}
 
 function sourceFiles(spec:{name:string;slug:string;objective:string;description:string;themeColor:string;backgroundColor:string;offline:boolean}){
  const pkg={name:spec.slug,private:true,version:'0.1.0',type:'module',scripts:{dev:'vite',build:'tsc -b && vite build',typecheck:'tsc -b'},dependencies:{'@vitejs/plugin-react':'latest',vite:'latest',typescript:'latest',react:'latest','react-dom':'latest'},devDependencies:{'@types/react':'latest','@types/react-dom':'latest'}};
@@ -43,7 +49,7 @@ function sourceFiles(spec:{name:string;slug:string;objective:string;description:
 
 async function gh(token:string,path:string,init:RequestInit={}){const r=await fetch(`https://api.github.com/repos/Hector35/Hector-IA${path}`,{...init,headers:{Authorization:`Bearer ${token}`,Accept:'application/vnd.github+json','User-Agent':'Hector-OS-PWA-Factory','Content-Type':'application/json',...(init.headers||{})}});const d=await r.json<any>().catch(()=>({}));if(!r.ok)throw new Error(`GitHub ${r.status}: ${d?.message||'error'}`);return d;}
 
-pwaFactory.post('/',async c=>{const parsed=createSchema.safeParse(await c.req.json());if(!parsed.success)return c.json({error:'Especificación inválida',details:parsed.error.flatten()},400);if(parsed.data.approvedNewPwa!==true)return c.json({error:'Nueva PWA bloqueada por gobernanza: reutiliza una superficie canónica o solicita autorización explícita para crear una PWA nueva.',code:'pwa_registry_reuse_required',registry:'config/pwa-registry.json',canonicalPwas:['hector-os','hector-agent','pendientes']},409);if(!parsed.data.approvalReason?.trim())return c.json({error:'Falta documentar la autorización explícita para la nueva PWA',code:'pwa_explicit_approval_reason_required'},400);const uid=c.get('userId'),id=crypto.randomUUID(),slug=slugify(parsed.data.name),spec={...parsed.data,slug,description:parsed.data.description||''};const files=sourceFiles(spec);await c.env.DB.batch([c.env.DB.prepare("INSERT INTO pwa_projects(id,user_id,name,slug,objective,specification_json,status,current_version) VALUES(?,?,?,?,?,?,'draft',1)").bind(id,uid,spec.name,slug,spec.objective,JSON.stringify(spec)),c.env.DB.prepare("INSERT INTO pwa_project_versions(id,project_id,version,source_json,build_status) VALUES(?,?,1,?,'pending')").bind(crypto.randomUUID(),id,JSON.stringify(files))]);return c.json({id,name:spec.name,slug,status:'draft',version:1,fileCount:Object.keys(files).length},201);});
+pwaFactory.post('/',async c=>{const parsed=createSchema.safeParse(await c.req.json());if(!parsed.success)return c.json({error:'Especificación inválida',details:parsed.error.flatten()},400);const uid=c.get('userId'),id=crypto.randomUUID(),slug=slugify(parsed.data.name),spec={...parsed.data,slug,description:parsed.data.description||''},coordination=coordinationHint(spec.name,spec.objective);const files=sourceFiles(spec);await c.env.DB.batch([c.env.DB.prepare("INSERT INTO pwa_projects(id,user_id,name,slug,objective,specification_json,status,current_version) VALUES(?,?,?,?,?,?,'draft',1)").bind(id,uid,spec.name,slug,spec.objective,JSON.stringify({...spec,coordination})),c.env.DB.prepare("INSERT INTO pwa_project_versions(id,project_id,version,source_json,build_status) VALUES(?,?,1,?,'pending')").bind(crypto.randomUUID(),id,JSON.stringify(files))]);return c.json({id,name:spec.name,slug,status:'draft',version:1,fileCount:Object.keys(files).length,coordination},201);});
 
 pwaFactory.get('/',async c=>c.json({items:(await c.env.DB.prepare('SELECT id,name,slug,objective,status,repository,branch,preview_url,production_url,current_version,last_error,created_at,updated_at FROM pwa_projects WHERE user_id=? ORDER BY updated_at DESC LIMIT 100').bind(c.get('userId')).all()).results}));
 

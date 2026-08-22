@@ -57,13 +57,13 @@ contextSync.post('/bootstrap',async c=>{
  ]);
  const sharedCommits=(commits.results as any[]||[]).map(row=>({id:row.id,chatRef:row.external_chat_ref,client:row.client,topic:row.topic,summary:row.summary,decisions:parseJson(row.decisions_json,[]),actions:parseJson(row.actions_json,[]),nextSteps:parseJson(row.next_steps_json,[]),blockers:parseJson(row.blockers_json,[]),resources:parseJson(row.resources_json,[]),createdAt:row.created_at,sameChat:row.external_chat_ref===input.chatRef}));
  return c.json({
-  ok:true,protocol:'hector-cross-chat-sync',version:1,session:{id:session.id,chatRef:session.external_chat_ref,client:session.client,topic:session.topic},
-  rules:['bootstrap before substantial work','claim scope before parallel implementation','commit decisions/actions/next steps after meaningful work','reuse canonical state instead of inventing parallel state'],
-  retrieval:{query,semanticMemory:pack.memories,priorSummaries:pack.priorSummaries.slice(0,8),projectState:pack.projectState},
+  ok:true,protocol:'hector-cross-chat-sync',version:2,session:{id:session.id,chatRef:session.external_chat_ref,client:session.client,topic:session.topic},
+  rules:['bootstrap before substantial work','announce scope with advisory claim','compare overlapping work before deciding whether to reuse, integrate or diverge','commit decisions/actions/next steps after meaningful work'],
+  retrieval:{query,semanticMemory:pack.memories,priorSummaries:pack.priorSummaries.slice(0,12),crossConversationMessages:pack.crossConversationMessages||[],projectState:pack.projectState},
   durableContext:{system:systemContext.results,records:(records.results as any[]||[]).map(row=>({...row,tags:parseJson(row.tags_json,[])}))},
-  coordination:{activeClaims:claims.results,recentCommits:sharedCommits,activeSessions:sessions.results},
+  coordination:{mode:'advisory',activeClaims:claims.results,recentCommits:sharedCommits,activeSessions:sessions.results},
   work:{projects:projects.results,jobs:jobs.results,schedules:schedules.results},
-  note:'La fuente de verdad es compartida y durable. No se copia cada transcripción completa al prompt; se recupera el estado relevante y los commits estructurados para evitar perder decisiones.'
+  note:'La historia durable se conserva completa en almacenamiento y cada sesión reconstruye el contexto relevante. Claims y registros informan decisiones; no bloquean trabajo paralelo.'
  });
 });
 
@@ -93,18 +93,14 @@ contextSync.post('/commit',async c=>{
 contextSync.post('/claim',async c=>{
  const parsed=claimSchema.safeParse(await c.req.json().catch(()=>null));if(!parsed.success)return c.json({error:'Claim inválido',details:parsed.error.flatten()},400);
  const input=parsed.data,userId=c.get('userId'),session=await upsertSession(c,input),scope=normalizeScope(input.scope);if(!scope)return c.json({error:'Scope inválido'},400);await expireClaims(c);
- const existing=await c.env.DB.prepare(`SELECT cl.id,cl.scope,cl.intent,cl.lease_expires_at,s.external_chat_ref,s.client,s.topic FROM coordination_claims cl JOIN chat_sync_sessions s ON s.id=cl.session_id
-  WHERE cl.user_id=? AND cl.scope=? AND cl.status='active' AND cl.lease_expires_at>CURRENT_TIMESTAMP LIMIT 1`).bind(userId,scope).first<any>();
- if(existing&&existing.external_chat_ref!==input.chatRef)return c.json({error:'Scope ocupado por otra sesión',code:'coordination_scope_claimed',claim:existing},409);
+ const active=(await c.env.DB.prepare(`SELECT cl.id,cl.scope,cl.intent,cl.lease_expires_at,s.external_chat_ref,s.client,s.topic FROM coordination_claims cl JOIN chat_sync_sessions s ON s.id=cl.session_id
+  WHERE cl.user_id=? AND cl.scope=? AND cl.status='active' AND cl.lease_expires_at>CURRENT_TIMESTAMP ORDER BY cl.updated_at DESC`).bind(userId,scope).all<any>()).results||[];
+ const own=active.find((x:any)=>x.external_chat_ref===input.chatRef),overlaps=active.filter((x:any)=>x.external_chat_ref!==input.chatRef);
  const lease=new Date(Date.now()+input.ttlMinutes*60_000).toISOString();
- if(existing){await c.env.DB.prepare('UPDATE coordination_claims SET intent=?,lease_expires_at=?,updated_at=CURRENT_TIMESTAMP WHERE id=? AND user_id=?').bind(input.intent,lease,existing.id,userId).run();return c.json({ok:true,claimId:existing.id,scope,leaseExpiresAt:lease,renewed:true});}
+ if(own){await c.env.DB.prepare('UPDATE coordination_claims SET intent=?,lease_expires_at=?,updated_at=CURRENT_TIMESTAMP WHERE id=? AND user_id=?').bind(input.intent,lease,own.id,userId).run();return c.json({ok:true,claimId:own.id,scope,leaseExpiresAt:lease,renewed:true,advisory:true,overlaps});}
  const id=crypto.randomUUID();
- try{await c.env.DB.prepare("INSERT INTO coordination_claims(id,user_id,scope,session_id,intent,status,lease_expires_at) VALUES(?,?,?,?,?,'active',?)").bind(id,userId,scope,session.id,input.intent,lease).run();}
- catch{
-  const raced=await c.env.DB.prepare(`SELECT cl.id,cl.scope,cl.intent,cl.lease_expires_at,s.external_chat_ref,s.client,s.topic FROM coordination_claims cl JOIN chat_sync_sessions s ON s.id=cl.session_id WHERE cl.user_id=? AND cl.scope=? AND cl.status='active' LIMIT 1`).bind(userId,scope).first<any>();
-  return c.json({error:'Scope ocupado por otra sesión',code:'coordination_scope_claimed',claim:raced},409);
- }
- return c.json({ok:true,claimId:id,scope,leaseExpiresAt:lease,renewed:false},201);
+ await c.env.DB.prepare("INSERT INTO coordination_claims(id,user_id,scope,session_id,intent,status,lease_expires_at) VALUES(?,?,?,?,?,'active',?)").bind(id,userId,scope,session.id,input.intent,lease).run();
+ return c.json({ok:true,claimId:id,scope,leaseExpiresAt:lease,renewed:false,advisory:true,overlaps},201);
 });
 
 contextSync.post('/release',async c=>{
@@ -125,5 +121,5 @@ contextSync.get('/status',async c=>{
   c.env.DB.prepare(`SELECT cl.id,cl.scope,cl.intent,cl.lease_expires_at,s.external_chat_ref,s.client,s.topic FROM coordination_claims cl JOIN chat_sync_sessions s ON s.id=cl.session_id WHERE cl.user_id=? AND cl.status='active' ORDER BY cl.updated_at DESC`).bind(userId).all(),
   c.env.DB.prepare('SELECT COUNT(*) count,MAX(created_at) last_commit_at FROM chat_sync_commits WHERE user_id=?').bind(userId).first<any>()
  ]);
- return c.json({ok:true,protocol:'hector-cross-chat-sync',version:1,activeSessions:sessions.results,activeClaims:claims.results,commitCount:Number(commits?.count||0),lastCommitAt:commits?.last_commit_at||null});
+ return c.json({ok:true,protocol:'hector-cross-chat-sync',version:2,coordinationMode:'advisory',activeSessions:sessions.results,activeClaims:claims.results,commitCount:Number(commits?.count||0),lastCommitAt:commits?.last_commit_at||null});
 });
