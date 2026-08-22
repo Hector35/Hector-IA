@@ -15,6 +15,7 @@ on:
       - 'vite.config.*'
       - 'wrangler.jsonc'
       - '.github/workflows/deploy-production.yml'
+      - '.github/workflows/context-platform-production-audit.yml'
 
 permissions:
   contents: read
