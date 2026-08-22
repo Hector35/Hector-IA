@@ -25,6 +25,13 @@ describe('Héctor Agent V1 audited contract',()=>{
   expect(route).toContain('Héctor Agent reanudado globalmente; objetivo devuelto a la cola');
  });
 
+ it('despacha objetivos de programación al runner real sin duplicar ejecuciones activas',()=>{
+  expect(route).toContain('agent-code-runner.yml/dispatches');
+  expect(route).toContain("kind==='programming'");
+  expect(route).toContain("execution:'runner_active'");
+  expect(route).toContain("execution:'runner_dispatched'");
+ });
+
  it('usa memoria persistente al crear objetivos y permite corregirla',()=>{
   expect(route).toContain('MEMORIA PERSISTENTE DISPONIBLE');
   expect(route).toContain("hectorAgent.patch('/memory/:id'");
