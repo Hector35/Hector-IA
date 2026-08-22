@@ -1,6 +1,6 @@
 const CACHE='hector-agent-v1.2';
 const CACHE_PREFIX='hector-agent-';
-const ASSETS=['./styles.css','./app.js','./manifest.webmanifest'];
+const ASSETS=['./','./styles.css','./app.js','./manifest.webmanifest'];
 
 self.addEventListener('install',event=>{
   event.waitUntil(caches.open(CACHE).then(cache=>cache.addAll(ASSETS)).then(()=>self.skipWaiting()));
@@ -14,7 +14,15 @@ self.addEventListener('fetch',event=>{
   const req=event.request,url=new URL(req.url);
   if(req.method!=='GET'||url.origin!==self.location.origin||url.pathname.startsWith('/api/'))return;
   if(req.mode==='navigate'){
-    event.respondWith(fetch(req,{cache:'no-store'}));
+    event.respondWith((async()=>{
+      try{
+        const res=await fetch(req,{cache:'no-store'});
+        if(res.ok)event.waitUntil(caches.open(CACHE).then(cache=>cache.put('./',res.clone())));
+        return res;
+      }catch{
+        return await caches.match('./')||Response.error();
+      }
+    })());
     return;
   }
   event.respondWith((async()=>{
