@@ -1,11 +1,11 @@
 {
-  "version": 2,
+  "version": 3,
   "updated": "2026-08-22",
-  "principle": "Use shared context to choose the best surface intelligently. Reuse canonical surfaces when that is simpler, but do not block a better architecture when a new surface has a concrete advantage.",
+  "principle": "Use shared context to coordinate work without blocking parallel progress, while preserving explicit user approval for changes to the installable PWA set.",
   "coordination": {
     "mode": "advisory",
     "sharedLedger": "https://github.com/Hector35/Hector-IA/issues/958",
-    "rule": "Inspect current main, open PRs, Context Hub and the shared ledger before duplicating a capability. Shared state guides judgment; it does not act as a permission gate."
+    "rule": "Inspect current main, open PRs, Context Hub and the shared ledger before duplicating a capability. Claims are advisory presence signals, not locks."
   },
   "installablePwas": [
     {
@@ -39,7 +39,7 @@
       "purpose": "Clinical Turno RX/Pendientes workflow.",
       "owns": ["piso", "rx", "tac", "usg", "clinical-local-data"],
       "protected": true,
-      "rule": "Keep unrelated work out of this PWA. Work explicitly targeting Pendientes may change it normally."
+      "rule": "Do not modify for unrelated work. Work explicitly targeting Pendientes may change it normally."
     }
   ],
   "sharedSurfaces": [
@@ -51,7 +51,7 @@
       "auxiliaryUi": ["/bridge-core.html"],
       "backend": "/api/hector-bridge",
       "status": "active",
-      "rule": "Bridge and Bridge Core currently form one capability layer. Extend or split only when evidence shows a real architectural benefit."
+      "rule": "Bridge and Bridge Core are one shared capability layer owned by Héctor OS."
     },
     {
       "id": "context-hub",
@@ -59,15 +59,17 @@
       "ownerPwa": "hector-os",
       "backend": "/api/context-hub",
       "status": "active",
-      "rule": "Context Hub is the shared context layer. UI normally belongs in an existing owner surface, but a different architecture is allowed when justified and recorded."
+      "rule": "Context Hub is shared context infrastructure, not an installable PWA."
     }
   ],
   "creationRules": [
-    "Before creating a PWA, inspect shared context and existing surfaces so the decision is informed rather than accidental.",
-    "Reusing an existing surface is preferred when it is the simplest coherent solution; it is not mandatory when separation has a concrete advantage.",
-    "If a new installable PWA is created, update this registry in the same change so other agents immediately inherit the new architecture.",
+    "Before creating or splitting a surface, inspect shared context and concurrent work so the decision is informed rather than accidental.",
+    "There are exactly three canonical installable PWAs unless Héctor explicitly authorizes creation of another installable PWA.",
+    "Authorization to implement a feature is not authorization to create a new installable PWA.",
+    "A new installable PWA requires approvedNewPwa=true and a non-empty approvalReason documenting the explicit user authorization.",
+    "The same change that creates a new installable PWA must update this registry with a unique path, manifest and service worker.",
     "Never create overlapping service-worker scopes or cache ownership across PWAs.",
     "Do not modify Pendientes for unrelated work.",
-    "Never use this registry as a hard permission gate. It is shared architectural state and must evolve when the system evolves."
+    "Claims and shared-context records remain advisory coordination signals and must not block otherwise authorized work."
   ]
 }

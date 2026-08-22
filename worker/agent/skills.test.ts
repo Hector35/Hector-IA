@@ -22,22 +22,22 @@ describe('agent skills',()=>{
   expect(ids).toContain('pwa-builder');
  });
 
- it('inyecta coordinación compartida incluso antes de decidir crear una PWA',()=>{
+ it('inyecta coordinación compartida y gobernanza canónica',()=>{
   const context=renderAgentContext('Agrega una consola nueva para herramientas');
-  expect(context).toContain('COORDINACIÓN INTELIGENTE DE SUPERFICIES');
+  expect(context).toContain('COORDINACIÓN CANÓNICA DE SUPERFICIES');
   expect(context).toContain('Héctor OS en /');
   expect(context).toContain('Héctor Agent en /agent/');
   expect(context).toContain('Pendientes en /turno-rx/');
   expect(context).toContain('Context Hub');
   expect(context).toContain('Shared Context Ledger');
-  expect(context).toContain('no son permisos ni frenos');
+  expect(context).toContain('claims de coordinación son señales consultivas y no locks');
  });
 
- it('permite una PWA nueva cuando la arquitectura realmente lo justifica',()=>{
+ it('requiere autorización explícita para una nueva PWA',()=>{
   const context=renderAgentContext('Construye una PWA para iPhone con service worker');
   expect(context).toContain('CONTRATO DE INGENIERÍA PWA');
   expect(context).toContain('config/pwa-registry.json');
-  expect(context).toContain('puedes crearla');
+  expect(context).toContain('requiere autorización explícita');
   expect(context).toContain('manifest.webmanifest');
   expect(context).toContain('viewport 390x844');
   expect(context).toContain('rollback');
