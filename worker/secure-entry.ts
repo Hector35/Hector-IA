@@ -3,6 +3,7 @@ import worker from './index';
 import type {Bindings,Variables} from './types';
 import {hectorBridge} from './routes/hector-bridge';
 import {contextHub} from './routes/context-hub';
+import {contextSync} from './routes/context-sync';
 import {evaluateSecurityBoundary,isProtectedMutation,normalizeRequestId} from './lib/security-boundary';
 
 const HECTOR_AGENT_VERSION='20260822-4';
@@ -10,6 +11,8 @@ const bridgeApi=new Hono<{Bindings:Bindings;Variables:Variables}>();
 bridgeApi.route('/api/hector-bridge',hectorBridge);
 const contextHubApi=new Hono<{Bindings:Bindings;Variables:Variables}>();
 contextHubApi.route('/api/context-hub',contextHub);
+const contextSyncApi=new Hono<{Bindings:Bindings;Variables:Variables}>();
+contextSyncApi.route('/api/context-sync',contextSync);
 
 function securedResponse(response:Response,pathname:string,requestId:string){
  const secured=new Response(response.body,response);
@@ -67,7 +70,9 @@ export default {
    ?await bridgeApi.fetch(new Request(request,{headers}),env,ctx)
    :url.pathname.startsWith('/api/context-hub')
     ?await contextHubApi.fetch(new Request(request,{headers}),env,ctx)
-    :await worker.fetch(new Request(request,{headers}),env,ctx);
+    :url.pathname.startsWith('/api/context-sync')
+     ?await contextSyncApi.fetch(new Request(request,{headers}),env,ctx)
+     :await worker.fetch(new Request(request,{headers}),env,ctx);
   return securedResponse(response,url.pathname,requestId);
  },
  scheduled:worker.scheduled
