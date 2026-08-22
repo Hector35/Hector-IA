@@ -2,7 +2,7 @@ import type {Bindings} from '../types';
 import {relevantMemories} from './openai';
 
 export type ContextMessage={role:'user'|'assistant';content:string};
-export type ContextPack={system:string;memories:string[];summary?:string;priorSummaries:string[];recentMessages:ContextMessage[];projectState:string[]};
+export type ContextPack={system:string;memories:string[];summary?:string;priorSummaries:string[];recentMessages:ContextMessage[];crossConversationMessages:string[];projectState:string[]};
 
 export const EMBEDDING_MODEL='text-embedding-3-small';
 export const EMBEDDING_DIMENSIONS=512;
@@ -96,29 +96,44 @@ async function semanticMemories(env:Bindings,userId:string,input:string,rows:Mem
   }catch{return [];}
 }
 
+function relevantAndRecent(input:string,items:string[],relevantLimit:number,recentLimit:number,totalLimit:number){
+  const clean=items.map(x=>String(x||'').trim()).filter(Boolean);
+  const relevant=relevantMemories(input,clean).slice(0,relevantLimit);
+  return [...new Set([...relevant,...clean.slice(0,recentLimit)])].slice(0,totalLimit);
+}
+
 export async function loadContextPack(env:Bindings,userId:string,conversationId:string|undefined,input:string):Promise<ContextPack>{
   const db=env.DB;
-  const [systemRows,memoryRows,summaryRow,priorRows,recentRows,workRows,updateRows]=await Promise.all([
+  const [systemRows,memoryRows,summaryRow,priorRows,recentRows,crossRows,workRows,updateRows,hubRows,syncRows]=await Promise.all([
     db.prepare("SELECT category,content FROM system_context WHERE active=1 ORDER BY priority DESC,context_key").all<{category:string;content:string}>(),
     db.prepare("SELECT m.id,m.content,e.model,e.dimensions,e.vector_json FROM memories m LEFT JOIN memory_embeddings e ON e.memory_id=m.id WHERE m.user_id=? ORDER BY m.importance DESC,m.updated_at DESC LIMIT 150").bind(userId).all<MemoryRow>(),
     conversationId?db.prepare("SELECT summary FROM conversation_summaries WHERE conversation_id=? AND user_id=?").bind(conversationId,userId).first<{summary:string}>():Promise.resolve(null),
-    db.prepare("SELECT summary FROM conversation_summaries WHERE user_id=? AND (? IS NULL OR conversation_id<>?) ORDER BY updated_at DESC LIMIT 4").bind(userId,conversationId||null,conversationId||null).all<{summary:string}>(),
+    db.prepare("SELECT summary FROM conversation_summaries WHERE user_id=? AND (? IS NULL OR conversation_id<>?) ORDER BY updated_at DESC LIMIT 30").bind(userId,conversationId||null,conversationId||null).all<{summary:string}>(),
     conversationId?db.prepare("SELECT role,content FROM messages WHERE conversation_id=? AND conversation_id IN (SELECT id FROM conversations WHERE user_id=?) ORDER BY created_at DESC LIMIT 16").bind(conversationId,userId).all<ContextMessage>():Promise.resolve({results:[]} as any),
-    db.prepare("SELECT kind,status,progress,result FROM work_jobs WHERE user_id=? ORDER BY updated_at DESC LIMIT 3").bind(userId).all<any>(),
-    db.prepare("SELECT request_text,status FROM update_requests WHERE user_id=? ORDER BY created_at DESC LIMIT 3").bind(userId).all<any>()
+    db.prepare("SELECT m.role,m.content FROM messages m JOIN conversations c ON c.id=m.conversation_id WHERE c.user_id=? AND (? IS NULL OR m.conversation_id<>?) ORDER BY m.created_at DESC LIMIT 120").bind(userId,conversationId||null,conversationId||null).all<ContextMessage>(),
+    db.prepare("SELECT kind,status,progress,result FROM work_jobs WHERE user_id=? ORDER BY updated_at DESC LIMIT 8").bind(userId).all<any>(),
+    db.prepare("SELECT request_text,status FROM update_requests WHERE user_id=? ORDER BY created_at DESC LIMIT 6").bind(userId).all<any>(),
+    db.prepare("SELECT record_type,subject,content,confidence,updated_at FROM context_hub_records WHERE user_id=? AND status='active' AND record_type IN ('state','project','task','decision','preference','error','solution') AND (valid_until IS NULL OR valid_until>CURRENT_TIMESTAMP) ORDER BY updated_at DESC LIMIT 60").bind(userId).all<any>(),
+    db.prepare(`SELECT cc.summary,cc.decisions_json,cc.actions_json,cc.next_steps_json,cc.blockers_json,cc.resources_json,cc.created_at,s.external_chat_ref,s.client,s.topic
+      FROM chat_sync_commits cc JOIN chat_sync_sessions s ON s.id=cc.session_id WHERE cc.user_id=? ORDER BY cc.created_at DESC LIMIT 40`).bind(userId).all<any>()
   ]);
   const rows=memoryRows.results||[];
   const lexical=relevantMemories(input,rows.map(x=>x.content));
   const semantic=await semanticMemories(env,userId,input,rows,lexical);
-  const memories=[...new Set([...semantic,...lexical])].slice(0,12);
+  const memories=[...new Set([...semantic,...lexical])].slice(0,16);
   const system=(systemRows.results||[]).map(x=>`[${x.category}] ${x.content}`).join('\n');
-  const priorSummaries=(priorRows.results||[]).map(x=>x.summary).filter(Boolean);
+  const allPrior=(priorRows.results||[]).map(x=>x.summary).filter(Boolean);
+  const priorSummaries=relevantAndRecent(input,allPrior,8,6,12);
   const recentMessages=[...(recentRows.results||[])].reverse().map(x=>({role:x.role,content:x.content}));
-  const projectState=[...(workRows.results||[]).map((x:any)=>`Trabajo ${x.kind}: ${x.status}, progreso ${x.progress}%${x.result?`, resultado: ${String(x.result).slice(0,240)}`:''}`),...(updateRows.results||[]).map((x:any)=>`Solicitud de mejora (${x.status}): ${String(x.request_text).slice(0,240)}`)];
-  return{system,memories,summary:summaryRow?.summary,priorSummaries,recentMessages,projectState};
+  const crossMessageText=(crossRows.results||[]).map((x:any)=>`${x.role}: ${String(x.content).slice(0,1200)}`);
+  const syncText=(syncRows.results||[]).map((x:any)=>`[${x.client}${x.topic?` · ${x.topic}`:''}] ${String(x.summary).slice(0,1200)}${x.decisions_json&&x.decisions_json!=='[]'?` Decisiones: ${String(x.decisions_json).slice(0,800)}`:''}${x.next_steps_json&&x.next_steps_json!=='[]'?` Siguientes: ${String(x.next_steps_json).slice(0,800)}`:''}`);
+  const crossConversationMessages=relevantAndRecent(input,[...syncText,...crossMessageText],10,6,14);
+  const hubState=(hubRows.results||[]).map((x:any)=>`Context Hub [${x.record_type}]${x.subject?` ${x.subject}:`:''} ${String(x.content).slice(0,700)} (confianza ${Number(x.confidence||0).toFixed(2)})`);
+  const projectState=[...hubState.slice(0,24),...(workRows.results||[]).map((x:any)=>`Trabajo ${x.kind}: ${x.status}, progreso ${x.progress}%${x.result?`, resultado: ${String(x.result).slice(0,400)}`:''}`),...(updateRows.results||[]).map((x:any)=>`Solicitud de mejora (${x.status}): ${String(x.request_text).slice(0,400)}`)];
+  return{system,memories,summary:summaryRow?.summary,priorSummaries,recentMessages,crossConversationMessages,projectState};
 }
 
-export function renderContext(pack:ContextPack){return['CONTEXTO PERMANENTE DEL SISTEMA',pack.system||'- No disponible','MEMORIA RELEVANTE DEL PROPIETARIO',pack.memories.length?pack.memories.map(x=>`- ${x}`).join('\n'):'- Sin memoria relevante','RESUMEN DE ESTA CONVERSACIÓN',pack.summary||'- Aún no existe resumen persistente','RESÚMENES DE CONVERSACIONES RECIENTES',pack.priorSummaries.length?pack.priorSummaries.map((x,i)=>`Conversación ${i+1}: ${x}`).join('\n\n'):'- No hay conversaciones resumidas anteriores','ESTADO RECIENTE DEL PROYECTO',pack.projectState.length?pack.projectState.map(x=>`- ${x}`).join('\n'):'- Sin trabajos o mejoras recientes'].join('\n\n');}
+export function renderContext(pack:ContextPack){return['CONTEXTO PERMANENTE DEL SISTEMA',pack.system||'- No disponible','MEMORIA RELEVANTE DEL PROPIETARIO',pack.memories.length?pack.memories.map(x=>`- ${x}`).join('\n'):'- Sin memoria relevante','RESUMEN DE ESTA CONVERSACIÓN',pack.summary||'- Aún no existe resumen persistente','RESÚMENES RELEVANTES DE OTRAS CONVERSACIONES',pack.priorSummaries.length?pack.priorSummaries.map((x,i)=>`Conversación ${i+1}: ${x}`).join('\n\n'):'- No hay conversaciones resumidas anteriores','SEÑALES RELEVANTES DE OTROS CHATS/AGENTES',pack.crossConversationMessages.length?pack.crossConversationMessages.map(x=>`- ${x}`).join('\n'):'- Sin señales cruzadas relevantes','ESTADO COMPARTIDO DEL PROYECTO',pack.projectState.length?pack.projectState.map(x=>`- ${x}`).join('\n'):'- Sin trabajos, decisiones o mejoras recientes'].join('\n\n');}
 
 export async function maybeSaveExplicitMemory(env:Bindings,userId:string,message:string){
   const match=message.match(/(?:recuerda(?: que)?|guarda(?: que)?|mi preferencia es|prefiero que|siempre quiero que)\s*[:,-]?\s*(.{8,500})/i);
