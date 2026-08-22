@@ -45,6 +45,7 @@
       "canonicalUi": "/bridge.html",
       "auxiliaryUi": ["/bridge-core.html"],
       "backend": "/api/hector-bridge",
+      "status": "active",
       "rule": "Bridge and Bridge Core are one capability layer. Do not create another Bridge PWA; consolidate new Bridge UI into Héctor OS/Bridge."
     },
     {
@@ -52,7 +53,7 @@
       "kind": "backend-service",
       "ownerPwa": "hector-os",
       "backend": "/api/context-hub",
-      "status": "planned-or-integration-pending",
+      "status": "active",
       "rule": "Context Hub is shared context infrastructure, not an installable PWA. Any UI belongs in Héctor OS or Bridge."
     }
   ],
