@@ -55,7 +55,7 @@ describe('canonical PWA governance with advisory cross-chat coordination',()=>{
 
  it('teaches agents the distinction between advisory claims and explicit PWA authorization',()=>{
   const agents=read('AGENTS.md'),skills=read('worker/agent/skills.ts');
-  expect(agents).toContain('Cross-chat claims are advisory');
+  expect(agents).toContain('Claims are advisory');
   expect(agents).toContain('requires explicit user approval');
   expect(skills).toContain('COORDINACIÓN CANÓNICA DE SUPERFICIES');
   expect(skills).toContain('Autorizar una función o corrección NO autoriza una nueva PWA');
