@@ -1,0 +1,51 @@
+name: Agent resilience fix once
+
+on:
+  push:
+    branches: [feat/hector-agent-resilience-broker-20260822]
+    paths:
+      - '.github/workflows/agent-resilience-fix-once.yml'
+
+permissions:
+  contents: write
+
+jobs:
+  patch:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: feat/hector-agent-resilience-broker-20260822
+          fetch-depth: 0
+      - name: Save checkpoint only after lease-owned transition succeeds
+        shell: python
+        run: |
+          from pathlib import Path
+          p=Path('worker/index.ts')
+          s=p.read_text()
+          before="""    const delay=parsed.state==='waiting'?parsed.retryAfterMinutes:2,progress=Math.min(95,15+Number(job.attempt_count||1)*4),wait=`+${delay} minutes`;
+    await saveResumeCheckpoint(env,{workJobId:job.id,reason:parsed.state==='waiting'?'external_dependency':'continuation',state:{result:parsed.text,attemptCount:job.attempt_count},status:parsed.state==='waiting'?'waiting_external':'ready',resumeAfter:new Date(Date.now()+delay*60_000).toISOString()});
+    const advanced=await env.DB.prepare(\"UPDATE work_jobs SET status='queued',progress=?,result=?,last_error=NULL,next_retry_at=datetime('now',?),lease_token=NULL,lease_expires_at=NULL,heartbeat_at=CURRENT_TIMESTAMP,updated_at=CURRENT_TIMESTAMP WHERE id=? AND lease_token=?\").bind(progress,parsed.text,wait,job.id,leaseToken).run();
+    if(!advanced.meta.changes)return;
+"""
+          after="""    const delay=parsed.state==='waiting'?parsed.retryAfterMinutes:2,progress=Math.min(95,15+Number(job.attempt_count||1)*4),wait=`+${delay} minutes`;
+    const advanced=await env.DB.prepare(\"UPDATE work_jobs SET status='queued',progress=?,result=?,last_error=NULL,next_retry_at=datetime('now',?),lease_token=NULL,lease_expires_at=NULL,heartbeat_at=CURRENT_TIMESTAMP,updated_at=CURRENT_TIMESTAMP WHERE id=? AND lease_token=?\").bind(progress,parsed.text,wait,job.id,leaseToken).run();
+    if(!advanced.meta.changes)return;
+    await saveResumeCheckpoint(env,{workJobId:job.id,reason:parsed.state==='waiting'?'external_dependency':'continuation',state:{result:parsed.text,attemptCount:job.attempt_count},status:parsed.state==='waiting'?'waiting_external':'ready',resumeAfter:new Date(Date.now()+delay*60_000).toISOString()});
+"""
+          if before not in s:
+              raise SystemExit('expected checkpoint ordering block not found')
+          p.write_text(s.replace(before,after,1))
+          Path('.github/workflows/agent-resilience-fix-once.yml').unlink()
+      - name: Verify
+        run: |
+          npm ci
+          npm run typecheck
+          npx vitest run tests/hector-agent-resilience.test.ts
+      - name: Commit
+        run: |
+          git config user.name 'github-actions[bot]'
+          git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
+          git add worker/index.ts .github/workflows/agent-resilience-fix-once.yml
+          git commit -m 'fix(agent): checkpoint only committed transitions'
+          git push origin HEAD:feat/hector-agent-resilience-broker-20260822
