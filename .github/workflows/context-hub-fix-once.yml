@@ -1,0 +1,48 @@
+name: Context Hub fix once
+
+on:
+  push:
+    branches: [feat/context-hub-memory-vault-v2-20260822]
+    paths:
+      - '.github/workflows/context-hub-fix-once.yml'
+
+permissions:
+  contents: write
+
+jobs:
+  patch:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: feat/context-hub-memory-vault-v2-20260822
+          fetch-depth: 0
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+      - name: Remove generics from calls made through Hono any-context
+        shell: python
+        run: |
+          from pathlib import Path
+          import re
+          p=Path('worker/routes/context-hub.ts')
+          s=p.read_text()
+          fixed=re.sub(r'\.(first|all)<[^()\n]+>\(\)', lambda m: f'.{m.group(1)}()', s)
+          if fixed == s:
+              raise SystemExit('no generic D1 calls found to repair')
+          p.write_text(fixed)
+          Path('.github/workflows/context-hub-fix-once.yml').unlink()
+      - name: Verify
+        run: |
+          npm ci
+          npm run typecheck
+          npx vitest run tests/context-hub.test.ts tests/hector-agent-resilience.test.ts tests/hector-bridge-core.test.ts
+          npm run build
+      - name: Commit repair
+        run: |
+          git config user.name 'github-actions[bot]'
+          git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
+          git add worker/routes/context-hub.ts .github/workflows/context-hub-fix-once.yml
+          git commit -m 'fix(context-hub): type D1 calls through runtime context'
+          git push origin HEAD:feat/context-hub-memory-vault-v2-20260822
