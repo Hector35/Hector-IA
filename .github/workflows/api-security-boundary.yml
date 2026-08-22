@@ -40,7 +40,9 @@ jobs:
           if(wrangler.main!=='worker/secure-entry.ts')throw new Error('secure entrypoint is not active');
           if(manifest.mutationPolicy.crossOrigin!=='deny'||manifest.mutationPolicy.crossSite!=='deny')throw new Error('cross-site writes must remain denied');
           if(!entry.includes('cross_site_mutation_denied'))throw new Error('explicit denial response missing');
-          if(!entry.includes("worker.fetch(new Request(request,{headers}),env,ctx)"))throw new Error('wrapped worker execution missing');
+          const directWrapped=entry.includes("worker.fetch(new Request(request,{headers}),env,ctx)");
+          const namedWrapped=entry.includes("const forwarded=new Request(request,{headers})")&&entry.includes("worker.fetch(forwarded,env,ctx)");
+          if(!directWrapped&&!namedWrapped)throw new Error('wrapped worker execution missing');
           if(!entry.includes('scheduled:worker.scheduled'))throw new Error('scheduled handler not preserved');
           if(!entry.includes("Cache-Control','no-store"))throw new Error('sensitive no-store missing');
           NODE
