@@ -1,0 +1,60 @@
+<!doctype html>
+<html lang="es-MX">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
+  <meta name="theme-color" content="#0a0b0d" />
+  <title>Héctor Bridge Core</title>
+  <link rel="stylesheet" href="/bridge.css" />
+  <style>
+    .coreShell{max-width:980px;margin:0 auto;padding:20px 16px 48px}.coreHeader{display:flex;align-items:center;gap:14px;margin-bottom:18px}.coreHeader a{text-decoration:none}.coreGrid{display:grid;grid-template-columns:repeat(auto-fit,minmax(280px,1fr));gap:14px}.coreCard{background:#111317;border:1px solid #292d35;border-radius:18px;padding:16px}.coreCard h2{margin:0 0 10px}.coreCard textarea,.coreCard input,.coreCard select{width:100%;box-sizing:border-box;margin:6px 0 10px}.coreCard textarea{min-height:110px}.coreActions{display:flex;gap:8px;flex-wrap:wrap}.coreOutput{white-space:pre-wrap;overflow-wrap:anywhere;min-height:70px}.statusLine{display:flex;justify-content:space-between;gap:10px;align-items:center;margin:12px 0 18px}.statusDot{font-weight:700}.wide{grid-column:1/-1}
+  </style>
+</head>
+<body>
+  <main class="coreShell">
+    <header class="coreHeader">
+      <a class="backLink" href="/bridge.html" aria-label="Volver a Bridge">←</a>
+      <div><p class="eyebrow">HÉCTOR BRIDGE</p><h1>Core</h1></div>
+    </header>
+    <div class="statusLine"><span>Memoria · Tools · Jobs · Inspector</span><span class="statusDot" id="coreStatus">CONECTANDO</span></div>
+
+    <section class="coreGrid">
+      <article class="coreCard wide">
+        <h2>Estado del núcleo</h2>
+        <div class="coreActions"><button class="primaryButton" id="refreshStatus">Actualizar</button><button class="secondaryButton" id="listTools">Ver herramientas</button></div>
+        <pre class="outputConsole coreOutput" id="statusOutput">Cargando…</pre>
+      </article>
+
+      <article class="coreCard">
+        <p class="eyebrow">MEMORIA</p><h2>Buscar contexto</h2>
+        <textarea id="memoryQuery" placeholder="Ej. ¿qué sabemos del routing de Héctor Agent?"></textarea>
+        <button class="primaryButton" id="searchMemory">Buscar</button>
+        <pre class="outputConsole coreOutput" id="memorySearchOutput">Sin consulta.</pre>
+      </article>
+
+      <article class="coreCard">
+        <p class="eyebrow">MEMORIA</p><h2>Guardar</h2>
+        <select id="memoryKind"><option>fact</option><option>decision</option><option>preference</option><option>project</option><option>error</option><option>solution</option></select>
+        <textarea id="memoryContent" placeholder="Dato, decisión o regla que debe permanecer disponible."></textarea>
+        <button class="primaryButton" id="writeMemory">Guardar memoria</button>
+        <pre class="outputConsole coreOutput" id="memoryWriteOutput">Sin cambios.</pre>
+      </article>
+
+      <article class="coreCard">
+        <p class="eyebrow">JOB ENGINE</p><h2>Crear objetivo persistente</h2>
+        <textarea id="jobObjective" placeholder="Objetivo que debe continuar aunque cierres la PWA."></textarea>
+        <button class="primaryButton" id="createJob">Crear objetivo</button>
+        <pre class="outputConsole coreOutput" id="jobOutput">Sin objetivo nuevo.</pre>
+      </article>
+
+      <article class="coreCard">
+        <p class="eyebrow">TOOL BROKER</p><h2>Inspeccionar PWA</h2>
+        <input id="pwaUrl" inputmode="url" value="https://hector-os.hectorhdzr035.workers.dev/agent/" />
+        <button class="primaryButton" id="inspectPwa">Inspeccionar</button>
+        <pre class="outputConsole coreOutput" id="pwaOutput">Sin inspección.</pre>
+      </article>
+    </section>
+  </main>
+  <script type="module" src="/bridge-core.js"></script>
+</body>
+</html>
