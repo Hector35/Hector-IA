@@ -1,7 +1,8 @@
-const CACHE='hector-elegant-chat-v6';
+const CACHE='hector-elegant-chat-v7';
+const CACHE_PREFIX='hector-elegant-chat-';
 const BRIDGE_ASSETS=['/bridge.html','/bridge.css','/bridge.js','/bridge-code-worker.mjs'];
 const SHELL=['/','/manifest.webmanifest','/icons/icon-192.png','/icons/icon-512.png',...BRIDGE_ASSETS];
-const PRIVATE_PREFIXES=['/api/','/control/','/generated/','/runner/','/evidence/','/self-improve/'];
+const PRIVATE_PREFIXES=['/api/','/control/','/generated/','/runner/','/evidence/','/self-improve/','/agent','/hector-agent'];
 
 function isPrivateRequest(request,url){
   return request.headers.has('Authorization')||PRIVATE_PREFIXES.some(prefix=>url.pathname.startsWith(prefix));
@@ -15,7 +16,7 @@ function isCacheable(response){
 }
 
 self.addEventListener('install',event=>event.waitUntil(caches.open(CACHE).then(cache=>cache.addAll(SHELL)).then(()=>self.skipWaiting())));
-self.addEventListener('activate',event=>event.waitUntil(caches.keys().then(keys=>Promise.all(keys.filter(key=>key!==CACHE).map(key=>caches.delete(key)))).then(()=>self.clients.claim())));
+self.addEventListener('activate',event=>event.waitUntil(caches.keys().then(keys=>Promise.all(keys.filter(key=>key.startsWith(CACHE_PREFIX)&&key!==CACHE).map(key=>caches.delete(key)))).then(()=>self.clients.claim())));
 self.addEventListener('message',event=>{if(event.data?.type==='SKIP_WAITING')self.skipWaiting();});
 self.addEventListener('fetch',event=>{
   const request=event.request,url=new URL(request.url);
