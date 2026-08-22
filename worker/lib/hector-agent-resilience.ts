@@ -28,13 +28,12 @@ export function routeFailureCooldownSeconds(failureCount:number){
 export function credentialState(credential:HectorAgentCredential|null|undefined,now=Date.now()){
  if(!credential)return{usable:true as const,state:'not_required' as const};
  if(['revoked','blocked'].includes(credential.status))return{usable:false as const,state:credential.status};
- const expiry=ms(credential.expires_at);
- if(expiry!==null&&expiry<=now){
+ const expiry=ms(credential.expires_at),needsRefresh=credential.status==='refresh_required'||credential.status==='expired'||(expiry!==null&&expiry<=now);
+ if(needsRefresh){
   if(credential.refreshable)return{usable:true as const,state:'refresh_required' as const};
   return{usable:false as const,state:'expired' as const};
  }
- if(credential.status==='expired'&&!credential.refreshable)return{usable:false as const,state:'expired' as const};
- return{usable:true as const,state:credential.status==='refresh_required'?'refresh_required' as const:'ready' as const};
+ return{usable:true as const,state:'ready' as const};
 }
 
 export function orderCapabilityRoutes(routes:HectorAgentCapabilityRoute[],now=Date.now()){
