@@ -9,7 +9,7 @@ function worker(responseHeaders={}){
  const cache={addAll:vi.fn(async()=>{}),put:vi.fn(async()=>{})};
  const caches={
   open:vi.fn(async()=>cache),
-  keys:vi.fn(async()=>['hector-os-transparent-model-v5','hector-os-static-shell-v6','hector-asi-evolution-shell-v7','hector-asi-stage-6-shell-v8','hector-command-console-v1','hector-command-console-v2','hector-elegant-chat-v5','hector-elegant-chat-v6']),
+  keys:vi.fn(async()=>['hector-os-transparent-model-v5','hector-os-static-shell-v6','hector-asi-evolution-shell-v7','hector-asi-stage-6-shell-v8','hector-command-console-v1','hector-command-console-v2','hector-agent-v1.1','pendientes-shell-20260822-91','hector-elegant-chat-v5','hector-elegant-chat-v6','hector-elegant-chat-v7']),
   delete:vi.fn(async()=>true),
   match:vi.fn(async()=>undefined)
  };
@@ -31,7 +31,7 @@ function dispatchFetch(listener,request){
 }
 
 describe('service worker private cache policy',()=>{
- it.each(['/api/usage','/control/v1/status','/generated/test/records','/runner/v1/status','/evidence/v1/report','/self-improve/v1/proposal'])('never intercepts private route %s',path=>{
+ it.each(['/api/usage','/control/v1/status','/generated/test/records','/runner/v1/status','/evidence/v1/report','/self-improve/v1/proposal','/agent/','/agent/index.html','/hector-agent'])('never intercepts private route %s',path=>{
   const {listeners,fetch,cache}=worker();
   const event=dispatchFetch(listeners.fetch,new Request(`https://hector.test${path}`));
   expect(event.response()).toBeUndefined();
@@ -78,18 +78,17 @@ describe('service worker private cache policy',()=>{
   expect(fetch).not.toHaveBeenCalled();
  });
 
- it('deletes every retired shell and keeps only elegant-chat v6',async()=>{
+ it('rotates only its own elegant-chat caches and preserves other apps',async()=>{
   const {listeners,caches}=worker();const waits=[];
   listeners.activate({waitUntil:value=>waits.push(Promise.resolve(value))});
   await Promise.all(waits);
-  expect(caches.delete).toHaveBeenCalledWith('hector-os-transparent-model-v5');
-  expect(caches.delete).toHaveBeenCalledWith('hector-os-static-shell-v6');
-  expect(caches.delete).toHaveBeenCalledWith('hector-asi-evolution-shell-v7');
-  expect(caches.delete).toHaveBeenCalledWith('hector-asi-stage-6-shell-v8');
-  expect(caches.delete).toHaveBeenCalledWith('hector-command-console-v1');
-  expect(caches.delete).toHaveBeenCalledWith('hector-command-console-v2');
   expect(caches.delete).toHaveBeenCalledWith('hector-elegant-chat-v5');
-  expect(caches.delete).not.toHaveBeenCalledWith('hector-elegant-chat-v6');
+  expect(caches.delete).toHaveBeenCalledWith('hector-elegant-chat-v6');
+  expect(caches.delete).not.toHaveBeenCalledWith('hector-elegant-chat-v7');
+  expect(caches.delete).not.toHaveBeenCalledWith('hector-agent-v1.1');
+  expect(caches.delete).not.toHaveBeenCalledWith('pendientes-shell-20260822-91');
+  expect(caches.delete).not.toHaveBeenCalledWith('hector-os-transparent-model-v5');
+  expect(caches.delete).not.toHaveBeenCalledWith('hector-command-console-v2');
  });
 
  it('accepts an explicit skip-waiting request from the refreshed client',()=>{
