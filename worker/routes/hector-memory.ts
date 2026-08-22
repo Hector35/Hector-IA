@@ -29,7 +29,7 @@ hectorMemory.post('/upsert',async c=>{
       VALUES(?,?,?,?,?,?,?,?,?,?,?,'active',?)`).bind(id,uid,id,v.recordType,v.subject,v.content,v.confidence,v.sourceType,v.sourceRef??null,JSON.stringify(v.tags),JSON.stringify({...v.metadata,reconciliation:{strategy:v.strategy,supersededCount:supersede?previous.length:0}}),supersedesId),
     c.env.DB.prepare("INSERT INTO audit_log(id,user_id,action,resource_type,resource_id,metadata_json) VALUES(?,?,'context_reconcile','context_hub_record',?,?)").bind(crypto.randomUUID(),uid,id,JSON.stringify({recordType:v.recordType,subject:v.subject,strategy:v.strategy,superseded:previous.map((x:any)=>x.id)}))
   ];
-  if(supersede&&previous.length)statements.push(c.env.DB.prepare("UPDATE context_hub_records SET status='superseded',valid_until=COALESCE(valid_until,CURRENT_TIMESTAMP),updated_at=CURRENT_TIMESTAMP WHERE user_id=? AND record_type=? AND lower(COALESCE(subject,''))=lower(?) AND status='active'").bind(uid,v.recordType,v.subject));
+  if(supersede&&previous.length)statements.push(c.env.DB.prepare("UPDATE context_hub_records SET status='superseded',valid_until=COALESCE(valid_until,CURRENT_TIMESTAMP),updated_at=CURRENT_TIMESTAMP WHERE user_id=? AND record_type=? AND lower(COALESCE(subject,''))=lower(?) AND status='active' AND id<>?").bind(uid,v.recordType,v.subject,id));
   await c.env.DB.batch(statements);
   return c.json({ok:true,deduplicated:false,item:{id,type:v.recordType,subject:v.subject,content:v.content,confidence:v.confidence,supersedesId},superseded:supersede?previous.map((x:any)=>x.id):[]},201);
 });
