@@ -2,11 +2,14 @@ import {Hono} from 'hono';
 import worker from './index';
 import type {Bindings,Variables} from './types';
 import {hectorBridge} from './routes/hector-bridge';
+import {contextHub} from './routes/context-hub';
 import {evaluateSecurityBoundary,isProtectedMutation,normalizeRequestId} from './lib/security-boundary';
 
 const HECTOR_AGENT_VERSION='20260822-4';
 const bridgeApi=new Hono<{Bindings:Bindings;Variables:Variables}>();
 bridgeApi.route('/api/hector-bridge',hectorBridge);
+const contextHubApi=new Hono<{Bindings:Bindings;Variables:Variables}>();
+contextHubApi.route('/api/context-hub',contextHub);
 
 function securedResponse(response:Response,pathname:string,requestId:string){
  const secured=new Response(response.body,response);
@@ -60,9 +63,12 @@ export default {
    }
   }
   const headers=new Headers(request.headers);headers.set('X-Request-ID',requestId);
+  const forwarded=new Request(request,{headers});
   const response=url.pathname.startsWith('/api/hector-bridge')
-   ?await bridgeApi.fetch(new Request(request,{headers}),env,ctx)
-   :await worker.fetch(new Request(request,{headers}),env,ctx);
+   ?await bridgeApi.fetch(forwarded,env,ctx)
+   :url.pathname.startsWith('/api/context-hub')
+    ?await contextHubApi.fetch(forwarded,env,ctx)
+    :await worker.fetch(forwarded,env,ctx);
   return securedResponse(response,url.pathname,requestId);
  },
  scheduled:worker.scheduled
