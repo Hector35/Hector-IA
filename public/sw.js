@@ -1,4 +1,4 @@
-const CACHE='hector-elegant-chat-v8';
+const CACHE='hector-elegant-chat-v7';
 const CACHE_PREFIX='hector-elegant-chat-';
 const BRIDGE_ASSETS=['/bridge.html','/bridge.css','/bridge.js','/bridge-code-worker.mjs'];
 const SHELL=['/','/manifest.webmanifest','/icons/icon-192.png','/icons/icon-512.png',...BRIDGE_ASSETS];
@@ -14,18 +14,16 @@ function isCacheable(response){
   const policy=(response.headers.get('Cache-Control')||'').toLowerCase();
   return response.ok&&!policy.includes('no-store')&&!policy.includes('private')&&!response.headers.has('Set-Cookie');
 }
-
-self.addEventListener('install',event=>event.waitUntil((async()=>{
+async function refreshRootShell(response){
+  if(!isCacheable(response))return;
   const cache=await caches.open(CACHE);
-  await cache.addAll(SHELL);
-  const shell=await cache.match('/');
-  if(shell){
-    const html=await shell.clone().text();
-    const assets=[...html.matchAll(/(?:src|href)=["'](\/assets\/[^"']+)["']/g)].map(match=>match[1]);
-    if(assets.length)await cache.addAll([...new Set(assets)]);
-  }
-  await self.skipWaiting();
-})()));
+  const html=await response.clone().text();
+  await cache.put('/',response.clone());
+  const assets=[...html.matchAll(/(?:src|href)=["'](\/assets\/[^"']+)["']/g)].map(match=>match[1]);
+  if(assets.length)await cache.addAll([...new Set(assets)]);
+}
+
+self.addEventListener('install',event=>event.waitUntil(caches.open(CACHE).then(cache=>cache.addAll(SHELL)).then(()=>self.skipWaiting())));
 self.addEventListener('activate',event=>event.waitUntil(caches.keys().then(keys=>Promise.all(keys.filter(key=>key.startsWith(CACHE_PREFIX)&&key!==CACHE).map(key=>caches.delete(key)))).then(()=>self.clients.claim())));
 self.addEventListener('message',event=>{if(event.data?.type==='SKIP_WAITING')self.skipWaiting();});
 self.addEventListener('fetch',event=>{
@@ -36,7 +34,7 @@ self.addEventListener('fetch',event=>{
     event.respondWith((async()=>{
       try{
         const response=await fetch(request,{cache:'no-store'});
-        if(fallback==='/'&&isCacheable(response))event.waitUntil(caches.open(CACHE).then(cache=>cache.put('/',response.clone())));
+        if(fallback==='/')await refreshRootShell(response);
         return response;
       }catch{
         return await caches.match(fallback)||Response.error();
