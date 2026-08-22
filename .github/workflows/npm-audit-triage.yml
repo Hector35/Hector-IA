@@ -1,0 +1,57 @@
+name: NPM Audit Triage
+
+on:
+  push:
+    branches: ['chore/npm-audit-triage-20260822']
+  pull_request:
+    paths:
+      - 'package.json'
+      - 'package-lock.json'
+      - '.github/workflows/npm-audit-triage.yml'
+
+permissions:
+  contents: read
+
+jobs:
+  audit:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+      - run: npm ci
+      - name: Full dependency audit
+        shell: bash
+        run: |
+          set +e
+          npm audit --json > /tmp/audit-full.json
+          code=$?
+          node - <<'NODE'
+          const fs=require('fs');
+          const a=JSON.parse(fs.readFileSync('/tmp/audit-full.json','utf8'));
+          console.log('AUDIT_FULL_METADATA='+JSON.stringify(a.metadata?.vulnerabilities||{}));
+          for (const [name,v] of Object.entries(a.vulnerabilities||{})) {
+            console.log('AUDIT_FULL_ITEM='+JSON.stringify({name,severity:v.severity,isDirect:v.isDirect,via:v.via,effects:v.effects,range:v.range,fixAvailable:v.fixAvailable}));
+          }
+          NODE
+          echo "npm_audit_exit=$code"
+          exit 0
+      - name: Production dependency audit
+        shell: bash
+        run: |
+          set +e
+          npm audit --omit=dev --json > /tmp/audit-prod.json
+          code=$?
+          node - <<'NODE'
+          const fs=require('fs');
+          const a=JSON.parse(fs.readFileSync('/tmp/audit-prod.json','utf8'));
+          console.log('AUDIT_PROD_METADATA='+JSON.stringify(a.metadata?.vulnerabilities||{}));
+          for (const [name,v] of Object.entries(a.vulnerabilities||{})) {
+            console.log('AUDIT_PROD_ITEM='+JSON.stringify({name,severity:v.severity,isDirect:v.isDirect,via:v.via,effects:v.effects,range:v.range,fixAvailable:v.fixAvailable}));
+          }
+          NODE
+          echo "npm_audit_prod_exit=$code"
+          exit 0
