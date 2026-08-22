@@ -135,7 +135,12 @@ async function sameOrigin(c:any,endpoint:string,method:string,input:unknown){
  if(!isSafeContextEndpoint(endpoint))throw new Error('Endpoint interno no permitido');const url=new URL(endpoint,c.req.url),upper=method.toUpperCase();
  if(upper==='GET'&&input&&typeof input==='object'&&!Array.isArray(input))for(const [k,v] of Object.entries(input as Record<string,unknown>))if(primitive(v))url.searchParams.set(k,String(v));
  const headers:Record<string,string>={Accept:'application/json'},cookie=c.req.header('Cookie');if(cookie)headers.Cookie=cookie;const init:RequestInit={method:upper,headers};if(upper!=='GET'){headers['Content-Type']='application/json';init.body=JSON.stringify(input??{});}
- const response=await fetch(url.toString(),init),text=(await response.text()).slice(0,250000);let data:any=text;try{data=text?JSON.parse(text):null}catch{}if(!response.ok)throw new Error(`HTTP ${response.status}: ${typeof data==='string'?data:JSON.stringify(data)}`.slice(0,3000));return{status:response.status,data};
+ let response:Response;
+ if(url.pathname==='/api/context-hub'||url.pathname.startsWith('/api/context-hub/')){
+  const localUrl=new URL(url.toString());localUrl.pathname=url.pathname.slice('/api/context-hub'.length)||'/';
+  response=await contextHub.fetch(new Request(localUrl.toString(),init),c.env,c.executionCtx);
+ }else response=await fetch(url.toString(),init);
+ const text=(await response.text()).slice(0,250000);let data:any=text;try{data=text?JSON.parse(text):null}catch{}if(!response.ok)throw new Error(`HTTP ${response.status}: ${typeof data==='string'?data:JSON.stringify(data)}`.slice(0,3000));return{status:response.status,data};
 }
 async function dispatchWorkflow(env:Bindings,workflow:string,input:unknown,metadata:Record<string,unknown>){
  const token=env.GITHUB_RUNNER_TOKEN?.trim();if(!token)throw new Error('GITHUB_RUNNER_TOKEN no configurado');if(!/^[A-Za-z0-9._-]+\.ya?ml$/.test(workflow))throw new Error('Workflow no permitido');const ref=typeof metadata.ref==='string'&&metadata.ref.trim()?metadata.ref.trim():'main';
