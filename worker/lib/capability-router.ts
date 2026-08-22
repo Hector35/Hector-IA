@@ -1,9 +1,10 @@
 import type {Bindings} from '../types';
-import {listCapabilityRoutes,markCapabilityRouteResult,type HectorAgentCapabilityRoute} from './hector-agent-resilience';
+import {listCapabilityRoutes,markCapabilityRouteResult,type HectorAgentCapabilityRoute,type HectorAgentCredential} from './hector-agent-resilience';
 import {resolveCredential} from './credential-broker';
 
 export type CapabilityFailureClass='temporary'|'rate_limit'|'credential'|'capability_missing'|'policy'|'permanent';
 export type RouteExecutionResult<T=unknown>={ok:true;value:T;evidence?:Record<string,unknown>}|{ok:false;error:string;status?:number;failureClass?:CapabilityFailureClass;evidence?:Record<string,unknown>};
+export type CapabilityCredential={usable:boolean;state:string;credential:HectorAgentCredential|null;material:unknown};
 
 export function classifyCapabilityFailure(input:{status?:number|null;error?:string|null;code?:string|null}):CapabilityFailureClass{
   const status=Number(input.status||0),text=`${input.code||''} ${input.error||''}`.toLowerCase();
@@ -26,15 +27,15 @@ async function trace(env:Bindings,input:{id:string;userId:string;requestId?:stri
     .bind(input.status,input.failureClass||null,input.latencyMs??null,JSON.stringify(input.evidence||{}),(input.error||null)?.slice(0,5000)||null,input.id,input.userId).run();
 }
 
-export async function executeCapabilityWithFallback<T>(env:Bindings,input:{userId:string;capability:string;requestId?:string|null;source?:string;invoke:(route:HectorAgentCapabilityRoute,credential:Awaited<ReturnType<typeof resolveCredential>>) => Promise<RouteExecutionResult<T>>}){
+export async function executeCapabilityWithFallback<T>(env:Bindings,input:{userId:string;capability:string;requestId?:string|null;source?:string;invoke:(route:HectorAgentCapabilityRoute,credential:CapabilityCredential)=>Promise<RouteExecutionResult<T>>}){
   const routes=await listCapabilityRoutes(env,input.userId,input.capability),attempts:any[]=[];
   if(!routes.length)return{ok:false as const,failureClass:'capability_missing' as const,error:'No hay rutas configuradas para la capacidad',attempts};
   for(const route of routes){
     const traceId=crypto.randomUUID(),started=Date.now();
     await trace(env,{id:traceId,userId:input.userId,requestId:input.requestId,source:input.source||'bridge',capability:input.capability,route,status:'started'});
-    let credential:Awaited<ReturnType<typeof resolveCredential>>;
-    try{credential=route.credential_id?await resolveCredential(env,input.userId,route.credential_id):{usable:true as const,state:'not_required' as const,credential:null,material:null};}
-    catch{credential={usable:false as const,state:'blocked' as const,credential:null,material:null};}
+    let credential:CapabilityCredential;
+    try{credential=route.credential_id?await resolveCredential(env,input.userId,route.credential_id):{usable:true,state:'not_required',credential:null,material:null};}
+    catch{credential={usable:false,state:'blocked',credential:null,material:null};}
     if(!credential.usable){
       const failureClass:'credential'='credential',error=`Credencial no utilizable: ${credential.state}`;
       attempts.push({routeId:route.id,provider:route.provider,ok:false,failureClass,error});
