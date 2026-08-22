@@ -1,1 +1,1 @@
-pwa-browser-production-audit-v1
+pwa-browser-production-audit-v2
