@@ -22,6 +22,15 @@ function securedResponse(response:Response,pathname:string,requestId:string){
 export default {
  async fetch(request:Request,env:Bindings,ctx:ExecutionContext){
   const url=new URL(request.url),requestId=normalizeRequestId(request.headers.get('X-Request-ID'));
+  if(url.pathname==='/agent'){
+   const redirectUrl=new URL(request.url);redirectUrl.pathname='/agent/';
+   return securedResponse(Response.redirect(redirectUrl.toString(),308),url.pathname,requestId);
+  }
+  if(url.pathname==='/agent/'){
+   const assetUrl=new URL(request.url);assetUrl.pathname='/agent/index.html';assetUrl.search='';
+   const response=await env.ASSETS.fetch(new Request(assetUrl.toString(),request));
+   return securedResponse(response,url.pathname,requestId);
+  }
   if(isProtectedMutation(url.pathname,request.method)){
    const decision=evaluateSecurityBoundary({url:request.url,method:request.method,origin:request.headers.get('Origin'),secFetchSite:request.headers.get('Sec-Fetch-Site')});
    if(!decision.allowed){
