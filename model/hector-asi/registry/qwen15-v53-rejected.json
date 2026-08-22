@@ -1,0 +1,84 @@
+{
+  "schemaVersion": 1,
+  "experimentId": "hector-asi-qwen15-v53-anchor-dpo",
+  "status": "rejected-for-champion",
+  "decision": "retain-v41",
+  "baseModel": "Qwen/Qwen2.5-1.5B-Instruct",
+  "baseRevision": "989aa7980e4cf806f80c7fef2b1adb7bc71aa306",
+  "sourceChampion": {
+    "runtimeId": "hector-asi-qwen15-v41",
+    "artifactId": 8560331055,
+    "adapterSha256": "31bead5f59982d8e321517fd235b81f992f83d2e3792a55690c2a841ff0e28f8",
+    "adapterBytes": 73911112
+  },
+  "training": {
+    "runId": 30044624217,
+    "artifactId": 8579832168,
+    "artifactDigest": "sha256:8411b52f0172928520b9949ab92a0018fc997412a5a27ad37e1c8b5403b506aa",
+    "artifactExpiresAt": "2026-10-21T21:03:01Z",
+    "adapterSha256": "c5382dbe87deb8dc05818f033ceb68dc39594a5467670f027f292d99da9ac04f",
+    "adapterBytes": 73911112,
+    "replicasByteIdentical": true,
+    "method": "length-normalized anchored DPO",
+    "hyperparameters": {
+      "beta": 0.15,
+      "anchorLambda": 0.02,
+      "learningRate": 0.000003,
+      "epochs": 2,
+      "clipNorm": 0.5,
+      "seed": 3053,
+      "maxLength": 160
+    },
+    "runtime": {
+      "secondsPerReplica": 1489.1228816509247,
+      "peakRssMb": 11834.0703125,
+      "python": "3.11.15",
+      "torch": "2.7.1+cpu",
+      "hardware": "Linux-6.17.0-1020-azure-x86_64-with-glibc2.39"
+    }
+  },
+  "dataset": {
+    "trainRows": 24,
+    "validationRows": 4,
+    "hiddenRows": 18,
+    "crossSplitOverlap": 0,
+    "privateUserData": false,
+    "license": "author-generated Apache-2.0-compatible",
+    "hiddenSha256": "17560e21b728c93f822a0e21cb4b4261823ae5b6f92f3fe1188fdfd4b5679ccb",
+    "validationSha256": "98c11537b72dba847432e44e4e0ed1aebf37738bcbe2e876c650a2ae8882ba95"
+  },
+  "comparison": {
+    "validationObjective": {
+      "v41": 1.2130075693130493,
+      "v53": 1.0577269196510315,
+      "relativeImprovement": 0.1280134901806014
+    },
+    "behavior": {
+      "v41Passed": 11,
+      "v53Passed": 9,
+      "total": 18,
+      "v41CriticalPassed": 6,
+      "v53CriticalPassed": 5,
+      "criticalTotal": 6,
+      "v41MeanLatencyMs": 7939.818159111067,
+      "v53MeanLatencyMs": 11604.931943777767,
+      "latencyRatio": 1.461612773457427,
+      "v41MeanTokens": 20.88888888888889,
+      "v53MeanTokens": 33.166666666666664,
+      "tokenRatio": 1.5877659574468086
+    }
+  },
+  "gates": {
+    "validationImproved": true,
+    "behavioralImprovement": false,
+    "criticalPerfect": false,
+    "noCriticalRegression": false,
+    "latencyAcceptable": false,
+    "tokenLengthAcceptable": false,
+    "eligibleForPromotion": false
+  },
+  "doNotRepeat": [
+    "anchored length-normalized DPO from v41 with beta 0.15, anchor 0.02, LR 3e-6, 2 epochs and this 24/4/18 split"
+  ],
+  "rollback": "hector-asi-qwen15-v41"
+}
