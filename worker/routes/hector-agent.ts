@@ -246,22 +246,23 @@ hectorAgent.get('/approvals',async c=>c.json({items:(await c.env.DB.prepare('SEL
 hectorAgent.post('/approvals/:id/approve',async c=>{
  const userId=c.get('userId'),approval=await c.env.DB.prepare("SELECT * FROM hector_agent_approvals WHERE id=? AND user_id=? AND status='pending'")
   .bind(c.req.param('id'),userId).first<any>();if(!approval)return c.json({error:'Aprobación no encontrada o ya resuelta'},404);
- const cfg=await settings(c.env,userId);if(cfg.paused||!cfg.auto_enabled)return c.json({error:'Héctor Agent está detenido globalmente; reanúdalo antes de autorizar'},409);
- if(approval.action==='start_goal'&&approval.goal_id){
-  const row=await c.env.DB.prepare('SELECT g.work_job_id,g.objective,w.kind FROM hector_agent_goals g JOIN work_jobs w ON w.id=g.work_job_id WHERE g.id=? AND g.user_id=?').bind(approval.goal_id,userId).first<any>();
-  if(!row)return c.json({error:'Objetivo no encontrado'},404);
-  await c.env.DB.prepare("UPDATE hector_agent_approvals SET status='approved',decided_at=CURRENT_TIMESTAMP WHERE id=?").bind(approval.id).run();
-  if(row.kind==='programming'){
-   try{await launchProgrammingJob(c.env,row.work_job_id,row.objective,cfg.max_iterations,'Inicio autorizado; runner editar-probar-corregir despachado');return c.json({ok:true,execution:'runner_dispatched'});}catch(e){return c.json({error:`Autorizado, pero el runner no pudo iniciar: ${e instanceof Error?e.message:'error'}`},502);}
-  }
-  await c.env.DB.batch([
-   c.env.DB.prepare("UPDATE work_jobs SET status='queued',next_retry_at=CURRENT_TIMESTAMP,last_error=NULL,lease_token=NULL,lease_expires_at=NULL,updated_at=CURRENT_TIMESTAMP WHERE id=?").bind(row.work_job_id),
-   c.env.DB.prepare('UPDATE hector_agent_goals SET stop_reason=NULL,updated_at=CURRENT_TIMESTAMP WHERE work_job_id=?').bind(row.work_job_id),
-   c.env.DB.prepare("INSERT INTO work_events(id,job_id,message,progress) SELECT ?,id,'Inicio manual autorizado; objetivo listo para ejecutar',progress FROM work_jobs WHERE id=?").bind(crypto.randomUUID(),row.work_job_id)
-  ]);
-  return c.json({ok:true});
+ if(approval.action!=='start_goal'||!approval.goal_id){
+  const result=await c.env.DB.prepare("UPDATE hector_agent_approvals SET status='approved',decided_at=CURRENT_TIMESTAMP WHERE id=? AND user_id=? AND status='pending'").bind(approval.id,userId).run();
+  if(!result.meta.changes)return c.json({error:'Aprobación no encontrada o ya resuelta'},409);
+  return c.json({ok:true,execution:'approval_recorded'});
  }
- await c.env.DB.prepare("UPDATE hector_agent_approvals SET status='approved',decided_at=CURRENT_TIMESTAMP WHERE id=?").bind(approval.id).run();
+ const cfg=await settings(c.env,userId);if(cfg.paused||!cfg.auto_enabled)return c.json({error:'Héctor Agent está detenido globalmente; reanúdalo antes de autorizar'},409);
+ const row=await c.env.DB.prepare('SELECT g.work_job_id,g.objective,w.kind FROM hector_agent_goals g JOIN work_jobs w ON w.id=g.work_job_id WHERE g.id=? AND g.user_id=?').bind(approval.goal_id,userId).first<any>();
+ if(!row)return c.json({error:'Objetivo no encontrado'},404);
+ await c.env.DB.prepare("UPDATE hector_agent_approvals SET status='approved',decided_at=CURRENT_TIMESTAMP WHERE id=? AND user_id=? AND status='pending'").bind(approval.id,userId).run();
+ if(row.kind==='programming'){
+  try{await launchProgrammingJob(c.env,row.work_job_id,row.objective,cfg.max_iterations,'Inicio autorizado; runner editar-probar-corregir despachado');return c.json({ok:true,execution:'runner_dispatched'});}catch(e){return c.json({error:`Autorizado, pero el runner no pudo iniciar: ${e instanceof Error?e.message:'error'}`},502);}
+ }
+ await c.env.DB.batch([
+  c.env.DB.prepare("UPDATE work_jobs SET status='queued',next_retry_at=CURRENT_TIMESTAMP,last_error=NULL,lease_token=NULL,lease_expires_at=NULL,updated_at=CURRENT_TIMESTAMP WHERE id=?").bind(row.work_job_id),
+  c.env.DB.prepare('UPDATE hector_agent_goals SET stop_reason=NULL,updated_at=CURRENT_TIMESTAMP WHERE work_job_id=?').bind(row.work_job_id),
+  c.env.DB.prepare("INSERT INTO work_events(id,job_id,message,progress) SELECT ?,id,'Inicio manual autorizado; objetivo listo para ejecutar',progress FROM work_jobs WHERE id=?").bind(crypto.randomUUID(),row.work_job_id)
+ ]);
  return c.json({ok:true});
 });
 
