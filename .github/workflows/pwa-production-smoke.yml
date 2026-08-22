@@ -25,7 +25,7 @@ jobs:
               sha: context.payload.workflow_run.head_sha,
               state: 'pending',
               context: 'pwa/production-smoke',
-              description: 'Verificando shells y assets de producción',
+              description: 'Verificando Héctor OS, Agent y Pendientes en producción',
               target_url: `${context.serverUrl}/${context.repo.owner}/${context.repo.repo}/actions/runs/${context.runId}`
             });
 
@@ -47,6 +47,7 @@ jobs:
           }
 
           curl -fsS "$BASE/health" | jq -e '.ok == true'
+          check "/" "<title>Hector ASI · Etapa 6</title>"
           check "/agent/" "<title>Héctor Agent</title>"
           check "/agent/app.js" "/api/hector-agent/dashboard"
           check "/turno-rx/" "<title>Pendientes</title>"
@@ -63,7 +64,7 @@ jobs:
               sha: context.payload.workflow_run.head_sha,
               state: 'success',
               context: 'pwa/production-smoke',
-              description: 'Héctor Agent y Pendientes responden con sus assets',
+              description: 'Héctor OS, Agent y Pendientes responden correctamente',
               target_url: `${context.serverUrl}/${context.repo.owner}/${context.repo.repo}/actions/runs/${context.runId}`
             });
 
