@@ -14,6 +14,7 @@ describe('agent skills',()=>{
   expect(plan.phases.map(phase=>phase.name)).toEqual(['inspect','plan','execute','test','verify']);
   expect(plan.maxAttempts).toBe(3);
   expect(plan.skills).toContain('research-web');
+  expect(plan.phases[0].goal).toContain('registro canónico');
  });
 
  it('reconoce una solicitud de PWA aunque use acentos',()=>{
@@ -21,9 +22,20 @@ describe('agent skills',()=>{
   expect(ids).toContain('pwa-builder');
  });
 
+ it('inyecta gobernanza incluso antes de decidir crear una PWA',()=>{
+  const context=renderAgentContext('Agrega una consola nueva para herramientas');
+  expect(context).toContain('GOBERNANZA CANÓNICA DE SUPERFICIES');
+  expect(context).toContain('Héctor OS en /');
+  expect(context).toContain('Héctor Agent en /agent/');
+  expect(context).toContain('Pendientes en /turno-rx/');
+  expect(context).toContain('Context Hub');
+ });
+
  it('inyecta el contrato técnico cuando construye una PWA',()=>{
   const context=renderAgentContext('Construye una PWA para iPhone con service worker');
   expect(context).toContain('CONTRATO DE INGENIERÍA PWA');
+  expect(context).toContain('config/pwa-registry.json');
+  expect(context).toContain('autorización explícita');
   expect(context).toContain('manifest.webmanifest');
   expect(context).toContain('viewport 390x844');
   expect(context).toContain('rollback');
