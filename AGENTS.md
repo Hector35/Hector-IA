@@ -14,30 +14,28 @@ When the runtime has access to Héctor OS authentication, use the cross-chat syn
 
 If the runtime cannot call Context Sync directly, inspect current `main`, open PRs, `system_context`, Context Hub records and GitHub issue #958 before starting overlapping work. Never assume missing local chat context means the project has no prior decision.
 
-This protocol is a coordination system, **not a permission system**. Shared context should make decisions smarter, not prevent action.
+This coordination protocol is not a permission system. Claims are advisory and must not freeze useful parallel work.
 
-## Intelligent PWA/surface coordination
+## Canonical PWA/surface governance
 
 Before creating, renaming, moving or replacing any app/page/manifest/service worker, read `config/pwa-registry.json` and compare it against the current task and current code.
 
-The current canonical installable PWAs are:
+There are exactly three canonical installable PWAs unless Héctor explicitly authorizes creation of another installable PWA:
 
 1. **Héctor OS** — `/` — general UI, chat, shared utilities and the owner UI for Bridge/Context features.
 2. **Héctor Agent** — `/agent/` — goals, autonomous work, jobs, approvals, activity and Agent controls.
 3. **Pendientes** — `/turno-rx/` — clinical workflow; protected from unrelated work.
 
-`/bridge.html` and `/bridge-core.html` are currently surfaces of the same **Héctor Bridge** capability layer owned by Héctor OS. `/api/hector-bridge` is its backend. **Context Hub** is currently shared context/backend infrastructure.
+`/bridge.html` and `/bridge-core.html` are surfaces of the same **Héctor Bridge** capability layer owned by Héctor OS. `/api/hector-bridge` is its backend. **Context Hub** is shared context/backend infrastructure, not another installable PWA.
 
-These are current architectural defaults, not artificial brakes. Reuse an existing surface when that is the simplest coherent architecture. If a new PWA or top-level surface is genuinely better, an agent may create it within the authorized task, but it must explain the concrete product/technical advantage, avoid scope/cache collisions and update the registry so every other agent sees the new reality.
+### Hard PWA rules
 
-### Operating rules
-
-- Prefer reuse when it reduces duplication; prefer separation when it has a concrete product or technical benefit.
-- Do not create parallel implementations merely because another chat lacked context. Inspect concurrent work first and reconcile when useful.
-- Do not block work solely because a registry entry, claim or prior design says something different; compare against current objective and evidence, then update stale shared context.
-- New manifests and service workers must have non-overlapping scopes/cache ownership.
+- Reuse a registered surface when the requested feature fits its purpose. Do not invent a sibling PWA merely because another chat lacked context.
+- Authorization to implement a feature is **not** authorization to create a new installable PWA.
+- A new installable PWA requires explicit user authorization specifically for a new PWA, plus a registry update in the same change.
+- PWA Factory must enforce that boundary with `approvedNewPwa=true` and a non-empty `approvalReason`.
+- New manifests and service workers require unique non-overlapping scopes/cache ownership.
 - Do not modify `public/turno-rx/` unless the task is explicitly about Pendientes.
-- Backends, brokers, memory systems and tool registries should usually be shared services, but this is an architectural preference rather than a hard prohibition.
-- When agents disagree, preserve both claims with evidence and resolve against current code, tests and production state.
+- Backends, brokers, memory systems and tool registries should attach to an existing owner surface by default rather than becoming new PWAs.
 
-The registry, Context Hub, claims and ledger are shared state, not immutable law. If reality changes, update them instead of silently diverging.
+The distinction is intentional: **cross-chat claims are advisory; changing the canonical installable PWA set requires explicit user approval.** Shared context can evolve as reality changes, but it cannot silently reinterpret a feature request as permission to create another PWA.
