@@ -9,22 +9,33 @@ export type Skill={
 };
 
 export const SURFACE_GOVERNANCE_CONTRACT=`COORDINACIÓN CANÓNICA DE SUPERFICIES
-- Fuentes compartidas: config/pwa-registry.json, Context Hub, main/PRs abiertos y GitHub issue #958 (Shared Context Ledger).
-- Las únicas PWAs instalables canónicas son Héctor OS en /, Héctor Agent en /agent/ y Pendientes en /turno-rx/, salvo autorización explícita de Héctor para crear otra PWA.
-- Héctor OS posee la UI general, chat, herramientas compartidas y superficies de Bridge/Context.
-- Héctor Agent posee objetivos, jobs autónomos, aprobaciones, actividad y controles del agente.
+- Fuentes compartidas: config/shared-decisions.json, config/pwa-registry.json, Context Hub, Context Sync, main/PRs abiertos y GitHub issue #958.
+- El estado actual tiene Héctor OS en /, Héctor Agent en /agent/ y Pendientes en /turno-rx/; el registro describe arquitectura actual, no un máximo rígido ni un permiso interno.
+- Héctor OS posee UI general, chat, herramientas compartidas y superficies Bridge/Context.
+- Héctor Agent posee objetivos, jobs autónomos, actividad y controles del agente.
 - Pendientes es la PWA clínica; no modifiques public/turno-rx/ para trabajo ajeno a Pendientes.
-- /bridge.html y /bridge-core.html pertenecen al mismo Héctor Bridge. Context Hub es infraestructura compartida y no otra PWA.
-- Antes de crear una app, página de nivel superior, manifest o service worker, consulta el contexto compartido y el trabajo concurrente para evitar duplicación accidental.
-- Reutiliza una superficie existente cuando el objetivo quepa en ella. Autorizar una función o corrección NO autoriza una nueva PWA.
-- Una nueva PWA instalable requiere autorización explícita del usuario, registro actualizado, scope único y razón documentada.
-- Los claims de Cross-Chat Sync son señales consultivas, no locks; no confundas coordinación no bloqueante con permiso para cambiar el conjunto de PWAs.
-- No dupliques una capacidad ya construida solo por falta de contexto; compara, integra o reemplaza según evidencia.
+- /bridge.html, /bridge-core.html, /api/hector-bridge, Context Hub y /mcp pertenecen a la misma capa compartida; no los conviertas en PWAs paralelas por falta de contexto.
+- Antes de crear o dividir una superficie, consulta contexto compartido y trabajo concurrente para evitar duplicación accidental.
+- Reutiliza una superficie cuando sea la solución más simple y limpia; refactoriza, reemplaza o crea/separa una nueva cuando la evidencia técnica muestre una ventaja real.
+- Los claims de Context Sync, el registro y las recomendaciones son señales consultivas, no locks ni permisos.
+- No inventes approvedNewPwa, approvalReason u otros tokens internos para decidir arquitectura dentro de un objetivo ya autorizado.
+- Si cambia el conjunto de PWAs instalables, actualiza el registro y usa scope/service worker/cache únicos.
 - Nunca solapes scopes de service worker ni propiedad de caches entre PWAs.`;
+
+export const CAPABILITY_STACK_CONTRACT=`STACK DE CAPACIDADES COMPARTIDAS
+- Contexto: /api/context-sync + /api/context-hub; bootstrap antes de trabajo sustancial y commit al terminar hitos.
+- Puente directo: /mcp para clientes MCP y /api/hector-bridge para llamadas autenticadas.
+- Broker: /api/hector-bridge/capabilities; lista rutas, ejecuta fallback y conserva trazas.
+- Credenciales: /api/hector-bridge/access; nunca expongas material secreto en respuestas, logs, prompts o código.
+- Memoria mutable: /api/hector-bridge/memory/upsert; supersede estado/preferencias/decisiones obsoletas en vez de acumular contradicciones activas.
+- Fallback solo resuelve fallos técnicos, rate limits, credenciales renovables o ausencia de una ruta. No uses fallback para saltar controles externos de autorización/seguridad/política.
+- Un fallo de una capacidad no debe congelar trabajo independiente.
+- Ejecutado != verificado: conserva evidencia, trazas y resultado observable antes de declarar éxito.`;
 
 export const PWA_ENGINEERING_CONTRACT=`CONTRATO DE INGENIERÍA PWA
 ${SURFACE_GOVERNANCE_CONTRACT}
 - Convierte el objetivo en casos de uso, datos, pantallas, estados y criterios de aceptación antes de generar código.
+- Decide por evidencia si conviene extender una PWA actual, crear una superficie dentro de ella o separar una nueva PWA; coordinación no equivale a permiso.
 - Entrega una aplicación completa y ejecutable, no solo HTML de demostración ni una explicación.
 - Mantén manifest.webmanifest coherente: name, short_name, id, start_url, scope, display, theme_color, background_color e iconos.
 - Registra el service worker únicamente cuando la especificación habilite modo offline; define estrategia de caché, actualización y recuperación ante fallos.
@@ -33,6 +44,7 @@ ${SURFACE_GOVERNANCE_CONTRACT}
 - No incrustes secretos en el cliente. Todo privilegio, API privada o escritura sensible debe quedar en backend autenticado.
 - Ejecuta typecheck, pruebas y build; corrige fallos antes de afirmar que la PWA está terminada.
 - Verifica instalabilidad, navegación, estado offline, accesibilidad básica y viewport 390x844 mediante evidencia independiente.
+- Si creas una PWA nueva, registra ownership y scopes en config/pwa-registry.json dentro del mismo cambio.
 - Publica una versión trazable y conserva rollback. Propuesto no significa construido; construido no significa verificado.`;
 
 export const SKILLS:Skill[]=[
@@ -50,35 +62,43 @@ export const SKILLS:Skill[]=[
   description:'Modificar código con rama, pruebas y PR.',
   triggers:['github','codigo','bug','repositorio','programa','corrige'],
   tools:['github','runner'],
-  steps:['Reconstruir contexto compartido y revisar trabajo concurrente','Consultar gobernanza canónica antes de crear UI nueva','Crear rama','Editar cambios mínimos','Ejecutar typecheck, tests y build','Crear PR','Verificar despliegue','Publicar un handoff al contexto compartido'],
-  success:['Pruebas aprobadas','Diff revisable','Sin superficies instalables no autorizadas','Evidencia de producción','Handoff compartido'],
+  steps:['Reconstruir contexto compartido y revisar trabajo concurrente','Elegir si conviene reutilizar, integrar o reemplazar','Crear rama','Editar cambios mínimos','Ejecutar typecheck, tests y build','Crear PR','Verificar despliegue','Publicar handoff compartido'],
+  success:['Pruebas aprobadas','Diff revisable','Arquitectura coherente','Evidencia de producción','Handoff compartido'],
+  risk:'medium'
+ },
+ {
+  id:'capability-routing',
+  description:'Resolver una acción mediante Tool Broker, credenciales, fallback y trazas sin bloquear el objetivo completo.',
+  triggers:['bridge','mcp','herramienta','tool','api','credencial','oauth','fallback','router','capacidad','acceso'],
+  tools:['context-hub','hector-bridge','credential-broker','capability-router'],
+  steps:['Bootstrap de contexto','Descubrir capacidades existentes','Elegir la ruta preferida','Resolver credencial sin exponer secretos','Ejecutar','Clasificar fallo y probar fallback técnico si corresponde','Registrar traza/evidencia','Publicar handoff si cambió estado durable'],
+  success:['Ruta seleccionada con evidencia','Secretos no expuestos','Fallback técnico trazable','Trabajo independiente no bloqueado'],
   risk:'medium'
  },
  {
   id:'pwa-builder',
-  description:'Diseñar, extender, generar, versionar, probar y publicar PWAs instalables respetando el registro canónico.',
+  description:'Diseñar, extender, generar, versionar, probar y publicar PWAs instalables usando coordinación consultiva y decisión arquitectónica por evidencia.',
   triggers:['pwa','aplicacion web progresiva','aplicacion instalable','app instalable','app para iphone','instalar en iphone','service worker','manifest web','offline first','pantalla de inicio'],
   tools:['pwa-factory','github','runner','browser'],
   steps:[
-   'Consultar contexto compartido, registro y trabajo concurrente antes de decidir la arquitectura',
-   'Identificar primero cuál de las tres PWAs canónicas es propietaria del objetivo',
-   'Solo considerar una nueva PWA instalable si existe autorización explícita del usuario para crear otra PWA',
+   'Consultar contexto compartido, registro y trabajo concurrente antes de decidir arquitectura',
+   'Comparar extensión de una PWA actual frente a una superficie o PWA nueva por simplicidad, aislamiento, lifecycle, UX y mantenibilidad',
+   'Elegir la mejor arquitectura sin convertir el registro, claims o recomendaciones en permisos internos',
    'Convertir el objetivo en especificación funcional, modelo de datos y criterios observables',
-   'Elegir arquitectura cliente, persistencia local y backend según los riesgos del caso',
    'Generar fuente completa con diseño responsive y accesible',
-   'Configurar manifest, iconos, metadatos de iPhone y estrategia de instalación sin solapar scopes',
-   'Implementar service worker, actualización y experiencia offline cuando corresponda',
+   'Configurar manifest, iconos, metadatos de iPhone y scopes sin solapamiento',
+   'Implementar service worker con limpieza limitada a su propia familia de cache',
    'Ejecutar typecheck, pruebas y build reproducible',
-   'Verificar instalación, navegación, offline y viewport iPhone con navegador aislado',
-   'Actualizar el registro si una nueva PWA fue explícitamente autorizada y publicar handoff compartido',
+   'Verificar instalación, navegación, offline y viewport iPhone con evidencia',
+   'Actualizar el registro si cambió la arquitectura y publicar handoff',
    'Publicar una versión trazable y conservar rollback'
   ],
   success:[
-   'Propietario canónico identificado',
-   'Nueva PWA ausente salvo autorización explícita documentada',
+   'Decisión arquitectónica informada',
+   'Sin duplicación accidental ni permisos internos artificiales',
    'Fuente completa y versionada',
    'Manifest e instalación validados',
-   'Política offline comprobada o explícitamente deshabilitada',
+   'Service worker aislado',
    'Typecheck, pruebas y build aprobados',
    'Interfaz usable en 390x844 y safe areas',
    'Contexto compartido actualizado',
@@ -97,27 +117,25 @@ export const SKILLS:Skill[]=[
  },
  {
   id:'memory-curation',
-  description:'Guardar, actualizar o invalidar memoria estructurada.',
-  triggers:['recuerda','olvida','preferencia','memoria'],
-  tools:['d1'],
-  steps:['Clasificar dato','Determinar vigencia y confianza','Detectar contradicciones','Guardar o invalidar'],
-  success:['Memoria trazable','Sin duplicados contradictorios'],
+  description:'Guardar, actualizar, superseder o invalidar memoria estructurada.',
+  triggers:['recuerda','olvida','preferencia','memoria','contexto'],
+  tools:['context-hub','hector-memory'],
+  steps:['Clasificar dato','Determinar sujeto, vigencia y confianza','Detectar versiones previas','Superseder estado mutable obsoleto o anexar hechos históricos','Verificar que retrieval no devuelva versiones supersedidas'],
+  success:['Memoria trazable','Una sola versión activa para estado mutable','Historial conservado'],
   risk:'medium'
  },
  {
   id:'self-analysis',
   description:'Autoevaluar capacidades, fallos y siguiente mejora.',
   triggers:['autoanaliza','limitaciones','que falta','mejorate','problemas'],
-  tools:['evals','d1'],
-  steps:['Ejecutar pruebas','Leer errores recientes','Agrupar fallos repetidos','Priorizar por impacto','Generar prompt de mejora'],
-  success:['Puntuación reproducible','Problemas concretos'],
+  tools:['evals','d1','capability-traces'],
+  steps:['Ejecutar pruebas','Leer errores y trazas recientes','Agrupar fallos repetidos','Priorizar por impacto','Convertir regresiones reales en evals'],
+  success:['Puntuación reproducible','Problemas concretos','Regresiones cubiertas'],
   risk:'low'
  }
 ];
 
-function normalize(value:string){
- return value.normalize('NFD').replace(/[\u0300-\u036f]/g,'').toLowerCase();
-}
+function normalize(value:string){return value.normalize('NFD').replace(/[\u0300-\u036f]/g,'').toLowerCase();}
 
 export function selectSkills(input:string,limit=4){
  const q=normalize(input);
@@ -129,6 +147,4 @@ export function selectSkills(input:string,limit=4){
   .map(item=>item.skill);
 }
 
-export function renderSkills(skills:Skill[]){
- return skills.map(skill=>`SKILL ${skill.id}\nObjetivo: ${skill.description}\nHerramientas: ${skill.tools.join(', ')}\nPasos:\n${skill.steps.map((step,index)=>`${index+1}. ${step}`).join('\n')}\nÉxito:\n${skill.success.map(item=>`- ${item}`).join('\n')}\nRiesgo: ${skill.risk}`).join('\n\n');
-}
+export function renderSkills(skills:Skill[]){return skills.map(skill=>`SKILL ${skill.id}\nObjetivo: ${skill.description}\nHerramientas: ${skill.tools.join(', ')}\nPasos:\n${skill.steps.map((step,index)=>`${index+1}. ${step}`).join('\n')}\nÉxito:\n${skill.success.map(item=>`- ${item}`).join('\n')}\nRiesgo: ${skill.risk}`).join('\n\n');}

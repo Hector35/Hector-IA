@@ -9,12 +9,13 @@ describe('agent skills',()=>{
   expect(ids).toContain('browser-verify');
  });
 
- it('crea fases verificables y limita reintentos',()=>{
+ it('crea fases verificables y reconsidera estrategia tras intentos fallidos',()=>{
   const plan=buildPlan('Investiga el problema actual');
   expect(plan.phases.map(phase=>phase.name)).toEqual(['inspect','plan','execute','test','verify']);
   expect(plan.maxAttempts).toBe(3);
   expect(plan.skills).toContain('research-web');
   expect(plan.phases[0].goal).toContain('contexto compartido');
+  expect(plan.phases[2].goal).toContain('alternativa legítima');
  });
 
  it('reconoce una solicitud de PWA aunque use acentos',()=>{
@@ -22,25 +23,31 @@ describe('agent skills',()=>{
   expect(ids).toContain('pwa-builder');
  });
 
- it('inyecta coordinación compartida y gobernanza canónica',()=>{
-  const context=renderAgentContext('Agrega una consola nueva para herramientas');
+ it('inyecta contexto compartido y el stack de capacidades sin convertirlos en locks',()=>{
+  const context=renderAgentContext('Agrega una consola nueva para herramientas y usa fallback si una API falla');
   expect(context).toContain('COORDINACIÓN CANÓNICA DE SUPERFICIES');
-  expect(context).toContain('Héctor OS en /');
-  expect(context).toContain('Héctor Agent en /agent/');
-  expect(context).toContain('Pendientes en /turno-rx/');
-  expect(context).toContain('Context Hub');
-  expect(context).toContain('Shared Context Ledger');
-  expect(context).toContain('claims de coordinación son señales consultivas y no locks');
+  expect(context).toContain('STACK DE CAPACIDADES COMPARTIDAS');
+  expect(context).toContain('/mcp');
+  expect(context).toContain('Credential Broker');
+  expect(context).toContain('señales consultivas, no locks ni permisos');
+  expect(context).toContain('no son locks ni permisos');
  });
 
- it('requiere autorización explícita para una nueva PWA',()=>{
+ it('selecciona capability routing para MCP, OAuth y fallback',()=>{
+  const ids=selectSkills('Conecta MCP con OAuth y usa fallback del tool broker si falla').map(skill=>skill.id);
+  expect(ids).toContain('capability-routing');
+ });
+
+ it('trata la arquitectura PWA como decisión informada, no como permiso interno',()=>{
   const context=renderAgentContext('Construye una PWA para iPhone con service worker');
   expect(context).toContain('CONTRATO DE INGENIERÍA PWA');
   expect(context).toContain('config/pwa-registry.json');
-  expect(context).toContain('requiere autorización explícita');
+  expect(context).toContain('no un máximo rígido ni un permiso interno');
+  expect(context).toContain('No inventes approvedNewPwa');
   expect(context).toContain('manifest.webmanifest');
   expect(context).toContain('viewport 390x844');
   expect(context).toContain('rollback');
+  expect(context).toContain('decisión arquitectónica por evidencia');
  });
 
  it('no activa PWA para una tarea analítica sin relación',()=>{

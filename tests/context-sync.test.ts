@@ -40,9 +40,10 @@ describe('cross-chat context synchronization',()=>{
   expect(route).toContain('Claims y registros informan decisiones; no bloquean trabajo paralelo');
  });
 
- it('mounts sync behind the existing security boundary without bypassing worker fallback',()=>{
+ it('mounts sync behind the existing security boundary without bypassing wrapped worker fallback',()=>{
   expect(secure).toContain("contextSyncApi.route('/api/context-sync',contextSync)");
   expect(secure).toContain("url.pathname.startsWith('/api/context-sync')");
+  expect(secure).toContain('const forwarded=new Request(request,{headers});');
   expect(secure).toContain('worker.fetch(new Request(request,{headers}),env,ctx)');
   expect(secure).toContain('cross_site_mutation_denied');
  });
@@ -51,7 +52,7 @@ describe('cross-chat context synchronization',()=>{
   expect(agents).toContain('Shared context / cross-chat coordination');
   expect(agents).toContain('POST /bootstrap');
   expect(agents).toContain('POST /claim');
-  expect(agents).toContain('presence signals, not locks');
+  expect(agents).toContain('Claims are presence signals, not locks.');
   expect(agents).toContain('POST /commit');
   expect(agents).toContain('POST /release');
   expect(agents).toContain('not a permission system');

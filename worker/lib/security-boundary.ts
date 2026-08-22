@@ -2,7 +2,7 @@ import type {MiddlewareHandler} from 'hono';
 import type {Bindings,Variables} from '../types';
 
 const UNSAFE=new Set(['POST','PUT','PATCH','DELETE']);
-const PROTECTED_PREFIXES=['/api/','/control/','/runner/','/self-improve/','/generated/'];
+const PROTECTED_PREFIXES=['/api/','/control/','/runner/','/self-improve/','/generated/','/mcp'];
 const REQUEST_ID=/^[A-Za-z0-9._:-]{8,128}$/;
 
 export type BoundaryInput={url:string;method:string;origin?:string|null;secFetchSite?:string|null};
@@ -24,7 +24,7 @@ export function evaluateSecurityBoundary(input:BoundaryInput):BoundaryDecision{
 export function normalizeRequestId(value:unknown){const candidate=String(value||'').trim();return REQUEST_ID.test(candidate)?candidate:crypto.randomUUID();}
 
 export const SECURITY_BOUNDARY_MANIFEST={
- version:'1.0.0',
+ version:'1.1.0',
  protectedMethods:[...UNSAFE],
  protectedPrefixes:PROTECTED_PREFIXES,
  crossSiteMutations:'deny',

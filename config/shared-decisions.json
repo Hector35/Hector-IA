@@ -1,0 +1,54 @@
+{
+  "schemaVersion": 1,
+  "revision": 2026082201,
+  "updatedAt": "2026-08-22T15:02:00Z",
+  "authority": "latest-explicit-user-instruction",
+  "purpose": "Machine-readable cross-chat decisions that must be checked before substantial architectural work.",
+  "decisions": [
+    {
+      "id": "shared-context-is-intelligence-not-permission",
+      "status": "active",
+      "priority": 100,
+      "decision": "Context Sync, claims, registry entries, recommendations and handoffs are shared intelligence and coordination signals, not internal permission gates or locks.",
+      "supersedes": ["explicit-pwa-approval-gate"],
+      "evidence": ["Shared Context Ledger issue #958 latest handoff", "latest explicit user instruction: no internal brakes; use intelligence and alternatives"]
+    },
+    {
+      "id": "current-pwa-architecture",
+      "status": "active",
+      "priority": 95,
+      "decision": "Héctor OS /, Héctor Agent /agent/, and Pendientes /turno-rx/ are the current canonical installable PWAs, not a hard maximum.",
+      "rules": [
+        "Prefer reuse when it is the simpler or cleaner design.",
+        "Create or split a PWA when isolation, lifecycle, UX, maintainability or other concrete evidence makes it better.",
+        "Do not require approvedNewPwa, approvalReason or another internal permission token inside an already authorized objective.",
+        "When the installable set changes, update config/pwa-registry.json in the same change and keep manifest, service-worker and cache scopes unique.",
+        "Do not modify public/turno-rx/ for unrelated work."
+      ]
+    },
+    {
+      "id": "maximum-capability-stack",
+      "status": "active",
+      "priority": 90,
+      "decision": "Extend one shared stack rather than multiplying parallel control planes: ChatGPT/API/MCP -> Héctor Bridge -> Context Hub + Context Sync -> Capability Router -> Credential Broker -> tools/providers -> verification/evidence -> durable state.",
+      "rules": [
+        "Use technical fallbacks for availability, rate limits, renewable credentials and missing capabilities.",
+        "Do not use fallbacks to bypass mandatory external authorization, security or provider-policy controls.",
+        "Do not expose secrets in code, prompts, logs or responses.",
+        "A localized failure must not freeze independent work.",
+        "Do not declare success without verification evidence."
+      ]
+    },
+    {
+      "id": "cross-chat-protocol",
+      "status": "active",
+      "priority": 85,
+      "decision": "Before substantial work reconstruct context from current main, open PRs, this file, Context Hub/Context Sync when reachable, and issue #958; after meaningful work publish a structured handoff.",
+      "rules": [
+        "If sources disagree, prefer the latest explicit user instruction, then verified current state/evidence.",
+        "A newer decision may supersede an older handoff without deleting history.",
+        "Do not let who arrived first decide architecture."
+      ]
+    }
+  ]
+}

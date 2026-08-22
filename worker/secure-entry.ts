@@ -2,6 +2,10 @@ import {Hono} from 'hono';
 import worker from './index';
 import type {Bindings,Variables} from './types';
 import {hectorBridge} from './routes/hector-bridge';
+import {hectorAccess} from './routes/hector-access';
+import {hectorCapabilities} from './routes/hector-capabilities';
+import {hectorMemory} from './routes/hector-memory';
+import {hectorMcp} from './routes/hector-mcp';
 import {contextHub} from './routes/context-hub';
 import {contextSync} from './routes/context-sync';
 import {evaluateSecurityBoundary,isProtectedMutation,normalizeRequestId} from './lib/security-boundary';
@@ -9,6 +13,14 @@ import {evaluateSecurityBoundary,isProtectedMutation,normalizeRequestId} from '.
 const HECTOR_AGENT_VERSION='20260822-4';
 const bridgeApi=new Hono<{Bindings:Bindings;Variables:Variables}>();
 bridgeApi.route('/api/hector-bridge',hectorBridge);
+const accessApi=new Hono<{Bindings:Bindings;Variables:Variables}>();
+accessApi.route('/api/hector-bridge/access',hectorAccess);
+const capabilitiesApi=new Hono<{Bindings:Bindings;Variables:Variables}>();
+capabilitiesApi.route('/api/hector-bridge/capabilities',hectorCapabilities);
+const memoryApi=new Hono<{Bindings:Bindings;Variables:Variables}>();
+memoryApi.route('/api/hector-bridge/memory',hectorMemory);
+const mcpApi=new Hono<{Bindings:Bindings;Variables:Variables}>();
+mcpApi.route('/mcp',hectorMcp);
 const contextHubApi=new Hono<{Bindings:Bindings;Variables:Variables}>();
 contextHubApi.route('/api/context-hub',contextHub);
 const contextSyncApi=new Hono<{Bindings:Bindings;Variables:Variables}>();
@@ -24,7 +36,7 @@ function securedResponse(response:Response,pathname:string,requestId:string){
  secured.headers.set('X-Frame-Options','DENY');
  secured.headers.set('Strict-Transport-Security','max-age=63072000; includeSubDomains; preload');
  secured.headers.set('Permissions-Policy','camera=(self), microphone=(self), geolocation=(), payment=(), usb=(), browsing-topics=()');
- if(['/api/','/control/','/runner/','/self-improve/','/generated/','/agent/','/hector-agent'].some(prefix=>pathname.startsWith(prefix))||pathname==='/agent'){
+ if(['/api/','/control/','/runner/','/self-improve/','/generated/','/agent/','/hector-agent','/mcp'].some(prefix=>pathname.startsWith(prefix))||pathname==='/agent'){
   secured.headers.set('Cache-Control','no-store, no-cache, must-revalidate, max-age=0');
   secured.headers.set('Pragma','no-cache');
   secured.headers.set('Expires','0');
@@ -66,13 +78,22 @@ export default {
    }
   }
   const headers=new Headers(request.headers);headers.set('X-Request-ID',requestId);
-  const response=url.pathname.startsWith('/api/hector-bridge')
-   ?await bridgeApi.fetch(new Request(request,{headers}),env,ctx)
-   :url.pathname.startsWith('/api/context-hub')
-    ?await contextHubApi.fetch(new Request(request,{headers}),env,ctx)
-    :url.pathname.startsWith('/api/context-sync')
-     ?await contextSyncApi.fetch(new Request(request,{headers}),env,ctx)
-     :await worker.fetch(new Request(request,{headers}),env,ctx);
+  const forwarded=new Request(request,{headers});
+  const response=url.pathname.startsWith('/mcp')
+   ?await mcpApi.fetch(forwarded,env,ctx)
+   :url.pathname.startsWith('/api/hector-bridge/access')
+    ?await accessApi.fetch(forwarded,env,ctx)
+    :url.pathname.startsWith('/api/hector-bridge/capabilities')
+     ?await capabilitiesApi.fetch(forwarded,env,ctx)
+     :url.pathname.startsWith('/api/hector-bridge/memory')
+      ?await memoryApi.fetch(forwarded,env,ctx)
+      :url.pathname.startsWith('/api/hector-bridge')
+       ?await bridgeApi.fetch(forwarded,env,ctx)
+       :url.pathname.startsWith('/api/context-hub')
+        ?await contextHubApi.fetch(forwarded,env,ctx)
+        :url.pathname.startsWith('/api/context-sync')
+         ?await contextSyncApi.fetch(forwarded,env,ctx)
+         :await worker.fetch(new Request(request,{headers}),env,ctx);
   return securedResponse(response,url.pathname,requestId);
  },
  scheduled:worker.scheduled
