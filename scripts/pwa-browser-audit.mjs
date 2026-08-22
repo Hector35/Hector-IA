@@ -257,28 +257,34 @@ async function chromiumPwaAudit(browser,pwa,files){
   }finally{await context.close();}
 }
 
-const webkitBrowser=await webkit.launch({headless:true});
-const chromiumBrowser=await chromium.launch({headless:true});
+async function runWebkitMobileAudit(pwa,files){
+  const browser=await webkit.launch({headless:true});
+  try{return await webkitMobileAudit(browser,pwa,files);}
+  finally{await browser.close().catch(()=>{});}
+}
+
+async function runChromiumPwaAudit(pwa,files){
+  const browser=await chromium.launch({headless:true});
+  try{return await chromiumPwaAudit(browser,pwa,files);}
+  finally{await browser.close().catch(()=>{});}
+}
+
 let failed=false;
-try{
-  for(const pwa of pwas){
-    const result={id:pwa.id,name:pwa.name,path:pwa.canonicalPath,checks:[]};
-    try{
-      const files=await verifyPwaFiles(pwa);
-      result.checks.push(await webkitMobileAudit(webkitBrowser,pwa,files));
-      result.checks.push(await chromiumPwaAudit(chromiumBrowser,pwa,files));
-      result.ok=true;
-      console.log(`✅ ${pwa.name}: WebKit iPhone + Chromium PWA/offline`);
-    }catch(error){
-      failed=true;
-      result.ok=false;
-      result.error=error instanceof Error?error.stack||error.message:String(error);
-      console.error(`❌ ${pwa.name}: ${result.error}`);
-    }
-    report.results.push(result);
+for(const pwa of pwas){
+  const result={id:pwa.id,name:pwa.name,path:pwa.canonicalPath,checks:[]};
+  try{
+    const files=await verifyPwaFiles(pwa);
+    result.checks.push(await runWebkitMobileAudit(pwa,files));
+    result.checks.push(await runChromiumPwaAudit(pwa,files));
+    result.ok=true;
+    console.log(`✅ ${pwa.name}: WebKit iPhone + Chromium PWA/offline`);
+  }catch(error){
+    failed=true;
+    result.ok=false;
+    result.error=error instanceof Error?error.stack||error.message:String(error);
+    console.error(`❌ ${pwa.name}: ${result.error}`);
   }
-}finally{
-  await Promise.allSettled([webkitBrowser.close(),chromiumBrowser.close()]);
+  report.results.push(result);
 }
 
 report.ok=!failed;
