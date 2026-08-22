@@ -1,0 +1,73 @@
+name: Hector model Qwen15 v35 training
+on:
+  pull_request:
+    branches: [main]
+    paths:
+      - 'model/hector-asi/data/qwen15-sft-v5.jsonl'
+      - 'model/hector-asi/data/qwen15-sft-v6-supplement.jsonl'
+      - 'model/hector-asi/evals/qwen15-held-out-v5.jsonl'
+      - 'model/hector-asi/evals/qwen15-held-out-v6-supplement.jsonl'
+      - 'model/hector-asi/train_qwen15_v35.py'
+      - '.github/workflows/hector-model-qwen15-v35.yml'
+  workflow_dispatch:
+permissions:
+  contents: read
+jobs:
+  train-qwen15-v35:
+    runs-on: ubuntu-latest
+    timeout-minutes: 360
+    env:
+      HF_HUB_DISABLE_TELEMETRY: '1'
+      TOKENIZERS_PARALLELISM: 'false'
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+      - name: Install pinned CPU stack
+        run: |
+          python -m pip install --upgrade pip
+          python -m pip install --index-url https://download.pytorch.org/whl/cpu 'torch==2.7.1'
+          python -m pip install 'transformers==4.53.2' 'peft==0.16.0' 'accelerate==1.8.1' 'safetensors==0.5.3'
+      - name: Train two warmup replicas
+        run: |
+          for replica in a b; do
+            python model/hector-asi/train_qwen15_v35.py \
+              --train-files model/hector-asi/data/qwen15-sft-v5.jsonl model/hector-asi/data/qwen15-sft-v6-supplement.jsonl \
+              --validation-files model/hector-asi/evals/qwen15-held-out-v5.jsonl model/hector-asi/evals/qwen15-held-out-v6-supplement.jsonl \
+              --experiment-id hector-asi-qwen15-v35 \
+              --output-dir artifacts/hector-asi-qwen15-v35-$replica \
+              --epochs 2 --max-length 112 --lr 3e-5 --warmup-ratio 0.10 --seed 35
+          done
+      - name: Verify reproducibility and held-out gate
+        run: |
+          python - <<'PY'
+          import hashlib,json
+          from pathlib import Path
+          roots=[Path('artifacts/hector-asi-qwen15-v35-a'),Path('artifacts/hector-asi-qwen15-v35-b')]
+          def sha(p):return hashlib.sha256(p.read_bytes()).hexdigest()
+          metrics=[json.loads((r/'metrics.json').read_text()) for r in roots]
+          hashes=[sha(r/'adapter'/'adapter_model.safetensors') for r in roots]
+          x=metrics[0]['results'];h=metrics[0]['hyperparameters'];d=metrics[0]['dataset']
+          summary={'adapterSha256':hashes[0],'byteIdenticalReplicas':int(hashes[0]==hashes[1]),'baseValidationLoss':x['baseValidationLoss'],'candidateValidationLoss':x['candidateValidationLoss'],'relativeValidationImprovement':x['relativeValidationImprovement'],'parameterDeltaL2':x['parameterDeltaL2'],'adapterBytes':x['adapterBytes'],'trainExamples':d['trainExamples'],'validationExamples':d['validationExamples'],'warmupSteps':h['warmupSteps'],'leaderLoss':2.1131172180,'controlledComparison':'v15 plus 10% linear warmup; all other settings identical'}
+          (roots[0]/'reproducibility.json').write_text(json.dumps(summary,indent=2)+'\n')
+          print(json.dumps(summary,indent=2))
+          assert hashes[0]==hashes[1]
+          for m,r in zip(metrics,roots):
+            x=m['results'];h=m['hyperparameters'];d=m['dataset']
+            assert x['weightsGenerated'] and x['parameterDeltaL2']>0
+            assert x['candidateValidationLoss']<x['baseValidationLoss']
+            assert x['relativeValidationImprovement']>=.03
+            assert d['trainExamples']==40 and d['validationExamples']==20 and d['crossSplitPromptOverlap']==0
+            assert h['scheduler']=='linear-warmup-then-constant' and h['warmupSteps']==8
+            assert x['firstLearningRate']<x['peakLearningRate']==x['finalLearningRate']
+            assert x['adapterBytes']>30000000 and (r/'SHA256SUMS').is_file()
+          PY
+      - name: Upload immutable adapter and evidence
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: hector-asi-qwen15-v35-${{ github.run_id }}
+          path: artifacts/hector-asi-qwen15-v35-a
+          if-no-files-found: error
+          retention-days: 90
