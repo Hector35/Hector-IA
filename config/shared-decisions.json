@@ -1,7 +1,7 @@
 {
   "schemaVersion": 1,
-  "revision": 2026082201,
-  "updatedAt": "2026-08-22T15:02:00Z",
+  "revision": 2026082301,
+  "updatedAt": "2026-08-23T12:33:00Z",
   "authority": "latest-explicit-user-instruction",
   "purpose": "Machine-readable cross-chat decisions that must be checked before substantial architectural work.",
   "decisions": [
@@ -37,6 +37,22 @@
         "Do not expose secrets in code, prompts, logs or responses.",
         "A localized failure must not freeze independent work.",
         "Do not declare success without verification evidence."
+      ]
+    },
+    {
+      "id": "ci-production-evidence-order",
+      "status": "active",
+      "priority": 88,
+      "decision": "For a SHA on main, use the combined commit status/checks as the primary operational source for terminal CI and production gates; use workflow runs as secondary evidence for diagnosis, logs or detail.",
+      "rules": [
+        "Treat deploy/production, pwa/production-smoke, context-platform/production-audit, pwa/browser-production-audit and hector-agent/production-audit as verified only when the corresponding status/check is terminal and successful.",
+        "Do not infer failure or missing evidence from an empty workflow-runs result when the connector or wrapper filters by event type.",
+        "Use workflow runs after combined status when detailed failure diagnosis, artifacts or logs are needed.",
+        "Do not declare success from merge state alone."
+      ],
+      "evidence": [
+        "main 1711242bc0c05e6cf9a7feed1f2eb9796170bdb5 exposed all five production gates as success through combined commit status",
+        "Shared Context Ledger #958 recorded repeated false uncertainty caused by workflow-run wrapper filtering"
       ]
     },
     {
