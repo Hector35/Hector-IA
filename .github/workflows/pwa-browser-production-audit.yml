@@ -5,6 +5,12 @@ on:
     workflows: ["Deploy Production"]
     types: [completed]
   workflow_dispatch:
+  push:
+    branches: [main]
+    paths:
+      - 'scripts/pwa-browser-audit.mjs'
+      - 'scripts/pwa-webkit-crash-diagnostic.mjs'
+      - '.github/workflows/pwa-browser-production-audit.yml'
 
 permissions:
   contents: read
@@ -16,7 +22,7 @@ concurrency:
 
 jobs:
   browser-e2e:
-    if: github.event_name == 'workflow_dispatch' || github.event.workflow_run.conclusion == 'success'
+    if: github.event_name == 'workflow_dispatch' || github.event_name == 'push' || github.event.workflow_run.conclusion == 'success'
     runs-on: ubuntu-latest
     timeout-minutes: 20
     env:
