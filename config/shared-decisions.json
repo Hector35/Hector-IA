@@ -1,7 +1,7 @@
 {
   "schemaVersion": 1,
-  "revision": 2026082301,
-  "updatedAt": "2026-08-23T12:33:00Z",
+  "revision": 2026082302,
+  "updatedAt": "2026-08-23T13:35:00Z",
   "authority": "latest-explicit-user-instruction",
   "purpose": "Machine-readable cross-chat decisions that must be checked before substantial architectural work.",
   "decisions": [
@@ -48,10 +48,13 @@
         "Treat deploy/production, pwa/production-smoke, context-platform/production-audit, pwa/browser-production-audit and hector-agent/production-audit as verified only when the corresponding status/check is terminal and successful.",
         "Do not infer failure or missing evidence from an empty workflow-runs result when the connector or wrapper filters by event type.",
         "Use workflow runs after combined status when detailed failure diagnosis, artifacts or logs are needed.",
-        "Do not declare success from merge state alone."
+        "Do not declare success from merge state alone.",
+        "If current main contains only non-runtime/context-only changes that intentionally do not trigger production workflows, do not treat an empty combined status as a production regression. Verify the current source/PR state for that config change, and use the most recent runtime-affecting ancestor SHA with terminal production gates as the production-health reference.",
+        "Never apply the non-runtime exception to product, worker, migration, public asset, workflow or other changes that can affect deployed behavior; those still require fresh terminal evidence for the affected gates."
       ],
       "evidence": [
         "main 1711242bc0c05e6cf9a7feed1f2eb9796170bdb5 exposed all five production gates as success through combined commit status",
+        "main 52357d922744208e7255599a4634e4cdb890e9ab changed only config/shared-decisions.json and exposed no statuses because no production workflow was triggered",
         "Shared Context Ledger #958 recorded repeated false uncertainty caused by workflow-run wrapper filtering"
       ]
     },
