@@ -1,5 +1,5 @@
 (() => {
-  // Pendientes v89 — categoría manual autoritativa y coherencia de Piso.
+  // Pendientes v94 — categoría manual autoritativa y coherencia de Piso; observer idempotente en WebKit.
   const STORAGE_KEY='pendientes-table-v2';
   const VALUE_FOR_TAB={RX:'Rayos X',TAC:'TAC',USG:'Ultrasonido',Piso:'Piso'};
   const MANUAL_FIELDS=['bed','name','age','sex','target','category','modality','diagnosis','diagnosisMeaning','transport','transportReason','oxygenProbable','oxygenReason'];
@@ -14,7 +14,7 @@
   function ensureCategorySelect(){
     const select=document.getElementById('modality');if(!select)return null;
     if(!select.querySelector('option[value="Piso"]')){const option=document.createElement('option');option.value='Piso';option.textContent='Piso';select.appendChild(option)}
-    const label=select.closest('label')?.querySelector('span');if(label)label.textContent='Categoría';
+    const label=select.closest('label')?.querySelector('span');if(label&&label.textContent!=='Categoría')label.textContent='Categoría';
     return select;
   }
   function valueForRow(row){
@@ -117,5 +117,5 @@
   window.addEventListener('pendientes:v80-updated',()=>migrateFloorRows({render:true}));
   window.addEventListener('pageshow',()=>migrateFloorRows({render:true}));
   migrateFloorRows({render:true});ensureCategorySelect();
-  document.documentElement.dataset.pendientesManualBuild='89';
+  document.documentElement.dataset.pendientesManualBuild='94';
 })();
