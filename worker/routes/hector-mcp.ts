@@ -2,6 +2,7 @@ import {Hono} from 'hono';
 import type {Bindings,Variables} from '../types';
 import {authHasScope,requireAuth} from '../lib/auth';
 import {hectorBridge} from './hector-bridge';
+import {hectorAgent} from './hector-agent';
 import {contextHub} from './context-hub';
 import {contextSync} from './context-sync';
 import {hectorCapabilities} from './hector-capabilities';
@@ -10,7 +11,10 @@ import {hectorMemory} from './hector-memory';
 export const hectorMcp=new Hono<{Bindings:Bindings;Variables:Variables}>();
 hectorMcp.use('*',requireAuth);
 
-type ToolDef={name:string;description:string;scope:string;method:'GET'|'POST';path:string;target:'bridge'|'context'|'sync'|'capabilities'|'memory';inputSchema:Record<string,unknown>;wrap?: (args:any)=>any};
+type ToolPath=string|((args:any)=>string);
+type ToolDef={name:string;description:string;scope:string;method:'GET'|'POST';path:ToolPath;target:'bridge'|'agent'|'context'|'sync'|'capabilities'|'memory';inputSchema:Record<string,unknown>;wrap?: (args:any)=>any};
+
+const goalIdSchema={type:'object',properties:{goalId:{type:'string'}},required:['goalId'],additionalProperties:false};
 
 const TOOLS:ToolDef[]=[
  {name:'context_search',description:'Busca en memoria, conversaciones, objetivos, proyectos, archivos y capacidades compartidas de Héctor.',scope:'context',method:'POST',path:'/search-everything',target:'context',inputSchema:{type:'object',properties:{query:{type:'string'},limit:{type:'number'}},required:['query'],additionalProperties:false}},
@@ -23,6 +27,10 @@ const TOOLS:ToolDef[]=[
  {name:'capabilities_list',description:'Lista el Tool Broker, rutas de fallback y credenciales disponibles sin exponer secretos.',scope:'tools',method:'GET',path:'/list',target:'capabilities',inputSchema:{type:'object',properties:{},additionalProperties:false}},
  {name:'capability_execute',description:'Ejecuta una capacidad mediante el router de fallback legítimo, con clasificación de fallos y trazas.',scope:'tools',method:'POST',path:'/execute',target:'capabilities',inputSchema:{type:'object',properties:{capability:{type:'string'},input:{type:'object'}},required:['capability'],additionalProperties:false}},
  {name:'job_create',description:'Crea un objetivo persistente de Héctor Agent que continúa por cron aunque ChatGPT o la PWA se cierren.',scope:'jobs',method:'POST',path:'/jobs/create',target:'bridge',inputSchema:{type:'object',properties:{objective:{type:'string'}},required:['objective'],additionalProperties:false}},
+ {name:'job_list',description:'Lista objetivos recientes de Héctor Agent, incluyendo el objetivo activo, progreso, estado, errores y aprobaciones pendientes.',scope:'jobs',method:'GET',path:'/dashboard',target:'agent',inputSchema:{type:'object',properties:{},additionalProperties:false}},
+ {name:'job_status',description:'Obtiene el estado detallado, tareas y eventos recientes de un objetivo persistente de Héctor Agent.',scope:'jobs',method:'GET',path:(args:any)=>`/goals/${encodeURIComponent(String(args?.goalId||''))}`,target:'agent',inputSchema:goalIdSchema},
+ {name:'job_resume',description:'Reanuda un objetivo detenido o bloqueado cuando sus aprobaciones y límites permiten continuar.',scope:'jobs',method:'POST',path:(args:any)=>`/goals/${encodeURIComponent(String(args?.goalId||''))}/resume`,target:'agent',inputSchema:goalIdSchema},
+ {name:'job_run_now',description:'Prioriza la siguiente ejecución de un objetivo; para programación despacha el runner verificado cuando corresponde.',scope:'jobs',method:'POST',path:(args:any)=>`/goals/${encodeURIComponent(String(args?.goalId||''))}/run-now`,target:'agent',inputSchema:goalIdSchema},
  {name:'pwa_inspect',description:'Verifica por red una PWA HTTPS: estado HTTP, título, manifest, service worker y cabeceras relevantes.',scope:'tools',method:'POST',path:'/tools/execute',target:'bridge',wrap:(args:any)=>({name:'pwa.inspect',input:args}),inputSchema:{type:'object',properties:{url:{type:'string'}},required:['url'],additionalProperties:false}},
  {name:'bridge_status',description:'Devuelve el estado operativo del Bridge, memoria, jobs y resiliencia.',scope:'bridge',method:'GET',path:'/status',target:'bridge',inputSchema:{type:'object',properties:{},additionalProperties:false}}
 ];
@@ -30,10 +38,11 @@ const TOOLS:ToolDef[]=[
 function jsonRpc(id:unknown,result:unknown){return{jsonrpc:'2.0',id:id??null,result};}
 function rpcError(id:unknown,code:number,message:string,data?:unknown){return{jsonrpc:'2.0',id:id??null,error:{code,message,...(data===undefined?{}:{data})}};}
 function authHeaders(c:any){const h=new Headers({'Accept':'application/json','Content-Type':'application/json'}),authorization=c.req.header('Authorization'),cookie=c.req.header('Cookie'),requestId=c.req.header('X-Request-ID');if(authorization)h.set('Authorization',authorization);if(cookie)h.set('Cookie',cookie);if(requestId)h.set('X-Request-ID',requestId);return h;}
-function subApp(tool:ToolDef){return tool.target==='bridge'?hectorBridge:tool.target==='context'?contextHub:tool.target==='sync'?contextSync:tool.target==='memory'?hectorMemory:hectorCapabilities;}
+function subApp(tool:ToolDef){return tool.target==='bridge'?hectorBridge:tool.target==='agent'?hectorAgent:tool.target==='context'?contextHub:tool.target==='sync'?contextSync:tool.target==='memory'?hectorMemory:hectorCapabilities;}
 async function callTool(c:any,tool:ToolDef,args:any){
   if(c.get('authMethod')!=='session'&&!authHasScope(c,tool.scope))return{status:403,payload:{error:`Scope ${tool.scope} requerido`}};
-  const url=new URL(tool.path,'https://hector.internal'),body=tool.method==='POST'?JSON.stringify(tool.wrap?tool.wrap(args||{}):(args||{})):undefined;
+  const path=typeof tool.path==='function'?tool.path(args||{}):tool.path;
+  const url=new URL(path,'https://hector.internal'),body=tool.method==='POST'?JSON.stringify(tool.wrap?tool.wrap(args||{}):(args||{})):undefined;
   const request=new Request(url.toString(),{method:tool.method,headers:authHeaders(c),body});
   const response=await (subApp(tool) as any).fetch(request,c.env,c.executionCtx),text=await response.text();
   let payload:unknown;try{payload=text?JSON.parse(text):{ok:response.ok};}catch{payload={text:text.slice(0,20000)};}
@@ -51,7 +60,7 @@ hectorMcp.post('/',async c=>{
   if(method==='ping')return c.json(jsonRpc(id,{}));
   if(method==='initialize'){
     const requested=typeof params?.protocolVersion==='string'?params.protocolVersion:'2025-03-26';
-    return c.json(jsonRpc(id,{protocolVersion:requested,capabilities:{tools:{listChanged:false}},serverInfo:{name:'hector-bridge',version:'2.1.0'},instructions:'Use Context Sync before substantial work, execute capabilities through the broker, use context_upsert for changing state/preferences, and publish meaningful handoffs. Coordination is advisory, not an internal permission gate.'}));
+    return c.json(jsonRpc(id,{protocolVersion:requested,capabilities:{tools:{listChanged:false}},serverInfo:{name:'hector-bridge',version:'2.2.0'},instructions:'Use Context Sync before substantial work. For persistent work, create a job, inspect it with job_status/job_list, and use job_resume or job_run_now only when continuation is appropriate. Execute capabilities through the broker, use context_upsert for changing state/preferences, and publish meaningful handoffs. Coordination is advisory, not an internal permission gate.'}));
   }
   if(method==='tools/list'){
     const visible=TOOLS.filter(tool=>c.get('authMethod')==='session'||authHasScope(c,tool.scope)).map(({name,description,inputSchema})=>({name,description,inputSchema}));
