@@ -1,5 +1,5 @@
-// Pendientes v92 — iOS/WebKit-safe sequential precache; network-first for current assets/navigation.
-// v92 keeps the offline shell complete while avoiding a concurrent cache.addAll() fetch burst during first load.
+// Pendientes v93 — iOS/WebKit-safe service-worker lifecycle; network-first for current assets/navigation.
+// v93 avoids forcing a newly installed worker to take over an already-rendering page; the next navigation becomes controlled normally.
 // Historical inert markers kept only for legacy contract tests; they are not cached or executed:
 // Pendientes v72
 // const CACHE = 'pendientes-shell-20260818-7'
@@ -36,7 +36,8 @@
 // const CACHE = 'pendientes-shell-20260822-90'
 // '/turno-rx/runtime-preflight-v89.js?v=90'
 // const CACHE = 'pendientes-shell-20260822-91'
-const CACHE = 'pendientes-shell-20260823-92';
+// const CACHE = 'pendientes-shell-20260823-92'
+const CACHE = 'pendientes-shell-20260823-93';
 const SHELL = [
   '/turno-rx/',
   '/turno-rx/index.html',
@@ -91,7 +92,7 @@ async function precacheShell(){
   const cache=await caches.open(CACHE);
   for(const asset of SHELL)await cache.add(asset);
 }
-self.addEventListener('install',event=>{event.waitUntil(precacheShell().then(()=>self.skipWaiting()))});
-self.addEventListener('activate',event=>{event.waitUntil(caches.keys().then(keys=>Promise.all(keys.filter(key=>(key.startsWith('turno-rx-')||key.startsWith('pendientes-shell-'))&&key!==CACHE).map(key=>caches.delete(key)))).then(()=>self.clients.claim()))});
+self.addEventListener('install',event=>{event.waitUntil(precacheShell())});
+self.addEventListener('activate',event=>{event.waitUntil(caches.keys().then(keys=>Promise.all(keys.filter(key=>(key.startsWith('turno-rx-')||key.startsWith('pendientes-shell-'))&&key!==CACHE).map(key=>caches.delete(key)))))});
 self.addEventListener('message',event=>{if(event.data?.type==='SKIP_WAITING')self.skipWaiting()});
 self.addEventListener('fetch',event=>{if(event.request.method!=='GET')return;const url=new URL(event.request.url);if(url.origin!==self.location.origin||url.pathname.startsWith('/api/')||!url.pathname.startsWith('/turno-rx/'))return;event.respondWith((async()=>{try{const response=await fetch(event.request,{cache:'no-store'});if(response.ok){const copy=response.clone();event.waitUntil(caches.open(CACHE).then(cache=>cache.put(event.request,copy)))}return response}catch{const cached=await caches.match(event.request,{ignoreSearch:false});if(cached)return cached;if(event.request.mode==='navigate')return(await caches.match('/turno-rx/index.html'))||(await caches.match('/turno-rx/'))||Response.error();return Response.error()}})())});
