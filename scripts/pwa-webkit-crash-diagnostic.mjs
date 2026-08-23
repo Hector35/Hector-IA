@@ -30,7 +30,10 @@ const cases=[
   allowScripts([...prefix(10),'manual-category-v72'],'allow','prefix-10-plus-manual','Control: add manual-category-v72 only')
 ];
 
-async function closeBounded(browser){if(!browser)return;await Promise.race([browser.close().catch(()=>{}),sleep(3000)]);}
+async function closeBounded(resource){
+  if(!resource)return;
+  await Promise.race([resource.close().catch(()=>{}),sleep(1500)]);
+}
 async function runCase(testCase){
   let browser,context,page;
   const started=Date.now();
@@ -40,7 +43,7 @@ async function runCase(testCase){
     context=await browser.newContext({...iphone,locale:'es-MX',javaScriptEnabled:testCase.javaScriptEnabled,serviceWorkers:testCase.serviceWorkers});
     if(SESSION_TOKEN)await context.addCookies([{name:'hector_session',value:SESSION_TOKEN,domain:base.hostname,path:'/',secure:base.protocol==='https:',httpOnly:true,sameSite:'Lax'}]);
     page=await context.newPage();
-    page.setDefaultTimeout(4000);
+    page.setDefaultTimeout(3000);
     page.on('crash',()=>{result.crashed=true;});
     page.on('requestfinished',req=>{if(req.resourceType()==='script')result.requests.push(scriptName(req));});
     await page.route('**/*',route=>{
@@ -51,19 +54,23 @@ async function runCase(testCase){
       if(testCase.block(req))return route.abort('blockedbyclient');
       return route.continue();
     });
-    const response=await page.goto(target,{waitUntil:'commit',timeout:15000});
+    const response=await page.goto(target,{waitUntil:'commit',timeout:12000});
     result.documentStatus=response?.status?.()??null;
-    await sleep(8000);
+    await sleep(6500);
     if(result.crashed)throw new Error('page crash event');
     result.state=await Promise.race([
       page.evaluate(()=>({title:document.title,readyState:document.readyState,bodyLength:(document.body?.innerText||'').trim().length,htmlLength:document.documentElement?.outerHTML?.length||0,controller:Boolean(navigator.serviceWorker?.controller)})),
-      sleep(4000).then(()=>{throw new Error('state evaluation timeout');})
+      sleep(3000).then(()=>{throw new Error('state evaluation timeout');})
     ]);
     result.responsive=true;result.ok=true;
   }catch(error){
     const message=error instanceof Error?error.message:String(error);result.error=message;
     if(/crash|Target closed|Target crashed|page crash/i.test(message))result.crashed=true;
-  }finally{result.elapsedMs=Date.now()-started;await context?.close().catch(()=>{});await closeBounded(browser);}
+  }finally{
+    result.elapsedMs=Date.now()-started;
+    await closeBounded(context);
+    await closeBounded(browser);
+  }
   console.log(`${result.ok?'✅':'❌'} diagnostic ${testCase.id}: ${JSON.stringify(result)}`);return result;
 }
 
@@ -71,3 +78,4 @@ const results=[];for(const testCase of cases)results.push(await runCase(testCase
 const report={auditedAt:new Date().toISOString(),target,orderedScripts,results};
 await writeFile(`${OUT_DIR}/webkit-crash-diagnostic.json`,JSON.stringify(report,null,2));
 console.log(JSON.stringify(report,null,2));
+process.exit(0);
