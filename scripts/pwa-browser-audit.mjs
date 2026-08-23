@@ -175,7 +175,7 @@ async function exerciseSafeUi(page,pwa){
   }else if(pwa.id==='pendientes'){
     let found=0;
     for(const label of ['Piso','RX','TAC','USG']){
-      const button=page.getByRole('button',{name:new RegExp(`^${label}\\b`,'i')}).first();
+      const button=page.getByRole('tab',{name:new RegExp(`^${label}\\b`,'i')}).first();
       if(await button.count()){
         await button.click();
         await page.waitForTimeout(100);
