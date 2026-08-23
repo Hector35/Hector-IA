@@ -102,7 +102,16 @@ jobs:
       - name: Exercise canonical PWAs in real browser engines
         env:
           SESSION_TOKEN: ${{ steps.session.outputs.token }}
-        run: node scripts/pwa-browser-audit.mjs
+        shell: bash
+        run: |
+          set +e
+          node scripts/pwa-browser-audit.mjs
+          AUDIT_STATUS=$?
+          if [ "$AUDIT_STATUS" -ne 0 ]; then
+            echo "Primary audit failed; collecting bounded Pendientes/WebKit crash diagnostics without changing the gate result."
+            node scripts/pwa-webkit-crash-diagnostic.mjs || true
+          fi
+          exit "$AUDIT_STATUS"
 
       - name: Upload browser evidence
         if: always()
