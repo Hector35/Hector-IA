@@ -1,7 +1,7 @@
 {
   "schemaVersion": 1,
-  "revision": 2026082302,
-  "updatedAt": "2026-08-23T13:35:00Z",
+  "revision": 2026082303,
+  "updatedAt": "2026-08-23T20:35:00Z",
   "authority": "latest-explicit-user-instruction",
   "purpose": "Machine-readable cross-chat decisions that must be checked before substantial architectural work.",
   "decisions": [
@@ -62,11 +62,13 @@
       "id": "cross-chat-protocol",
       "status": "active",
       "priority": 85,
-      "decision": "Before substantial work reconstruct context from current main, open PRs, this file, Context Hub/Context Sync when reachable, and issue #958; after meaningful work publish a structured handoff.",
+      "decision": "Before substantial work reconstruct context in this order when applicable: latest explicit user instruction, config/shared-decisions.json, Shared Context Ledger issue #958, current main, open/recent PRs, then CI; use Context Hub/Context Sync additionally when reachable. After meaningful work publish a structured handoff only if state changed materially.",
       "rules": [
         "If sources disagree, prefer the latest explicit user instruction, then verified current state/evidence.",
         "A newer decision may supersede an older handoff without deleting history.",
-        "Do not let who arrived first decide architecture."
+        "Do not let who arrived first decide architecture.",
+        "When reviewing concurrent work, prioritize PRs updated in the last 7 days plus PRs explicitly referenced by the active instruction, shared decisions, ledger or an active handoff; do not expand stale historical PRs unless a current dependency reactivates them.",
+        "Treat claims and handoffs as coordination signals, not permissions or locks."
       ]
     }
   ]
