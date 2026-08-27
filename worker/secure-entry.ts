@@ -7,6 +7,7 @@ import {hectorCapabilities} from './routes/hector-capabilities';
 import {hectorMemory} from './routes/hector-memory';
 import {hectorMcp} from './routes/hector-mcp';
 import {hectorMcpRead} from './routes/hector-mcp-read';
+import {openaiMcpRead} from './routes/openai-mcp-read';
 import {contextHub} from './routes/context-hub';
 import {contextSync} from './routes/context-sync';
 import {evaluateSecurityBoundary,isProtectedMutation,normalizeRequestId} from './lib/security-boundary';
@@ -24,6 +25,8 @@ const mcpApi=new Hono<{Bindings:Bindings;Variables:Variables}>();
 mcpApi.route('/mcp',hectorMcp);
 const mcpReadApi=new Hono<{Bindings:Bindings;Variables:Variables}>();
 mcpReadApi.route('/mcp-read',hectorMcpRead);
+const openaiMcpReadApi=new Hono<{Bindings:Bindings;Variables:Variables}>();
+openaiMcpReadApi.route('/api/hector-ai',openaiMcpRead);
 const contextHubApi=new Hono<{Bindings:Bindings;Variables:Variables}>();
 contextHubApi.route('/api/context-hub',contextHub);
 const contextSyncApi=new Hono<{Bindings:Bindings;Variables:Variables}>();
@@ -60,6 +63,15 @@ async function serveHectorAgentShell(request:Request,env:Bindings,pathname:strin
  return secured;
 }
 
+async function routeMcpCommand(request:Request){
+ const url=new URL(request.url);
+ if(request.method!=='POST'||url.pathname!=='/api/intelligence/qwen397-chat')return request;
+ const body=await request.clone().json<any>().catch(()=>null),message=String(body?.message||'');
+ if(!/^\s*\/mcp(?:\s|$)/i.test(message))return request;
+ url.pathname='/api/hector-ai/chat';
+ return new Request(url.toString(),request);
+}
+
 export default {
  async fetch(request:Request,env:Bindings,ctx:ExecutionContext){
   const url=new URL(request.url),requestId=normalizeRequestId(request.headers.get('X-Request-ID'));
@@ -82,23 +94,26 @@ export default {
   }
   const headers=new Headers(request.headers);headers.set('X-Request-ID',requestId);
   const forwarded=new Request(request,{headers});
-  const response=url.pathname.startsWith('/mcp-read')
-   ?await mcpReadApi.fetch(forwarded,env,ctx)
-   :url.pathname.startsWith('/mcp')
-    ?await mcpApi.fetch(forwarded,env,ctx)
-    :url.pathname.startsWith('/api/hector-bridge/access')
-     ?await accessApi.fetch(forwarded,env,ctx)
-     :url.pathname.startsWith('/api/hector-bridge/capabilities')
-      ?await capabilitiesApi.fetch(forwarded,env,ctx)
-      :url.pathname.startsWith('/api/hector-bridge/memory')
-       ?await memoryApi.fetch(forwarded,env,ctx)
-       :url.pathname.startsWith('/api/hector-bridge')
-        ?await bridgeApi.fetch(forwarded,env,ctx)
-        :url.pathname.startsWith('/api/context-hub')
-         ?await contextHubApi.fetch(forwarded,env,ctx)
-         :url.pathname.startsWith('/api/context-sync')
-          ?await contextSyncApi.fetch(forwarded,env,ctx)
-          :await worker.fetch(forwarded,env,ctx);
+  const routed=await routeMcpCommand(forwarded),routedUrl=new URL(routed.url);
+  const response=routedUrl.pathname.startsWith('/api/hector-ai')
+   ?await openaiMcpReadApi.fetch(routed,env,ctx)
+   :url.pathname.startsWith('/mcp-read')
+    ?await mcpReadApi.fetch(forwarded,env,ctx)
+    :url.pathname.startsWith('/mcp')
+     ?await mcpApi.fetch(forwarded,env,ctx)
+     :url.pathname.startsWith('/api/hector-bridge/access')
+      ?await accessApi.fetch(forwarded,env,ctx)
+      :url.pathname.startsWith('/api/hector-bridge/capabilities')
+       ?await capabilitiesApi.fetch(forwarded,env,ctx)
+       :url.pathname.startsWith('/api/hector-bridge/memory')
+        ?await memoryApi.fetch(forwarded,env,ctx)
+        :url.pathname.startsWith('/api/hector-bridge')
+         ?await bridgeApi.fetch(forwarded,env,ctx)
+         :url.pathname.startsWith('/api/context-hub')
+          ?await contextHubApi.fetch(forwarded,env,ctx)
+          :url.pathname.startsWith('/api/context-sync')
+           ?await contextSyncApi.fetch(forwarded,env,ctx)
+           :await worker.fetch(forwarded,env,ctx);
   return securedResponse(response,url.pathname,requestId);
  },
  scheduled:worker.scheduled

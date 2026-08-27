@@ -1,14 +1,14 @@
 export type PricingUsage={input_tokens?:number;output_tokens?:number;input_tokens_details?:{cached_tokens?:number;cache_write_tokens?:number}};
 export type ModelPricing={family:string;inputPerMTok:number;cachedInputPerMTok:number;outputPerMTok:number;cacheWriteMultiplier:number;longContextThreshold?:number;longInputMultiplier?:number;longOutputMultiplier?:number;known:boolean;source:string};
 
-const GPT_56_COMMON={cacheWriteMultiplier:1.25,longContextThreshold:272_000,longInputMultiplier:2,longOutputMultiplier:1.5,known:true,source:'openai-pricing-2026-07'} as const;
+const GPT_56_COMMON={cacheWriteMultiplier:1.25,longContextThreshold:272_000,longInputMultiplier:2,longOutputMultiplier:1.5,known:true,source:'openai-pricing-2026-08-27-promotional'} as const;
 const LEGACY_FALLBACK:ModelPricing={family:'unknown',inputPerMTok:.75,cachedInputPerMTok:.075,outputPerMTok:4.5,cacheWriteMultiplier:1,known:false,source:'legacy-fallback'};
 
 export function pricingForModel(model:string|undefined):ModelPricing{
  const id=(model||'').toLowerCase();
- if(id==='gpt-5.6'||id.startsWith('gpt-5.6-sol'))return{family:'gpt-5.6-sol',inputPerMTok:5,cachedInputPerMTok:.5,outputPerMTok:30,...GPT_56_COMMON};
- if(id.startsWith('gpt-5.6-terra'))return{family:'gpt-5.6-terra',inputPerMTok:2.5,cachedInputPerMTok:.25,outputPerMTok:15,...GPT_56_COMMON};
- if(id.startsWith('gpt-5.6-luna'))return{family:'gpt-5.6-luna',inputPerMTok:1,cachedInputPerMTok:.1,outputPerMTok:6,...GPT_56_COMMON};
+ if(id==='gpt-5.6'||id.startsWith('gpt-5.6-sol'))return{family:'gpt-5.6-sol',inputPerMTok:4,cachedInputPerMTok:.4,outputPerMTok:20,...GPT_56_COMMON};
+ if(id.startsWith('gpt-5.6-terra'))return{family:'gpt-5.6-terra',inputPerMTok:2,cachedInputPerMTok:.2,outputPerMTok:12,...GPT_56_COMMON};
+ if(id.startsWith('gpt-5.6-luna'))return{family:'gpt-5.6-luna',inputPerMTok:.2,cachedInputPerMTok:.02,outputPerMTok:1.2,...GPT_56_COMMON};
  if(id.includes('qwen3.5-397b-a17b'))return{family:'qwen3.5-397b-a17b:cheapest',inputPerMTok:.45,cachedInputPerMTok:.45,outputPerMTok:3,cacheWriteMultiplier:1,longContextThreshold:262_144,known:true,source:'huggingface-inference-providers-2026-07-25'};
  return{...LEGACY_FALLBACK,family:id||'unknown'};
 }
