@@ -1,0 +1,21 @@
+{
+  "name": "hector-os",
+  "version": "0.1.0",
+  "description": "Read-only access to Héctor OS shared context, jobs, capabilities, and PWA state through OAuth-protected MCP.",
+  "repository": "https://github.com/Hector35/Hector-IA",
+  "keywords": ["hector", "mcp", "context", "productivity"],
+  "mcpServers": "./.mcp.json",
+  "interface": {
+    "displayName": "Héctor OS",
+    "shortDescription": "Consulta Héctor OS desde Codex",
+    "longDescription": "Conecta Codex a la superficie MCP de solo lectura de Héctor OS mediante OAuth 2.1 con PKCE.",
+    "developerName": "Héctor OS",
+    "category": "Productivity",
+    "capabilities": ["Read"],
+    "websiteURL": "https://hector-os.hectorhdzr035.workers.dev/",
+    "defaultPrompt": [
+      "Consulta Héctor OS para resumir mi estado actual.",
+      "Busca en el contexto compartido de Héctor lo relacionado con este proyecto."
+    ]
+  }
+}
