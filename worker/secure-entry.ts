@@ -93,24 +93,25 @@ export default {
    }
   }
   const headers=new Headers(request.headers);headers.set('X-Request-ID',requestId);
-  const forwarded=await routeMcpCommand(new Request(request,{headers})),routedUrl=new URL(forwarded.url);
-  const response=routedUrl.pathname.startsWith('/mcp-read')
-   ?await mcpReadApi.fetch(forwarded,env,ctx)
-   :routedUrl.pathname.startsWith('/mcp')
-    ?await mcpApi.fetch(forwarded,env,ctx)
-    :routedUrl.pathname.startsWith('/api/hector-ai')
-     ?await openaiMcpReadApi.fetch(forwarded,env,ctx)
-     :routedUrl.pathname.startsWith('/api/hector-bridge/access')
+  const forwarded=new Request(request,{headers});
+  const routed=await routeMcpCommand(forwarded),routedUrl=new URL(routed.url);
+  const response=routedUrl.pathname.startsWith('/api/hector-ai')
+   ?await openaiMcpReadApi.fetch(routed,env,ctx)
+   :url.pathname.startsWith('/mcp-read')
+    ?await mcpReadApi.fetch(forwarded,env,ctx)
+    :url.pathname.startsWith('/mcp')
+     ?await mcpApi.fetch(forwarded,env,ctx)
+     :url.pathname.startsWith('/api/hector-bridge/access')
       ?await accessApi.fetch(forwarded,env,ctx)
-      :routedUrl.pathname.startsWith('/api/hector-bridge/capabilities')
+      :url.pathname.startsWith('/api/hector-bridge/capabilities')
        ?await capabilitiesApi.fetch(forwarded,env,ctx)
-       :routedUrl.pathname.startsWith('/api/hector-bridge/memory')
+       :url.pathname.startsWith('/api/hector-bridge/memory')
         ?await memoryApi.fetch(forwarded,env,ctx)
-        :routedUrl.pathname.startsWith('/api/hector-bridge')
+        :url.pathname.startsWith('/api/hector-bridge')
          ?await bridgeApi.fetch(forwarded,env,ctx)
-         :routedUrl.pathname.startsWith('/api/context-hub')
+         :url.pathname.startsWith('/api/context-hub')
           ?await contextHubApi.fetch(forwarded,env,ctx)
-          :routedUrl.pathname.startsWith('/api/context-sync')
+          :url.pathname.startsWith('/api/context-sync')
            ?await contextSyncApi.fetch(forwarded,env,ctx)
            :await worker.fetch(forwarded,env,ctx);
   return securedResponse(response,url.pathname,requestId);
