@@ -22,8 +22,8 @@ function mcpUnauthorized(c:AuthContext){
   let metadata='',scopes:string[]=[];
   if(url.pathname==='/mcp-read'||url.pathname.startsWith('/mcp-read/')){metadata=`${origin}/.well-known/oauth-protected-resource/mcp-read`;scopes=[...MCP_READ_SCOPES];}
   else if(url.pathname==='/mcp'||url.pathname.startsWith('/mcp/')){metadata=`${origin}/.well-known/oauth-protected-resource/mcp`;scopes=[...MCP_FULL_SCOPES];}
-  if(metadata)c.header('WWW-Authenticate',`Bearer resource_metadata="${metadata}", scope="${scopes.join(' ')}"`);
-  return c.json({error:'No autorizado'},401);
+  if(metadata)c.header('WWW-Authenticate',`Bearer error="invalid_token", error_description="Authentication required", resource_metadata="${metadata}", scope="${scopes.join(' ')}"`);
+  return c.json({error:'invalid_token',error_description:'Authentication required'},401);
 }
 
 export function authHasScope(c:AuthContext,scope:string){
