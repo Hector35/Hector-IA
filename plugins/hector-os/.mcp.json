@@ -1,0 +1,8 @@
+{
+  "mcpServers": {
+    "hector-read": {
+      "type": "http",
+      "url": "https://hector-os.hectorhdzr035.workers.dev/mcp-read"
+    }
+  }
+}
