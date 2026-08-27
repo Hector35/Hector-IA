@@ -10,7 +10,7 @@ export const openaiMcpRead=new Hono<{Bindings:Bindings;Variables:Variables}>();
 openaiMcpRead.use('*',requireAuth);
 
 const requestSchema=z.object({message:z.string().trim().min(1).max(8000),conversationId:z.string().uuid().optional()});
-const MCP_TOKEN_SCOPES=['context','tools','jobs','bridge'] as const;
+const MCP_TOKEN_SCOPES=['mcp','context','tools','jobs','bridge'] as const;
 
 function randomMachineToken(){
  const bytes=crypto.getRandomValues(new Uint8Array(32));let binary='';
