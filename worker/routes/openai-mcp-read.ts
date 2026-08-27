@@ -26,7 +26,7 @@ async function ensureConversation(db:D1Database,userId:string,conversationId:str
 }
 async function callResponses(env:Bindings,body:Record<string,unknown>){
  const response=await fetch('https://api.openai.com/v1/responses',{method:'POST',headers:{Authorization:`Bearer ${env.OPENAI_API_KEY}`,'Content-Type':'application/json'},body:JSON.stringify(body)});
- const data=await response.json<OpenAIMcpReadResponse>().catch(()=>({error:{message:'OpenAI devolvió una respuesta no JSON'}}));
+ const data:OpenAIMcpReadResponse=await response.json<OpenAIMcpReadResponse>().catch(()=>({error:{message:'OpenAI devolvió una respuesta no JSON'}}));
  if(!response.ok)throw new Error(String(data.error?.message||`OpenAI Responses HTTP ${response.status}`).slice(0,700));
  return data;
 }
