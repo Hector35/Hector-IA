@@ -7,6 +7,7 @@ import {hectorCapabilities} from './routes/hector-capabilities';
 import {hectorMemory} from './routes/hector-memory';
 import {hectorMcp} from './routes/hector-mcp';
 import {hectorMcpRead} from './routes/hector-mcp-read';
+import {mcpOAuth} from './routes/mcp-oauth';
 import {openaiMcpRead} from './routes/openai-mcp-read';
 import {contextHub} from './routes/context-hub';
 import {contextSync} from './routes/context-sync';
@@ -42,7 +43,7 @@ function securedResponse(response:Response,pathname:string,requestId:string){
  secured.headers.set('X-Frame-Options','DENY');
  secured.headers.set('Strict-Transport-Security','max-age=63072000; includeSubDomains; preload');
  secured.headers.set('Permissions-Policy','camera=(self), microphone=(self), geolocation=(), payment=(), usb=(), browsing-topics=()');
- if(['/api/','/control/','/runner/','/self-improve/','/generated/','/agent/','/hector-agent','/mcp'].some(prefix=>pathname.startsWith(prefix))||pathname==='/agent'){
+ if(['/api/','/control/','/runner/','/self-improve/','/generated/','/agent/','/hector-agent','/mcp','/oauth/','/.well-known/oauth-'].some(prefix=>pathname.startsWith(prefix))||pathname==='/agent'){
   secured.headers.set('Cache-Control','no-store, no-cache, must-revalidate, max-age=0');
   secured.headers.set('Pragma','no-cache');
   secured.headers.set('Expires','0');
@@ -95,25 +96,27 @@ export default {
   const headers=new Headers(request.headers);headers.set('X-Request-ID',requestId);
   const forwarded=new Request(request,{headers});
   const routed=await routeMcpCommand(forwarded),routedUrl=new URL(routed.url);
-  const response=routedUrl.pathname.startsWith('/api/hector-ai')
-   ?await openaiMcpReadApi.fetch(routed,env,ctx)
-   :url.pathname.startsWith('/mcp-read')
-    ?await mcpReadApi.fetch(forwarded,env,ctx)
-    :url.pathname.startsWith('/mcp')
-     ?await mcpApi.fetch(forwarded,env,ctx)
-     :url.pathname.startsWith('/api/hector-bridge/access')
-      ?await accessApi.fetch(forwarded,env,ctx)
-      :url.pathname.startsWith('/api/hector-bridge/capabilities')
-       ?await capabilitiesApi.fetch(forwarded,env,ctx)
-       :url.pathname.startsWith('/api/hector-bridge/memory')
-        ?await memoryApi.fetch(forwarded,env,ctx)
-        :url.pathname.startsWith('/api/hector-bridge')
-         ?await bridgeApi.fetch(forwarded,env,ctx)
-         :url.pathname.startsWith('/api/context-hub')
-          ?await contextHubApi.fetch(forwarded,env,ctx)
-          :url.pathname.startsWith('/api/context-sync')
-           ?await contextSyncApi.fetch(forwarded,env,ctx)
-           :await worker.fetch(forwarded,env,ctx);
+  const response=url.pathname.startsWith('/oauth/')||url.pathname.startsWith('/.well-known/oauth-')
+   ?await mcpOAuth.fetch(forwarded,env,ctx)
+   :routedUrl.pathname.startsWith('/api/hector-ai')
+    ?await openaiMcpReadApi.fetch(routed,env,ctx)
+    :url.pathname.startsWith('/mcp-read')
+     ?await mcpReadApi.fetch(forwarded,env,ctx)
+     :url.pathname.startsWith('/mcp')
+      ?await mcpApi.fetch(forwarded,env,ctx)
+      :url.pathname.startsWith('/api/hector-bridge/access')
+       ?await accessApi.fetch(forwarded,env,ctx)
+       :url.pathname.startsWith('/api/hector-bridge/capabilities')
+        ?await capabilitiesApi.fetch(forwarded,env,ctx)
+        :url.pathname.startsWith('/api/hector-bridge/memory')
+         ?await memoryApi.fetch(forwarded,env,ctx)
+         :url.pathname.startsWith('/api/hector-bridge')
+          ?await bridgeApi.fetch(forwarded,env,ctx)
+          :url.pathname.startsWith('/api/context-hub')
+           ?await contextHubApi.fetch(forwarded,env,ctx)
+           :url.pathname.startsWith('/api/context-sync')
+            ?await contextSyncApi.fetch(forwarded,env,ctx)
+            :await worker.fetch(forwarded,env,ctx);
   return securedResponse(response,url.pathname,requestId);
  },
  scheduled:worker.scheduled
