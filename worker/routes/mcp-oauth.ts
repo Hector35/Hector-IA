@@ -60,7 +60,7 @@ mcpOAuth.get('/oauth/authorize',async c=>{
  const session=await currentSession(c);
  if(!session){
   const here=new URL(c.req.url);here.searchParams.set('continue','1');
-  return c.html(htmlPage('Inicia sesión en Héctor',`<h1>Autorizar ${esc(request.client.clientName)}</h1><p>El navegador aún no entregó una sesión de Héctor a esta solicitud.</p><p>Si ya tienes sesión abierta, toca <strong>Continuar autorización</strong>. Si no, abre Héctor OS, inicia sesión y vuelve a esta pestaña.</p><p><a class="button primary" href="${esc(here.toString())}">Continuar autorización</a><a class="button" target="_blank" rel="noopener" href="/">Abrir Héctor OS</a></p><p class="muted">La cookie de sesión permanece SameSite=Strict; no se debilita para OAuth.</p>`),401);
+  return c.html(htmlPage('Inicia sesión en Héctor',`<h1>Autorizar ${esc(request.client.clientName)}</h1><p>El navegador aún no entregó una sesión de Héctor a esta solicitud.</p><p>Si ya tienes sesión abierta, toca <strong>Continuar autorización</strong>. Si no, abre Héctor OS, inicia sesión y vuelve a esta pestaña.</p><p><a class="button primary" href="${esc(here.toString())}">Continuar autorización</a><a class="button" target="_blank" rel="noopener" href="/">Abrir Héctor OS</a></p><p class="muted">La cookie de sesión permanece SameSite=Strict; no se debilita para OAuth.</p>`));
  }
  const full=request.profile.mode==='full';
  const warning=full?`<p class="warn"><strong>Acceso completo:</strong> este cliente podrá usar herramientas de Héctor que creen o modifiquen datos dentro de los scopes mostrados.</p>`:`<p><strong>Solo lectura:</strong> el recurso autorizado es <code>/mcp-read</code>; no expone herramientas de escritura.</p>`;
