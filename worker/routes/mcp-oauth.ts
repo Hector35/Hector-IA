@@ -11,6 +11,7 @@ export const mcpOAuth=new Hono<{Bindings:Bindings;Variables:Variables}>();
 
 const CODE_TTL_SECONDS=5*60;
 const TOKEN_TTL_SECONDS=30*24*60*60;
+const REFRESH_TTL_SECONDS=90*24*60*60;
 
 function originOf(url:string){const u=new URL(url);return`${u.protocol}//${u.host}`;}
 function esc(value:unknown){return String(value??'').replace(/[&<>"']/g,ch=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot',"'":'&#39;'}[ch]||ch));}
@@ -24,6 +25,14 @@ function validConsentSource(c:any){
  if(referer&&safeOrigin(referer)===expectedOrigin)return true;
  return fetchSite==='same-origin';
 }
+function parseStoredScopes(value:string){
+ try{const parsed=JSON.parse(value);return Array.isArray(parsed)?parsed.map(String):[];}catch{return[];}
+}
+function parseRefreshMarker(value:string|null|undefined){
+ const match=String(value||'').match(/^refresh:(\/mcp(?:-read)?):([a-f0-9]{64})$/);
+ return match?{path:match[1] as '/mcp'|'/mcp-read',clientHash:match[2]}:null;
+}
+async function refreshMarker(path:'/mcp'|'/mcp-read',clientId:string){return`refresh:${path}:${await sha256(clientId)}`;}
 async function currentSession(c:any){
  const raw=getCookie(c,'hector_session');if(!raw)return null;
  const tokenHash=await sha256(raw);
@@ -44,19 +53,31 @@ function redirectWithOAuthResult(request:{origin:string;redirectUri:string;state
  const target=new URL(request.redirectUri);for(const [key,value] of Object.entries(params))target.searchParams.set(key,value);
  if(request.state)target.searchParams.set('state',request.state);target.searchParams.set('iss',request.origin);return target.toString();
 }
+async function issueTokens(c:any,input:{userId:string;clientId:string;clientName:string;path:'/mcp'|'/mcp-read';resource:string;scopes:string[]}){
+ const rawAccess=`htr_${randomToken(32)}`,accessHash=await sha256(rawAccess),accessId=crypto.randomUUID(),accessExpiresAt=new Date(Date.now()+TOKEN_TTL_SECONDS*1000).toISOString();
+ const statements=[c.env.DB.prepare('INSERT INTO external_access_tokens(id,user_id,name,token_hash,scopes_json,expires_at,resource_path) VALUES(?,?,?,?,?,?,?)').bind(accessId,input.userId,`OAuth ${input.clientName}`.slice(0,120),accessHash,JSON.stringify(input.scopes),accessExpiresAt,input.path)];
+ let rawRefresh:string|undefined;
+ if(input.scopes.includes('offline_access')){
+  rawRefresh=`hrr_${randomToken(48)}`;
+  const refreshHash=await sha256(rawRefresh),refreshExpiresAt=new Date(Date.now()+REFRESH_TTL_SECONDS*1000).toISOString(),marker=await refreshMarker(input.path,input.clientId);
+  statements.push(c.env.DB.prepare('INSERT INTO external_access_tokens(id,user_id,name,token_hash,scopes_json,expires_at,resource_path) VALUES(?,?,?,?,?,?,?)').bind(crypto.randomUUID(),input.userId,`OAuth ${input.clientName} refresh`.slice(0,120),refreshHash,JSON.stringify(input.scopes),refreshExpiresAt,marker));
+ }
+ await c.env.DB.batch(statements);
+ return{access_token:rawAccess,token_type:'Bearer',expires_in:TOKEN_TTL_SECONDS,scope:input.scopes.join(' '),resource:input.resource,...(rawRefresh?{refresh_token:rawRefresh}:{})};
+}
 
 mcpOAuth.get('/.well-known/oauth-authorization-server',c=>{oauthHeaders(c);return c.json(authorizationServerMetadata(c.req.url));});
 mcpOAuth.get('/.well-known/oauth-protected-resource',c=>{oauthHeaders(c);return c.json(protectedResourceMetadata(c.req.url,'/mcp-read'));});
 mcpOAuth.get('/.well-known/oauth-protected-resource/mcp-read',c=>{oauthHeaders(c);return c.json(protectedResourceMetadata(c.req.url,'/mcp-read'));});
 mcpOAuth.get('/.well-known/oauth-protected-resource/mcp',c=>{oauthHeaders(c);return c.json(protectedResourceMetadata(c.req.url,'/mcp'));});
 
-mcpOAuth.get('/oauth/help',c=>{oauthHeaders(c);return c.html(htmlPage('Acceso MCP de Héctor',`<h1>Acceso MCP de Héctor</h1><p>Este servidor usa OAuth 2.1 con PKCE para autorizar clientes OpenAI y Codex.</p><p><strong>/mcp-read</strong> concede solo herramientas de consulta. <strong>/mcp</strong> puede incluir acciones que modifican Héctor y siempre muestra una advertencia antes de conceder acceso.</p><p class="muted">Los tokens se vinculan al recurso autorizado y pueden revocarse desde Héctor OS.</p>`));});
+mcpOAuth.get('/oauth/help',c=>{oauthHeaders(c);return c.html(htmlPage('Acceso MCP de Héctor',`<h1>Acceso MCP de Héctor</h1><p>Este servidor usa OAuth 2.1 con PKCE para autorizar clientes OpenAI y Codex.</p><p><strong>/mcp-read</strong> concede solo herramientas de consulta. <strong>/mcp</strong> puede incluir acciones que modifican Héctor y siempre muestra una advertencia antes de conceder acceso.</p><p class="muted">Los tokens se vinculan al recurso autorizado, los refresh tokens se rotan en cada uso y todos pueden revocarse desde Héctor OS.</p>`));});
 
 mcpOAuth.post('/oauth/register',async c=>{
  oauthHeaders(c);
  try{
   const body=await c.req.json().catch(()=>null),client=normalizeDynamicClientRegistration(body),clientId=encodeDynamicClientId(client);
-  return c.json({client_id:clientId,client_name:client.clientName,redirect_uris:client.redirectUris,grant_types:['authorization_code'],response_types:['code'],token_endpoint_auth_method:'none',client_id_issued_at:Math.floor(Date.now()/1000)},201);
+  return c.json({client_id:clientId,client_name:client.clientName,redirect_uris:client.redirectUris,grant_types:['authorization_code','refresh_token'],response_types:['code'],token_endpoint_auth_method:'none',client_id_issued_at:Math.floor(Date.now()/1000)},201);
  }catch(error){return c.json({error:'invalid_client_metadata',error_description:error instanceof Error?error.message:'Registro inválido'},400);}
 });
 
@@ -95,19 +116,38 @@ mcpOAuth.post('/oauth/authorize',async c=>{
 mcpOAuth.post('/oauth/token',async c=>{
  oauthHeaders(c);
  const type=(c.req.header('Content-Type')||'').toLowerCase();if(!type.includes('application/x-www-form-urlencoded'))return c.json({error:'invalid_request',error_description:'Content-Type debe ser application/x-www-form-urlencoded'},400);
- const form=await c.req.parseBody(),grantType=String(form.grant_type||''),rawCode=String(form.code||''),clientId=String(form.client_id||''),redirectUri=String(form.redirect_uri||''),resource=String(form.resource||''),verifier=String(form.code_verifier||'');
- if(grantType!=='authorization_code'||!rawCode||!clientId||!redirectUri||!resource||!verifier)return c.json({error:'invalid_request'},400);
+ const form=await c.req.parseBody(),grantType=String(form.grant_type||''),clientId=String(form.client_id||''),resource=String(form.resource||''),requestedScope=String(form.scope||'').trim();
  try{
-  const client=decodeDynamicClientId(clientId);if(!client.redirectUris.some(uri=>redirectUriMatches(uri,redirectUri)))throw new Error('redirect_uri no registrado');
-  const profile=resourceProfile(c.req.url,resource);if(!profile)throw new Error('resource inválido');
-  const codeHash=await sha256(rawCode),row=await c.env.DB.prepare(`SELECT id,user_id,client_id,redirect_uri,resource,scope,code_challenge FROM mcp_oauth_codes WHERE code_hash=? AND consumed_at IS NULL AND expires_at>CURRENT_TIMESTAMP LIMIT 1`).bind(codeHash).first<{id:string;user_id:string;client_id:string;redirect_uri:string;resource:string;scope:string;code_challenge:string}>();
-  if(!row)throw new Error('Código inválido o vencido');
-  if(row.client_id!==clientId||row.redirect_uri!==redirectUri||row.resource!==resource)throw new Error('Código no corresponde al cliente o recurso');
-  const actualChallenge=await pkceS256(verifier);if(actualChallenge!==row.code_challenge)throw new Error('PKCE inválido');
-  const scopes=normalizeScopes(row.scope,profile.scopes),consume=await c.env.DB.prepare('UPDATE mcp_oauth_codes SET consumed_at=CURRENT_TIMESTAMP WHERE id=? AND consumed_at IS NULL').bind(row.id).run();
-  if(Number(consume.meta.changes||0)!==1)throw new Error('Código ya utilizado');
-  const rawToken=`htr_${randomToken(32)}`,tokenHash=await sha256(rawToken),expiresAt=new Date(Date.now()+TOKEN_TTL_SECONDS*1000).toISOString();
-  await c.env.DB.prepare('INSERT INTO external_access_tokens(id,user_id,name,token_hash,scopes_json,expires_at,resource_path) VALUES(?,?,?,?,?,?,?)').bind(crypto.randomUUID(),row.user_id,`OAuth ${client.clientName}`.slice(0,120),tokenHash,JSON.stringify(scopes),expiresAt,profile.path).run();
-  return c.json({access_token:rawToken,token_type:'Bearer',expires_in:TOKEN_TTL_SECONDS,scope:scopes.join(' '),resource});
- }catch(error){return c.json({error:'invalid_grant',error_description:error instanceof Error?error.message:'No se pudo canjear el código'},400);}
+  if(grantType==='authorization_code'){
+   const rawCode=String(form.code||''),redirectUri=String(form.redirect_uri||''),verifier=String(form.code_verifier||'');
+   if(!rawCode||!clientId||!redirectUri||!resource||!verifier)return c.json({error:'invalid_request'},400);
+   const client=decodeDynamicClientId(clientId);if(!client.redirectUris.some(uri=>redirectUriMatches(uri,redirectUri)))throw new Error('redirect_uri no registrado');
+   const profile=resourceProfile(c.req.url,resource);if(!profile)throw new Error('resource inválido');
+   const codeHash=await sha256(rawCode),row=await c.env.DB.prepare(`SELECT id,user_id,client_id,redirect_uri,resource,scope,code_challenge FROM mcp_oauth_codes WHERE code_hash=? AND consumed_at IS NULL AND expires_at>CURRENT_TIMESTAMP LIMIT 1`).bind(codeHash).first<{id:string;user_id:string;client_id:string;redirect_uri:string;resource:string;scope:string;code_challenge:string}>();
+   if(!row)throw new Error('Código inválido o vencido');
+   if(row.client_id!==clientId||row.redirect_uri!==redirectUri||row.resource!==resource)throw new Error('Código no corresponde al cliente o recurso');
+   const actualChallenge=await pkceS256(verifier);if(actualChallenge!==row.code_challenge)throw new Error('PKCE inválido');
+   const scopes=normalizeScopes(row.scope,profile.scopes),consume=await c.env.DB.prepare('UPDATE mcp_oauth_codes SET consumed_at=CURRENT_TIMESTAMP WHERE id=? AND consumed_at IS NULL').bind(row.id).run();
+   if(Number(consume.meta.changes||0)!==1)throw new Error('Código ya utilizado');
+   return c.json(await issueTokens(c,{userId:row.user_id,clientId,clientName:client.clientName,path:profile.path,resource,scopes}));
+  }
+
+  if(grantType==='refresh_token'){
+   const rawRefresh=String(form.refresh_token||'');if(!rawRefresh||!clientId)return c.json({error:'invalid_request'},400);
+   const client=decodeDynamicClientId(clientId),refreshHash=await sha256(rawRefresh);
+   const row=await c.env.DB.prepare(`SELECT id,user_id,scopes_json,resource_path FROM external_access_tokens WHERE token_hash=? AND revoked_at IS NULL AND (expires_at IS NULL OR expires_at>CURRENT_TIMESTAMP) LIMIT 1`).bind(refreshHash).first<{id:string;user_id:string;scopes_json:string;resource_path:string|null}>();
+   const marker=parseRefreshMarker(row?.resource_path);if(!row||!marker)throw new Error('Refresh token inválido o vencido');
+   if(marker.clientHash!==await sha256(clientId))throw new Error('Refresh token no corresponde al cliente');
+   const canonicalResource=`${originOf(c.req.url)}${marker.path}`;if(resource&&resource!==canonicalResource)throw new Error('resource no corresponde al refresh token');
+   const profile=resourceProfile(c.req.url,canonicalResource);if(!profile)throw new Error('Recurso del refresh token inválido');
+   const originalScopes=normalizeScopes(parseStoredScopes(row.scopes_json).join(' '),profile.scopes);if(!originalScopes.includes('offline_access'))throw new Error('Refresh token sin offline_access');
+   const scopes=requestedScope?normalizeScopes(requestedScope,profile.scopes):originalScopes;
+   if(scopes.some(scope=>!originalScopes.includes(scope)))throw new Error('scope excede el consentimiento original');
+   const rotated=await c.env.DB.prepare('UPDATE external_access_tokens SET revoked_at=CURRENT_TIMESTAMP,updated_at=CURRENT_TIMESTAMP WHERE id=? AND revoked_at IS NULL').bind(row.id).run();
+   if(Number(rotated.meta.changes||0)!==1)throw new Error('Refresh token ya utilizado');
+   return c.json(await issueTokens(c,{userId:row.user_id,clientId,clientName:client.clientName,path:profile.path,resource:canonicalResource,scopes}));
+  }
+
+  return c.json({error:'unsupported_grant_type'},400);
+ }catch(error){return c.json({error:'invalid_grant',error_description:error instanceof Error?error.message:'No se pudo procesar el grant'},400);}
 });
