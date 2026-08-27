@@ -7,6 +7,7 @@ on:
     paths:
       - 'worker/lib/auth.ts'
       - 'worker/lib/mcp-oauth.ts'
+      - 'worker/routes/mcp-oauth.ts'
       - 'worker/routes/hector-mcp.ts'
       - 'worker/routes/hector-bridge.ts'
       - '.github/workflows/mcp-production-auth-smoke.yml'
@@ -26,6 +27,7 @@ jobs:
       CLOUDFLARE_API_TOKEN_RAW: ${{ secrets.CLOUDFLARE_API_TOKEN }}
       CLOUDFLARE_ACCOUNT_ID: ${{ vars.CLOUDFLARE_ACCOUNT_ID }}
       MCP_URL: https://hector-os.hectorhdzr035.workers.dev/mcp
+      TOKEN_URL: https://hector-os.hectorhdzr035.workers.dev/oauth/token
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-node@v4
@@ -83,11 +85,72 @@ jobs:
           jq -e '.result.isError == false and .result.structuredContent.ok == true' /tmp/mcp-call.json >/dev/null
 
           echo 'Production MCP initialize, tools/list, and bridge_status succeeded.'
+      - name: Verify refresh token rotation and refreshed MCP access
+        shell: bash
+        run: |
+          set -euo pipefail
+          CLIENT_ID="$(node --input-type=module <<'NODE'
+          const metadata={v:1,n:'hector-ci-refresh',r:['https://chatgpt.com/oauth/hector-ci-refresh']};
+          console.log('htr_dcr_'+Buffer.from(JSON.stringify(metadata)).toString('base64url'));
+          NODE
+          )"
+          CLIENT_HASH="$(printf %s "$CLIENT_ID" | sha256sum | awk '{print $1}')"
+          RAW_REFRESH="hrr_ci_$(openssl rand -hex 48)"
+          REFRESH_HASH="$(printf %s "$RAW_REFRESH" | sha256sum | awk '{print $1}')"
+          REFRESH_ID="$(python - <<'PY'
+          import uuid
+          print(uuid.uuid4())
+          PY
+          )"
+          echo "::add-mask::$RAW_REFRESH"
+          NEW_ACCESS_HASH=''
+          NEW_REFRESH_HASH=''
+          cleanup_refresh() {
+            SQL="DELETE FROM external_access_tokens WHERE id='$REFRESH_ID'"
+            if [ -n "$NEW_ACCESS_HASH" ]; then SQL="$SQL OR token_hash='$NEW_ACCESS_HASH'"; fi
+            if [ -n "$NEW_REFRESH_HASH" ]; then SQL="$SQL OR token_hash='$NEW_REFRESH_HASH'"; fi
+            npx wrangler d1 execute hector-os-db --remote --command="$SQL" >/dev/null 2>&1 || true
+          }
+          trap cleanup_refresh EXIT
+
+          npx wrangler d1 execute hector-os-db --remote --command="INSERT INTO external_access_tokens(id,user_id,name,token_hash,scopes_json,expires_at,resource_path) SELECT '$REFRESH_ID',user_id,'CI MCP refresh smoke','$REFRESH_HASH','[\"mcp\",\"context\",\"tools\",\"jobs\",\"bridge\",\"offline_access\"]',datetime('now','+10 minutes'),'refresh:/mcp:$CLIENT_HASH' FROM owner_registration WHERE singleton=1" >/tmp/mcp-refresh-insert.log
+
+          curl -fsS "$TOKEN_URL" \
+            -H 'Content-Type: application/x-www-form-urlencoded' \
+            --data-urlencode 'grant_type=refresh_token' \
+            --data-urlencode "refresh_token=$RAW_REFRESH" \
+            --data-urlencode "client_id=$CLIENT_ID" \
+            --data-urlencode 'resource=https://hector-os.hectorhdzr035.workers.dev/mcp' \
+            | tee /tmp/mcp-refresh.json
+
+          jq -e '.access_token and .refresh_token and .token_type == "Bearer" and (.scope | contains("offline_access"))' /tmp/mcp-refresh.json >/dev/null
+          NEW_ACCESS="$(jq -r '.access_token' /tmp/mcp-refresh.json)"
+          NEW_REFRESH="$(jq -r '.refresh_token' /tmp/mcp-refresh.json)"
+          echo "::add-mask::$NEW_ACCESS"
+          echo "::add-mask::$NEW_REFRESH"
+          NEW_ACCESS_HASH="$(printf %s "$NEW_ACCESS" | sha256sum | awk '{print $1}')"
+          NEW_REFRESH_HASH="$(printf %s "$NEW_REFRESH" | sha256sum | awk '{print $1}')"
+
+          curl -fsS "$MCP_URL" \
+            -H "Authorization: Bearer $NEW_ACCESS" \
+            -H 'Content-Type: application/json' \
+            --data '{"jsonrpc":"2.0","id":4,"method":"tools/call","params":{"name":"bridge_status","arguments":{}}}' \
+            | tee /tmp/mcp-refreshed-call.json
+          jq -e '.result.isError == false and .result.structuredContent.ok == true' /tmp/mcp-refreshed-call.json >/dev/null
+
+          npx wrangler d1 execute hector-os-db --remote --command="SELECT revoked_at FROM external_access_tokens WHERE id='$REFRESH_ID'" --json >/tmp/mcp-old-refresh.json
+          node --input-type=module <<'NODE'
+          import {readFileSync} from 'node:fs';
+          const raw=JSON.parse(readFileSync('/tmp/mcp-old-refresh.json','utf8'));
+          const rows=(Array.isArray(raw)?raw:[raw]).flatMap(x=>Array.isArray(x?.results)?x.results:[]);
+          if(!rows[0]?.revoked_at)throw new Error('Old refresh token was not revoked during rotation');
+          NODE
+          echo 'Production refresh-token rotation and refreshed bridge_status succeeded.'
       - name: Report sanitized OAuth token activity
         shell: bash
         run: |
           set -euo pipefail
-          npx wrangler d1 execute hector-os-db --remote --command="SELECT name,resource_path,scopes_json,created_at,last_used_at,expires_at,revoked_at FROM external_access_tokens WHERE name NOT LIKE 'CI MCP production smoke%' ORDER BY created_at DESC LIMIT 8" --json > /tmp/oauth-token-activity.json
+          npx wrangler d1 execute hector-os-db --remote --command="SELECT name,resource_path,scopes_json,created_at,last_used_at,expires_at,revoked_at FROM external_access_tokens WHERE name NOT LIKE 'CI MCP production smoke%' AND name NOT LIKE 'CI MCP refresh smoke%' ORDER BY created_at DESC LIMIT 8" --json > /tmp/oauth-token-activity.json
           node --input-type=module <<'NODE'
           import {readFileSync} from 'node:fs';
           const raw=JSON.parse(readFileSync('/tmp/oauth-token-activity.json','utf8'));
