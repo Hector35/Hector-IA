@@ -1,5 +1,5 @@
 export const MCP_OAUTH_CLIENT_PREFIX='htr_dcr_';
-export const MCP_READ_SCOPES=['context','tools','jobs','bridge'] as const;
+export const MCP_READ_SCOPES=['mcp','context','tools','jobs','bridge'] as const;
 export const MCP_FULL_SCOPES=['mcp','context','tools','jobs','bridge'] as const;
 
 export type McpResourceProfile={mode:'read-only'|'full';path:'/mcp-read'|'/mcp';resource:string;scopes:string[]};
