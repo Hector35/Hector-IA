@@ -83,3 +83,15 @@ jobs:
           jq -e '.result.isError == false and .result.structuredContent.ok == true' /tmp/mcp-call.json >/dev/null
 
           echo 'Production MCP initialize, tools/list, and bridge_status succeeded.'
+      - name: Report sanitized OAuth token activity
+        shell: bash
+        run: |
+          set -euo pipefail
+          npx wrangler d1 execute hector-os-db --remote --command="SELECT name,resource_path,scopes_json,created_at,last_used_at,expires_at,revoked_at FROM external_access_tokens WHERE name NOT LIKE 'CI MCP production smoke%' ORDER BY created_at DESC LIMIT 8" --json > /tmp/oauth-token-activity.json
+          node --input-type=module <<'NODE'
+          import {readFileSync} from 'node:fs';
+          const raw=JSON.parse(readFileSync('/tmp/oauth-token-activity.json','utf8'));
+          const groups=Array.isArray(raw)?raw:[raw];
+          const rows=groups.flatMap(group=>Array.isArray(group?.results)?group.results:[]);
+          console.log(JSON.stringify({oauthTokenMetadata:rows},null,2));
+          NODE
