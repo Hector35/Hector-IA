@@ -1,0 +1,85 @@
+name: MCP Production Auth Smoke
+
+on:
+  workflow_dispatch:
+  push:
+    branches: [main]
+    paths:
+      - 'worker/lib/auth.ts'
+      - 'worker/lib/mcp-oauth.ts'
+      - 'worker/routes/hector-mcp.ts'
+      - 'worker/routes/hector-bridge.ts'
+      - '.github/workflows/mcp-production-auth-smoke.yml'
+
+permissions:
+  contents: read
+
+concurrency:
+  group: mcp-production-auth-smoke
+  cancel-in-progress: true
+
+jobs:
+  smoke:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    env:
+      CLOUDFLARE_API_TOKEN_RAW: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+      CLOUDFLARE_ACCOUNT_ID: ${{ vars.CLOUDFLARE_ACCOUNT_ID }}
+      MCP_URL: https://hector-os.hectorhdzr035.workers.dev/mcp
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+      - run: npm ci
+      - name: Prepare Cloudflare credentials
+        shell: bash
+        run: |
+          set -euo pipefail
+          CLEAN_TOKEN="$(printf %s "$CLOUDFLARE_API_TOKEN_RAW" | tr -d '[:space:]')"
+          test -n "$CLEAN_TOKEN"
+          test -n "$CLOUDFLARE_ACCOUNT_ID"
+          echo "::add-mask::$CLEAN_TOKEN"
+          echo "CLOUDFLARE_API_TOKEN=$CLEAN_TOKEN" >> "$GITHUB_ENV"
+      - name: Mint temporary MCP token and verify real production tool call
+        shell: bash
+        run: |
+          set -euo pipefail
+          RAW_TOKEN="mcp_smoke_$(openssl rand -hex 32)"
+          TOKEN_HASH="$(printf %s "$RAW_TOKEN" | sha256sum | awk '{print $1}')"
+          TOKEN_ID="$(python - <<'PY'
+          import uuid
+          print(uuid.uuid4())
+          PY
+          )"
+          echo "::add-mask::$RAW_TOKEN"
+          cleanup() {
+            npx wrangler d1 execute hector-os-db --remote --command="DELETE FROM external_access_tokens WHERE id='$TOKEN_ID'" >/dev/null 2>&1 || true
+          }
+          trap cleanup EXIT
+
+          npx wrangler d1 execute hector-os-db --remote --command="INSERT INTO external_access_tokens(id,user_id,name,token_hash,scopes_json,expires_at,resource_path) SELECT '$TOKEN_ID',user_id,'CI MCP production smoke','$TOKEN_HASH','[\"mcp\",\"context\",\"tools\",\"jobs\",\"bridge\"]',datetime('now','+10 minutes'),'/mcp' FROM owner_registration WHERE singleton=1" >/tmp/mcp-token-insert.log
+
+          curl -fsS "$MCP_URL" \
+            -H "Authorization: Bearer $RAW_TOKEN" \
+            -H 'Content-Type: application/json' \
+            --data '{"jsonrpc":"2.0","id":1,"method":"initialize","params":{"protocolVersion":"2025-03-26","capabilities":{},"clientInfo":{"name":"hector-ci","version":"1"}}}' \
+            | tee /tmp/mcp-init.json
+          jq -e '.result.serverInfo.name == "hector-bridge"' /tmp/mcp-init.json >/dev/null
+
+          curl -fsS "$MCP_URL" \
+            -H "Authorization: Bearer $RAW_TOKEN" \
+            -H 'Content-Type: application/json' \
+            --data '{"jsonrpc":"2.0","id":2,"method":"tools/list","params":{}}' \
+            | tee /tmp/mcp-tools.json
+          jq -e '.result.tools | any(.name == "bridge_status")' /tmp/mcp-tools.json >/dev/null
+
+          curl -fsS "$MCP_URL" \
+            -H "Authorization: Bearer $RAW_TOKEN" \
+            -H 'Content-Type: application/json' \
+            --data '{"jsonrpc":"2.0","id":3,"method":"tools/call","params":{"name":"bridge_status","arguments":{}}}' \
+            | tee /tmp/mcp-call.json
+          jq -e '.result.isError == false and .result.structuredContent.ok == true' /tmp/mcp-call.json >/dev/null
+
+          echo 'Production MCP initialize, tools/list, and bridge_status succeeded.'
