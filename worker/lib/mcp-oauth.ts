@@ -45,14 +45,14 @@ export function redirectUriMatches(registered:string,requested:string){
 }
 
 export function normalizeDynamicClientRegistration(input:any):DynamicClientMetadata{
- const redirects=Array.isArray(input?.redirect_uris)?input.redirect_uris.map((x:unknown)=>String(x||'').trim()).filter(Boolean):[];
- if(redirects.length<1||redirects.length>8||redirects.some((uri:string)=>!isAllowedOpenAIRedirect(uri)))throw new Error('redirect_uris no permitidos');
- const grantTypes=Array.isArray(input?.grant_types)?input.grant_types.map(String):['authorization_code'];
- const responseTypes=Array.isArray(input?.response_types)?input.response_types.map(String):['code'];
+ const redirects:string[]=Array.isArray(input?.redirect_uris)?input.redirect_uris.map((x:unknown)=>String(x||'').trim()).filter((x:string)=>Boolean(x)):[];
+ if(redirects.length<1||redirects.length>8||redirects.some(uri=>!isAllowedOpenAIRedirect(uri)))throw new Error('redirect_uris no permitidos');
+ const grantTypes:string[]=Array.isArray(input?.grant_types)?input.grant_types.map((x:unknown)=>String(x)):['authorization_code'];
+ const responseTypes:string[]=Array.isArray(input?.response_types)?input.response_types.map((x:unknown)=>String(x)):['code'];
  if(!grantTypes.includes('authorization_code')||!responseTypes.includes('code'))throw new Error('Solo authorization_code es compatible');
  if(input?.token_endpoint_auth_method&&input.token_endpoint_auth_method!=='none')throw new Error('Solo clientes públicos PKCE son compatibles');
  const clientName=String(input?.client_name||input?.software_id||'OpenAI MCP client').trim().slice(0,120)||'OpenAI MCP client';
- return{clientName,redirectUris:[...new Set(redirects)]};
+ return{clientName,redirectUris:Array.from(new Set<string>(redirects))};
 }
 
 export function encodeDynamicClientId(metadata:DynamicClientMetadata){
