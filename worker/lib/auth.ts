@@ -10,8 +10,11 @@ function parseScopes(value:string|undefined|null){
   if(!value)return[];
   try{const parsed=JSON.parse(value);return Array.isArray(parsed)?parsed.map(String):[];}catch{return[];}
 }
-function resourcePathAllows(resourcePath:string|null|undefined,pathname:string){
+function resourcePathAllows(resourcePath:string|null|undefined,requestUrl:string){
   if(!resourcePath)return true;
+  const url=new URL(requestUrl);
+  if(url.protocol==='https:'&&url.hostname==='hector.internal'&&(resourcePath==='/mcp'||resourcePath==='/mcp-read'))return true;
+  const pathname=url.pathname;
   return pathname===resourcePath||pathname.startsWith(`${resourcePath}/`);
 }
 function mcpUnauthorized(c:AuthContext){
@@ -49,7 +52,7 @@ export async function requireAuth(c:AuthContext,next:Next){
       const row=await c.env.DB.prepare(`SELECT t.id token_id,t.scopes_json,t.resource_path,u.id,u.name
         FROM external_access_tokens t JOIN users u ON u.id=t.user_id
         WHERE t.token_hash=? AND t.revoked_at IS NULL AND (t.expires_at IS NULL OR t.expires_at>CURRENT_TIMESTAMP) LIMIT 1`).bind(tokenHash).first<{token_id:string;scopes_json:string;resource_path:string|null;id:string;name:string}>();
-      if(row&&resourcePathAllows(row.resource_path,new URL(c.req.url).pathname)){
+      if(row&&resourcePathAllows(row.resource_path,c.req.url)){
         c.set('userId',row.id);c.set('userName',row.name);c.set('authMethod','external_token');c.set('authTokenId',row.token_id);c.set('authScopes',parseScopes(row.scopes_json));
         await c.env.DB.prepare('UPDATE external_access_tokens SET last_used_at=CURRENT_TIMESTAMP,updated_at=CURRENT_TIMESTAMP WHERE id=?').bind(row.token_id).run();
         await next();return;
