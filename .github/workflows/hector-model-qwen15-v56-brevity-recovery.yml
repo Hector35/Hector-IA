@@ -1,0 +1,119 @@
+name: Hector model Qwen15 v56 brevity recovery
+on:
+  pull_request:
+    branches: [main]
+    paths:
+      - '.github/workflows/hector-model-qwen15-v56-brevity-recovery.yml'
+      - 'model/hector-asi/data/qwen15-v56-brevity-recovery-train.jsonl'
+      - 'model/hector-asi/evals/qwen15-v56-brevity-recovery-validation.jsonl'
+      - 'model/hector-asi/training/prepare_qwen15_v56_hidden.py'
+  workflow_dispatch:
+permissions:
+  contents: read
+  actions: read
+concurrency:
+  group: hector-qwen15-v56-${{ github.ref }}
+  cancel-in-progress: false
+jobs:
+  train-qwen15-v56:
+    runs-on: ubuntu-latest
+    timeout-minutes: 150
+    env:
+      SOURCE_ARTIFACT_ID: '8579920006'
+      SOURCE_SHA: '86cac6f1e80e23dec0941159c6d5e1250b238385e5c88cc647152848b42123df'
+      SOURCE_BYTES: '73911112'
+      SOURCE_DIR: /tmp/hector-v54/adapter
+      TRAIN: model/hector-asi/data/qwen15-v56-brevity-recovery-train.jsonl
+      VALIDATION: model/hector-asi/evals/qwen15-v56-brevity-recovery-validation.jsonl
+      HIDDEN_SOURCE: model/hector-asi/evals/qwen15-v51-hidden.jsonl
+      HIDDEN: /tmp/qwen15-v56-hidden-chat.jsonl
+      OUT_A: artifacts/hector-asi-qwen15-v56-a
+      OUT_B: artifacts/hector-asi-qwen15-v56-b
+      TOKENIZERS_PARALLELISM: 'false'
+      HF_HOME: /home/runner/.cache/huggingface
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+          cache: pip
+      - name: Validate licensed data and strict splits
+        run: |
+          set -euo pipefail
+          python -m py_compile model/hector-asi/training/prepare_qwen15_v56_hidden.py
+          python model/hector-asi/training/prepare_qwen15_v56_hidden.py --input "$HIDDEN_SOURCE" --output "$HIDDEN"
+          python - <<'PY'
+          import json,unicodedata
+          from pathlib import Path
+          def rows(path): return [json.loads(x) for x in Path(path).read_text().splitlines() if x.strip()]
+          def norm(s): return ' '.join(''.join(c for c in unicodedata.normalize('NFKD',s.lower()) if not unicodedata.combining(c)).split())
+          tr,va,hi=rows('model/hector-asi/data/qwen15-v56-brevity-recovery-train.jsonl'),rows('model/hector-asi/evals/qwen15-v56-brevity-recovery-validation.jsonl'),rows('/tmp/qwen15-v56-hidden-chat.jsonl')
+          assert (len(tr),len(va),len(hi))==(18,6,18)
+          for group in (tr,va,hi):
+            assert all(x['verification']['verified'] is True for x in group)
+            assert all(x['verification']['source']=='author-generated' for x in group)
+            assert all(x['verification']['license']=='Apache-2.0-compatible' for x in group)
+          sig=[]
+          for group in (tr,va,hi):
+            ids={x['id'] for x in group}; prompts={norm(next(m['content'] for m in x['messages'] if m['role']=='user')) for x in group}
+            assert len(ids)==len(group) and len(prompts)==len(group); sig.append((ids,prompts))
+          for a in range(3):
+            for b in range(a+1,3): assert not sig[a][0]&sig[b][0] and not sig[a][1]&sig[b][1]
+          assert sum(bool(x.get('evaluation',{}).get('critical')) for x in hi)==6
+          print('train=18 validation=6 hidden=18 criticalHidden=6 contamination=0 privateData=false')
+          PY
+      - name: Download and verify immutable V54 adapter
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          set -euo pipefail
+          mkdir -p /tmp/v54zip /tmp/hector-v54
+          curl --fail --location --retry 4 -H "Authorization: Bearer $GH_TOKEN" -H "Accept: application/vnd.github+json" "https://api.github.com/repos/${GITHUB_REPOSITORY}/actions/artifacts/${SOURCE_ARTIFACT_ID}/zip" -o /tmp/v54.zip
+          unzip -q /tmp/v54.zip -d /tmp/v54zip
+          F="$(find /tmp/v54zip -type f -path '*/adapter/adapter_model.safetensors' -print -quit)"
+          test -n "$F"
+          test "$(sha256sum "$F" | awk '{print $1}')" = "$SOURCE_SHA"
+          test "$(stat -c%s "$F")" -eq "$SOURCE_BYTES"
+          cp -a "$(dirname "$F")" "$SOURCE_DIR"
+      - name: Prepare pinned trainer for V54 source
+        run: |
+          cp model/hector-asi/training/train_qwen15_v50_risk_weighted.py /tmp/train_qwen15_v56.py
+          sed -i 's/31bead5f59982d8e321517fd235b81f992f83d2e3792a55690c2a841ff0e28f8/86cac6f1e80e23dec0941159c6d5e1250b238385e5c88cc647152848b42123df/g' /tmp/train_qwen15_v56.py
+          sed -i 's/8560331055/8579920006/g; s/hector-asi-qwen15-v41/hector-asi-qwen15-v54/g; s/qwen15-v50-risk-weighted/qwen15-v56-brevity-recovery/g' /tmp/train_qwen15_v56.py
+          python -m py_compile /tmp/train_qwen15_v56.py
+      - name: Install pinned CPU stack
+        run: |
+          python -m pip install --disable-pip-version-check --index-url https://download.pytorch.org/whl/cpu torch==2.7.1
+          python -m pip install --disable-pip-version-check accelerate==1.8.1 huggingface_hub==0.34.4 peft==0.16.0 safetensors==0.5.3 transformers==4.53.2
+      - name: Train two deterministic compression continuations
+        run: |
+          set -euo pipefail
+          mkdir -p artifacts/logs
+          /usr/bin/time -v python /tmp/train_qwen15_v56.py --source-adapter "$SOURCE_DIR" --train-files "$TRAIN" --validation-files "$VALIDATION" --test-files "$HIDDEN" --output-dir "$OUT_A" --experiment-id hector-asi-qwen15-v56-brevity-recovery --epochs 1 --max-length 128 --max-new-tokens 64 --lr 1e-6 --seed 3056 2>&1 | tee artifacts/logs/v56-a.log
+          /usr/bin/time -v python /tmp/train_qwen15_v56.py --source-adapter "$SOURCE_DIR" --train-files "$TRAIN" --validation-files "$VALIDATION" --test-files "$HIDDEN" --output-dir "$OUT_B" --experiment-id hector-asi-qwen15-v56-brevity-recovery --epochs 1 --max-length 128 --max-new-tokens 64 --lr 1e-6 --seed 3056 2>&1 | tee artifacts/logs/v56-b.log
+      - name: Verify real weights, reproducibility and compression
+        run: |
+          set -euo pipefail
+          A="$OUT_A/adapter/adapter_model.safetensors"; B="$OUT_B/adapter/adapter_model.safetensors"
+          test -f "$A" -a -f "$B"; cmp "$A" "$B"; test "$(stat -c%s "$A")" -gt 50000000
+          python - <<'PY'
+          import json
+          from pathlib import Path
+          a=json.loads(Path('artifacts/hector-asi-qwen15-v56-a/metrics.json').read_text()); b=json.loads(Path('artifacts/hector-asi-qwen15-v56-b/metrics.json').read_text())
+          assert a['candidate']['adapterSha256']==b['candidate']['adapterSha256']
+          assert a['candidate']['adapterBytes']==b['candidate']['adapterBytes']
+          assert a['candidate']['parameterDeltaL2']>0
+          before=a['baseline']['behavioral']; after=a['candidate']['behavioral']; token_ratio=after['outputTokens']/max(1,before['outputTokens'])
+          print(json.dumps({'sha256':a['candidate']['adapterSha256'],'bytes':a['candidate']['adapterBytes'],'behaviorBefore':before['passed'],'behaviorAfter':after['passed'],'criticalBefore':before['criticalPassed'],'criticalAfter':after['criticalPassed'],'tokensBefore':before['outputTokens'],'tokensAfter':after['outputTokens'],'tokenRatio':token_ratio,'latencyRatio':a['candidate']['latencyRatioVsV41'],'eligible':a['eligibleForChampion']},sort_keys=True))
+          PY
+      - name: Upload weights, metrics and logs
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: hector-asi-qwen15-v56-brevity-recovery-${{ github.run_id }}
+          path: |
+            artifacts/hector-asi-qwen15-v56-a
+            artifacts/hector-asi-qwen15-v56-b
+            artifacts/logs
+          retention-days: 90
+          if-no-files-found: warn
