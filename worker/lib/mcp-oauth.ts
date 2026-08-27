@@ -15,7 +15,7 @@ function bytesToBase64Url(bytes:Uint8Array){
 }
 function base64UrlToBytes(value:string){
  if(!/^[A-Za-z0-9_-]+$/.test(value))throw new Error('client_id inválido');
- const padded=value.replace(/-/g,'+').replace(/_/g,'/')+'==='.slice((value.length+3)%4);
+ const normalized=value.replace(/-/g,'+').replace(/_/g,'/'),padded=normalized+'='.repeat((4-normalized.length%4)%4);
  const binary=atob(padded),bytes=new Uint8Array(binary.length);
  for(let i=0;i<binary.length;i++)bytes[i]=binary.charCodeAt(i);
  return bytes;
