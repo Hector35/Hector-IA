@@ -31,13 +31,14 @@ describe('MCP OAuth dynamic registration',()=>{
 });
 
 describe('MCP OAuth resources and discovery',()=>{
- it('separa lectura de acceso completo',()=>{
+ it('separa lectura de acceso completo por recurso aunque ambos requieran scope de transporte MCP',()=>{
   const read=resourceProfile('https://hector.example','https://hector.example/mcp-read');
   const full=resourceProfile('https://hector.example','https://hector.example/mcp');
   expect(read).toMatchObject({mode:'read-only',path:'/mcp-read'});
-  expect(read?.scopes).not.toContain('mcp');
+  expect(read?.scopes).toContain('mcp');
   expect(full).toMatchObject({mode:'full',path:'/mcp'});
   expect(full?.scopes).toContain('mcp');
+  expect(read?.resource).not.toBe(full?.resource);
  });
  it('publica DCR, PKCE S256 e issuer identification',()=>{
   const auth=authorizationServerMetadata('https://hector.example/mcp-read');
