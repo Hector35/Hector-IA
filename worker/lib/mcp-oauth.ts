@@ -1,6 +1,6 @@
 export const MCP_OAUTH_CLIENT_PREFIX='htr_dcr_';
-export const MCP_READ_SCOPES=['mcp','context','tools','jobs','bridge'] as const;
-export const MCP_FULL_SCOPES=['mcp','context','tools','jobs','bridge'] as const;
+export const MCP_READ_SCOPES=['mcp','context','tools','jobs','bridge','offline_access'] as const;
+export const MCP_FULL_SCOPES=['mcp','context','tools','jobs','bridge','offline_access'] as const;
 
 export type McpResourceProfile={mode:'read-only'|'full';path:'/mcp-read'|'/mcp';resource:string;scopes:string[]};
 export type DynamicClientMetadata={clientName:string;redirectUris:string[]};
@@ -49,7 +49,7 @@ export function normalizeDynamicClientRegistration(input:any):DynamicClientMetad
  if(redirects.length<1||redirects.length>8||redirects.some(uri=>!isAllowedOpenAIRedirect(uri)))throw new Error('redirect_uris no permitidos');
  const grantTypes:string[]=Array.isArray(input?.grant_types)?input.grant_types.map((x:unknown)=>String(x)):['authorization_code'];
  const responseTypes:string[]=Array.isArray(input?.response_types)?input.response_types.map((x:unknown)=>String(x)):['code'];
- if(!grantTypes.includes('authorization_code')||!responseTypes.includes('code'))throw new Error('Solo authorization_code es compatible');
+ if(!grantTypes.includes('authorization_code')||grantTypes.some(x=>x!=='authorization_code'&&x!=='refresh_token')||!responseTypes.includes('code'))throw new Error('Solo authorization_code y refresh_token son compatibles');
  if(input?.token_endpoint_auth_method&&input.token_endpoint_auth_method!=='none')throw new Error('Solo clientes públicos PKCE son compatibles');
  const clientName=String(input?.client_name||input?.software_id||'OpenAI MCP client').trim().slice(0,120)||'OpenAI MCP client';
  return{clientName,redirectUris:Array.from(new Set<string>(redirects))};
@@ -66,7 +66,7 @@ export function decodeDynamicClientId(clientId:string):DynamicClientMetadata{
  const raw=decoder.decode(base64UrlToBytes(clientId.slice(MCP_OAUTH_CLIENT_PREFIX.length)));
  const parsed=JSON.parse(raw);
  if(parsed?.v!==1||typeof parsed?.n!=='string'||!Array.isArray(parsed?.r))throw new Error('client_id inválido');
- return normalizeDynamicClientRegistration({client_name:parsed.n,redirect_uris:parsed.r,grant_types:['authorization_code'],response_types:['code'],token_endpoint_auth_method:'none'});
+ return normalizeDynamicClientRegistration({client_name:parsed.n,redirect_uris:parsed.r,grant_types:['authorization_code','refresh_token'],response_types:['code'],token_endpoint_auth_method:'none'});
 }
 
 export function resourceProfile(originOrUrl:string,resource:string):McpResourceProfile|null{
@@ -98,7 +98,7 @@ export function authorizationServerMetadata(originOrUrl:string){
   token_endpoint:`${origin}/oauth/token`,
   registration_endpoint:`${origin}/oauth/register`,
   token_endpoint_auth_methods_supported:['none'],
-  grant_types_supported:['authorization_code'],
+  grant_types_supported:['authorization_code','refresh_token'],
   response_types_supported:['code'],
   code_challenge_methods_supported:['S256'],
   scopes_supported:[...MCP_FULL_SCOPES]
