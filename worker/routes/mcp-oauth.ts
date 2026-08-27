@@ -13,10 +13,17 @@ const CODE_TTL_SECONDS=5*60;
 const TOKEN_TTL_SECONDS=30*24*60*60;
 
 function originOf(url:string){const u=new URL(url);return`${u.protocol}//${u.host}`;}
-function esc(value:unknown){return String(value??'').replace(/[&<>"']/g,ch=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[ch]||ch));}
+function esc(value:unknown){return String(value??'').replace(/[&<>"']/g,ch=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot',"'":'&#39;'}[ch]||ch));}
 function oauthHeaders(c:any){c.header('Cache-Control','no-store');c.header('Pragma','no-cache');}
 function htmlPage(title:string,body:string){return`<!doctype html><html lang="es"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><meta name="color-scheme" content="light dark"><title>${esc(title)}</title><style>body{font-family:system-ui,-apple-system,sans-serif;max-width:720px;margin:0 auto;padding:32px 20px;line-height:1.45}main{border:1px solid color-mix(in srgb,currentColor 18%,transparent);border-radius:18px;padding:24px}h1{font-size:1.45rem;margin-top:0}.muted{opacity:.72}.warn{padding:12px 14px;border:1px solid #b36b00;border-radius:12px}button,a.button{display:inline-block;font:inherit;padding:11px 16px;border-radius:11px;border:1px solid currentColor;background:transparent;color:inherit;text-decoration:none;cursor:pointer;margin:4px 8px 4px 0}.primary{font-weight:700}code{overflow-wrap:anywhere}</style></head><body><main>${body}</main></body></html>`;}
 function hidden(name:string,value:unknown){return`<input type="hidden" name="${esc(name)}" value="${esc(value)}">`;}
+function safeOrigin(value:string|undefined){try{return value?originOf(value):'';}catch{return'';}}
+function validConsentSource(c:any){
+ const expectedOrigin=originOf(c.req.url),requestOrigin=c.req.header('Origin'),referer=c.req.header('Referer'),fetchSite=(c.req.header('Sec-Fetch-Site')||'').toLowerCase();
+ if(requestOrigin&&requestOrigin!=='null'&&safeOrigin(requestOrigin)===expectedOrigin)return true;
+ if(referer&&safeOrigin(referer)===expectedOrigin)return true;
+ return fetchSite==='same-origin';
+}
 async function currentSession(c:any){
  const raw=getCookie(c,'hector_session');if(!raw)return null;
  const tokenHash=await sha256(raw);
@@ -70,8 +77,7 @@ mcpOAuth.get('/oauth/authorize',async c=>{
 
 mcpOAuth.post('/oauth/authorize',async c=>{
  oauthHeaders(c);
- const expectedOrigin=originOf(c.req.url),requestOrigin=c.req.header('Origin');
- if(!requestOrigin||requestOrigin!==expectedOrigin)return c.json({error:'invalid_request',error_description:'Origen de consentimiento inválido'},403);
+ if(!validConsentSource(c))return c.json({error:'invalid_request',error_description:'Origen de consentimiento inválido'},403);
  const session=await currentSession(c);if(!session)return c.json({error:'login_required'},401);
  const form=await c.req.parseBody(),query=new URL(c.req.url);
  for(const key of ['client_id','redirect_uri','response_type','resource','scope','code_challenge','code_challenge_method','state'])query.searchParams.set(key,String(form[key]||''));
