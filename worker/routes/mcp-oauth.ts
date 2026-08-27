@@ -20,10 +20,10 @@ function hidden(name:string,value:unknown){return`<input type="hidden" name="${e
 async function currentSession(c:any){
  const raw=getCookie(c,'hector_session');if(!raw)return null;
  const tokenHash=await sha256(raw);
- return c.env.DB.prepare(`SELECT u.id,u.name FROM sessions s JOIN users u ON u.id=s.user_id WHERE s.token_hash=? AND s.expires_at>datetime('now') LIMIT 1`).bind(tokenHash).first<{id:string;name:string}>();
+ return await c.env.DB.prepare(`SELECT u.id,u.name FROM sessions s JOIN users u ON u.id=s.user_id WHERE s.token_hash=? AND s.expires_at>datetime('now') LIMIT 1`).bind(tokenHash).first() as {id:string;name:string}|null;
 }
-function trustedAuthorizationRequest(c:any){
- const url=new URL(c.req.url),origin=originOf(c.req.url);
+function trustedAuthorizationRequest(urlString:string){
+ const url=new URL(urlString),origin=originOf(urlString);
  const clientId=url.searchParams.get('client_id')||'',redirectUri=url.searchParams.get('redirect_uri')||'',responseType=url.searchParams.get('response_type')||'',resource=url.searchParams.get('resource')||'',scope=url.searchParams.get('scope')||'',challenge=url.searchParams.get('code_challenge')||'',challengeMethod=url.searchParams.get('code_challenge_method')||'',state=url.searchParams.get('state')||'';
  if(responseType!=='code')throw new Error('response_type debe ser code');
  const client=decodeDynamicClientId(clientId);
@@ -56,7 +56,7 @@ mcpOAuth.post('/oauth/register',async c=>{
 mcpOAuth.get('/oauth/authorize',async c=>{
  oauthHeaders(c);
  let request:ReturnType<typeof trustedAuthorizationRequest>;
- try{request=trustedAuthorizationRequest(c);}catch(error){return c.html(htmlPage('Solicitud OAuth inválida',`<h1>No se puede autorizar</h1><p>${esc(error instanceof Error?error.message:'Solicitud OAuth inválida')}</p>`),400);}
+ try{request=trustedAuthorizationRequest(c.req.url);}catch(error){return c.html(htmlPage('Solicitud OAuth inválida',`<h1>No se puede autorizar</h1><p>${esc(error instanceof Error?error.message:'Solicitud OAuth inválida')}</p>`),400);}
  const session=await currentSession(c);
  if(!session){
   const here=new URL(c.req.url);here.searchParams.set('continue','1');
@@ -75,9 +75,8 @@ mcpOAuth.post('/oauth/authorize',async c=>{
  const session=await currentSession(c);if(!session)return c.json({error:'login_required'},401);
  const form=await c.req.parseBody(),query=new URL(c.req.url);
  for(const key of ['client_id','redirect_uri','response_type','resource','scope','code_challenge','code_challenge_method','state'])query.searchParams.set(key,String(form[key]||''));
- const synthetic={...c,req:{...c.req,url:query.toString()}} as any;
  let request:ReturnType<typeof trustedAuthorizationRequest>;
- try{request=trustedAuthorizationRequest(synthetic);}catch(error){return c.json({error:'invalid_request',error_description:error instanceof Error?error.message:'Solicitud inválida'},400);}
+ try{request=trustedAuthorizationRequest(query.toString());}catch(error){return c.json({error:'invalid_request',error_description:error instanceof Error?error.message:'Solicitud inválida'},400);}
  if(String(form.decision||'')!=='allow')return c.redirect(redirectWithOAuthResult(request,{error:'access_denied'}),302);
  const rawCode=`hoc_${randomToken(32)}`,codeHash=await sha256(rawCode),id=crypto.randomUUID(),expiresAt=new Date(Date.now()+CODE_TTL_SECONDS*1000).toISOString();
  await c.env.DB.batch([
