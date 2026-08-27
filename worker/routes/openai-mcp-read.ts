@@ -10,7 +10,7 @@ export const openaiMcpRead=new Hono<{Bindings:Bindings;Variables:Variables}>();
 openaiMcpRead.use('*',requireAuth);
 
 const requestSchema=z.object({message:z.string().trim().min(1).max(8000),conversationId:z.string().uuid().optional()});
-const MCP_TOKEN_SCOPES=['mcp','context','tools','jobs','bridge'] as const;
+const MCP_TOKEN_SCOPES=['context','tools','jobs','bridge'] as const;
 
 function randomMachineToken(){
  const bytes=crypto.getRandomValues(new Uint8Array(32));let binary='';
@@ -47,7 +47,7 @@ openaiMcpRead.post('/chat',async c=>{
  if(!c.env.OPENAI_API_KEY)return c.json({error:'OPENAI_API_KEY no está configurada en el Worker'},503);
 
  const userId=c.get('userId'),message=cleanMessage(parsed.data.message),tokenId=crypto.randomUUID(),rawToken=randomMachineToken(),tokenHash=await sha256(rawToken),expiresAt=new Date(Date.now()+5*60_000).toISOString();
- await c.env.DB.prepare('INSERT INTO external_access_tokens(id,user_id,name,token_hash,scopes_json,expires_at) VALUES(?,?,?,?,?,?)').bind(tokenId,userId,'OpenAI MCP read ephemeral',tokenHash,JSON.stringify(MCP_TOKEN_SCOPES),expiresAt).run();
+ await c.env.DB.prepare('INSERT INTO external_access_tokens(id,user_id,name,token_hash,scopes_json,expires_at,resource_path) VALUES(?,?,?,?,?,?,?)').bind(tokenId,userId,'OpenAI MCP read ephemeral',tokenHash,JSON.stringify(MCP_TOKEN_SCOPES),expiresAt,'/mcp-read').run();
 
  try{
   const serverUrl=new URL('/mcp-read',c.req.url).toString(),model=c.env.OPENAI_MODEL_FAST||c.env.OPENAI_MODEL||'gpt-5.6-luna';
