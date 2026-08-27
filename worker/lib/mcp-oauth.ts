@@ -111,6 +111,7 @@ export function protectedResourceMetadata(originOrUrl:string,path:'/mcp-read'|'/
   resource:profile.resource,
   authorization_servers:[origin],
   scopes_supported:profile.scopes,
+  bearer_methods_supported:['header'],
   resource_documentation:`${origin}/oauth/help`
  };
 }
