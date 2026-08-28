@@ -7,9 +7,11 @@ const a11y=readFileSync('src/patient-shift-accessibility.css','utf8');
 const main=readFileSync('src/main.tsx','utf8');
 
 describe('patient shift adversarial contract',()=>{
-  it('keeps the requested workflow primary instead of the retired assistant shell',()=>{
-    expect(main).toContain("import {PatientShiftApp} from './PatientShiftApp'");
-    expect(main).not.toContain("import {HectorChatApp}");
+  it('keeps Héctor OS primary without duplicating the protected clinical surface',()=>{
+    expect(main).toContain("import {CodexApp} from './CodexApp'");
+    expect(main).toContain('<CodexApp/>');
+    expect(main).not.toContain('PatientShiftApp');
+    expect(main).not.toContain('HectorChatApp');
     expect(app.indexOf('Rayos X')).toBeGreaterThanOrEqual(0);
     expect(app.indexOf('Pacientes a piso')).toBeGreaterThanOrEqual(0);
   });

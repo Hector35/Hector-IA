@@ -6,13 +6,13 @@ const main=read('src/main.tsx');
 const app=read('src/PatientShiftApp.tsx');
 const css=read('src/patient-shift.css');
 
-describe('control de pacientes por turno',()=>{
-  it('monta la experiencia operativa nueva como pantalla principal',()=>{
-    expect(main).toContain("import {PatientShiftApp} from './PatientShiftApp'");
-    expect(main).toContain('<PatientShiftApp/>');
-    expect(main).toContain("import './patient-shift.css'");
-    expect(main).not.toContain('<HectorChatApp/>');
-    expect(main).not.toContain('<HectorQualityOverlay/>');
+describe('superficies canónicas de Héctor',()=>{
+  it('monta CodexApp como Héctor OS y mantiene el flujo clínico fuera del entry point',()=>{
+    expect(main).toContain("import {CodexApp} from './CodexApp'");
+    expect(main).toContain('<CodexApp/>');
+    expect(main).toContain("import './codex-ui.css'");
+    expect(main).not.toContain('PatientShiftApp');
+    expect(main).not.toContain('HectorChatApp');
   });
 
   it('separa Rayos X y pacientes a piso',()=>{
