@@ -1,13 +1,12 @@
 import React from 'react';
 import ReactDOM from 'react-dom/client';
-import {PatientShiftApp} from './PatientShiftApp';
-import './patient-shift.css';
-import './patient-shift-accessibility.css';
+import {CodexApp} from './CodexApp';
+import './codex-ui.css';
+import './codex-mobile.css';
 
-// Active PWA surface: patient shift control.
 ReactDOM.createRoot(document.getElementById('root')!).render(
   <React.StrictMode>
-    <PatientShiftApp/>
+    <CodexApp/>
   </React.StrictMode>
 );
 

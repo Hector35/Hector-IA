@@ -23,14 +23,14 @@ describe('verified quality evidence refresh',()=>{
   expect(memory?.score).toBe(5);
  });
 
- it('credits the mounted chat and automated accessibility but not manual WCAG review',()=>{
+ it('credits the mounted chat without carrying accessibility evidence from the retired UI',()=>{
   const report=applyVerifiedQualityEvidence(buildSystemQualityReport(emptyQualityMetrics()));
   const ux=report.dimensions.find(item=>item.id==='ux-accessibility');
   expect(ux?.checks.find(item=>item.id==='chat-first')?.passed).toBe(true);
-  expect(ux?.checks.find(item=>item.id==='automated-accessibility')?.passed).toBe(true);
+  expect(ux?.checks.find(item=>item.id==='automated-accessibility')?.passed).toBe(false);
   expect(ux?.checks.find(item=>item.id==='manual-accessibility')?.passed).toBe(false);
-  expect(ux?.score).toBe(9);
-  expect(ux?.gaps).toEqual(['Auditoría WCAG manual independiente']);
+  expect(ux?.score).toBe(8);
+  expect(ux?.gaps).toEqual(['Auditoría automatizada de accesibilidad activa','Auditoría WCAG manual independiente']);
  });
 
  it('uses the active API security boundary as evidence without claiming external review',()=>{

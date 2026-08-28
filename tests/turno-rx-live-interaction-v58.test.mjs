@@ -5,12 +5,14 @@ const originalDocument=globalThis.document;
 const originalWindow=globalThis.window;
 const originalLocalStorage=globalThis.localStorage;
 const originalCustomEvent=globalThis.CustomEvent;
+const originalNavigator=globalThis.navigator;
 
 afterEach(()=>{
   if(originalDocument===undefined)delete globalThis.document;else globalThis.document=originalDocument;
   if(originalWindow===undefined)delete globalThis.window;else globalThis.window=originalWindow;
   if(originalLocalStorage===undefined)delete globalThis.localStorage;else globalThis.localStorage=originalLocalStorage;
   if(originalCustomEvent===undefined)delete globalThis.CustomEvent;else globalThis.CustomEvent=originalCustomEvent;
+  if(originalNavigator===undefined)delete globalThis.navigator;else globalThis.navigator=originalNavigator;
 });
 
 class MemoryStorage{
@@ -35,6 +37,7 @@ test('sin recargar, sincroniza traslado, estado, contadores y diez cambios conse
   globalThis.window=new EventTarget();
   globalThis.localStorage=new MemoryStorage();
   globalThis.CustomEvent=TestCustomEvent;
+  globalThis.navigator={serviceWorker:{register:()=>Promise.resolve({update:()=>Promise.resolve()})}};
 
   const row={id:'row-1',bed:'CE1',name:'Paciente',category:'Piso',target:'20',destination:'20',transport:'Por definir',status:'Pendiente',createdAt:'2026-08-18T00:00:00.000Z'};
   localStorage.setItem('pendientes-table-v2',JSON.stringify([row]));

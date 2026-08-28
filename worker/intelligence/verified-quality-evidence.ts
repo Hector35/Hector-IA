@@ -38,7 +38,7 @@ export function applyVerifiedQualityEvidence(input:SystemQualityReport):SystemQu
  }
  const ux=dimensions.find(item=>item.id==='ux-accessibility');
  if(ux){
-  const activeChat=activeUi.entrypoint==='src/main.tsx'&&activeUi.activeApplication==='src/HectorChatApp.tsx'&&activeUi.chatFirst.activeAppMounted&&activeUi.chatFirst.defaultSurface==='chat'&&activeUi.chatFirst.qualityTriggerVisible;
+  const activeChat=activeUi.entrypoint==='src/main.tsx'&&activeUi.activeApplication==='src/CodexApp.tsx'&&activeUi.chatFirst.activeAppMounted&&activeUi.chatFirst.defaultSurface==='chat';
   replaceCheck(ux,'chat-first',check=>({...check,passed:activeChat,evidence:`${activeUi.activeApplication} montada por ${activeUi.entrypoint}; auditoría visible=${activeUi.chatFirst.qualityTriggerVisible}`}));
   const original=ux.checks.find(check=>check.id==='accessibility');
   if(original){
