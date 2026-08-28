@@ -128,6 +128,9 @@ print("Energía en 5 h (Wh):", round(sum(potencias) / len(potencias) * 5, 2))</t
           <span class="privacyBadge">Confirmación de iOS</span>
         </div>
         <div class="formStack">
+          <label>¿Qué quieres automatizar?
+            <textarea id="shortcutPurpose" rows="3" placeholder="Ejemplo: al compartir una foto, guardarla en un álbum y crear una nota con la fecha."></textarea>
+          </label>
           <label>Nombre del atajo
             <input id="shortcutName" value="Hector Bridge" />
           </label>
@@ -136,14 +139,15 @@ print("Energía en 5 h (Wh):", round(sum(potencias) / len(potencias) * 5, 2))</t
           </label>
         </div>
         <div class="actionRow wrap">
+          <button class="primaryButton" id="createShortcut">Crear en Atajos</button>
           <button class="primaryButton" id="runShortcut">Ejecutar Atajo</button>
           <button class="secondaryButton" id="runClipboardShortcut">Usar portapapeles</button>
           <button class="secondaryButton" id="openShortcuts">Abrir Atajos</button>
           <button class="secondaryButton" id="openCurrentLocation">Abrir ubicación en Mapas</button>
         </div>
         <div class="infoCard">
-          <strong>Contrato del Atajo</strong>
-          <p>El atajo llamado <em>Hector Bridge</em> recibe texto o JSON. Puede decidir si crea una nota, recordatorio, archivo, ruta u otra acción permitida por iOS.</p>
+          <strong>ChatGPT + Atajos</strong>
+          <p>Pide a ChatGPT que use <code>apple_shortcut_create</code>: preparará el nombre, la entrada, las acciones y su configuración. Por seguridad, Apple exige que confirmes la creación y los permisos en iOS.</p>
         </div>
       </section>
 
