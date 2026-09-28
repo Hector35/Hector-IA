@@ -7,8 +7,6 @@ on:
         description: Identificador opaco opcional del trabajo de inferencia
         required: false
         type: string
-  schedule:
-    - cron: '*/5 * * * *'
 
 permissions:
   contents: read
