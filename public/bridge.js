@@ -161,6 +161,7 @@ $('#stopAudio').addEventListener('click',async()=>{
 $('#downloadAudio').addEventListener('click',()=>{if(!state.recordedBlob)return;const url=URL.createObjectURL(state.recordedBlob);const a=document.createElement('a');a.href=url;a.download=`hector-audio-${new Date().toISOString().replace(/[:.]/g,'-')}.webm`;a.click();setTimeout(()=>URL.revokeObjectURL(url),1500)});
 
 function shortcutUrl(clipboard=false){const name=encodeURIComponent($('#shortcutName').value.trim()||'Hector Bridge');if(clipboard)return`shortcuts://run-shortcut?name=${name}&input=clipboard`;return`shortcuts://run-shortcut?name=${name}&input=text&text=${encodeURIComponent($('#shortcutPayload').value)}`}
+$('#createShortcut').addEventListener('click',()=>{const purpose=$('#shortcutPurpose').value.trim();if(!purpose){alert('Describe primero qué quieres automatizar para que ChatGPT pueda diseñarlo.');$('#shortcutPurpose').focus();return}localStorage.setItem('hector-shortcut-draft',JSON.stringify({name:$('#shortcutName').value.trim()||'Hector Bridge',purpose,payload:$('#shortcutPayload').value}));location.href='shortcuts://create-shortcut'});
 $('#runShortcut').addEventListener('click',()=>{location.href=shortcutUrl(false)});
 $('#runClipboardShortcut').addEventListener('click',()=>{location.href=shortcutUrl(true)});
 $('#openShortcuts').addEventListener('click',()=>{location.href='shortcuts://'});

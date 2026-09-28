@@ -54,4 +54,10 @@ describe('Héctor Bridge capability workspace',()=>{
  it('exposes Bridge as an installed PWA shortcut',()=>{
   expect(manifest.shortcuts).toEqual(expect.arrayContaining([expect.objectContaining({name:'Héctor Bridge',url:'/bridge.html'})]));
  });
+
+ it('connects ChatGPT shortcut design to the native Apple editor',()=>{
+  expect(html).toContain('apple_shortcut_create');
+  expect(html).toContain('id="createShortcut"');
+  expect(client).toContain("shortcuts://create-shortcut");
+ });
 });

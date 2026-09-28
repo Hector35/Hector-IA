@@ -18,8 +18,14 @@ const memoryWriteSchema=z.object({
 const memorySearchSchema=z.object({query:z.string().trim().min(2).max(4000)});
 const jobSchema=z.object({objective:z.string().trim().min(10).max(12000)});
 const inspectSchema=z.object({url:z.string().trim().url().max(2000)});
+const shortcutSchema=z.object({
+  name:z.string().trim().min(1).max(80),
+  purpose:z.string().trim().min(3).max(1000),
+  input:z.enum(['none','text','clipboard','share_sheet']).default('none'),
+  actions:z.array(z.object({name:z.string().trim().min(1).max(120),configuration:z.string().trim().max(1000).default('')})).min(1).max(20)
+});
 const toolSchema=z.object({
-  name:z.enum(['memory.search','memory.write','jobs.create','pwa.inspect']),
+  name:z.enum(['memory.search','memory.write','jobs.create','pwa.inspect','shortcuts.design']),
   input:z.record(z.string(),z.unknown()).default({})
 });
 
@@ -27,7 +33,8 @@ const BUILTIN_TOOLS=[
   {name:'memory.search',kind:'deterministic',writes:false,description:'Recupera memoria semántica y estado reciente relevante.'},
   {name:'memory.write',kind:'deterministic',writes:true,description:'Guarda memoria persistente para Héctor Bridge y Héctor Agent.'},
   {name:'jobs.create',kind:'worker',writes:true,description:'Crea un objetivo persistente que continúa por cron aunque la interfaz esté cerrada.'},
-  {name:'pwa.inspect',kind:'worker',writes:false,description:'Inspecciona una PWA remota: HTTP, título, manifest y referencias de service worker.'}
+  {name:'pwa.inspect',kind:'worker',writes:false,description:'Inspecciona una PWA remota: HTTP, título, manifest y referencias de service worker.'},
+  {name:'shortcuts.design',kind:'deterministic',writes:false,description:'Convierte una intención de ChatGPT en una receta verificable para crear y configurar un Atajo de Apple.'}
 ] as const;
 
 function parseTitle(html:string){
@@ -114,6 +121,24 @@ async function inspectPwa(input:unknown){
   finally{clearTimeout(timer);}
 }
 
+function designShortcut(input:unknown){
+  const parsed=shortcutSchema.safeParse(input);if(!parsed.success)return{error:'Diseño de Atajo inválido',status:400 as const};
+  const value=parsed.data,name=encodeURIComponent(value.name),receives=value.input==='share_sheet'?'Hoja para compartir':value.input==='clipboard'?'Portapapeles':value.input==='text'?'Texto':'Nada';
+  const steps=[
+    `Toca “Crear Atajo” y asigna el nombre “${value.name}”.`,
+    `En los detalles del atajo, configura “Recibir” como “${receives}”.`,
+    ...value.actions.map((action,index)=>`${index+1}. Añade la acción “${action.name}”${action.configuration?` y configúrala así: ${action.configuration}`:'.'}`),
+    'Ejecuta una prueba dentro de Atajos y acepta únicamente los permisos de iOS necesarios.'
+  ];
+  return{status:200 as const,data:{
+    platform:'Apple Shortcuts',name:value.name,purpose:value.purpose,input:value.input,actions:value.actions,steps,
+    createUrl:'shortcuts://create-shortcut',
+    runUrl:value.input==='clipboard'?`shortcuts://run-shortcut?name=${name}&input=clipboard`:`shortcuts://run-shortcut?name=${name}`,
+    limitation:'Apple no permite que una web o ChatGPT instale acciones silenciosamente. iOS abre el editor y la persona confirma la configuración y los permisos.',
+    requiresUserConfirmation:true
+  }};
+}
+
 hectorBridge.get('/status',async c=>{
   const userId=c.get('userId');
   const [memoryCount,routeCount,jobCount]=await Promise.all([
@@ -140,9 +165,13 @@ hectorBridge.post('/jobs/create',async c=>{
   const result=await createJob(c.env,c.get('userId'),await c.req.json().catch(()=>null));
   return result.error?c.json({error:result.error},result.status):c.json(result.data,result.status);
 });
+hectorBridge.post('/shortcuts/design',async c=>{
+  const result=designShortcut(await c.req.json().catch(()=>null));
+  return result.error?c.json({error:result.error},result.status):c.json(result.data,result.status);
+});
 hectorBridge.post('/tools/execute',async c=>{
   const parsed=toolSchema.safeParse(await c.req.json().catch(()=>null));if(!parsed.success)return c.json({error:'Invocación de herramienta inválida'},400);
   const userId=c.get('userId'),{name,input}=parsed.data;
-  const result=name==='memory.search'?await searchMemory(c.env,userId,input):name==='memory.write'?await writeMemory(c.env,userId,input):name==='jobs.create'?await createJob(c.env,userId,input):await inspectPwa(input);
+  const result=name==='memory.search'?await searchMemory(c.env,userId,input):name==='memory.write'?await writeMemory(c.env,userId,input):name==='jobs.create'?await createJob(c.env,userId,input):name==='shortcuts.design'?designShortcut(input):await inspectPwa(input);
   return result.error?c.json({tool:name,error:result.error},result.status):c.json({tool:name,result:result.data},result.status);
 });
